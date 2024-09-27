@@ -6,8 +6,8 @@ SPECS = {
     </method>
   </interface>
 """,
-    "org.storage.stratis3.Manager.r6": """
-<interface name="org.storage.stratis3.Manager.r6">
+    "org.storage.stratis3.Manager.r7": """
+<interface name="org.storage.stratis3.Manager.r7">
     <method name="CreatePool">
       <arg name="name" type="s" direction="in" />
       <arg name="devices" type="as" direction="in" />
@@ -71,8 +71,8 @@ SPECS = {
     </property>
   </interface>
 """,
-    "org.storage.stratis3.Report.r6": """
-<interface name="org.storage.stratis3.Report.r6">
+    "org.storage.stratis3.Report.r7": """
+<interface name="org.storage.stratis3.Report.r7">
     <method name="GetReport">
       <arg name="name" type="s" direction="in" />
       <arg name="result" type="s" direction="out" />
@@ -81,8 +81,8 @@ SPECS = {
     </method>
   </interface>
 """,
-    "org.storage.stratis3.blockdev.r6": """
-<interface name="org.storage.stratis3.blockdev.r6">
+    "org.storage.stratis3.blockdev.r7": """
+<interface name="org.storage.stratis3.blockdev.r7">
     <property name="Devnode" type="s" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>
@@ -109,8 +109,8 @@ SPECS = {
     </property>
   </interface>
 """,
-    "org.storage.stratis3.filesystem.r6": """
-<interface name="org.storage.stratis3.filesystem.r6">
+    "org.storage.stratis3.filesystem.r7": """
+<interface name="org.storage.stratis3.filesystem.r7">
     <method name="SetName">
       <arg name="name" type="s" direction="in" />
       <arg name="result" type="(bs)" direction="out" />
@@ -124,18 +124,20 @@ SPECS = {
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="invalidates" />
     </property>
     <property name="Name" type="s" access="read" />
+    <property name="Origin" type="(bs)" access="read" />
     <property name="Pool" type="o" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>
     <property name="Size" type="s" access="read" />
+    <property name="SizeLimit" type="(bs)" access="readwrite" />
     <property name="Used" type="(bs)" access="read" />
     <property name="Uuid" type="s" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>
   </interface>
 """,
-    "org.storage.stratis3.pool.r6": """
-<interface name="org.storage.stratis3.pool.r6">
+    "org.storage.stratis3.pool.r7": """
+<interface name="org.storage.stratis3.pool.r7">
     <method name="AddCacheDevs">
       <arg name="devices" type="as" direction="in" />
       <arg name="results" type="(bao)" direction="out" />
@@ -162,7 +164,7 @@ SPECS = {
       <arg name="return_string" type="s" direction="out" />
     </method>
     <method name="CreateFilesystems">
-      <arg name="specs" type="a(s(bs))" direction="in" />
+      <arg name="specs" type="a(s(bs)(bs))" direction="in" />
       <arg name="results" type="(ba(os))" direction="out" />
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
@@ -170,6 +172,13 @@ SPECS = {
     <method name="DestroyFilesystems">
       <arg name="filesystems" type="ao" direction="in" />
       <arg name="results" type="(bas)" direction="out" />
+      <arg name="return_code" type="q" direction="out" />
+      <arg name="return_string" type="s" direction="out" />
+    </method>
+    <method name="FilesystemMetadata">
+      <arg name="fs_name" type="(bs)" direction="in" />
+      <arg name="current" type="b" direction="in" />
+      <arg name="results" type="s" direction="out" />
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
@@ -182,6 +191,12 @@ SPECS = {
     <method name="InitCache">
       <arg name="devices" type="as" direction="in" />
       <arg name="results" type="(bao)" direction="out" />
+      <arg name="return_code" type="q" direction="out" />
+      <arg name="return_string" type="s" direction="out" />
+    </method>
+    <method name="Metadata">
+      <arg name="current" type="b" direction="in" />
+      <arg name="results" type="s" direction="out" />
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>

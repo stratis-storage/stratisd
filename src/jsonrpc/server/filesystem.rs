@@ -71,7 +71,11 @@ pub async fn filesystem_destroy<'a>(
     let (uuid, _) = pool
         .get_filesystem_by_name(&Name::new(fs_name.to_string()))
         .ok_or_else(|| StratisError::Msg(format!("No filesystem named {fs_name} found")))?;
-    block_in_place(|| Ok(pool.destroy_filesystems(pool_name, &[uuid])?.is_changed()))
+    block_in_place(|| {
+        Ok(pool
+            .destroy_filesystems(pool_name, &[uuid].into())?
+            .is_changed())
+    })
 }
 
 // stratis-min filesystem rename
@@ -93,4 +97,20 @@ pub async fn filesystem_rename<'a>(
             .rename_filesystem(pool_name, uuid, new_fs_name)?
             .is_changed())
     })
+}
+
+// stratis-min filesystem origin
+pub async fn filesystem_origin<'a>(
+    engine: Arc<dyn Engine>,
+    pool_name: &'a str,
+    fs_name: &'a str,
+) -> StratisResult<Option<String>> {
+    let pool = engine
+        .get_pool(PoolIdentifier::Name(Name::new(pool_name.to_owned())))
+        .await
+        .ok_or_else(|| StratisError::Msg(format!("No pool named {pool_name} found")))?;
+    let (_, fs) = pool
+        .get_filesystem_by_name(&Name::new(fs_name.to_string()))
+        .ok_or_else(|| StratisError::Msg(format!("No filesystem named {fs_name} found")))?;
+    Ok(fs.origin().map(|u| u.as_simple().to_string()))
 }

@@ -10,10 +10,7 @@ use std::{
 use devicemapper::Sectors;
 
 use crate::{
-    engine::{
-        strat_engine::{backstore::transaction::RequestTransaction, metadata::BlockdevSize},
-        types::DevUuid,
-    },
+    engine::strat_engine::metadata::BlockdevSize,
     stratis::{StratisError, StratisResult},
 };
 
@@ -22,7 +19,7 @@ use crate::{
 /// It enforces some invariants:
 /// * No 0 length segment
 /// * No contiguous segments; if two segments would be contiguous they are
-/// coalesced into a single segment.
+///   coalesced into a single segment.
 /// * No overlapping segments
 /// * No segments that extend beyond limit
 #[derive(Debug, Clone)]
@@ -352,38 +349,11 @@ impl RangeAllocator {
 
     /// Attempt to allocate.
     /// Returns a PerDevSegments object containing the allocated ranges.
-    /// The device UUID is used to filter out all segment requests on devices
-    /// other than the specified device.
-    pub fn request(
-        &self,
-        uuid: DevUuid,
-        amount: Sectors,
-        transaction: &RequestTransaction,
-    ) -> StratisResult<PerDevSegments> {
-        let trans_used = transaction
-            .get_blockdevmgr()
-            .into_iter()
-            .filter_map(|seg| {
-                if seg.uuid == uuid {
-                    Some((seg.segment.start, seg.segment.length))
-                } else {
-                    None
-                }
-            })
-            .try_fold(
-                PerDevSegments::new(self.segments.limit()),
-                |mut segs, seg| {
-                    segs.insert(&seg)?;
-                    StratisResult::Ok(segs)
-                },
-            )?;
-
-        let total_segments = self.segments.union(&trans_used)?;
-
+    pub fn alloc(&mut self, amount: Sectors) -> PerDevSegments {
         let mut segs = PerDevSegments::new(self.segments.limit());
         let mut needed = amount;
 
-        for (&start, &len) in total_segments.complement().iter() {
+        for (&start, &len) in self.segments.complement().iter() {
             if needed == Sectors(0) {
                 break;
             }
@@ -393,18 +363,12 @@ impl RangeAllocator {
                 .expect("wholly disjoint from other elements in segs");
             needed -= to_use;
         }
-        Ok(segs)
-    }
-
-    /// Commit an allocation determined to be valid.
-    ///
-    /// This method does not actually modify metadata but is required for bookkeeping
-    /// for the internal block device allocation data structure.
-    pub fn commit(&mut self, segs: PerDevSegments) {
         self.segments = self
             .segments
             .union(&segs)
             .expect("all segments verified to be in available ranges");
+
+        segs
     }
 
     /// Increase the available size of the RangeAlloc data structure.
@@ -445,24 +409,14 @@ mod tests {
         assert_eq!(allocator.used(), Sectors(100));
         assert_eq!(allocator.available(), Sectors(28));
 
-        let seg = allocator
-            .request(
-                DevUuid::new_v4(),
-                Sectors(50),
-                &RequestTransaction::default(),
-            )
-            .unwrap();
-        allocator.commit(seg.clone());
+        let seg = allocator.alloc(Sectors(50));
         assert_eq!(seg.len(), 2);
         assert_eq!(seg.sum(), Sectors(28));
         assert_eq!(allocator.used(), Sectors(128));
         assert_eq!(allocator.available(), Sectors(0));
 
         let available = allocator.available();
-        let seg = allocator
-            .request(DevUuid::new_v4(), available, &RequestTransaction::default())
-            .unwrap();
-        allocator.commit(seg);
+        allocator.alloc(available);
         assert_eq!(allocator.available(), Sectors(0));
     }
 
@@ -506,9 +460,7 @@ mod tests {
     /// Verify that the largest possible limit may be used for the
     /// allocator.
     fn test_max_allocator_range() {
-        use std::u64::MAX;
-
-        PerDevSegments::new(Sectors(MAX));
+        PerDevSegments::new(Sectors(u64::MAX));
     }
 
     #[test]
@@ -535,14 +487,7 @@ mod tests {
     fn test_allocator_failures_range_overwrite() {
         let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
 
-        let seg = allocator
-            .request(
-                DevUuid::new_v4(),
-                Sectors(128),
-                &RequestTransaction::default(),
-            )
-            .unwrap();
-        allocator.commit(seg.clone());
+        let seg = allocator.alloc(Sectors(128));
         assert_eq!(allocator.used(), Sectors(128));
         assert_eq!(
             seg.iter().collect::<Vec<_>>(),
@@ -572,12 +517,10 @@ mod tests {
     /// Verify that insert() errors when an element in a requested range
     /// exceeds u64::MAX.
     fn test_allocator_failures_overflow_max() {
-        use std::u64::MAX;
-
-        let mut allocator = PerDevSegments::new(Sectors(MAX));
+        let mut allocator = PerDevSegments::new(Sectors(u64::MAX));
 
         // overflow max u64
-        assert_matches!(allocator.insert(&(Sectors(MAX), Sectors(1))), Err(_));
+        assert_matches!(allocator.insert(&(Sectors(u64::MAX), Sectors(1))), Err(_));
         allocator.invariant();
     }
 

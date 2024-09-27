@@ -1,0 +1,27 @@
+path: /tests/client-dbus
+duration: 20m
+
+require:
+  - clevis-luks
+  - make
+  - python3-dbus
+  - python3-dbus-client-gen
+  - python3-dbus-python-client-gen
+  - python3-psutil
+  - python3-pyudev
+  - python3-tenacity
+
+environment:
+  TANG_URL: localhost
+  RUST_LOG: stratisd=debug
+  STRATISD: /usr/libexec/stratisd
+  STRATIS_DUMPMETADATA: /usr/bin/stratis-dumpmetadata
+  PYTHONPATH: ./src
+
+/udev:
+  summary: Run Python udev tests
+  test: make -f Makefile udev-tests
+
+/loop:
+  summary: Run Python tests that use loopbacked device framework
+  test: make -f Makefile tang-tests dump-metadata-tests startup-tests

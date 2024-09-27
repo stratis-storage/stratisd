@@ -21,9 +21,7 @@ use crate::{
                 blockdev::StratBlockDev,
                 crypt::CryptHandle,
                 devices::{initialize_devices, wipe_blockdevs, UnownedDevices},
-                range_alloc::PerDevSegments,
                 shared::{BlkDevSegment, Segment},
-                transaction::RequestTransaction,
             },
             metadata::{MDADataSize, BDA},
             serde_structs::{BaseBlockDevSave, Recordable},
@@ -37,12 +35,44 @@ use crate::{
 const MAX_NUM_TO_WRITE: usize = 10;
 
 #[derive(Debug)]
+struct TimeStamp {
+    inner: Option<DateTime<Utc>>,
+}
+
+impl From<Option<DateTime<Utc>>> for TimeStamp {
+    fn from(time: Option<DateTime<Utc>>) -> Self {
+        TimeStamp { inner: time }
+    }
+}
+
+impl TimeStamp {
+    // Get the best next time stamp; at least now() and at least one
+    // nanosecond more than the previous.
+    fn next(&self) -> DateTime<Utc> {
+        let current_time = Utc::now();
+        if Some(current_time) <= self.inner {
+            self.inner
+                .expect("self.inner >= Some(current_time")
+                .checked_add_signed(Duration::nanoseconds(1))
+                .expect("self.inner << maximum representable DateTime")
+        } else {
+            current_time
+        }
+    }
+
+    // Set the time stamp to a new value.
+    fn set(&mut self, time: DateTime<Utc>) {
+        self.inner = Some(time);
+    }
+}
+
+#[derive(Debug)]
 pub struct BlockDevMgr {
     /// All the block devices that belong to this block dev manager.
     block_devs: Vec<StratBlockDev>,
     /// The most recent time that variable length metadata was saved to the
     /// devices managed by this block dev manager.
-    last_update_time: Option<DateTime<Utc>>,
+    last_update_time: TimeStamp,
 }
 
 impl BlockDevMgr {
@@ -53,7 +83,7 @@ impl BlockDevMgr {
     ) -> BlockDevMgr {
         BlockDevMgr {
             block_devs,
-            last_update_time,
+            last_update_time: last_update_time.into(),
         }
     }
 
@@ -107,7 +137,7 @@ impl BlockDevMgr {
         devices: UnownedDevices,
         sector_size: Option<u32>,
     ) -> StratisResult<Vec<DevUuid>> {
-        let this_pool_uuid = self.block_devs.get(0).map(|bd| bd.pool_uuid());
+        let this_pool_uuid = self.block_devs.first().map(|bd| bd.pool_uuid());
         if this_pool_uuid.is_some() && this_pool_uuid != Some(pool_uuid) {
             return Err(StratisError::Msg(
                 format!("block devices being managed have pool UUID {} but new devices are to be added with pool UUID {}",
@@ -120,7 +150,7 @@ impl BlockDevMgr {
         if let Some(ref ei) = encryption_info {
             if !CryptHandle::can_unlock(
                 self.block_devs
-                    .get(0)
+                    .first()
                     .expect("Must have at least one blockdev")
                     .physical_path(),
                 ei.key_description().is_some(),
@@ -194,16 +224,17 @@ impl BlockDevMgr {
     /// not possible to satisfy the request.
     /// This method is atomic, it either allocates all requested or allocates
     /// nothing.
-    pub fn request_space(&self, sizes: &[Sectors]) -> StratisResult<Option<RequestTransaction>> {
-        let mut transaction = RequestTransaction::default();
-
+    pub fn alloc(&mut self, sizes: &[Sectors]) -> Option<Vec<Vec<BlkDevSegment>>> {
         let total_needed: Sectors = sizes.iter().cloned().sum();
         if self.avail_space() < total_needed {
-            return Ok(None);
+            return None;
         }
 
-        for (idx, &needed) in sizes.iter().enumerate() {
+        let mut lists = Vec::new();
+
+        for &needed in sizes.iter() {
             let mut alloc = Sectors(0);
+            let mut segs = Vec::new();
             // TODO: Consider greater efficiency for allocation generally.
             // Over time, the blockdevs at the start will be exhausted. It
             // might be a good idea to keep an auxiliary structure, so that
@@ -211,63 +242,23 @@ impl BlockDevMgr {
             // In the context of this major inefficiency that ensues over time
             // the obvious but more minor inefficiency of this inner loop is
             // not worth worrying about.
-            for bd in &self.block_devs {
+            for bd in &mut self.block_devs {
                 if alloc == needed {
                     break;
                 }
 
-                let r_segs = bd.request_space(needed - alloc, &transaction)?;
-                for (&start, &length) in r_segs.iter() {
-                    transaction.add_bd_seg_req(
-                        idx,
-                        BlkDevSegment::new(bd.uuid(), Segment::new(*bd.device(), start, length)),
-                    );
-                }
+                let r_segs = bd.alloc(needed - alloc);
+                let blkdev_segs = r_segs.iter().map(|(&start, &length)| {
+                    BlkDevSegment::new(bd.uuid(), Segment::new(*bd.device(), start, length))
+                });
+                segs.extend(blkdev_segs);
                 alloc += r_segs.sum();
             }
             assert_eq!(alloc, needed);
+            lists.push(segs);
         }
 
-        Ok(Some(transaction))
-    }
-
-    /// Commit the allocations calculated by the request_space() method.
-    ///
-    /// This method converts the block device segments into the necessary data
-    /// structure and dispatches them to the corresponding block devices to
-    /// update the internal records of allocated space.
-    pub fn commit_space(&mut self, mut transaction: RequestTransaction) -> StratisResult<()> {
-        let mut segs = transaction.drain_blockdevmgr().try_fold(
-            HashMap::<DevUuid, PerDevSegments>::new(),
-            |mut map, seg| -> StratisResult<_> {
-                if let Some(segs) = map.get_mut(&seg.uuid) {
-                    segs.insert(&(seg.segment.start, seg.segment.length))?;
-                } else {
-                    let mut segs = PerDevSegments::new(
-                        self.block_devs
-                            .iter()
-                            .find(|bd| bd.uuid() == seg.uuid)
-                            .expect(
-                                "Block dev was determined to be present during allocation request",
-                            )
-                            .total_size()
-                            .sectors(),
-                    );
-                    segs.insert(&(seg.segment.start, seg.segment.length))?;
-                    map.insert(seg.uuid, segs);
-                }
-
-                Ok(map)
-            },
-        )?;
-
-        for (uuid, bd) in self.blockdevs_mut() {
-            if let Some(segs) = segs.remove(&uuid) {
-                bd.commit_space(segs);
-            }
-        }
-
-        Ok(())
+        Some(lists)
     }
 
     /// Write the given data to all blockdevs marking with current time.
@@ -278,21 +269,18 @@ impl BlockDevMgr {
     /// written. Randomly select no more than MAX_NUM_TO_WRITE blockdevs to
     /// write to.
     pub fn save_state(&mut self, metadata: &[u8]) -> StratisResult<()> {
-        let current_time = Utc::now();
-        let stamp_time = if Some(current_time) <= self.last_update_time {
-            self.last_update_time
-                .expect("self.last_update_time >= Some(current_time")
-                .checked_add_signed(Duration::nanoseconds(1))
-                .expect("self.last_update_time << maximum representable DateTime")
-        } else {
-            current_time
-        };
+        let stamp_time = self.last_update_time.next();
 
         let data_size = Bytes::from(metadata.len());
         let candidates = self
             .block_devs
             .iter_mut()
             .filter(|b| b.max_metadata_size().bytes() >= data_size);
+
+        debug!(
+            "Writing {} of pool level metadata to devices in pool",
+            data_size
+        );
 
         // TODO: consider making selection not entirely random, i.e, ensuring
         // distribution of metadata over different paths.
@@ -304,12 +292,36 @@ impl BlockDevMgr {
             });
 
         if saved {
-            self.last_update_time = Some(stamp_time);
+            self.last_update_time.set(stamp_time);
             Ok(())
         } else {
             let err_msg = "Failed to save metadata to even one device in pool";
             Err(StratisError::Msg(err_msg.into()))
         }
+    }
+
+    /// Load the most recently written metadata from the block devices.
+    /// Returns an error if there is some metadata on a device but it could
+    /// not be loaded.
+    pub fn load_state(&self) -> StratisResult<Vec<u8>> {
+        let (mut last_updated, mut result) = (None, None);
+        for metadata in self.block_devs.iter().map(|dev| dev.load_state()) {
+            match metadata {
+                Ok(Some((metadata, updated))) => {
+                    if Some(updated) > last_updated {
+                        (last_updated, result) = (Some(updated), Some(metadata));
+                    }
+                }
+                Ok(None) => {}
+                Err(err) => return Err(err),
+            }
+        }
+
+        result.ok_or_else(|| {
+            StratisError::Msg(
+                "No pool-level metadata could be obtained for the specified pool".into(),
+            )
+        })
     }
 
     /// Get references to managed blockdevs.
@@ -472,8 +484,7 @@ mod tests {
         assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
 
         let allocated = Sectors(2);
-        let transaction = mgr.request_space(&[allocated]).unwrap().unwrap();
-        mgr.commit_space(transaction).unwrap();
+        mgr.alloc(&[allocated]).unwrap();
         assert_eq!(
             mgr.avail_space() + allocated + mgr.metadata_size(),
             mgr.size()

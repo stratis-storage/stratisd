@@ -44,11 +44,11 @@ pub trait KeyActions {
     ///
     /// Successful return values:
     /// * `Ok(MappingCreateAction::Identity)`: The key was already in the keyring
-    /// with the appropriate key description and key data.
+    ///   with the appropriate key description and key data.
     /// * `Ok(MappingCreateAction::Created(_))`: The key was newly added to the
-    /// keyring.
+    ///   keyring.
     /// * `Ok(MappingCreateAction::Changed)`: The key description was already present
-    /// in the keyring but the key data was updated.
+    ///   in the keyring but the key data was updated.
     fn set(
         &self,
         key_desc: &KeyDescription,
@@ -93,6 +93,9 @@ pub trait Filesystem: Debug {
 
     /// Get filesystem size limit.
     fn size_limit(&self) -> Option<Sectors>;
+
+    /// Get filesystem snapshot origin.
+    fn origin(&self) -> Option<FilesystemUuid>;
 }
 
 pub trait BlockDev: Debug {
@@ -130,11 +133,11 @@ pub trait Pool: Debug + Send + Sync {
     /// Returns a list of the the block devices that were actually added as cache
     /// devices. In practice, this will have three types of return values:
     /// * An error if the cache has already been initialized with a different set
-    /// of block devices.
+    ///   of block devices.
     /// * `SetCreateAction::Identity` if the cache has already been initialized with
-    /// the same set of block devices.
+    ///   the same set of block devices.
     /// * `SetCreateAction::Created` containing all provided block devices if the
-    /// cache has not yet been initialized.
+    ///   cache has not yet been initialized.
     ///
     /// This ensures the contract of providing a truly idempotent API as the cache
     /// can only be initialized once and if an attempt is made to initialize it
@@ -206,8 +209,8 @@ pub trait Pool: Debug + Send + Sync {
     fn destroy_filesystems(
         &mut self,
         pool_name: &str,
-        fs_uuids: &[FilesystemUuid],
-    ) -> StratisResult<SetDeleteAction<FilesystemUuid>>;
+        fs_uuids: &HashSet<FilesystemUuid>,
+    ) -> StratisResult<SetDeleteAction<FilesystemUuid, FilesystemUuid>>;
 
     /// Rename filesystem
     /// Rename pool with uuid to new_name.
@@ -338,6 +341,18 @@ pub trait Pool: Debug + Send + Sync {
         fs: FilesystemUuid,
         limit: Option<Bytes>,
     ) -> StratisResult<PropChangeAction<Option<Sectors>>>;
+
+    /// Return the metadata that would be written if metadata were written.
+    fn current_metadata(&self, pool_name: &Name) -> StratisResult<String>;
+
+    /// Return the metadata that was last written to pool devices.
+    fn last_metadata(&self) -> StratisResult<String>;
+
+    /// Get the filesystem metadata that would be written if written now.
+    fn current_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String>;
+
+    /// Get the last written filesystem metadata.
+    fn last_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String>;
 }
 
 pub type HandleEvents<P> = (

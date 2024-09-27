@@ -8,6 +8,7 @@ use std::{
     cmp::Ordering,
     fmt,
     fs::{File, OpenOptions},
+    io::Seek,
     path::Path,
 };
 
@@ -25,7 +26,6 @@ use crate::{
                 crypt::CryptHandle,
                 devices::BlockSizes,
                 range_alloc::{PerDevSegments, RangeAllocator},
-                transaction::RequestTransaction,
             },
             device::blkdev_size,
             metadata::{
@@ -123,8 +123,10 @@ impl StratBlockDev {
     /// - hardware_info: identifying information in the hardware
     /// - key_description: optional argument enabling encryption using
     ///                    the specified key in the kernel keyring
+    ///
     /// Returns an error if it is impossible to allocate all segments on the
     /// device.
+    ///
     /// NOTE: It is possible that the actual device size is greater than
     /// the recorded device size. In that case, the additional space available
     /// on the device is simply invisible to the blockdev. Consequently, it
@@ -250,9 +252,32 @@ impl StratBlockDev {
 
     pub fn save_state(&mut self, time: &DateTime<Utc>, metadata: &[u8]) -> StratisResult<()> {
         let mut f = OpenOptions::new()
+            .read(true)
             .write(true)
             .open(self.underlying_device.metadata_path())?;
-        self.bda.save_state(time, metadata, &mut f)
+        self.bda.save_state(time, metadata, &mut f)?;
+
+        f.rewind()?;
+        let header = static_header(&mut f)?.ok_or_else(|| {
+            StratisError::Msg("Stratis device has no signature buffer".to_string())
+        })?;
+        let bda = BDA::load(header, &mut f)?
+            .ok_or_else(|| StratisError::Msg("Stratis device has no BDA".to_string()))?;
+        self.bda = bda;
+        Ok(())
+    }
+
+    pub fn load_state(&self) -> StratisResult<Option<(Vec<u8>, &DateTime<Utc>)>> {
+        let mut f = OpenOptions::new()
+            .read(true)
+            .open(self.underlying_device.metadata_path())?;
+        match (self.bda.load_state(&mut f)?, self.bda.last_update_time()) {
+            (Some(state), Some(time)) => Ok(Some((state, time))),
+            (None, None) => Ok(None),
+            _ => Err(StratisError::Msg(
+                "Stratis metadata written but unknown update time or vice-versa".into(),
+            )),
+        }
     }
 
     /// The pool's UUID.
@@ -267,19 +292,8 @@ impl StratBlockDev {
 
     /// Find some sector ranges that could be allocated. If more
     /// sectors are needed than are available, return partial results.
-    pub fn request_space(
-        &self,
-        size: Sectors,
-        transaction: &RequestTransaction,
-    ) -> StratisResult<PerDevSegments> {
-        self.used.request(self.uuid(), size, transaction)
-    }
-
-    /// Commit allocation requested by request_space().
-    ///
-    /// This method will record the requested allocations in the metadata.
-    pub fn commit_space(&mut self, segs: PerDevSegments) {
-        self.used.commit(segs);
+    pub fn alloc(&mut self, size: Sectors) -> PerDevSegments {
+        self.used.alloc(size)
     }
 
     // ALL SIZE METHODS (except size(), which is in BlockDev impl.)
@@ -334,9 +348,9 @@ impl StratBlockDev {
     ///
     /// Returns:
     /// * Some(Some(_)) if the pool is encrypted and the pool name is set in the
-    /// metadata
+    ///   metadata
     /// * Some(None) if the pool is encrypted and the pool name is not set in the
-    /// metadata
+    ///   metadata
     /// * None if the pool is not encrypted
     #[allow(clippy::option_option)]
     pub fn pool_name(&self) -> Option<Option<&Name>> {
@@ -405,7 +419,7 @@ impl StratBlockDev {
     ///
     /// Returns:
     /// * `None` if the size hasn't changed or is equal to the current size recorded
-    /// in the metadata.
+    ///   in the metadata.
     /// * Otherwise, `Some(_)`
     pub fn calc_new_size(&self) -> StratisResult<Option<Sectors>> {
         let s = Self::scan_blkdev_size(

@@ -12,5 +12,5 @@ mod thinpool;
 pub use self::thinpool::ThinPoolStatusDigest;
 pub use self::{
     filesystem::StratFilesystem,
-    thinpool::{ThinPool, ThinPoolSizeParams, ThinPoolState, DATA_BLOCK_SIZE},
+    thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
 };

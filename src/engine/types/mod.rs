@@ -19,7 +19,7 @@ use serde_json::Value;
 use uuid::Uuid;
 
 pub use crate::engine::{
-    engine::{Engine, StateDiff},
+    engine::StateDiff,
     structures::Lockable,
     types::{
         actions::{
@@ -203,7 +203,7 @@ impl fmt::Display for Name {
 /// This report may be fetched through `Report::engine_state_report()`.
 ///
 /// * `ErroredPoolDevices` returns the state of devices that caused an error while
-/// attempting to reconstruct a pool.
+///   attempting to reconstruct a pool.
 pub enum ReportType {
     StoppedPools,
 }

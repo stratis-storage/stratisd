@@ -63,6 +63,9 @@ def remove_stratis_setup():
             if _remove_device(dev):
                 devices.remove(dev)
 
+    if _get_stratis_devices() != []:
+        raise RuntimeError("Some devices were not removed")
+
 
 if __name__ == "__main__":
     remove_stratis_setup()

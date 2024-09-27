@@ -17,7 +17,6 @@ use crate::{
                 blockdevmgr::BlockDevMgr,
                 devices::UnownedDevices,
                 shared::{metadata_to_segment, AllocatedAbove, BlkDevSegment, BlockDevPartition},
-                transaction::RequestTransaction,
             },
             serde_structs::{BaseDevSave, BlockDevSave, DataTierSave, Recordable},
             types::BDARecordResult,
@@ -89,20 +88,22 @@ impl DataTier {
     }
 
     /// Allocate a region for all sector size requests from unallocated segments in
-    /// block devices belonging to the data tier. Return Some(_) if requested
-    /// amount or more was allocated, otherwise, None.
-    pub fn alloc_request(&self, requests: &[Sectors]) -> StratisResult<Option<RequestTransaction>> {
-        self.block_mgr.request_space(requests)
-    }
-
-    /// Commit an allocation that was determined to be valid by alloc_request()
-    /// to metadata.
-    pub fn alloc_commit(&mut self, transaction: RequestTransaction) -> StratisResult<()> {
-        let segments = transaction.get_blockdevmgr();
-        self.block_mgr.commit_space(transaction)?;
-        self.segments.coalesce_blkdevsegs(&segments);
-
-        Ok(())
+    /// block devices belonging to the data tier. Return true if requested
+    /// amount or more was allocated, otherwise, false.
+    pub fn alloc(&mut self, requests: &[Sectors]) -> bool {
+        self.block_mgr
+            .alloc(requests)
+            .map(|segments| {
+                self.segments.coalesce_blkdevsegs(
+                    &segments
+                        .iter()
+                        .flat_map(|s| s.iter())
+                        .cloned()
+                        .collect::<Vec<_>>(),
+                );
+                true
+            })
+            .unwrap_or(false)
     }
 
     /// The sum of the lengths of all the sectors that have been mapped to an
@@ -135,6 +136,10 @@ impl DataTier {
     /// device entirely.
     pub fn save_state(&mut self, metadata: &[u8]) -> StratisResult<()> {
         self.block_mgr.save_state(metadata)
+    }
+
+    pub fn load_state(&self) -> StratisResult<Vec<u8>> {
+        self.block_mgr.load_state()
     }
 
     /// Lookup an immutable blockdev by its Stratis UUID.
@@ -260,8 +265,7 @@ mod tests {
         let request_amount = data_tier.block_mgr.avail_space() / 2usize;
         assert!(request_amount != Sectors(0));
 
-        let transaction = data_tier.alloc_request(&[request_amount]).unwrap().unwrap();
-        data_tier.alloc_commit(transaction).unwrap();
+        assert!(data_tier.alloc(&[request_amount]));
         data_tier.invariant();
 
         // A data tier w/ some amount allocated
@@ -279,11 +283,7 @@ mod tests {
         size = data_tier.size();
 
         // Allocate enough to get into the newly added block devices
-        let transaction = data_tier
-            .alloc_request(&[last_request_amount])
-            .unwrap()
-            .unwrap();
-        data_tier.alloc_commit(transaction).unwrap();
+        assert!(data_tier.alloc(&[last_request_amount]));
         data_tier.invariant();
 
         assert!(data_tier.allocated() >= request_amount + last_request_amount);

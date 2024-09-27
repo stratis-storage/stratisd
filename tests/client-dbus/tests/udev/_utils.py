@@ -16,6 +16,7 @@ Support for testing udev device discovery.
 """
 
 # isort: STDLIB
+import logging
 import os
 import random
 import signal
@@ -29,6 +30,7 @@ from tempfile import NamedTemporaryFile
 import dbus
 import psutil
 import pyudev
+from tenacity import Retrying, retry_if_exception_type, stop_after_delay, wait_fixed
 
 # isort: LOCAL
 from stratisd_client_dbus import (
@@ -43,10 +45,11 @@ from stratisd_client_dbus import (
 )
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from ._dm import _get_stratis_devices, remove_stratis_setup
+from ._dm import remove_stratis_setup
 from ._loopback import LoopBackDevices
 
 _STRATISD = os.environ["STRATISD"]
+STRATISD = _STRATISD
 
 CRYPTO_LUKS_FS_TYPE = "crypto_LUKS"
 STRATIS_FS_TYPE = "stratis"
@@ -81,12 +84,12 @@ def create_pool(
         {
             "name": name,
             "devices": devices,
-            "key_desc": (False, "")
-            if key_description is None
-            else (True, key_description),
-            "clevis_info": (False, ("", ""))
-            if clevis_info is None
-            else (True, clevis_info),
+            "key_desc": (
+                (False, "") if key_description is None else (True, key_description)
+            ),
+            "clevis_info": (
+                (False, ("", "")) if clevis_info is None else (True, clevis_info)
+            ),
         },
     )
 
@@ -232,23 +235,14 @@ def processes(name):
             pass
 
 
-def remove_stratis_dm_devices():
-    """
-    Remove Stratis device mapper devices, fail with a runtime error if
-    some have been missed.
-    :raises RuntimeError: if some devices are remaining
-    """
-    remove_stratis_setup()
-    if _get_stratis_devices() != []:
-        raise RuntimeError("Some devices were not removed")
-
-
 class _Service:
     """
     Start and stop stratisd.
     """
 
-    # pylint: disable=consider-using-with
+    def __init__(self):
+        self._service = None
+
     def start_service(self):
         """
         Starts the stratisd service if it is not already started. Verifies
@@ -261,34 +255,31 @@ class _Service:
         if next(processes("stratisd"), None) is not None:
             raise RuntimeError("A stratisd process is already running")
 
-        service = subprocess.Popen(
+        service = subprocess.Popen(  # pylint: disable=consider-using-with
             [x for x in _STRATISD.split(" ") if x != ""],
             text=True,
         )
 
-        dbus_interface_present = False
-        limit = time.time() + 120.0
-        while (
-            time.time() <= limit
-            and not dbus_interface_present
-            and service.poll() is None
-        ):
-            try:
-                get_object(TOP_OBJECT)
-                dbus_interface_present = True
-            except dbus.exceptions.DBusException:
-                time.sleep(0.5)
+        try:
+            for attempt in Retrying(
+                retry=(retry_if_exception_type(dbus.exceptions.DBusException)),
+                stop=stop_after_delay(120),
+                wait=wait_fixed(0.5),
+                reraise=True,
+            ):
+                if service.poll() is not None:
+                    raise RuntimeError(
+                        f"Daemon unexpectedly exited with exit code {service.returncode}"
+                    )
 
-        time.sleep(1)
-        if service.poll() is not None:
+                with attempt:
+                    get_object(TOP_OBJECT)
+        except dbus.exceptions.DBusException as err:
             raise RuntimeError(
-                f"Daemon unexpectedly exited with exit code {service.returncode}"
-            )
+                "No D-Bus interface for stratisd found although stratisd appears to be running"
+            ) from err
 
-        if not dbus_interface_present:
-            raise RuntimeError("No D-Bus interface for stratisd found")
-
-        self._service = service  # pylint: disable=attribute-defined-outside-init
+        self._service = service
         return self
 
     def stop_service(self):
@@ -296,8 +287,11 @@ class _Service:
         Stops the stratisd daemon previously spawned.
         :return: None
         """
+        if self._service is None:
+            return
+
         self._service.send_signal(signal.SIGINT)
-        self._service.wait()
+        self._service.wait(timeout=30)
         if next(processes("stratisd"), None) is not None:
             raise RuntimeError("Failed to stop stratisd service")
 
@@ -326,7 +320,7 @@ class KernelKey:
         :raises RuntimeError: if setting a key in the keyring through stratisd
                               fails
         """
-        for (key_desc, key_data) in self._key_descs:
+        for key_desc, key_data in self._key_descs:
             with NamedTemporaryFile(mode="w") as temp_file:
                 temp_file.write(key_data)
                 temp_file.flush()
@@ -349,7 +343,7 @@ class KernelKey:
 
     def __exit__(self, exception_type, exception_value, traceback):
         try:
-            for (key_desc, _) in reversed(self._key_descs):
+            for key_desc, _ in reversed(self._key_descs):
                 (_, return_code, message) = Manager.Methods.UnsetKey(
                     get_object(TOP_OBJECT), {"key_desc": key_desc}
                 )
@@ -426,10 +420,17 @@ class UdevTest(unittest.TestCase):
         """
         stratisds = list(processes("stratisd"))
         for process in stratisds:
+            logging.warning("stratisd process %s still running, terminating", process)
             process.terminate()
-        psutil.wait_procs(stratisds)
+        (_, alive) = psutil.wait_procs(stratisds, timeout=10)
+        for process in alive:
+            logging.warning(
+                "stratisd process %s did not respond to terminate signal, killing",
+                process,
+            )
+            process.kill()
 
-        remove_stratis_dm_devices()
+        remove_stratis_setup()
         self._lb_mgr.destroy_all()
 
     def wait_for_pools(self, expected_num, *, name=None):

@@ -4,7 +4,7 @@
 
 use std::{error::Error, path::PathBuf};
 
-use clap::{Arg, ArgAction, ArgGroup, ArgMatches, Command};
+use clap::{Arg, ArgAction, ArgGroup, Command};
 use serde_json::{json, Map, Value};
 
 use stratisd::{
@@ -56,6 +56,7 @@ fn parse_args() -> Command {
                     .arg(
                         Arg::new("blockdevs")
                             .action(ArgAction::Append)
+                            .value_parser(clap::value_parser!(PathBuf))
                             .required(true),
                     )
                     .arg(Arg::new("key_desc").long("key-desc").num_args(1))
@@ -86,6 +87,7 @@ fn parse_args() -> Command {
                     .arg(
                         Arg::new("blockdevs")
                             .action(ArgAction::Append)
+                            .value_parser(clap::value_parser!(PathBuf))
                             .required(true),
                     ),
                 Command::new("rename")
@@ -96,6 +98,7 @@ fn parse_args() -> Command {
                     .arg(
                         Arg::new("blockdevs")
                             .action(ArgAction::Append)
+                            .value_parser(clap::value_parser!(PathBuf))
                             .required(true),
                     ),
                 Command::new("add-cache")
@@ -103,6 +106,7 @@ fn parse_args() -> Command {
                     .arg(
                         Arg::new("blockdevs")
                             .action(ArgAction::Append)
+                            .value_parser(clap::value_parser!(PathBuf))
                             .required(true),
                     ),
                 Command::new("destroy").arg(Arg::new("name").required(true)),
@@ -121,54 +125,60 @@ fn parse_args() -> Command {
                 Command::new("clevis-pin")
                     .arg(Arg::new("name").long("name").num_args(0))
                     .arg(Arg::new("id").required(true)),
-                Command::new("bind").subcommands(vec![
-                    Command::new("keyring")
-                        .arg(Arg::new("name").long("name").num_args(0))
-                        .arg(Arg::new("id").required(true))
-                        .arg(
-                            Arg::new("key_desc")
-                                .long("key-desc")
-                                .num_args(1)
-                                .required(true),
-                        ),
-                    Command::new("nbde")
-                        .alias("tang")
-                        .arg(Arg::new("name").long("name").num_args(0))
-                        .arg(Arg::new("id").required(true))
-                        .arg(Arg::new("tang_url").required(true))
-                        .arg(Arg::new("thumbprint").long("thumbprint").num_args(1))
-                        .arg(Arg::new("trust_url").long("trust-url").num_args(0))
-                        .group(
-                            ArgGroup::new("tang_args")
-                                .arg("thumbprint")
-                                .arg("trust_url"),
-                        ),
-                    Command::new("tpm2")
-                        .arg(Arg::new("name").long("name").num_args(0))
-                        .arg(Arg::new("id").required(true)),
-                ]),
-                Command::new("unbind").subcommands(vec![
-                    Command::new("keyring")
-                        .arg(Arg::new("name").long("name").num_args(0))
-                        .arg(Arg::new("id").required(true)),
-                    Command::new("clevis")
-                        .arg(Arg::new("name").long("name").num_args(0))
-                        .arg(Arg::new("id").required(true)),
-                ]),
-                Command::new("rebind").subcommands(vec![
-                    Command::new("keyring")
-                        .arg(Arg::new("name").long("name").num_args(0))
-                        .arg(Arg::new("id").required(true))
-                        .arg(
-                            Arg::new("key_desc")
-                                .long("key-desc")
-                                .num_args(1)
-                                .required(true),
-                        ),
-                    Command::new("clevis")
-                        .arg(Arg::new("name").long("name").num_args(0))
-                        .arg(Arg::new("id").required(true)),
-                ]),
+                Command::new("bind")
+                    .subcommand_required(true)
+                    .subcommands(vec![
+                        Command::new("keyring")
+                            .arg(Arg::new("name").long("name").num_args(0))
+                            .arg(Arg::new("id").required(true))
+                            .arg(
+                                Arg::new("key_desc")
+                                    .long("key-desc")
+                                    .num_args(1)
+                                    .required(true),
+                            ),
+                        Command::new("nbde")
+                            .alias("tang")
+                            .arg(Arg::new("name").long("name").num_args(0))
+                            .arg(Arg::new("id").required(true))
+                            .arg(Arg::new("tang_url").required(true))
+                            .arg(Arg::new("thumbprint").long("thumbprint").num_args(1))
+                            .arg(Arg::new("trust_url").long("trust-url").num_args(0))
+                            .group(
+                                ArgGroup::new("tang_args")
+                                    .arg("thumbprint")
+                                    .arg("trust_url"),
+                            ),
+                        Command::new("tpm2")
+                            .arg(Arg::new("name").long("name").num_args(0))
+                            .arg(Arg::new("id").required(true)),
+                    ]),
+                Command::new("unbind")
+                    .subcommand_required(true)
+                    .subcommands(vec![
+                        Command::new("keyring")
+                            .arg(Arg::new("name").long("name").num_args(0))
+                            .arg(Arg::new("id").required(true)),
+                        Command::new("clevis")
+                            .arg(Arg::new("name").long("name").num_args(0))
+                            .arg(Arg::new("id").required(true)),
+                    ]),
+                Command::new("rebind")
+                    .subcommand_required(true)
+                    .subcommands(vec![
+                        Command::new("keyring")
+                            .arg(Arg::new("name").long("name").num_args(0))
+                            .arg(Arg::new("id").required(true))
+                            .arg(
+                                Arg::new("key_desc")
+                                    .long("key-desc")
+                                    .num_args(1)
+                                    .required(true),
+                            ),
+                        Command::new("clevis")
+                            .arg(Arg::new("name").long("name").num_args(0))
+                            .arg(Arg::new("id").required(true)),
+                    ]),
             ]),
             Command::new("filesystem").subcommands(vec![
                 Command::new("create")
@@ -181,16 +191,12 @@ fn parse_args() -> Command {
                     .arg(Arg::new("pool_name").required(true))
                     .arg(Arg::new("fs_name").required(true))
                     .arg(Arg::new("new_fs_name").required(true)),
+                Command::new("origin")
+                    .arg(Arg::new("pool_name").required(true))
+                    .arg(Arg::new("fs_name").required(true)),
             ]),
             Command::new("report"),
         ])
-}
-
-fn get_paths_from_args(args: &ArgMatches) -> Vec<PathBuf> {
-    args.get_many::<String>("blockdevs")
-        .expect("required")
-        .map(PathBuf::from)
-        .collect::<Vec<_>>()
 }
 
 fn main() -> Result<(), String> {
@@ -237,7 +243,8 @@ fn main() -> Result<(), String> {
                 let prompt = args.get_flag("prompt");
                 if prompt && unlock_method == Some(UnlockMethod::Clevis) {
                     return Err(Box::new(StratisError::Msg(
-                        "--prompt and an unlock_method of clevis are mutally exclusive".to_string(),
+                        "--prompt and an unlock_method of clevis are mutually exclusive"
+                            .to_string(),
                     )));
                 }
                 pool::pool_start(id, unlock_method, prompt)?;
@@ -257,7 +264,6 @@ fn main() -> Result<(), String> {
                 pool::pool_stop(id)?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("create") {
-                let paths = get_paths_from_args(args);
                 let key_description = match args.get_one::<String>("key_desc").map(|s| s.to_owned())
                 {
                     Some(string) => Some(KeyDescription::try_from(string)?),
@@ -290,7 +296,10 @@ fn main() -> Result<(), String> {
                 };
                 pool::pool_create(
                     args.get_one::<String>("name").expect("required").to_owned(),
-                    paths,
+                    args.get_many::<PathBuf>("blockdevs")
+                        .expect("required")
+                        .cloned()
+                        .collect::<Vec<_>>(),
                     EncryptionInfo::from_options((key_description, clevis_info)),
                 )?;
                 Ok(())
@@ -298,10 +307,12 @@ fn main() -> Result<(), String> {
                 pool::pool_destroy(args.get_one::<String>("name").expect("required").to_owned())?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("init-cache") {
-                let paths = get_paths_from_args(args);
                 pool::pool_init_cache(
                     args.get_one::<String>("name").expect("required").to_owned(),
-                    paths,
+                    args.get_many::<PathBuf>("blockdevs")
+                        .expect("required")
+                        .cloned()
+                        .collect::<Vec<_>>(),
                 )?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("rename") {
@@ -315,17 +326,21 @@ fn main() -> Result<(), String> {
                 )?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("add-data") {
-                let paths = get_paths_from_args(args);
                 pool::pool_add_data(
                     args.get_one::<String>("name").expect("required").to_owned(),
-                    paths,
+                    args.get_many::<PathBuf>("blockdevs")
+                        .expect("required")
+                        .cloned()
+                        .collect::<Vec<_>>(),
                 )?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("add-cache") {
-                let paths = get_paths_from_args(args);
                 pool::pool_add_cache(
                     args.get_one::<String>("name").expect("required").to_owned(),
-                    paths,
+                    args.get_many::<PathBuf>("blockdevs")
+                        .expect("required")
+                        .cloned()
+                        .collect::<Vec<_>>(),
                 )?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("is-encrypted") {
@@ -575,6 +590,19 @@ fn main() -> Result<(), String> {
                         .expect("required")
                         .to_owned(),
                 )?;
+                Ok(())
+            } else if let Some(args) = subcommand.subcommand_matches("origin") {
+                filesystem::filesystem_origin(
+                    args.get_one::<String>("pool_name")
+                        .expect("required")
+                        .to_owned(),
+                    args.get_one::<String>("fs_name")
+                        .expect("required")
+                        .to_owned(),
+                )
+                .map(|origin| {
+                    println!("{}", origin);
+                })?;
                 Ok(())
             } else {
                 filesystem::filesystem_list()?;

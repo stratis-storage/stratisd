@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use dbus::{arg::Array, Message};
 use dbus_tree::{MTSync, MethodInfo, MethodResult};
@@ -168,7 +168,7 @@ pub fn destroy_filesystems(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodRe
     let result = handle_action!(
         pool.destroy_filesystems(
             &pool_name,
-            &filesystem_map.keys().cloned().collect::<Vec<_>>(),
+            &filesystem_map.keys().cloned().collect::<HashSet<_>>(),
         ),
         dbus_context,
         pool_path.get_name()
@@ -177,7 +177,7 @@ pub fn destroy_filesystems(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodRe
         Ok(uuids) => {
             // Only get changed values here as non-existent filesystems will have been filtered out
             // before calling destroy_filesystems
-            let uuid_vec: Vec<String> = if let Some(ref changed_uuids) = uuids.changed() {
+            let uuid_vec: Vec<String> = if let Some((ref changed_uuids, _)) = uuids.changed() {
                 for uuid in changed_uuids {
                     let op = filesystem_map
                         .get(uuid)

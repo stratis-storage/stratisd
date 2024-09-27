@@ -8,7 +8,7 @@ use std::{
     fs::{create_dir_all, remove_file},
     future::Future,
     io::{IoSlice, IoSliceMut},
-    os::unix::io::{AsRawFd, RawFd},
+    os::unix::io::{AsRawFd, OwnedFd, RawFd},
     path::Path,
     pin::Pin,
     sync::Arc,
@@ -22,8 +22,8 @@ use futures::{
 use nix::{
     fcntl::{fcntl, FcntlArg, OFlag},
     sys::socket::{
-        accept, bind, listen, recvmsg, sendmsg, socket, AddressFamily, ControlMessageOwned,
-        MsgFlags, SockFlag, SockType, UnixAddr,
+        accept, bind, listen, recvmsg, sendmsg, socket, AddressFamily, Backlog,
+        ControlMessageOwned, MsgFlags, SockFlag, SockType, UnixAddr,
     },
     unistd::close,
 };
@@ -239,6 +239,13 @@ impl StratisParams {
                     false,
                 )))
             }
+            StratisParamType::FsOrigin(pool_name, fs_name) => {
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::FsOrigin(stratis_result_to_return(
+                    filesystem::filesystem_origin(engine, &pool_name, &fs_name).await,
+                    None,
+                )))
+            }
             StratisParamType::Report => {
                 expects_fd!(self.fd_opt, false);
                 Ok(StratisRet::Report(report::report(engine).await))
@@ -347,7 +354,7 @@ fn try_recvmsg(fd: RawFd) -> StratisResult<StratisParams> {
     let (cmsgs, bytes) = {
         let mut iovecs = [IoSliceMut::new(vec.as_mut_slice())];
         let rmsg = recvmsg::<UnixAddr>(fd, &mut iovecs, Some(&mut cmsg_space), MsgFlags::empty())?;
-        (rmsg.cmsgs().collect(), rmsg.bytes)
+        (rmsg.cmsgs()?.collect(), rmsg.bytes)
     };
 
     let fd_opt = handle_cmsgs(cmsgs)?;
@@ -418,7 +425,7 @@ impl Future for StratisUnixResponse {
 }
 
 pub struct StratisUnixListener {
-    fd: AsyncFd<RawFd>,
+    fd: AsyncFd<OwnedFd>,
 }
 
 impl StratisUnixListener {
@@ -438,12 +445,13 @@ impl StratisUnixListener {
             SockFlag::empty(),
             None,
         )?;
-        let flags = OFlag::from_bits(fcntl(fd, FcntlArg::F_GETFL)?).ok_or_else(|| {
-            StratisError::Msg("Unrecognized flag types returned from fcntl".to_string())
-        })?;
-        fcntl(fd, FcntlArg::F_SETFL(flags | OFlag::O_NONBLOCK))?;
-        bind(fd, &UnixAddr::new(path.as_ref())?)?;
-        listen(fd, 0)?;
+        let flags =
+            OFlag::from_bits(fcntl(fd.as_raw_fd(), FcntlArg::F_GETFL)?).ok_or_else(|| {
+                StratisError::Msg("Unrecognized flag types returned from fcntl".to_string())
+            })?;
+        fcntl(fd.as_raw_fd(), FcntlArg::F_SETFL(flags | OFlag::O_NONBLOCK))?;
+        bind(fd.as_raw_fd(), &UnixAddr::new(path.as_ref())?)?;
+        listen(&fd, Backlog::new(0).expect("0 is always valid"))?;
         Ok(StratisUnixListener {
             fd: AsyncFd::new(fd)?,
         })

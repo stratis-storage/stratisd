@@ -1,9 +1,9 @@
 [package]
 name = "stratisd"
-version = "3.6.0"
-authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.org>"]
-edition = "2021"
-rust-version = "1.71.1"  # LOWEST SUPPORTED RUST TOOLCHAIN
+version = "3.7.0"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 build = "build.rs"
 description = "Stratis daemon"
 license = "MPL-2.0"
@@ -31,12 +31,20 @@ exclude = [
     "/udev"
 ]
 
+[workspace]
+members = [".", "stratisd_proc_macros"]
+
+[workspace.package]
+authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.org>"]
+edition = "2021"
+rust-version = "1.71.1"  # LOWEST SUPPORTED RUST TOOLCHAIN
+
 [[bin]]
 name = "stratisd"
 required-features = ["engine"]
 
 [[bin]]
-name = "stratis-dumpmetadata"
+name = "stratisd-tools"
 required-features = ["engine", "extras", "min"]
 
 [[bin]]
@@ -90,7 +98,7 @@ version = "2.3.0"
 optional = true
 
 [dependencies.devicemapper]
-version = "0.34.0"
+version = "0.34.4"
 optional = true
 
 [dependencies.dbus]
@@ -106,7 +114,7 @@ version = "1.6.1"
 optional = true
 
 [dependencies.env_logger]
-version ="0.10.0"
+version ="0.11.0"
 optional = true
 
 [dependencies.futures]
@@ -118,15 +126,11 @@ version = "0.1.0"
 optional = true
 
 [dependencies.itertools]
-version = "0.11.0"
-optional = true
-
-[dependencies.lazy_static]
-version = "1.4.0"
+version = "0.13.0"
 optional = true
 
 [dependencies.libblkid-rs]
-version = "0.3.1"
+version = "0.3.2"
 optional = true
 
 [dependencies.libc]
@@ -134,12 +138,12 @@ version = "0.2.147"
 optional = true
 
 [dependencies.libcryptsetup-rs]
-version = "0.9.1"
+version = "0.10.0"
 features = ["mutex"]
 optional = true
 
 [dependencies.libcryptsetup-rs-sys]
-version = "0.3.0"
+version = "0.4.0"
 optional = true
 
 [dependencies.libmount]
@@ -155,11 +159,16 @@ version = "0.4.19"
 optional = true
 
 [dependencies.nix]
-version = "0.26.0"
+version = "0.29.0"
+optional = true
+features = ["fs", "ioctl", "mount", "poll", "process", "sched", "signal", "socket"]
+
+[dependencies.once_cell]
+version = "1.19.0"
 optional = true
 
 [dependencies.pretty-hex]
-version = "0.3.0"
+version = "0.4.1"
 optional = true
 
 [dependencies.rand]
@@ -171,8 +180,12 @@ version = "1.5.4"
 optional = true
 
 [dependencies.retry]
-version = "1.3.1"
+version = "2.0.0"
 default-features = false
+optional = true
+
+[dependencies.semver]
+version = "1.0.0"
 optional = true
 
 [dependencies.serde]
@@ -218,15 +231,15 @@ features = ["serde", "v4"]
 pkg-config = "0.3.18"
 
 [build-dependencies.bindgen]
-default_features = false
+default-features = false
 features = ["runtime"]
-version = "0.68.1"
+version = "0.69.0"
 optional = true
 
 [dev-dependencies]
 assert_cmd = "2.0.8"
 assert_matches = "1.5.0"
-loopdev = "0.4.0"
+loopdev-3 = "0.5.1"
 predicates = "3.0.0"
 proptest = "1.0.0"
 
@@ -244,7 +257,6 @@ engine = [
     "futures",
     "iocuddle",
     "itertools",
-    "lazy_static",
     "libblkid-rs",
     "libc",
     "libcryptsetup-rs",
@@ -253,9 +265,11 @@ engine = [
     "libudev",
     "log",
     "nix",
+    "once_cell",
     "rand",
     "regex",
     "retry",
+    "semver",
     "serde",
     "serde_derive",
     "serde_json",
@@ -272,10 +286,69 @@ min = ["termios"]
 systemd_compat = ["bindgen"]
 udev_scripts = ["data-encoding"]
 
-# FIXME: remove when loopdev dependency lower bound is increased from 0.4.0
-[patch.crates-io.loopdev]
-git = "https://github.com/mulkieran/loopdev"
-branch = "bump-bindgen-reduce-version-0.68.1"
+[lints.rust]
+warnings = { level = "deny" }
+future_incompatible = { level = "deny", priority = 1 }
+unused = { level = "deny", priority = 2}
+rust_2018_idioms = { level = "deny", priority = 3 }
+nonstandard_style = { level = "deny", priority = 4 }
+
+[lints.clippy]
+all = { level = "deny" }
+cargo = { level = "deny", priority = 1 }
+multiple-crate-versions = { level = "allow", priority = 2 }
+from_over_into = { level = "allow", priority = 3 }
+upper_case_acronyms = { level = "allow", priority = 3 }
+# SOME PEDANTIC OR NURSERY LINTS THAT STRATISD CURRENTLY OBEYS.
+# IF ANY OF THESE LINTS ARE DISCOVERED TO BE UNNECESSARILY RESTRICTIVE,
+# CHOOSING TO ALLOW THE LINT BY REMOVING THE DENY ENTRY SHOULD BE A MINOR
+# DECISION AND EASILY MADE.
+cast_lossless = { level = "deny", priority = 4 }
+cast_possible_truncation = { level = "deny", priority = 4 }
+cast_precision_loss = { level = "deny", priority = 4 }
+cast_ptr_alignment = { level = "deny", priority = 4 }
+checked_conversions = { level = "deny", priority = 4 }
+copy_iterator = { level = "deny", priority = 4 }
+empty_enum = { level = "deny", priority = 4 }
+enum_glob_use = { level = "deny", priority = 4 }
+expl_impl_clone_on_copy = { level = "deny", priority = 4 }
+explicit_deref_methods = { level = "deny", priority = 4 }
+explicit_into_iter_loop = { level = "deny", priority = 4 }
+fn_params_excessive_bools = { level = "deny", priority = 4 }
+implicit_hasher = { level = "deny", priority = 4 }
+inefficient_to_string = { level = "deny", priority = 4 }
+inline_always = { level = "deny", priority = 4 }
+invalid_upcast_comparisons = { level = "deny", priority = 4 }
+large_digit_groups = { level = "deny", priority = 4 }
+large_stack_arrays = { level = "deny", priority = 4 }
+large_types_passed_by_value = { level = "deny", priority = 4 }
+linkedlist = { level = "deny", priority = 4 }
+macro_use_imports = { level = "deny", priority = 4 }
+manual_ok_or = { level = "deny", priority = 4 }
+match_bool = { level = "deny", priority = 4 }
+match_on_vec_items = { level = "deny", priority = 4 }
+match_wild_err_arm = { level = "deny", priority = 4 }
+maybe_infinite_iter = { level = "deny", priority = 4 }
+mut_mut = { level = "deny", priority = 4 }
+needless_continue = { level = "deny", priority = 4 }
+option_option = { level = "deny", priority = 4 }
+range_minus_one = { level = "deny", priority = 4 }
+range_plus_one = { level = "deny", priority = 4 }
+ref_option_ref = { level = "deny", priority = 4 }
+same_functions_in_if_condition = { level = "deny", priority = 4 }
+string_add_assign = { level = "deny", priority = 4 }
+struct_excessive_bools = { level = "deny", priority = 4 }
+trait_duplication_in_bounds = { level = "deny", priority = 4 }
+trivially_copy_pass_by_ref = { level = "deny", priority = 4 }
+type_repetition_in_bounds = { level = "deny", priority = 4 }
+unicode_not_nfc = { level = "deny", priority = 4 }
+unnested_or_patterns = { level = "deny", priority = 4 }
+unreadable_literal = { level = "deny", priority = 4 }
+unsafe_derive_deserialize = { level = "deny", priority = 4 }
+unused_self = { level = "deny", priority = 4 }
+used_underscore_binding = { level = "deny", priority = 4 }
+verbose_bit_mask = { level = "deny", priority = 4 }
+wildcard_imports = { level = "deny", priority = 4 }
 
 [package.metadata.vendor-filter]
 platforms = ["*-unknown-linux-gnu"]

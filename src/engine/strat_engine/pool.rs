@@ -2,7 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{cmp::max, collections::HashMap, path::Path, vec::Vec};
+use std::{
+    cmp::max,
+    collections::{HashMap, HashSet},
+    path::Path,
+    vec::Vec,
+};
 
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
@@ -324,8 +329,8 @@ impl StratPool {
     /// Write current metadata to pool members.
     #[pool_mutating_action("NoPoolChanges")]
     pub fn write_metadata(&mut self, name: &str) -> StratisResult<()> {
-        let data = serde_json::to_string(&self.record(name))?;
-        self.backstore.save_state(data.as_bytes())
+        let data = serde_json::to_vec(&self.record(name))?;
+        self.backstore.save_state(&data)
     }
 
     /// Teardown a pool.
@@ -433,10 +438,8 @@ impl StratPool {
         self.thin_pool.teardown(pool_uuid)?;
         let mut data = self.record(pool_name);
         data.started = Some(false);
-        let json = serde_json::to_string(&data).map_err(|e| (StratisError::from(e), false))?;
-        self.backstore
-            .save_state(json.as_bytes())
-            .map_err(|e| (e, false))?;
+        let json = serde_json::to_vec(&data).map_err(|e| (StratisError::from(e), false))?;
+        self.backstore.save_state(&json).map_err(|e| (e, false))?;
         self.backstore.teardown(pool_uuid).map_err(|e| (e, false))?;
         let bds = self.backstore.drain_bds();
         Ok(DeviceSet::from(bds))
@@ -938,7 +941,7 @@ impl Pool for StratPool {
 
                 let block_size_summary = unowned_devices.blocksizes();
                 if block_size_summary.len() > 1 {
-                    let err_str = "The devices specified to be added to the data tier do not have uniform physcal and logical sector sizes.".into();
+                    let err_str = "The devices specified to be added to the data tier do not have uniform physical and logical sector sizes.".into();
                     return Err(StratisError::Msg(err_str));
                 }
 
@@ -1002,8 +1005,8 @@ impl Pool for StratPool {
     fn destroy_filesystems(
         &mut self,
         pool_name: &str,
-        fs_uuids: &[FilesystemUuid],
-    ) -> StratisResult<SetDeleteAction<FilesystemUuid>> {
+        fs_uuids: &HashSet<FilesystemUuid>,
+    ) -> StratisResult<SetDeleteAction<FilesystemUuid, FilesystemUuid>> {
         let mut removed = Vec::new();
         for &uuid in fs_uuids {
             if let Some(uuid) = self.thin_pool.destroy_filesystem(pool_name, uuid)? {
@@ -1011,7 +1014,29 @@ impl Pool for StratPool {
             }
         }
 
-        Ok(SetDeleteAction::new(removed))
+        let snapshots: Vec<FilesystemUuid> = self
+            .thin_pool
+            .filesystems()
+            .iter()
+            .filter_map(|(_, u, fs)| {
+                fs.origin()
+                    .and_then(|x| if removed.contains(&x) { Some(*u) } else { None })
+            })
+            .collect();
+
+        let mut updated_origins = vec![];
+        for sn_uuid in snapshots {
+            if let Err(err) = self.thin_pool.unset_fs_origin(sn_uuid) {
+                warn!(
+                    "Failed to write null origin to metadata for filesystem with UUID {}: {}",
+                    sn_uuid, err
+                );
+            } else {
+                updated_origins.push(sn_uuid);
+            }
+        }
+
+        Ok(SetDeleteAction::new(removed, updated_origins))
     }
 
     #[pool_mutating_action("NoRequests")]
@@ -1135,6 +1160,7 @@ impl Pool for StratPool {
         uuid: DevUuid,
         user_info: Option<&str>,
     ) -> StratisResult<RenameAction<DevUuid>> {
+        user_info.map(validate_name).transpose()?;
         let result = self.backstore.set_blockdev_user_info(uuid, user_info);
         match result {
             Ok(Some(uuid)) => {
@@ -1240,6 +1266,25 @@ impl Pool for StratPool {
         } else {
             Ok(PropChangeAction::Identity)
         }
+    }
+
+    fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {
+        serde_json::to_string(&self.record(pool_name)).map_err(|e| e.into())
+    }
+
+    fn last_metadata(&self) -> StratisResult<String> {
+        self.backstore.load_state().and_then(|v| {
+            String::from_utf8(v)
+                .map_err(|_| StratisError::Msg("metadata byte array is not utf-8".into()))
+        })
+    }
+
+    fn current_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String> {
+        self.thin_pool.current_fs_metadata(fs_name)
+    }
+
+    fn last_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String> {
+        self.thin_pool.last_fs_metadata(fs_name)
     }
 }
 
@@ -1378,6 +1423,7 @@ mod tests {
             .unwrap();
             OpenOptions::new()
                 .create(true)
+                .truncate(true)
                 .write(true)
                 .open(&new_file)
                 .unwrap()
@@ -1634,7 +1680,8 @@ mod tests {
         assert!(pool
             .set_overprov_mode(&Name::new(pool_name.to_string()), false)
             .is_err());
-        pool.destroy_filesystems(pool_name, &[fs_uuid]).unwrap();
+        pool.destroy_filesystems(pool_name, &[fs_uuid].into())
+            .unwrap();
 
         pool.set_overprov_mode(&Name::new(pool_name.to_string()), false)
             .unwrap();
@@ -1686,6 +1733,7 @@ mod tests {
 
         let mut f = OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .open(new_file)
             .unwrap();
@@ -1761,6 +1809,7 @@ mod tests {
 
         let mut f = OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .open(new_file)
             .unwrap();

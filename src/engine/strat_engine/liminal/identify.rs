@@ -150,6 +150,7 @@ impl fmt::Display for StratisInfo {
 /// An enum type to distinguish between LUKS devices belong to Stratis and
 /// Stratis devices.
 #[derive(Debug, Eq, Hash, PartialEq)]
+#[allow(clippy::large_enum_variant)]
 pub enum DeviceInfo {
     Luks(LuksInfo),
     Stratis(StratisInfo),
@@ -516,7 +517,7 @@ mod tests {
     /// recognized.
     ///
     /// * Verify that the physical paths are recognized as LUKS devices
-    /// belonging to Stratis.
+    ///   belonging to Stratis.
     /// * Verify that the physical paths are not recognized as Stratis devices.
     /// * Verify that the metadata paths are recognized as Stratis devices.
     fn test_process_luks_device_initialized(paths: &[&Path]) {
@@ -699,7 +700,7 @@ mod tests {
         }
 
         for path in paths {
-            create_fs(path, None, false).unwrap();
+            create_fs(path, None).unwrap();
             let device_path = DevicePath::new(path).expect("our test path");
             assert_eq!(
                 block_device_apply(&device_path, process_stratis_device)

@@ -5,26 +5,26 @@ name: stratisd CI
 on:
   push:
     branches:
-      - master
+      - rebase-3.6.0
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
       - 'README_tests.md'
-      - 'tests/**'
+      - 'tests/client-dbus/**'
       - '.packit.yaml'
       - 'plans/**'
-      - 'test/**'
+      - 'tests-fmf/**'
   pull_request:
     branches:
-      - master
+      - rebase-3.6.0
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
       - 'README_tests.md'
-      - 'tests/**'
+      - 'tests/client-dbus/**'
       - '.packit.yaml'
       - 'plans/**'
-      - 'test/**'
+      - 'tests-fmf/**'
 
   workflow_dispatch:
 
@@ -40,20 +40,21 @@ jobs:
       matrix:
         include:
           - task: make -f Makefile fmt-ci
-            toolchain: 1.73.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.81.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: rustfmt
           - task: make -f Makefile check-typos
-            toolchain: 1.73.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.81.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-22.04
     container:
-      image: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:40  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
+          black
           clang
           curl
           cryptsetup-devel
@@ -62,78 +63,25 @@ jobs:
           libblkid-devel
           make
           ncurses
+          python3-isort
           systemd-devel
       - uses: dtolnay/rust-toolchain@master
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
-      - uses: baptiste0928/cargo-install@v2
+      - uses: baptiste0928/cargo-install@v3
         with:
           crate: typos-cli
-      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
-        run: ${{ matrix.task }}
-
-  # TESTS WITH TANG
-  checks_with_tang:
-    strategy:
-      matrix:
-        include:
-          # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
-          - task: >-
-              TANG_URL=tang
-              RUST_LOG=stratisd=debug
-              make -f Makefile test-clevis-loop
-            toolchain: 1.73.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
-            image: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
-    runs-on: ubuntu-22.04
-    container:
-      image: ${{ matrix.image }}
-      options: --privileged -v /dev:/dev -v /run/udev:/run/udev --ipc=host
-    services:
-      tang:
-        # yamllint disable rule:line-length
-        image: ghcr.io/stratis-storage/stratisd/tang:38  # CURRENT DEVELOPMENT ENVIRONMENT
-        credentials:
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-        options: --privileged -p 80:80
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install dependencies for Fedora
-        # cracklib-dicts: https://github.com/stratis-storage/project/issues/581
-        run: >
-          dnf install -y
-          clang
-          cryptsetup-devel
-          clevis
-          clevis-luks
-          cracklib-dicts
-          curl
-          dbus-devel
-          device-mapper-devel
-          device-mapper-persistent-data
-          libblkid-devel
-          make
-          ncurses
-          sudo
-          systemd-devel
-          systemd-udev
-          xfsprogs
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          components: ${{ matrix.components }}
-          toolchain: ${{ matrix.toolchain }}
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
   stratis-cli-checks:
     runs-on: ubuntu-22.04
     container:
-      image: fedora:34  # LOWEST DEVELOPMENT ENVIRONMENT
+      image: fedora:35  # LOWEST DEVELOPMENT ENVIRONMENT
       options: --privileged --userns=host --ipc=host -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies
         run: >
           dnf install -y
@@ -169,7 +117,10 @@ jobs:
       - name: Workaround for dbus inotify
         run: cp stratisd.conf /usr/share/dbus-1/system.d
       - name: Check out stratis-cli
-        run: git clone https://github.com/stratis-storage/stratis-cli.git
+        run: >
+          git clone
+          https://github.com/stratis-storage/stratis-cli.git
+          --branch rebase-3.6.0
       - name: Run stratis-cli tests
         run: >
           RUST_LOG=stratisd=debug
@@ -181,10 +132,10 @@ jobs:
   stratis-min-cli-checks:
     runs-on: ubuntu-22.04
     container:
-      image: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:40  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged --userns=host --ipc=host -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies
         run: >
           dnf install -y
@@ -214,7 +165,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.73.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.81.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Run stratisd-min cli tests
         run: make test-stratisd-min
       - name: Run stratis-min cli tests
@@ -223,9 +174,9 @@ jobs:
   shell-checks:
     runs-on: ubuntu-22.04
     container:
-      image: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:40  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies
         run: >
           dnf install -y
@@ -235,13 +186,28 @@ jobs:
       - name: Run shell check
         run: make -f Makefile fmt-shell-ci
 
+  pylint:
+    runs-on: ubuntu-22.04
+    container:
+      image: fedora:40  # CURRENT DEVELOPMENT ENVIRONMENT
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: >
+          dnf install -y
+          make
+          pylint
+          python3-dbus
+      - name: Run pylint
+        run: make -f Makefile pylint
+
   python-based-tests:
     runs-on: ubuntu-22.04
     container:
-      image: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:40  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -264,7 +230,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.73.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.81.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd
@@ -281,12 +247,12 @@ jobs:
       matrix:
         include:
           - rev: HEAD
-            args: --log-level=debug stratisd_cert --verify-devices --monitor-dbus --highest-revision-number=6
-          - rev: v3.5.2
-            args: stratisd_cert --verify-devices
+            options: --post-test-check=verify-filesystem-symlinks --post-test-check=verify-pool-metadata --highest-revision-number=7
+          - rev: v3.6.2
+            options: --highest-revision-number=6
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Run apt-get update
         run: sudo apt-get -q update
       - name: Install dependencies
@@ -311,6 +277,7 @@ jobs:
           sudo python -m pip install
           dbus-python
           dbus-python-client-gen
+          justbytes
           psutil
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -333,6 +300,10 @@ jobs:
         run: >
           sudo
           RUST_LOG=stratisd=debug
-          python3 test_harness.py
-          ${{ matrix.args }}
+          python3 test_harness.py --log-level=debug
+          stratisd_cert
+          --post-test-check=monitor-dbus
+          --post-test-check=verify-sysfs
+          --post-test-check=verify-private-symlinks
+          ${{ matrix.options }}
         working-directory: ./testing

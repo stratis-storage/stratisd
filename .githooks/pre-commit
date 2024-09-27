@@ -4,13 +4,14 @@ export PROFILEDIR=debug
 
 make fmt-ci &&
 	make build &&
-	make stratis-dumpmetadata &&
+	make stratisd-tools &&
 	make build-min &&
 	make build-no-ipc &&
 	make test &&
 	make clippy &&
 	make yamllint &&
 	make tmtlint &&
+	make pylint &&
 	make check-typos || exit 1
 
 export PYTHONPATH=$PWD/tests/client-dbus/src

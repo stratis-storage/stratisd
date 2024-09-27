@@ -52,7 +52,7 @@ impl MetadataVol {
 
     /// Initialize a new Metadata Volume.
     pub fn initialize(pool_uuid: PoolUuid, dev: LinearDev) -> StratisResult<MetadataVol> {
-        create_fs(&dev.devnode(), Some(StratisUuid::Pool(pool_uuid)), false)?;
+        create_fs(&dev.devnode(), Some(StratisUuid::Pool(pool_uuid)))?;
         MetadataVol::setup(pool_uuid, dev)
     }
 
@@ -110,7 +110,7 @@ impl MetadataVol {
         uuid: FilesystemUuid,
         fs: &StratFilesystem,
     ) -> StratisResult<()> {
-        let data = serde_json::to_string(&fs.record(name, uuid))?;
+        let data = serde_json::to_vec(&fs.record(name, uuid))?;
         let path = self
             .mount_pt
             .join(FILESYSTEM_DIR)
@@ -123,9 +123,10 @@ impl MetadataVol {
             let mut mdv_record_file = OpenOptions::new()
                 .write(true)
                 .create(true)
+                .truncate(true)
                 .open(&temp_path)?;
 
-            mdv_record_file.write_all(data.as_bytes())?;
+            mdv_record_file.write_all(&data)?;
             // This ultimately results in an fsync() on the file.
             mdv_record_file.sync_all()?;
         }
@@ -191,17 +192,16 @@ impl MetadataVol {
 
     /// Tear down a Metadata Volume.
     pub fn teardown(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
-        if let Err(e) = retry_with_index(Fixed::from_millis(100).take(2), |i| {
-            trace!("MDV unmount attempt {}", i);
-            umount(&self.mount_pt)
-        }) {
-            return Err(match e {
-                retry::Error::Internal(msg) => StratisError::Msg(msg),
-                retry::Error::Operation { error, .. } => StratisError::Chained(
-                    "Failed to unmount MDV".to_string(),
-                    Box::new(StratisError::from(error)),
-                ),
-            });
+        if let Err(retry::Error { error, .. }) =
+            retry_with_index(Fixed::from_millis(100).take(2), |i| {
+                trace!("MDV unmount attempt {}", i);
+                umount(&self.mount_pt)
+            })
+        {
+            return Err(StratisError::Chained(
+                "Failed to unmount MDV".to_string(),
+                Box::new(StratisError::from(error)),
+            ));
         }
 
         if let Err(err) = remove_dir(&self.mount_pt) {
@@ -266,17 +266,16 @@ impl Drop for MetadataVol {
             };
 
             if mtpt_stat.st_dev != parent_stat.st_dev {
-                if let Err(e) = retry_with_index(Fixed::from_millis(100).take(2), |i| {
-                    trace!("MDV unmount attempt {}", i);
-                    umount(mount_pt)
-                }) {
-                    Err(match e {
-                        retry::Error::Internal(msg) => StratisError::Msg(msg),
-                        retry::Error::Operation { error, .. } => StratisError::Chained(
-                            "Failed to unmount MDV".to_string(),
-                            Box::new(StratisError::from(error)),
-                        ),
+                if let Err(retry::Error { error, .. }) =
+                    retry_with_index(Fixed::from_millis(100).take(2), |i| {
+                        trace!("MDV unmount attempt {}", i);
+                        umount(mount_pt)
                     })
+                {
+                    Err(StratisError::Chained(
+                        "Failed to unmount MDV".to_string(),
+                        Box::new(StratisError::from(error)),
+                    ))
                 } else {
                     Ok(())
                 }

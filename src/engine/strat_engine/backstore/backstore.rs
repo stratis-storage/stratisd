@@ -26,7 +26,6 @@ use crate::{
                 data_tier::DataTier,
                 devices::UnownedDevices,
                 shared::BlockSizeSummary,
-                transaction::RequestTransaction,
             },
             dm::{get_dm, list_of_backstore_devices, remove_optional_devices},
             metadata::{MDADataSize, BDA},
@@ -126,9 +125,9 @@ impl Backstore {
     ///
     /// Precondition:
     ///   * key_description.is_some() -> every StratBlockDev in datadevs has a
-    ///   key description and that key description == key_description
+    ///     key description and that key description == key_description
     ///   * key_description.is_none() -> no StratBlockDev in datadevs has a
-    ///   key description.
+    ///     key description.
     ///   * no StratBlockDev in cachedevs has a key description
     ///
     /// Postcondition:
@@ -416,59 +415,41 @@ impl Backstore {
     /// retained as a convenience to the caller.
     /// Postcondition:
     /// forall i, result_i.0 = result_(i - 1).0 + result_(i - 1).1
-    pub fn request_alloc(
+    ///
+    /// WARNING: metadata changing event
+    pub fn alloc(
         &mut self,
+        pool_uuid: PoolUuid,
         sizes: &[Sectors],
-    ) -> StratisResult<Option<RequestTransaction>> {
-        let mut transaction = match self.data_tier.alloc_request(sizes)? {
-            Some(t) => t,
-            None => return Ok(None),
-        };
+    ) -> StratisResult<Option<Vec<(Sectors, Sectors)>>> {
+        let total_required = sizes.iter().cloned().sum();
+        if self.available_in_backstore() < total_required {
+            return Ok(None);
+        }
 
-        let mut next = self.next;
+        if self.data_tier.alloc(sizes) {
+            self.extend_cap_device(pool_uuid)?;
+        } else {
+            return Ok(None);
+        }
+
+        let mut chunks = Vec::new();
         for size in sizes {
-            transaction.add_seg_req((next, *size));
-            next += *size
+            chunks.push((self.next, *size));
+            self.next += *size;
         }
 
         // Assert that the postcondition holds.
         assert_eq!(
             sizes,
-            transaction
-                .get_backstore()
+            chunks
                 .iter()
                 .map(|x| x.1)
                 .collect::<Vec<Sectors>>()
                 .as_slice()
         );
 
-        Ok(Some(transaction))
-    }
-
-    /// Commit space requested by request_alloc() to metadata.
-    ///
-    /// This method commits the newly allocated data segments and then extends the cap device
-    /// to be the same size as the allocated data size.
-    pub fn commit_alloc(
-        &mut self,
-        pool_uuid: PoolUuid,
-        transaction: RequestTransaction,
-    ) -> StratisResult<()> {
-        let segs = transaction.get_backstore();
-        self.data_tier.alloc_commit(transaction)?;
-        // This must occur after the segments have been updated in the data tier
-        self.extend_cap_device(pool_uuid)?;
-
-        assert!(self.next <= self.size());
-
-        self.next += segs
-            .into_iter()
-            .fold(Sectors(0), |mut size, (_, next_size)| {
-                size += next_size;
-                size
-            });
-
-        Ok(())
+        Ok(Some(chunks))
     }
 
     /// Get only the datadevs in the pool.
@@ -542,6 +523,7 @@ impl Backstore {
     /// DM devices. But the devicemapper library stores the data from which
     /// the size of each DM device is calculated; the result is computed and
     /// no ioctl is required.
+    #[cfg(test)]
     fn size(&self) -> Sectors {
         self.linear
             .as_ref()
@@ -650,13 +632,18 @@ impl Backstore {
         self.data_tier.save_state(metadata)
     }
 
+    /// Read the currently saved state from the data tier's devices.
+    pub fn load_state(&self) -> StratisResult<Vec<u8>> {
+        self.data_tier.load_state()
+    }
+
     /// Set user info field on the specified blockdev.
     /// May return an error if there is no blockdev for the given UUID.
     ///
     /// * Ok(Some(uuid)) provides the uuid of the changed blockdev
     /// * Ok(None) is returned if the blockdev was unchanged
     /// * Err(StratisError::Engine(_)) is returned if the UUID
-    /// does not correspond to a blockdev
+    ///   does not correspond to a blockdev
     pub fn set_blockdev_user_info(
         &mut self,
         uuid: DevUuid,
@@ -707,9 +694,9 @@ impl Backstore {
     ///
     /// * Returns Ok(true) if the binding was performed.
     /// * Returns Ok(false) if the binding had already been previously performed and
-    /// nothing was changed.
+    ///   nothing was changed.
     /// * Returns Err(_) if an inconsistency was found in the metadata across pools
-    /// or binding failed.
+    ///   or binding failed.
     pub fn bind_clevis(&mut self, pin: &str, clevis_info: &Value) -> StratisResult<bool> {
         let encryption_info = match pool_enc_to_enc!(self.encryption_info()) {
             Some(ei) => ei,
@@ -736,7 +723,7 @@ impl Backstore {
             if (existing_pin.as_str(), &config_to_check) == (pin, &parsed_config)
                 && CryptHandle::can_unlock(
                     self.blockdevs()
-                        .get(0)
+                        .first()
                         .expect("Must have at least one blockdev")
                         .2
                         .physical_path(),
@@ -764,9 +751,9 @@ impl Backstore {
     ///
     /// * Returns Ok(true) if the unbinding was performed.
     /// * Returns Ok(false) if the unbinding had already been previously performed and
-    /// nothing was changed.
+    ///   nothing was changed.
     /// * Returns Err(_) if an inconsistency was found in the metadata across pools
-    /// or unbinding failed.
+    ///   or unbinding failed.
     pub fn unbind_clevis(&mut self) -> StratisResult<bool> {
         let encryption_info = match pool_enc_to_enc!(self.encryption_info()) {
             Some(ei) => ei,
@@ -793,9 +780,9 @@ impl Backstore {
     ///
     /// * Returns Ok(true) if the binding was performed.
     /// * Returns Ok(false) if the binding had already been previously performed and
-    /// nothing was changed.
+    ///   nothing was changed.
     /// * Returns Err(_) if an inconsistency was found in the metadata across pools
-    /// or binding failed.
+    ///   or binding failed.
     pub fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<bool> {
         let encryption_info = match pool_enc_to_enc!(self.encryption_info()) {
             Some(ei) => ei,
@@ -810,7 +797,7 @@ impl Backstore {
             if kd == key_desc {
                 if CryptHandle::can_unlock(
                     self.blockdevs()
-                        .get(0)
+                        .first()
                         .expect("Must have at least one blockdev")
                         .2
                         .physical_path(),
@@ -848,9 +835,9 @@ impl Backstore {
     ///
     /// * Returns Ok(true) if the unbinding was performed.
     /// * Returns Ok(false) if the unbinding had already been previously performed and
-    /// nothing was changed.
+    ///   nothing was changed.
     /// * Returns Err(_) if an inconsistency was found in the metadata across pools
-    /// or unbinding failed.
+    ///   or unbinding failed.
     pub fn unbind_keyring(&mut self) -> StratisResult<bool> {
         let encryption_info = match pool_enc_to_enc!(self.encryption_info()) {
             Some(ei) => ei,
@@ -1179,11 +1166,10 @@ mod tests {
         invariant(&backstore);
 
         // Allocate space from the backstore so that the cap device is made.
-        let transaction = backstore
-            .request_alloc(&[INITIAL_BACKSTORE_ALLOCATION])
+        backstore
+            .alloc(pool_uuid, &[INITIAL_BACKSTORE_ALLOCATION])
             .unwrap()
             .unwrap();
-        backstore.commit_alloc(pool_uuid, transaction).unwrap();
 
         let cache_uuids = backstore
             .init_cache(pool_name.clone(), pool_uuid, initcachedevs, None)
@@ -1295,11 +1281,10 @@ mod tests {
         invariant(&backstore);
 
         // Allocate space from the backstore so that the cap device is made.
-        let transaction = backstore
-            .request_alloc(&[INITIAL_BACKSTORE_ALLOCATION])
+        backstore
+            .alloc(pool_uuid, &[INITIAL_BACKSTORE_ALLOCATION])
             .unwrap()
             .unwrap();
-        backstore.commit_alloc(pool_uuid, transaction).unwrap();
 
         let old_device = backstore.device();
 

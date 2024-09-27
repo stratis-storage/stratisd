@@ -41,6 +41,13 @@ pub struct SimPool {
     enable_overprov: bool,
 }
 
+#[derive(Debug, Eq, PartialEq, Serialize)]
+pub struct PoolSave {
+    name: String,
+    fs_limit: Option<u64>,
+    enable_overprov: Option<bool>,
+}
+
 impl SimPool {
     pub fn new(paths: &[&Path], enc_info: Option<&EncryptionInfo>) -> (PoolUuid, SimPool) {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
@@ -116,6 +123,21 @@ impl SimPool {
             Err(StratisError::Msg(format!("The pool limit of {} filesystems has already been reached; increase the filesystem limit on the pool to continue", self.fs_limit)))
         } else {
             Ok(())
+        }
+    }
+
+    fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut SimFilesystem)> {
+        self.filesystems
+            .iter_mut()
+            .map(|(name, uuid, x)| (name.clone(), *uuid, x))
+            .collect()
+    }
+
+    pub fn record(&self, name: &str) -> PoolSave {
+        PoolSave {
+            name: name.to_owned(),
+            enable_overprov: Some(self.enable_overprov),
+            fs_limit: Some(self.fs_limit),
         }
     }
 }
@@ -243,7 +265,7 @@ impl Pool for SimPool {
         for (name, (size, size_limit)) in spec_map {
             if !self.filesystems.contains_name(name) {
                 let uuid = FilesystemUuid::new_v4();
-                let new_filesystem = SimFilesystem::new(size, size_limit)?;
+                let new_filesystem = SimFilesystem::new(size, size_limit, None)?;
                 self.filesystems
                     .insert(Name::new((name).to_owned()), uuid, new_filesystem);
                 result.push((name, uuid, size));
@@ -475,15 +497,34 @@ impl Pool for SimPool {
     fn destroy_filesystems(
         &mut self,
         _pool_name: &str,
-        fs_uuids: &[FilesystemUuid],
-    ) -> StratisResult<SetDeleteAction<FilesystemUuid>> {
+        fs_uuids: &HashSet<FilesystemUuid>,
+    ) -> StratisResult<SetDeleteAction<FilesystemUuid, FilesystemUuid>> {
         let mut removed = Vec::new();
         for &uuid in fs_uuids {
             if self.filesystems.remove_by_uuid(uuid).is_some() {
                 removed.push(uuid);
             }
         }
-        Ok(SetDeleteAction::new(removed))
+
+        let updated_origins: Vec<FilesystemUuid> = self
+            .filesystems_mut()
+            .iter_mut()
+            .filter_map(|(_, u, fs)| {
+                fs.origin().and_then(|x| {
+                    if removed.contains(&x) {
+                        if fs.unset_origin() {
+                            Some(*u)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect();
+
+        Ok(SetDeleteAction::new(removed, updated_origins))
     }
 
     fn rename_filesystem(
@@ -533,7 +574,11 @@ impl Pool for SimPool {
                         return Ok(CreateAction::Identity);
                     }
                 }
-                SimFilesystem::new(filesystem.size(), filesystem.size_limit())?
+                SimFilesystem::new(
+                    filesystem.size(),
+                    filesystem.size_limit(),
+                    Some(origin_uuid),
+                )?
             }
             None => {
                 return Err(StratisError::Msg(origin_uuid.to_string()));
@@ -628,6 +673,7 @@ impl Pool for SimPool {
         uuid: DevUuid,
         user_info: Option<&str>,
     ) -> StratisResult<RenameAction<DevUuid>> {
+        user_info.map(validate_name).transpose()?;
         Ok(self.get_mut_blockdev_internal(uuid).map_or_else(
             || RenameAction::NoSource,
             |(_, b)| {
@@ -708,6 +754,38 @@ impl Pool for SimPool {
         } else {
             Ok(PropChangeAction::Identity)
         }
+    }
+
+    fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {
+        serde_json::to_string(&self.record(pool_name)).map_err(|e| e.into())
+    }
+
+    fn last_metadata(&self) -> StratisResult<String> {
+        // Just invent a name for the pool; a sim pool has no real metadata
+        serde_json::to_string(&self.record("<name>")).map_err(|e| e.into())
+    }
+
+    fn current_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String> {
+        serde_json::to_string(
+            &self
+                .filesystems
+                .iter()
+                .filter_map(|(name, uuid, fs)| {
+                    if fs_name.map(|n| *n == **name).unwrap_or(true) {
+                        Some((uuid, fs.record(name, *uuid)))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<HashMap<_, _>>(),
+        )
+        .map_err(|e| e.into())
+    }
+
+    fn last_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String> {
+        // The sim pool doesn't write data, so the last fs metadata and the
+        // current fs metadata are, by definition, the same.
+        self.current_fs_metadata(fs_name)
     }
 }
 
@@ -837,7 +915,7 @@ mod tests {
         .changed()
         .unwrap();
         let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
-        assert!(match pool.destroy_filesystems(pool_name, &[]) {
+        assert!(match pool.destroy_filesystems(pool_name, &HashSet::new()) {
             Ok(uuids) => !uuids.is_changed(),
             _ => false,
         });
@@ -858,7 +936,7 @@ mod tests {
         .unwrap();
         let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
         assert_matches!(
-            pool.destroy_filesystems(pool_name, &[FilesystemUuid::new_v4()]),
+            pool.destroy_filesystems(pool_name, &[FilesystemUuid::new_v4()].into()),
             Ok(_)
         );
     }
@@ -883,10 +961,12 @@ mod tests {
             .changed()
             .unwrap();
         let fs_uuid = fs_results[0].1;
-        assert!(match pool.destroy_filesystems(pool_name, &[fs_uuid]) {
-            Ok(filesystems) => filesystems == SetDeleteAction::new(vec![fs_uuid]),
-            _ => false,
-        });
+        assert!(
+            match pool.destroy_filesystems(pool_name, &[fs_uuid].into()) {
+                Ok(filesystems) => filesystems == SetDeleteAction::new(vec![fs_uuid], vec![]),
+                _ => false,
+            }
+        );
     }
 
     #[test]

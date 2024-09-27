@@ -7,7 +7,6 @@ use std::{
     error::Error,
     fs::{File, OpenOptions},
     io::{Read, Write},
-    os::unix::io::AsRawFd,
     str::FromStr,
 };
 
@@ -15,7 +14,7 @@ use clap::{Arg, Command};
 use env_logger::Builder;
 use log::LevelFilter;
 use nix::{
-    fcntl::{flock, FlockArg},
+    fcntl::{Flock, FlockArg},
     unistd::getpid,
 };
 
@@ -43,8 +42,9 @@ fn parse_args() -> Command {
 
 /// To ensure only one instance of stratisd runs at a time, acquire an
 /// exclusive lock. Return an error if lock attempt fails.
-fn trylock_pid_file() -> StratisResult<File> {
-    let mut f = OpenOptions::new()
+fn trylock_pid_file() -> StratisResult<Flock<File>> {
+    #[allow(clippy::suspicious_open_options)]
+    let f = OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
@@ -57,12 +57,13 @@ fn trylock_pid_file() -> StratisResult<File> {
                 Box::new(StratisError::from(err)),
             )
         })?;
-    let stratisd_min_file = match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
-        Ok(_) => {
+    let stratisd_min_file = match Flock::lock(f, FlockArg::LockExclusiveNonblock) {
+        Ok(mut f) => {
+            f.set_len(0)?;
             f.write_all(getpid().to_string().as_bytes())?;
             f
         }
-        Err(_) => {
+        Err((mut f, _)) => {
             let mut buf = String::new();
 
             if f.read_to_string(&mut buf).is_err() {
@@ -75,7 +76,8 @@ fn trylock_pid_file() -> StratisResult<File> {
         }
     };
 
-    let mut f = OpenOptions::new()
+    #[allow(clippy::suspicious_open_options)]
+    let f = OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
@@ -86,9 +88,9 @@ fn trylock_pid_file() -> StratisResult<File> {
                 Box::new(StratisError::from(err)),
             )
         })?;
-    match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
-        Ok(_) => drop(f),
-        Err(_) => {
+    match Flock::lock(f, FlockArg::LockExclusiveNonblock) {
+        Ok(_) => (),
+        Err((mut f, _)) => {
             let mut buf = String::new();
 
             if f.read_to_string(&mut buf).is_err() {

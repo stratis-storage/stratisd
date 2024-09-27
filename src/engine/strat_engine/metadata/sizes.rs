@@ -6,7 +6,7 @@ pub use self::{
     bda_size::{BDAExtendedSize, ReservedSize},
     blkdev_size::BlockdevSize,
     mda_size::{MDADataSize, MDARegionSize, MDASize},
-    static_header_size::{StaticHeaderSize, STATIC_HEADER_SIZE},
+    static_header_size::STATIC_HEADER_SIZE,
 };
 
 /// A module which defines constants and types related to static header sizes.
@@ -63,6 +63,7 @@ pub mod mda_size {
     /// It is constructed in one of two ways:
     /// * By reading a value from a device in constructing a StaticHeader
     /// * MDARegionSize::mda_size
+    ///
     /// Since only a valid MDASize can be constructed, only a valid MDASize
     /// can be written. An error on reading ought to be detected by
     /// checksums.
@@ -98,6 +99,7 @@ pub mod mda_size {
     /// Values of this type are created by one of two methods:
     /// * MDASize::region_size
     /// * MDADataSize::region_size
+    ///
     /// Since an MDADataSize is always at least the minimum required by the
     /// design specification, MDADataSize::region_size() always yields a
     /// value of at least the minimum required size.

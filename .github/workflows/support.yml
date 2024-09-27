@@ -6,15 +6,21 @@ name: stratisd support CI
 on:
   push:
     branches:
-      - master
+      - rebase-3.6.0
     paths:
+      - ".packit.yaml"
+      - "plans/**"
+      - "tests-fmf/**"
       - "**/*.yml"
       - "tests/**"
       - "!tests/**/README.*"
   pull_request:
     branches:
-      - master
+      - rebase-3.6.0
     paths:
+      - ".packit.yaml"
+      - "plans/**"
+      - "tests-fmf/**"
       - "**/*.yml"
       - "tests/**"
       - "!tests/**/README.*"
@@ -40,6 +46,7 @@ jobs:
               python3-psutil
               python3-pyudev
               python3-semantic_version
+              python3-tenacity
             task: PYTHONPATH=./src make -f Makefile lint
             working-directory: ./tests/client-dbus
           - dependencies: black python3-isort
@@ -49,9 +56,9 @@ jobs:
             task: make -f Makefile yamllint tmtlint
             working-directory: .
     runs-on: ubuntu-22.04
-    container: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
+    container: fedora:40  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies
         run: >
           dnf install -y

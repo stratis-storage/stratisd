@@ -70,7 +70,11 @@ pub fn get_kernel_cmdline() -> Result<HashMap<String, Option<Vec<String>>>, io::
 }
 
 pub fn write_unit_file(dest: &Path, file_contents: String) -> Result<(), io::Error> {
-    let mut file = OpenOptions::new().write(true).create(true).open(dest)?;
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(dest)?;
     file.write_all(file_contents.as_bytes())?;
     Ok(())
 }

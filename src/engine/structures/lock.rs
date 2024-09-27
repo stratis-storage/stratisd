@@ -145,7 +145,10 @@ where
     U: AsUuid,
 {
     /// * Asserts that tasks performing an actions either are performing an action immediately
-    /// after being spawned or are in the list of woken tasks.
+    ///   clippyafter being spawned or are in the list of woken tasks.
+    ///
+    /// NOTE: This method has the side effect of clearing a woken waiter if it is the waiter that
+    /// is currently acquiring the lock.
     fn woken_or_new(&mut self, wait_type: Option<&WaitType<U>>, idx: u64) {
         if self.woken.contains_key(&idx) {
             let woken = self.woken.remove(&idx);
@@ -156,10 +159,13 @@ where
     }
 
     /// * Asserts that tasks performing an actions either are performing an action immediately
-    /// after being spawned or are in the list of woken tasks.
+    ///   after being spawned or are in the list of woken tasks.
     /// * Asserts that the current task never conflicts with tasks that have been woken but
-    /// not processed yet.
-    fn assert(&mut self, wait_type: &WaitType<U>, idx: u64) {
+    ///   not processed yet.
+    ///
+    /// NOTE: This method has the side effect of clearing a woken waiter if it is the waiter that
+    /// is currently acquiring the lock.
+    fn pre_acquire_assertion(&mut self, wait_type: &WaitType<U>, idx: u64) {
         self.woken_or_new(Some(wait_type), idx);
         assert!(!self.conflicts_with_woken(wait_type));
     }
@@ -176,7 +182,7 @@ where
         }
 
         if let Some(i) = idx {
-            self.assert(&WaitType::SomeRead(uuid), i);
+            self.pre_acquire_assertion(&WaitType::SomeRead(uuid), i);
         }
 
         trace!("Lock record after acquisition: {}", self);
@@ -201,7 +207,7 @@ where
         self.write_locked.insert(uuid);
 
         if let Some(i) = idx {
-            self.assert(&WaitType::SomeWrite(uuid), i);
+            self.pre_acquire_assertion(&WaitType::SomeWrite(uuid), i);
         }
 
         trace!("Lock record after acquisition: {}", self);
@@ -218,7 +224,7 @@ where
     fn add_read_all_lock(&mut self, idx: u64) {
         self.all_read_locked += 1;
 
-        self.assert(&WaitType::AllRead, idx);
+        self.pre_acquire_assertion(&WaitType::AllRead, idx);
 
         trace!("Lock record after acquisition: {}", self);
     }
@@ -237,7 +243,7 @@ where
     fn add_write_all_lock(&mut self, idx: u64) {
         self.all_write_locked = true;
 
-        self.assert(&WaitType::AllWrite, idx);
+        self.pre_acquire_assertion(&WaitType::AllWrite, idx);
 
         trace!("Lock record after acquisition: {}", self);
     }
@@ -285,9 +291,8 @@ where
 
     /// Returns true if the current request should be put in the wait queue.
     /// * Always returns false if the index for the given request is in the record of woken
-    /// tasks.
-    /// * Otherwise, returns true if any of the following conditions are met:
-    ///   * There are already tasks waiting in the queue.
+    ///   tasks.
+    /// * Otherwise, returns true if either of the following conditions are met:
     ///   * The lock already has a conflicting acquisition.
     ///   * The request conflicts with any tasks that have already been woken up.
     fn should_wait(&self, ty: &WaitType<U>, idx: u64) -> bool {
@@ -299,9 +304,7 @@ where
             );
             false
         } else {
-            let should_wait = !self.waiting.is_empty()
-                || self.already_acquired(ty)
-                || self.conflicts_with_woken(ty);
+            let should_wait = self.already_acquired(ty) || self.conflicts_with_woken(ty);
             if should_wait {
                 trace!(
                     "Putting task with index {}, wait type {:?} to sleep",
@@ -366,25 +369,17 @@ where
         }
     }
 
-    /// Determines whether a task should be woken up from the queue.
-    /// Returns true if:
-    /// * The waiting task does not conflict with any already woken tasks.
-    /// * The waiting task does not conflict with any locks currently held.
-    fn should_wake(&self) -> bool {
-        if let Some(w) = self.waiting.get(0) {
-            !self.conflicts_with_woken(&w.ty) && !self.already_acquired(&w.ty)
-        } else {
-            false
-        }
-    }
-
-    /// Wake all non-conflicting tasks in the queue and stop at the first conflicting task.
+    /// Wake all non-conflicting tasks in the queue.
     /// Adds all woken tasks to the record of woken tasks.
     fn wake(&mut self) {
-        while self.should_wake() {
-            if let Some(w) = self.waiting.pop_front() {
-                self.woken.insert(w.idx, w.ty);
-                w.waker.wake();
+        let mut waiting = VecDeque::new();
+        std::mem::swap(&mut waiting, &mut self.waiting);
+        for waiter in waiting.drain(..) {
+            if !self.conflicts_with_woken(&waiter.ty) && !self.already_acquired(&waiter.ty) {
+                self.woken.insert(waiter.idx, waiter.ty);
+                waiter.waker.wake();
+            } else {
+                self.waiting.push_back(waiter);
             }
         }
     }
@@ -521,7 +516,7 @@ where
     /// This counter performs wrapping addition so the maximum number of futures supported by
     /// this lock is u64::MAX.
     fn next_idx(&self) -> u64 {
-        let (mut lock_record, _) = self.acquire_mutex();
+        let (mut lock_record, _unused) = self.acquire_mutex();
         let idx = lock_record.next_idx;
         lock_record.next_idx = lock_record.next_idx.wrapping_add(1);
         idx

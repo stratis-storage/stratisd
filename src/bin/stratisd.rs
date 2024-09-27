@@ -6,7 +6,6 @@ use std::{
     env,
     fs::{File, OpenOptions},
     io::{Read, Write},
-    os::unix::io::AsRawFd,
     process::exit,
     str::FromStr,
 };
@@ -17,7 +16,7 @@ use libc::pid_t;
 use log::LevelFilter;
 use nix::{
     errno::Errno,
-    fcntl::{flock, FlockArg},
+    fcntl::{Flock, FlockArg},
     sys::signal::{kill, Signal},
     unistd::{getpid, Pid},
 };
@@ -51,8 +50,9 @@ fn initialize_log(log_level: Option<&str>) {
 
 /// To ensure only one instance of stratisd runs at a time, acquire an
 /// exclusive lock. Return an error if lock attempt fails.
-fn trylock_pid_file() -> StratisResult<File> {
-    let mut f = OpenOptions::new()
+fn trylock_pid_file() -> StratisResult<Flock<File>> {
+    #[allow(clippy::suspicious_open_options)]
+    let f = OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
@@ -63,12 +63,13 @@ fn trylock_pid_file() -> StratisResult<File> {
                 Box::new(StratisError::from(err)),
             )
         })?;
-    let stratisd_file = match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
-        Ok(_) => {
+    let stratisd_file = match Flock::lock(f, FlockArg::LockExclusiveNonblock) {
+        Ok(mut f) => {
+            f.set_len(0)?;
             f.write_all(getpid().to_string().as_bytes())?;
             Ok(f)
         }
-        Err(_) => {
+        Err((mut f, _)) => {
             let mut buf = String::new();
 
             if f.read_to_string(&mut buf).is_err() {
@@ -81,7 +82,8 @@ fn trylock_pid_file() -> StratisResult<File> {
         }
     };
 
-    let mut f = OpenOptions::new()
+    #[allow(clippy::suspicious_open_options)]
+    let f = OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
@@ -95,24 +97,24 @@ fn trylock_pid_file() -> StratisResult<File> {
             )
         })?;
 
-    if let Err(Errno::EWOULDBLOCK) = flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
+    if let Err((mut f, Errno::EWOULDBLOCK)) = Flock::lock(f, FlockArg::LockExclusiveNonblock) {
         let mut string = String::new();
         f.read_to_string(&mut string)?;
         let pid = string
             .parse::<pid_t>()
             .map_err(|_| StratisError::Msg(format!("Failed to parse {} as PID", string)))?;
         kill(Pid::from_raw(pid), Signal::SIGINT)?;
-    }
 
-    match flock(f.as_raw_fd(), FlockArg::LockExclusive) {
-        Ok(_) => drop(f),
-        Err(e) => {
-            return Err(StratisError::Chained(
-                "Failed to wait on stratisd-min to exit".to_string(),
-                Box::new(StratisError::from(e)),
-            ))
-        }
-    };
+        match Flock::lock(f, FlockArg::LockExclusive) {
+            Ok(_) => (),
+            Err((_, e)) => {
+                return Err(StratisError::Chained(
+                    "Failed to wait on stratisd-min to exit".to_string(),
+                    Box::new(StratisError::from(e)),
+                ))
+            }
+        };
+    }
 
     stratisd_file
 }

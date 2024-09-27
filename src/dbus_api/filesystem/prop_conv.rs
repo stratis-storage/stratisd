@@ -4,7 +4,7 @@
 
 use devicemapper::{Bytes, Sectors};
 
-use crate::dbus_api::util::option_to_tuple;
+use crate::{dbus_api::util::option_to_tuple, engine::FilesystemUuid};
 
 /// Generate D-Bus representation of filesystem size property.
 #[inline]
@@ -22,4 +22,10 @@ pub fn fs_used_to_prop(used: Option<Bytes>) -> (bool, String) {
 #[inline]
 pub fn fs_size_limit_to_prop(limit: Option<Sectors>) -> (bool, String) {
     option_to_tuple(limit.map(|u| (*u.bytes()).to_string()), String::new())
+}
+
+/// Generate D-Bus representation of filesystem origin property.
+#[inline]
+pub fn fs_origin_to_prop(origin: Option<FilesystemUuid>) -> (bool, String) {
+    option_to_tuple(origin.map(|u| (uuid_to_string!(u))), String::new())
 }

@@ -690,22 +690,15 @@ impl Engine for StratEngine {
         };
         if let Some(pool_uuid) = pool_uuid {
             if has_partially_constructed {
-                if stopped_pools.stopped.get(&pool_uuid).is_some() {
+                if stopped_pools.stopped.contains_key(&pool_uuid) {
                     return Ok(StopAction::Identity);
-                } else if stopped_pools
-                    .partially_constructed
-                    .get(&pool_uuid)
-                    .is_some()
-                {
+                } else if stopped_pools.partially_constructed.contains_key(&pool_uuid) {
                     let mut lim_devs = self.liminal_devices.write().await;
                     spawn_blocking!(lim_devs.stop_partially_constructed_pool(pool_uuid))??;
                     return Ok(StopAction::CleanedUp(pool_uuid));
                 }
-            } else if stopped_pools.stopped.get(&pool_uuid).is_some()
-                || stopped_pools
-                    .partially_constructed
-                    .get(&pool_uuid)
-                    .is_some()
+            } else if stopped_pools.stopped.contains_key(&pool_uuid)
+                || stopped_pools.partially_constructed.contains_key(&pool_uuid)
             {
                 return Ok(StopAction::Identity);
             }
@@ -819,20 +812,18 @@ mod test {
             let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid1))).unwrap();
             pool.destroy_filesystems(
                 name2,
-                fs_uuid1
+                &fs_uuid1
                     .into_iter()
                     .map(|(_, u, _)| u)
-                    .collect::<Vec<_>>()
-                    .as_slice(),
+                    .collect::<HashSet<_>>(),
             )
             .unwrap();
             pool.destroy_filesystems(
                 name2,
-                fs_uuid2
+                &fs_uuid2
                     .into_iter()
                     .map(|(_, u, _)| u)
-                    .collect::<Vec<_>>()
-                    .as_slice(),
+                    .collect::<HashSet<_>>(),
             )
             .unwrap();
         }

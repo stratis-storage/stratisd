@@ -169,7 +169,10 @@ jobs:
       - name: Workaround for dbus inotify
         run: cp stratisd.conf /usr/share/dbus-1/system.d
       - name: Check out stratis-cli
-        run: git clone https://github.com/stratis-storage/stratis-cli.git
+        run: >
+          git clone
+          https://github.com/stratis-storage/stratis-cli.git
+          --branch rebase-3.6.0
       - name: Run stratis-cli tests
         run: >
           RUST_LOG=stratisd=debug

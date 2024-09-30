@@ -283,12 +283,12 @@ pub fn pool_avail_actions_prop(pool: &dyn Pool) -> String {
 
 /// Generate D-Bus representation of a pool key description property.
 pub fn pool_key_desc_prop(pool: &dyn Pool) -> (bool, (bool, String)) {
-    prop_conv::key_desc_to_prop(pool.encryption_info())
+    prop_conv::key_desc_to_prop(pool.encryption_info_legacy())
 }
 
 /// Generate D-Bus representation of a pool Clevis info property.
 pub fn pool_clevis_info_prop(pool: &dyn Pool) -> (bool, (bool, (String, String))) {
-    prop_conv::clevis_info_to_prop(pool.encryption_info())
+    prop_conv::clevis_info_to_prop(pool.encryption_info_legacy())
 }
 
 /// Generate D-Bus representation of a boolean indicating whether the pool

@@ -30,7 +30,7 @@ use crate::{
             shared::{bds_to_bdas, tiers_to_bdas},
             types::{BDARecordResult, BDAResult},
         },
-        types::{BlockDevTier, DevUuid, DevicePath, Name},
+        types::{BlockDevTier, DevUuid, DevicePath, Name, TokenUnlockMethod},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -189,7 +189,7 @@ pub fn get_feature_set(
 /// infos and bdas are identical.
 pub fn get_blockdevs_legacy(
     backstore_save: &BackstoreSave,
-    infos: &HashMap<DevUuid, LStratisDevInfo>,
+    infos: &HashMap<DevUuid, Box<LStratisDevInfo>>,
     mut bdas: HashMap<DevUuid, BDA>,
 ) -> BDARecordResult<(Vec<v1::StratBlockDev>, Vec<v1::StratBlockDev>)> {
     let recorded_data_map: HashMap<DevUuid, (usize, &BaseBlockDevSave)> = backstore_save
@@ -290,7 +290,7 @@ pub fn get_blockdevs_legacy(
 /// infos and bdas are identical.
 pub fn get_blockdevs(
     backstore_save: &BackstoreSave,
-    infos: &HashMap<DevUuid, LStratisDevInfo>,
+    infos: &HashMap<DevUuid, Box<LStratisDevInfo>>,
     mut bdas: HashMap<DevUuid, BDA>,
 ) -> BDARecordResult<(Vec<v2::StratBlockDev>, Vec<v2::StratBlockDev>)> {
     let recorded_data_map: HashMap<DevUuid, (usize, &BaseBlockDevSave)> = backstore_save
@@ -451,7 +451,7 @@ fn get_blockdev_legacy(
         Some(luks) => &luks.dev_info.devnode,
         None => &info.dev_info.devnode,
     };
-    let handle = match CryptHandle::setup(physical_path, None, None) {
+    let handle = match CryptHandle::setup(physical_path, TokenUnlockMethod::None, None) {
         Ok(h) => h,
         Err(e) => return Err((e, bda)),
     };

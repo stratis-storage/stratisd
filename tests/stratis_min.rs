@@ -75,20 +75,15 @@ fn test_stratis_min_create_with_clevis_1() {
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();
     cmd.arg("pool")
         .arg("create")
-        .arg("--clevis")
-        .arg("tang")
-        .arg("--tang-url")
-        .arg("url")
-        .arg("--thumbprint")
-        .arg("jkj")
-        .arg("--trust-url")
+        .arg("--clevis-infos")
+        .arg("pin=tang tang_url=url thumbprint=jkj trust_url")
         .arg("pn")
         .arg("/dev/n");
     cmd.assert()
         .failure()
-        .code(2)
+        .code(1)
         .stderr(predicate::str::contains(
-            "'--thumbprint <thumbprint>' cannot be used with '--trust-url'",
+            "thumbprint= cannot be used with trust_url",
         ));
 }
 
@@ -97,11 +92,8 @@ fn stratis_min_create_with_clevis_url() {
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();
     cmd.arg("pool")
         .arg("create")
-        .arg("--clevis")
-        .arg("tang")
-        .arg("--tang-url")
-        .arg("url")
-        .arg("--trust-url")
+        .arg("--clevis-infos")
+        .arg("pin=tang tang_url=url trust_url")
         .arg("pn")
         .arg("/dev/n");
     cmd.assert().success();
@@ -117,12 +109,8 @@ fn stratis_min_create_with_clevis_thumbprint() {
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();
     cmd.arg("pool")
         .arg("create")
-        .arg("--clevis")
-        .arg("tang")
-        .arg("--tang-url")
-        .arg("url")
-        .arg("--thumbprint")
-        .arg("jkj")
+        .arg("--clevis-infos")
+        .arg("pin=tang tang_url=url thumbprint=jkj")
         .arg("pn")
         .arg("/dev/n");
     cmd.assert().success();
@@ -138,8 +126,8 @@ fn stratis_min_create_with_clevis_tpm() {
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();
     cmd.arg("pool")
         .arg("create")
-        .arg("--clevis")
-        .arg("tpm2")
+        .arg("--clevis-infos")
+        .arg("pin=tpm2")
         .arg("pn")
         .arg("/dev/n");
     cmd.assert().success();
@@ -156,16 +144,14 @@ fn test_stratis_min_create_with_clevis_invalid() {
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();
     cmd.arg("pool")
         .arg("create")
-        .arg("--clevis")
-        .arg("nosuch")
+        .arg("--clevis-infos")
+        .arg("pin=nosuch")
         .arg("pn")
         .arg("/dev/n");
     cmd.assert()
         .failure()
-        .code(2)
-        .stderr(predicate::str::contains(
-            "invalid value 'nosuch' for '--clevis <clevis>'",
-        ));
+        .code(1)
+        .stderr(predicate::str::contains("Invalid pin"));
 }
 
 #[test]
@@ -175,16 +161,14 @@ fn test_stratis_min_create_with_clevis_missing_args() {
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();
     cmd.arg("pool")
         .arg("create")
-        .arg("--clevis")
-        .arg("tang")
+        .arg("--clevis-infos")
+        .arg("pin=tang")
         .arg("pn")
         .arg("/dev/n");
     cmd.assert()
         .failure()
-        .code(2)
-        .stderr(predicate::str::contains(
-            "required arguments were not provided",
-        ));
+        .code(1)
+        .stderr(predicate::str::contains("tang_url is required"));
 }
 
 #[test]
@@ -194,17 +178,15 @@ fn test_stratis_min_create_with_clevis_invalid_2() {
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();
     cmd.arg("pool")
         .arg("create")
-        .arg("--clevis")
-        .arg("tang")
-        .arg("--tang-url")
-        .arg("url")
+        .arg("--clevis-infos")
+        .arg("pin=tang tang_url=url")
         .arg("pn")
         .arg("/dev/n");
     cmd.assert()
         .failure()
-        .code(2)
+        .code(1)
         .stderr(predicate::str::contains(
-            "required arguments were not provided",
+            "Missing required argument trust_url or thumbprint=",
         ));
 }
 
@@ -367,13 +349,6 @@ fn test_stratis_min_pool_properties_invalid_uuid() {
         .failure()
         .code(1)
         .stderr(predicate::str::contains("Uuid error"));
-
-    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
-    cmd.arg("pool").arg("clevis-pin").arg("pn");
-    cmd.assert()
-        .failure()
-        .code(1)
-        .stderr(predicate::str::contains("Uuid error"));
 }
 
 #[test]
@@ -446,8 +421,8 @@ fn stratis_min_create_encrypted_keydesc() {
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();
     cmd.arg("pool")
         .arg("create")
-        .arg("--key-desc")
-        .arg("testkey")
+        .arg("--key-descs")
+        .arg("testkey:0")
         .arg("pn")
         .arg("/dev/n");
     cmd.assert().success();
@@ -467,10 +442,19 @@ fn stratis_min_create_encrypted_keydesc_bind_clevis() {
         .arg("testkey");
     cmd.assert().success();
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.write_stdin("thisisanewtestpassphrase\n")
+        .arg("key")
+        .arg("set")
+        .arg("--capture-key")
+        .arg("testkey1");
+    cmd.assert().success();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
     cmd.arg("pool")
         .arg("create")
-        .arg("--key-desc")
-        .arg("testkey")
+        .arg("--key-descs")
+        .arg("testkey:0")
+        .arg("--key-descs")
+        .arg("testkey1:1")
         .arg("pn")
         .arg("/dev/n");
     cmd.assert().success();
@@ -481,7 +465,9 @@ fn stratis_min_create_encrypted_keydesc_bind_clevis() {
         .arg("--name")
         .arg("pn")
         .arg("url")
-        .arg("--trust-url");
+        .arg("--trust-url")
+        .arg("--token-slot")
+        .arg("2");
     cmd.assert().success();
 }
 
@@ -774,16 +760,4 @@ fn stratis_min_key_set_empty() {
 #[test]
 fn test_stratis_min_key_set_empty() {
     test_with_stratisd_min_sim(stratis_min_key_set_empty);
-}
-
-fn stratis_min_pool_clevis_pin() {
-    stratis_min_create_pool_and_fs();
-    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
-    cmd.arg("pool").arg("clevis-pin").arg("--name").arg("pn");
-    cmd.assert().success();
-}
-
-#[test]
-fn test_stratis_min_pool_clevis_pin() {
-    test_with_stratisd_min_sim(stratis_min_pool_clevis_pin);
 }

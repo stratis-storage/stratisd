@@ -12,7 +12,7 @@ use serde_json::{json, Map, Value};
 
 use stratisd::{
     engine::{
-        register_clevis_token, EncryptionInfo, KeyDescription, ProcessedPathInfos, StratPool,
+        register_clevis_token, InputEncryptionInfo, KeyDescription, ProcessedPathInfos, StratPool,
         CLEVIS_TANG_TRUST_URL,
     },
     stratis::StratisResult,
@@ -91,12 +91,7 @@ pub fn run(matches: &ArgMatches) -> StratisResult<()> {
     )?
     .unpack()
     .1;
-    let encryption_info = match (key_desc, clevis_info) {
-        (Some(kd), Some(ci)) => Some(EncryptionInfo::Both(kd, ci)),
-        (Some(kd), _) => Some(EncryptionInfo::KeyDesc(kd)),
-        (_, Some(ci)) => Some(EncryptionInfo::ClevisInfo(ci)),
-        (_, _) => None,
-    };
+    let encryption_info = InputEncryptionInfo::new_legacy(key_desc, clevis_info);
     register_clevis_token()?;
     StratPool::initialize(name.as_str(), unowned, encryption_info.as_ref())?;
     Ok(())

@@ -367,8 +367,8 @@ pub fn udev_settle() -> StratisResult<()> {
 /// Bind a LUKS device using clevis.
 pub fn clevis_luks_bind(
     dev_path: &Path,
-    existing_auth: Either<c_uint, SizedKeyMemory>,
-    slot: c_uint,
+    existing_auth: &Either<c_uint, SizedKeyMemory>,
+    slot: Option<c_uint>,
     pin: &str,
     json: &Value,
     yes: bool,
@@ -387,10 +387,10 @@ pub fn clevis_luks_bind(
         cmd.arg("-e").arg(token_slot.to_string());
     }
 
-    cmd.arg("-t")
-        .arg(slot.to_string())
-        .arg(pin)
-        .arg(json.to_string());
+    if let Some(t) = slot {
+        cmd.arg("-t").arg(t.to_string());
+    }
+    cmd.arg(pin).arg(json.to_string());
 
     match existing_auth {
         Either::Left(_) => {

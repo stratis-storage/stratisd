@@ -103,28 +103,31 @@ impl Into<Value> for &LLuksInfo {
 
 /// Convert a reference to a HashMap to an owned HashMap with borrowed values.
 pub fn stratis_infos_ref(
-    infos: &HashMap<DevUuid, LStratisInfo>,
+    infos: &HashMap<DevUuid, Box<LStratisInfo>>,
 ) -> HashMap<DevUuid, &LStratisInfo> {
     infos
         .iter()
-        .map(|(dev_uuid, info)| (*dev_uuid, info))
+        .map(|(dev_uuid, info)| (*dev_uuid, info.as_ref()))
         .collect::<HashMap<_, _>>()
 }
 
 /// Split a `Vec<LStratisInfo>` into a `Vec` of BDAs and a `Vec` of the remaining
 /// information contained by `Vec<LStratisInfo>`.
 pub fn split_stratis_infos(
-    infos: HashMap<DevUuid, LStratisInfo>,
-) -> (HashMap<DevUuid, LStratisDevInfo>, HashMap<DevUuid, BDA>) {
+    infos: HashMap<DevUuid, Box<LStratisInfo>>,
+) -> (
+    HashMap<DevUuid, Box<LStratisDevInfo>>,
+    HashMap<DevUuid, BDA>,
+) {
     infos.into_iter().fold(
         (HashMap::new(), HashMap::new()),
         |(mut new_infos, mut bdas), (dev_uuid, info)| {
             new_infos.insert(
                 dev_uuid,
-                LStratisDevInfo {
+                Box::new(LStratisDevInfo {
                     dev_info: info.dev_info,
                     luks: info.luks,
-                },
+                }),
             );
             bdas.insert(dev_uuid, info.bda);
             (new_infos, bdas)
@@ -136,7 +139,7 @@ pub fn split_stratis_infos(
 ///
 /// Precondition: infos.keys() == bdas.keys()
 pub fn reconstruct_stratis_infos(
-    mut infos: HashMap<DevUuid, LStratisDevInfo>,
+    mut infos: HashMap<DevUuid, Box<LStratisDevInfo>>,
     mut bdas: HashMap<DevUuid, BDA>,
 ) -> DeviceSet {
     let uuids = infos.keys().copied().collect::<HashSet<_>>();
@@ -149,11 +152,11 @@ pub fn reconstruct_stratis_infos(
             let bda = bdas.remove(&uuid).expect("infos.keys() == bdas.keys()");
             (
                 uuid,
-                LInfo::Stratis(LStratisInfo {
+                LInfo::Stratis(Box::new(LStratisInfo {
                     dev_info: info.dev_info,
                     luks: info.luks,
                     bda,
-                }),
+                })),
             )
         })
         .collect::<DeviceSet>()
@@ -287,7 +290,7 @@ impl LStratisInfo {
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum LInfo {
     /// A Stratis device, which may be an encrypted device
-    Stratis(LStratisInfo),
+    Stratis(Box<LStratisInfo>),
     /// A LUKS device
     Luks(LLuksInfo),
 }
@@ -305,7 +308,7 @@ impl From<DeviceInfo> for LInfo {
     fn from(info: DeviceInfo) -> LInfo {
         match info {
             DeviceInfo::Luks(info) => LInfo::Luks(info.into()),
-            DeviceInfo::Stratis(info) => LInfo::Stratis(info.into()),
+            DeviceInfo::Stratis(info) => LInfo::Stratis(Box::new(info.into())),
         }
     }
 }
@@ -315,7 +318,7 @@ impl Into<Value> for &LInfo {
     // Precondition: (&LLuksInfo).into() pattern matches Value::Object()
     fn into(self) -> Value {
         match self {
-            LInfo::Stratis(info) => info.into(),
+            LInfo::Stratis(info) => info.as_ref().into(),
             LInfo::Luks(info) => info.into(),
         }
     }
@@ -430,11 +433,11 @@ impl LInfo {
 
         match (info_1, info_2) {
             (LInfo::Luks(luks_info), DeviceInfo::Stratis(strat_info)) => {
-                Either::Left(LInfo::Stratis(LStratisInfo {
+                Either::Left(LInfo::Stratis(Box::new(LStratisInfo {
                     dev_info: strat_info.dev_info,
                     bda: strat_info.bda,
                     luks: Some(luks_info),
-                }))
+                })))
             }
             (LInfo::Stratis(strat_info), DeviceInfo::Luks(luks_info)) => {
                 if let Some(luks) = strat_info.luks.as_ref() {
@@ -442,11 +445,11 @@ impl LInfo {
                         return Either::Right(LInfo::Stratis(strat_info));
                     }
                 }
-                Either::Left(LInfo::Stratis(LStratisInfo {
+                Either::Left(LInfo::Stratis(Box::new(LStratisInfo {
                     dev_info: strat_info.dev_info,
                     bda: strat_info.bda,
                     luks: Some(LLuksInfo::from(luks_info)),
-                }))
+                })))
             }
             (LInfo::Luks(luks_info_1), DeviceInfo::Luks(luks_info_2)) => {
                 if !luks_luks_compatible(&luks_info_1, &luks_info_2) {
@@ -459,11 +462,11 @@ impl LInfo {
                 if !stratis_stratis_compatible(&strat_info_1, &strat_info_2) {
                     Either::Right(LInfo::Stratis(strat_info_1))
                 } else {
-                    Either::Left(LInfo::Stratis(LStratisInfo {
+                    Either::Left(LInfo::Stratis(Box::new(LStratisInfo {
                         dev_info: strat_info_2.dev_info,
                         bda: strat_info_2.bda,
                         luks: strat_info_1.luks,
-                    }))
+                    })))
                 }
             }
         }
@@ -571,7 +574,7 @@ impl DeviceSet {
                     .iter()
                     .map(|(dev_uuid, info)| match info {
                         LInfo::Luks(_) => unreachable!("!self.some_closed() is satisfied"),
-                        LInfo::Stratis(info) => (*dev_uuid, info),
+                        LInfo::Stratis(info) => (*dev_uuid, info.as_ref()),
                     })
                     .collect(),
             )
@@ -580,7 +583,7 @@ impl DeviceSet {
 
     /// Return a view of the DeviceSet as a set of wholly opened devices.
     /// Return Either::Right(_) if some of the devices are unopened.
-    pub fn into_opened_set(self) -> Either<HashMap<DevUuid, LStratisInfo>, Self> {
+    pub fn into_opened_set(self) -> Either<HashMap<DevUuid, Box<LStratisInfo>>, Self> {
         if self.some_closed() {
             Either::Right(self)
         } else {

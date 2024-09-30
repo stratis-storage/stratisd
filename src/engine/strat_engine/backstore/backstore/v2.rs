@@ -33,8 +33,9 @@ use crate::{
             writing::wipe_sectors,
         },
         types::{
-            ActionAvailability, BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, PoolUuid,
-            SizedKeyMemory, UnlockMethod, ValidatedIntegritySpec,
+            ActionAvailability, BlockDevTier, DevUuid, EncryptionInfo, InputEncryptionInfo,
+            KeyDescription, OptionalTokenSlotInput, PoolUuid, SizedKeyMemory, TokenUnlockMethod,
+            UnlockMechanism, ValidatedIntegritySpec,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -149,7 +150,7 @@ pub struct Backstore {
     placeholder: Option<LinearDev>,
     /// Either encryption information for a handle to be created at a later time or
     /// handle for encryption layer in backstore.
-    enc: Option<Either<EncryptionInfo, CryptHandle>>,
+    enc: Option<Either<InputEncryptionInfo, CryptHandle>>,
     /// Data allocations on the cap device,
     allocs: Vec<(Sectors, Sectors)>,
     /// Metadata allocations on the cache or placeholder device.
@@ -298,7 +299,7 @@ impl Backstore {
         datadevs: Vec<StratBlockDev>,
         cachedevs: Vec<StratBlockDev>,
         last_update_time: DateTime<Utc>,
-        unlock_method: Option<UnlockMethod>,
+        token_slot: TokenUnlockMethod,
         passphrase: Option<SizedKeyMemory>,
     ) -> BDARecordResult<Backstore> {
         let block_mgr = BlockDevMgr::new(datadevs, Some(last_update_time));
@@ -383,9 +384,13 @@ impl Backstore {
                     .as_str(),
             ))
             .collect::<PathBuf>();
-        let enc = match (metadata_enc_enabled, unlock_method, passphrase.as_ref()) {
-            (true, Some(unlock_method), pass) => {
-                match CryptHandle::setup(crypt_physical_path, pool_uuid, unlock_method, pass) {
+        let has_header = match CryptHandle::load_metadata(crypt_physical_path, pool_uuid) {
+            Ok(opt) => opt.is_some(),
+            Err(e) => return Err((e, data_tier.block_mgr.into_bdas())),
+        };
+        let enc = match (metadata_enc_enabled, has_header, passphrase.as_ref()) {
+            (true, true, pass) => {
+                match CryptHandle::setup(crypt_physical_path, pool_uuid, token_slot, pass) {
                     Ok(opt) => {
                         if let Some(h) = opt {
                             Some(Either::Right(h))
@@ -396,19 +401,25 @@ impl Backstore {
                     Err(e) => return Err((e, data_tier.block_mgr.into_bdas())),
                 }
             }
-            (true, None, _) => {
-                unreachable!("Checked in liminal device code");
+            (true, _, _) => {
+                return Err((
+                    StratisError::Msg(
+                        "Metadata reported that encryption is enabled but no header was found"
+                            .to_string(),
+                    ),
+                    data_tier.block_mgr.into_bdas(),
+                ));
             }
-            (false, _, _) => match CryptHandle::load_metadata(crypt_physical_path, pool_uuid) {
-                Ok(opt) => {
-                    if opt.is_some() {
-                        return Err((StratisError::Msg("Metadata reported that encryption is not enabled but a crypt header was found".to_string()), data_tier.block_mgr.into_bdas()));
-                    } else {
-                        None
-                    }
-                }
-                Err(e) => return Err((e, data_tier.block_mgr.into_bdas())),
-            },
+            (false, true, _) => {
+                return Err((
+                    StratisError::Msg(
+                        "Metadata reported that encryption is disabled but header was found"
+                            .to_string(),
+                    ),
+                    data_tier.block_mgr.into_bdas(),
+                ));
+            }
+            (false, _, _) => None,
         };
 
         Ok(Backstore {
@@ -436,7 +447,7 @@ impl Backstore {
         pool_uuid: PoolUuid,
         devices: UnownedDevices,
         mda_data_size: MDADataSize,
-        encryption_info: Option<&EncryptionInfo>,
+        encryption_info: Option<&InputEncryptionInfo>,
         integrity_spec: ValidatedIntegritySpec,
     ) -> StratisResult<Backstore> {
         let data_tier = DataTier::<StratBlockDev>::new(
@@ -917,7 +928,7 @@ impl Backstore {
     pub fn encryption_info(&self) -> Option<&EncryptionInfo> {
         self.enc
             .as_ref()
-            .map(|either| either.as_ref().either(|e| e, |h| h.encryption_info()))
+            .and_then(|either| either.as_ref().right().map(|h| h.encryption_info()))
     }
 
     /// Bind device in the given backstore using the given clevis
@@ -927,7 +938,12 @@ impl Backstore {
     /// * Returns Ok(false) if the binding had already been previously performed and
     ///   nothing was changed.
     /// * Returns Err(_) if binding failed.
-    pub fn bind_clevis(&mut self, pin: &str, clevis_info: &Value) -> StratisResult<bool> {
+    pub fn bind_clevis(
+        &mut self,
+        token_slot: OptionalTokenSlotInput,
+        pin: &str,
+        clevis_info: &Value,
+    ) -> StratisResult<bool> {
         let handle = self
             .enc
             .as_mut()
@@ -938,29 +954,58 @@ impl Backstore {
                 StratisError::Msg("No space has been allocated from the backstore".to_string())
             })?;
 
-        if let Some((ref existing_pin, ref existing_info)) = handle.encryption_info().clevis_info()
-        {
-            if existing_pin.as_str() == pin {
-                Ok(false)
-            } else {
-                Err(StratisError::Msg(format!(
-                    "Block devices have already been bound with pin {existing_pin} and config {existing_info}; \
-                        requested pin {pin} and config {clevis_info} can't be applied"
-                )))
+        match token_slot {
+            OptionalTokenSlotInput::Legacy => {
+                let ci = handle.encryption_info().single_clevis_info();
+                if let Some((_, (existing_pin, existing_info))) = ci {
+                    if existing_pin.as_str() == pin {
+                        Ok(false)
+                    } else {
+                        Err(StratisError::Msg(format!(
+                            "Crypt device has already been bound with pin {existing_pin} and config {existing_info}; \
+                                requested pin {pin} and config {clevis_info} can't be applied"
+                        )))
+                    }
+                } else {
+                    handle.bind_clevis(None, pin, clevis_info)?;
+                    Ok(true)
+                }
             }
-        } else {
-            handle.clevis_bind(pin, clevis_info)?;
-            Ok(true)
+            OptionalTokenSlotInput::Some(k) => {
+                // Ignore thumbprint if stratis:tang:trust_url is set in the clevis_info
+                // config.
+                let ci = handle.encryption_info().get_info(k);
+                if let Some(UnlockMechanism::ClevisInfo((existing_pin, existing_info))) = ci {
+                    if existing_pin == pin {
+                        Ok(false)
+                    } else {
+                        Err(StratisError::Msg(format!(
+                            "Crypt device has already been bound with pin {existing_pin} and config {existing_info}; \
+                                requested pin {pin} and config {clevis_info} can't be applied"
+                        )))
+                    }
+                } else {
+                    handle.bind_clevis(Some(k), pin, clevis_info)?;
+                    Ok(true)
+                }
+            }
+            OptionalTokenSlotInput::None => {
+                // Because idemptotence is checked based on pin, we can't reliably check whether
+                // the binding has already been applied when no token slot is specified. As a
+                // result, we default to adding the new config unless a token slot is specified.
+                handle.bind_clevis(None, pin, clevis_info)?;
+                Ok(true)
+            }
         }
     }
 
-    /// Unbind device in the given backstore from clevis.
+    /// Remove the keyring unlock mechanism specified by the token slot for the backstore.
     ///
     /// * Returns Ok(true) if the unbinding was performed.
     /// * Returns Ok(false) if the unbinding had already been previously performed and
     ///   nothing was changed.
     /// * Returns Err(_) if unbinding failed.
-    pub fn unbind_clevis(&mut self) -> StratisResult<bool> {
+    pub fn unbind_keyring(&mut self, token_slot: Option<u32>) -> StratisResult<bool> {
         let handle = self
             .enc
             .as_mut()
@@ -971,11 +1016,70 @@ impl Backstore {
                 StratisError::Msg("No space has been allocated from the backstore".to_string())
             })?;
 
-        if handle.encryption_info().clevis_info().is_some() {
-            handle.clevis_unbind()?;
-            Ok(true)
-        } else {
-            Ok(false)
+        let ei = handle.encryption_info();
+        match token_slot {
+            Some(t) => {
+                let info = ei.get_info(t);
+                if let Some(UnlockMechanism::KeyDesc(_)) = info {
+                    handle.unbind_keyring(t)?;
+                    Ok(true)
+                } else if let Some(UnlockMechanism::ClevisInfo(_)) = info {
+                    Err(StratisError::Msg(format!("Token slot {t} could not be unbound from keyring; it is bound to a Clevis token")))
+                } else {
+                    Ok(false)
+                }
+            }
+            None => {
+                if let Some((t, _)) = ei.single_key_description() {
+                    handle.unbind_keyring(t)?;
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
+            }
+        }
+    }
+
+    /// Remove the Clevis unlock mechanism specified by the token slot for the backstore.
+    ///
+    /// * Returns Ok(true) if the unbinding was performed.
+    /// * Returns Ok(false) if the unbinding had already been previously performed and
+    ///   nothing was changed.
+    /// * Returns Err(_) if unbinding failed.
+    pub fn unbind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<bool> {
+        let handle = self
+            .enc
+            .as_mut()
+            .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?
+            .as_mut()
+            .right()
+            .ok_or_else(|| {
+                StratisError::Msg("No space has been allocated from the backstore".to_string())
+            })?;
+
+        let ei = handle.encryption_info();
+        match token_slot {
+            Some(t) => {
+                let info = ei.get_info(t);
+                if let Some(UnlockMechanism::ClevisInfo(_)) = info {
+                    handle.unbind_clevis(t)?;
+                    Ok(true)
+                } else if let Some(UnlockMechanism::KeyDesc(_)) = info {
+                    Err(StratisError::Msg(format!("Token slot {t} could not be unbound from Clevis; it is bound to a key description token")))
+                } else {
+                    Ok(false)
+                }
+            }
+            None => {
+                let opt = ei.single_clevis_info();
+                match opt {
+                    Some((t, _)) => {
+                        handle.unbind_clevis(t)?;
+                        Ok(true)
+                    }
+                    None => Ok(false),
+                }
+            }
         }
     }
 
@@ -986,7 +1090,11 @@ impl Backstore {
     /// * Returns Ok(false) if the binding had already been previously performed and
     ///   nothing was changed.
     /// * Returns Err(_) if binding failed.
-    pub fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<bool> {
+    pub fn bind_keyring(
+        &mut self,
+        token_slot: OptionalTokenSlotInput,
+        key_desc: &KeyDescription,
+    ) -> StratisResult<bool> {
         let handle = self
             .enc
             .as_mut()
@@ -997,47 +1105,59 @@ impl Backstore {
                 StratisError::Msg("No space has been allocated from the backstore".to_string())
             })?;
 
-        if let Some(kd) = handle.encryption_info().key_description() {
-            if kd == key_desc {
-                Ok(false)
-            } else {
-                Err(StratisError::Msg(format!(
-                    "Block devices have already been bound with key description {}; \
-                        requested key description {} can't be applied",
-                    kd.as_application_str(),
-                    key_desc.as_application_str(),
-                )))
+        match token_slot {
+            OptionalTokenSlotInput::Legacy => {
+                let info = handle.encryption_info().single_key_description();
+                if let Some((_, kd)) = info {
+                    if kd == key_desc {
+                        Ok(false)
+                    } else {
+                        Err(StratisError::Msg(format!(
+                            "Crypt device has already been bound with key description {}; \
+                                requested key description {} can't be applied",
+                            kd.as_application_str(),
+                            key_desc.as_application_str(),
+                        )))
+                    }
+                } else {
+                    handle.bind_keyring(None, key_desc)?;
+                    Ok(true)
+                }
             }
-        } else {
-            handle.bind_keyring(key_desc)?;
-            Ok(true)
-        }
-    }
-
-    /// Unbind device in the given backstore from the passphrase
-    /// associated with the key description.
-    ///
-    /// * Returns Ok(true) if the unbinding was performed.
-    /// * Returns Ok(false) if the unbinding had already been previously performed and
-    ///   nothing was changed.
-    /// * Returns Err(_) if unbinding failed.
-    pub fn unbind_keyring(&mut self) -> StratisResult<bool> {
-        let handle = self
-            .enc
-            .as_mut()
-            .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?
-            .as_mut()
-            .right()
-            .ok_or_else(|| {
-                StratisError::Msg("No space has been allocated from the backstore".to_string())
-            })?;
-
-        if handle.encryption_info().key_description().is_some() {
-            handle.unbind_keyring()?;
-            Ok(true)
-        } else {
-            // is encrypted and key description is None
-            Ok(false)
+            OptionalTokenSlotInput::Some(k) => {
+                // Ignore thumbprint if stratis:tang:trust_url is set in the clevis_info
+                // config.
+                let info = handle.encryption_info().get_info(k);
+                if let Some(UnlockMechanism::KeyDesc(ref kd)) = info {
+                    if kd == key_desc {
+                        Ok(false)
+                    } else {
+                        Err(StratisError::Msg(format!(
+                            "Crypt device has already been bound with key description {}; \
+                                requested key description {} can't be applied",
+                            kd.as_application_str(),
+                            key_desc.as_application_str(),
+                        )))
+                    }
+                } else {
+                    handle.bind_keyring(Some(k), key_desc)?;
+                    Ok(true)
+                }
+            }
+            OptionalTokenSlotInput::None => {
+                // Ignore thumbprint if stratis:tang:trust_url is set in the clevis_info
+                // config.
+                let existing_config = handle
+                    .encryption_info()
+                    .all_key_descriptions()
+                    .find(|(_, kd)| *kd == key_desc);
+                if existing_config.is_some() {
+                    Ok(false)
+                } else {
+                    handle.bind_keyring(None, key_desc)?;
+                    Ok(true)
+                }
+            }
         }
     }
 
@@ -1048,7 +1168,11 @@ impl Backstore {
     /// * Ok(Some(true)) if the pool was successfully bound to the new key description.
     /// * Ok(Some(false)) if the pool is already bound to this key description.
     /// * Err(_) if an operation fails while changing the passphrase.
-    pub fn rebind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<Option<bool>> {
+    pub fn rebind_keyring(
+        &mut self,
+        token_slot: Option<u32>,
+        key_desc: &KeyDescription,
+    ) -> StratisResult<Option<bool>> {
         let handle = self
             .enc
             .as_mut()
@@ -1059,14 +1183,32 @@ impl Backstore {
                 StratisError::Msg("No space has been allocated from the backstore".to_string())
             })?;
 
-        if handle.encryption_info().key_description() == Some(key_desc) {
-            Ok(Some(false))
-        } else if handle.encryption_info().key_description().is_some() {
-            // Keys are not the same but key description is present
-            handle.rebind_keyring(key_desc)?;
-            Ok(Some(true))
-        } else {
-            Ok(None)
+        let ei = handle.encryption_info();
+        match token_slot {
+            Some(t) => {
+                let info = ei.get_info(t);
+                match info {
+                    Some(UnlockMechanism::KeyDesc(ref kd)) => if kd == key_desc {
+                        Ok(Some(false))
+                    } else {
+                        handle.rebind_keyring(t, key_desc)?;
+                        Ok(Some(true))
+                    },
+                    Some(UnlockMechanism::ClevisInfo(_)) => Err(StratisError::Msg(format!("Cannot rebind keyring implementation; token slot {t} is already bound to Clevis"))),
+                    None => Ok(None)
+                }
+            }
+            None => match ei.single_key_description() {
+                Some((slot, kd)) => {
+                    if kd == key_desc {
+                        Ok(Some(false))
+                    } else {
+                        handle.rebind_keyring(slot, key_desc)?;
+                        Ok(Some(true))
+                    }
+                }
+                None => Ok(None),
+            },
         }
     }
 
@@ -1077,7 +1219,7 @@ impl Backstore {
     /// will always change the metadata when successful. The command is not idempotent
     /// so this method will either fail to regenerate the bindings or it will
     /// result in a metadata change.
-    pub fn rebind_clevis(&mut self) -> StratisResult<()> {
+    pub fn rebind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<()> {
         let handle = self
             .enc
             .as_mut()
@@ -1088,14 +1230,22 @@ impl Backstore {
                 StratisError::Msg("No space has been allocated from the backstore".to_string())
             })?;
 
-        if handle.encryption_info().clevis_info().is_none() {
-            Err(StratisError::Msg(
-                "Requested pool is not already bound to Clevis".to_string(),
-            ))
-        } else {
-            handle.rebind_clevis()?;
-
-            Ok(())
+        let ei = handle.encryption_info();
+        match token_slot {
+            Some(t) => {
+                let info = ei.get_info(t);
+                match info {
+                    Some(UnlockMechanism::KeyDesc(_)) => Err(StratisError::Msg(format!("Cannot rebind Clevis implementation; token slot {t} is already bound to a key description"))),
+                    Some(UnlockMechanism::ClevisInfo(_)) => handle.rebind_clevis(t),
+                    None => Err(StratisError::Msg(format!("Cannot rebind clevis implementation; token slot {t} is unbound"))),
+                }
+            }
+            None => match ei.single_clevis_info() {
+                Some((t, _)) => handle.rebind_clevis(t),
+                None => Err(StratisError::Msg(
+                    "Cannot rebind clevis implementation; no Clevis tokens are present".to_string(),
+                )),
+            },
         }
     }
 
@@ -1417,14 +1567,20 @@ mod tests {
         unshare_mount_namespace().unwrap();
         let _memfs = MemoryFilesystem::new().unwrap();
         let pool_uuid = PoolUuid::new_v4();
+        let ei = InputEncryptionInfo::new(
+            vec![],
+            vec![
+                (None, (
+                    "tang".to_string(),
+                    json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
+                ))
+            ]
+        ).expect("Empty data structure");
         let mut backstore = Backstore::initialize(
             pool_uuid,
             get_devices(paths).unwrap(),
             MDADataSize::default(),
-            Some(&EncryptionInfo::ClevisInfo((
-                "tang".to_string(),
-                json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
-            ))),
+            ei.as_ref(),
             ValidatedIntegritySpec::default(),
         )
         .unwrap();
@@ -1433,6 +1589,7 @@ mod tests {
 
         assert_matches!(
             backstore.bind_clevis(
+                OptionalTokenSlotInput::None,
                 "tang",
                 &json!({"url": env::var("TANG_URL").expect("TANG_URL env var required")})
             ),
@@ -1441,6 +1598,7 @@ mod tests {
 
         assert_matches!(
             backstore.bind_clevis(
+                OptionalTokenSlotInput::None,
                 "tang",
                 &json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true})
             ),
@@ -1489,19 +1647,21 @@ mod tests {
             unshare_mount_namespace().unwrap();
             let _memfs = MemoryFilesystem::new().unwrap();
             let pool_uuid = PoolUuid::new_v4();
+            let ei = InputEncryptionInfo::new(
+                vec![(None, key_desc.to_owned())],
+                vec![(None, (
+                    "tang".to_string(),
+                    json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
+                ))],
+            ).expect("Empty data structure");
             let mut backstore = Backstore::initialize(
                 pool_uuid,
                 get_devices(paths).unwrap(),
                 MDADataSize::default(),
-                Some(&EncryptionInfo::Both(
-                    key_desc.clone(),
-                    (
-                        "tang".to_string(),
-                        json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
-                    ),
-                )),
+                ei.as_ref(),
                 ValidatedIntegritySpec::default(),
-            ).unwrap();
+            )
+            .unwrap();
             cmd::udev_settle().unwrap();
 
             // Allocate space from the backstore so that the cap device is made.
@@ -1510,7 +1670,20 @@ mod tests {
                 .unwrap()
                 .unwrap();
 
+            let ei = backstore.encryption_info().unwrap();
+            let (kd_slot, _) = ei
+                .all_key_descriptions()
+                .next()
+                .map(|(slot, kd)| (*slot, kd.clone()))
+                .expect("Set one key description");
+            let (ci_slot, _) = ei
+                .all_clevis_infos()
+                .next()
+                .map(|(slot, ci)| (*slot, ci.clone()))
+                .expect("Set one Clevis info");
+
             if backstore.bind_clevis(
+                OptionalTokenSlotInput::Some(ci_slot),
                 "tang",
                 &json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
             ).unwrap() {
@@ -1521,31 +1694,42 @@ mod tests {
 
             invariant(&backstore);
 
-            if backstore.bind_keyring(key_desc).unwrap() {
+            if backstore
+                .bind_keyring(OptionalTokenSlotInput::None, key_desc)
+                .unwrap()
+            {
+                panic!("Keyring bind idempotence test failed")
+            }
+
+            if backstore
+                .bind_keyring(OptionalTokenSlotInput::Some(kd_slot), key_desc)
+                .unwrap()
+            {
                 panic!("Keyring bind idempotence test failed")
             }
 
             invariant(&backstore);
 
-            if !backstore.unbind_clevis().unwrap() {
+            if !backstore.unbind_clevis(Some(ci_slot)).unwrap() {
                 panic!("Clevis unbind test failed");
             }
 
             invariant(&backstore);
 
-            if backstore.unbind_clevis().unwrap() {
+            if backstore.unbind_clevis(Some(ci_slot)).unwrap() {
                 panic!("Clevis unbind idempotence test failed");
             }
 
             invariant(&backstore);
 
-            if backstore.unbind_keyring().is_ok() {
+            if backstore.unbind_keyring(Some(kd_slot)).is_ok() {
                 panic!("Keyring unbind check test failed");
             }
 
             invariant(&backstore);
 
             if !backstore.bind_clevis(
+                OptionalTokenSlotInput::Some(10),
                 "tang",
                 &json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
             ).unwrap() {
@@ -1556,25 +1740,35 @@ mod tests {
 
             invariant(&backstore);
 
-            if !backstore.unbind_keyring().unwrap() {
+            if !backstore.unbind_keyring(Some(kd_slot)).unwrap() {
                 panic!("Keyring unbind test failed");
             }
 
             invariant(&backstore);
 
-            if backstore.unbind_keyring().unwrap() {
+            if backstore.unbind_keyring(Some(kd_slot)).unwrap() {
                 panic!("Keyring unbind idempotence test failed");
             }
 
             invariant(&backstore);
 
-            if backstore.unbind_clevis().is_ok() {
+            if backstore.unbind_clevis(Some(10)).is_ok() {
                 panic!("Clevis unbind check test failed");
             }
 
             invariant(&backstore);
 
-            if !backstore.bind_keyring(key_desc).unwrap() {
+            if !backstore
+                .bind_keyring(OptionalTokenSlotInput::Some(11), key_desc)
+                .unwrap()
+            {
+                panic!("Keyring bind test failed");
+            }
+
+            if !backstore
+                .bind_keyring(OptionalTokenSlotInput::Some(12), key_desc)
+                .unwrap()
+            {
                 panic!("Keyring bind test failed");
             }
         }

@@ -31,8 +31,8 @@ pub use self::{
 pub use self::{
     backstore::integrity_meta_space,
     crypt::{
-        register_clevis_token, set_up_crypt_logging, CLEVIS_TANG_TRUST_URL,
-        DEFAULT_CRYPT_DATA_OFFSET_V2,
+        register_clevis_token, set_up_crypt_logging, CLEVIS_LUKS_TOKEN_ID, CLEVIS_TANG_TRUST_URL,
+        DEFAULT_CRYPT_DATA_OFFSET_V2, LUKS2_TOKEN_ID,
     },
     dm::{get_dm, get_dm_init},
     engine::StratEngine,

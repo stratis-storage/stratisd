@@ -135,45 +135,45 @@ impl StratisParams {
                 expects_fd!(self.fd_opt, false);
                 Ok(StratisRet::PoolList(pool::pool_list(engine).await))
             }
-            StratisParamType::PoolBindKeyring(id, key_desc) => {
+            StratisParamType::PoolBindKeyring(id, token_slot, key_desc) => {
                 expects_fd!(self.fd_opt, false);
                 Ok(StratisRet::PoolBindKeyring(stratis_result_to_return(
-                    pool::pool_bind_keyring(engine, id, &key_desc).await,
+                    pool::pool_bind_keyring(engine, id, token_slot, &key_desc).await,
                     false,
                 )))
             }
-            StratisParamType::PoolBindClevis(id, pin, clevis_info) => {
+            StratisParamType::PoolBindClevis(id, token_slot, pin, clevis_info) => {
                 expects_fd!(self.fd_opt, false);
                 Ok(StratisRet::PoolBindClevis(stratis_result_to_return(
-                    pool::pool_bind_clevis(engine, id, &pin, &clevis_info).await,
+                    pool::pool_bind_clevis(engine, id, token_slot, &pin, &clevis_info).await,
                     false,
                 )))
             }
-            StratisParamType::PoolUnbindKeyring(id) => {
+            StratisParamType::PoolUnbindKeyring(id, token_slot) => {
                 expects_fd!(self.fd_opt, false);
                 Ok(StratisRet::PoolUnbindKeyring(stratis_result_to_return(
-                    pool::pool_unbind_keyring(engine, id).await,
+                    pool::pool_unbind_keyring(engine, id, token_slot).await,
                     false,
                 )))
             }
-            StratisParamType::PoolUnbindClevis(id) => {
+            StratisParamType::PoolUnbindClevis(id, token_slot) => {
                 expects_fd!(self.fd_opt, false);
                 Ok(StratisRet::PoolUnbindClevis(stratis_result_to_return(
-                    pool::pool_unbind_clevis(engine, id).await,
+                    pool::pool_unbind_clevis(engine, id, token_slot).await,
                     false,
                 )))
             }
-            StratisParamType::PoolRebindKeyring(id, key_desc) => {
+            StratisParamType::PoolRebindKeyring(id, token_slot, key_desc) => {
                 expects_fd!(self.fd_opt, false);
                 Ok(StratisRet::PoolRebindKeyring(stratis_result_to_return(
-                    pool::pool_rebind_keyring(engine, id, key_desc).await,
+                    pool::pool_rebind_keyring(engine, id, token_slot, key_desc).await,
                     false,
                 )))
             }
-            StratisParamType::PoolRebindClevis(id) => {
+            StratisParamType::PoolRebindClevis(id, token_slot) => {
                 expects_fd!(self.fd_opt, false);
                 Ok(StratisRet::PoolRebindClevis(stratis_result_to_return(
-                    pool::pool_rebind_clevis(engine, id).await,
+                    pool::pool_rebind_clevis(engine, id, token_slot).await,
                     false,
                 )))
             }
@@ -203,13 +203,6 @@ impl StratisParams {
                 Ok(StratisRet::PoolHasPassphrase(stratis_result_to_return(
                     pool::pool_has_passphrase(engine, id).await,
                     false,
-                )))
-            }
-            StratisParamType::PoolClevisPin(id) => {
-                expects_fd!(self.fd_opt, false);
-                Ok(StratisRet::PoolClevisPin(stratis_result_to_return(
-                    pool::pool_clevis_pin(engine, id).await,
-                    None,
                 )))
             }
             StratisParamType::FsCreate(pool_name, fs_name) => {

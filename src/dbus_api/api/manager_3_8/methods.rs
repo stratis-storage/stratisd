@@ -23,8 +23,8 @@ use crate::{
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
     engine::{
-        CreateAction, EncryptionInfo, IntegritySpec, IntegrityTagSpec, KeyDescription, Name,
-        PoolIdentifier, PoolUuid, StartAction, UnlockMethod,
+        CreateAction, InputEncryptionInfo, IntegritySpec, IntegrityTagSpec, KeyDescription, Name,
+        PoolIdentifier, PoolUuid, StartAction, TokenUnlockMethod, UnlockMethod,
     },
     stratis::StratisError,
 };
@@ -86,7 +86,7 @@ pub fn start_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
 
     let ret = match handle_action!(block_on(dbus_context.engine.start_pool(
         id.clone(),
-        unlock_method,
+        TokenUnlockMethod::from(unlock_method),
         fd.map(|f| f.into_fd()),
     ))) {
         Ok(StartAction::Started(_)) => {
@@ -208,7 +208,7 @@ pub fn create_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let create_result = handle_action!(block_on(dbus_context.engine.create_pool(
         name,
         &devs.map(Path::new).collect::<Vec<&Path>>(),
-        EncryptionInfo::from_options((key_desc, clevis_info)).as_ref(),
+        InputEncryptionInfo::new_legacy(key_desc, clevis_info).as_ref(),
         IntegritySpec {
             journal_size,
             tag_spec,

@@ -49,7 +49,7 @@ use crate::{
         types::{
             DevUuid, LockedPoolsInfo, MaybeInconsistent, Name, PoolEncryptionInfo, PoolIdentifier,
             PoolUuid, SizedKeyMemory, StoppedPoolsInfo, StratBlockDevDiff, StratSigblockVersion,
-            UdevEngineEvent, UnlockMethod, UuidOrConflict,
+            TokenUnlockMethod, UdevEngineEvent, UuidOrConflict,
         },
         BlockDevTier,
     },
@@ -97,17 +97,15 @@ impl LiminalDevices {
         &mut self,
         pools: &Table<PoolUuid, AnyPool>,
         pool_uuid: PoolUuid,
-        unlock_method: UnlockMethod,
+        token_slot: TokenUnlockMethod,
         passphrase: Option<&SizedKeyMemory>,
     ) -> StratisResult<Vec<DevUuid>> {
         fn handle_luks(
             luks_info: &LLuksInfo,
-            unlock_method: UnlockMethod,
+            token_slot: TokenUnlockMethod,
             passphrase: Option<&SizedKeyMemory>,
         ) -> StratisResult<()> {
-            if CryptHandle::setup(&luks_info.dev_info.devnode, Some(unlock_method), passphrase)?
-                .is_some()
-            {
+            if CryptHandle::setup(&luks_info.dev_info.devnode, token_slot, passphrase)?.is_some() {
                 Ok(())
             } else {
                 Err(StratisError::Msg(format!(
@@ -145,7 +143,7 @@ impl LiminalDevices {
                     match info {
                         LInfo::Stratis(_) => (),
                         LInfo::Luks(ref luks_info) => {
-                            match handle_luks(luks_info, unlock_method, passphrase) {
+                            match handle_luks(luks_info, token_slot, passphrase) {
                                 Ok(()) => unlocked.push(*dev_uuid),
                                 Err(e) => return Err(e),
                             }
@@ -183,14 +181,14 @@ impl LiminalDevices {
         &mut self,
         pools: &Table<PoolUuid, AnyPool>,
         pool_uuid: PoolUuid,
-        unlock_method: Option<UnlockMethod>,
+        token_slot: TokenUnlockMethod,
         passphrase_fd: Option<RawFd>,
     ) -> StratisResult<(Name, PoolUuid, AnyPool, Vec<DevUuid>)> {
         fn start_pool_failure(
             pools: &Table<PoolUuid, AnyPool>,
             pool_uuid: PoolUuid,
             luks_info: StratisResult<Option<PoolEncryptionInfo>>,
-            infos: &HashMap<DevUuid, LStratisDevInfo>,
+            infos: &HashMap<DevUuid, Box<LStratisDevInfo>>,
             bdas: HashMap<DevUuid, BDA>,
             meta_res: StratisResult<(DateTime<Utc>, PoolSave)>,
         ) -> BDARecordResult<(Name, AnyPool)> {
@@ -214,19 +212,19 @@ impl LiminalDevices {
         // below requires the pool being unlocked to still have its entry in stopped_pools.
         // Removing it here would cause an error.
         let encryption_info = pool.encryption_info();
-        let unlocked_devices = match (encryption_info, unlock_method, passphrase_fd) {
-            (Ok(None), None, None) => Vec::new(),
+        let unlocked_devices = match (encryption_info, token_slot, passphrase_fd) {
+            (Ok(None), TokenUnlockMethod::None, None) => Vec::new(),
             (Ok(None), _, _) => {
                 return Err(StratisError::Msg(format!(
                     "Pool with UUID {pool_uuid} is not encrypted but an unlock method or passphrase was provided"
                 )));
             }
-            (Ok(Some(_)), None, _) => {
+            (Ok(Some(_)), TokenUnlockMethod::None, _) => {
                 return Err(StratisError::Msg(format!(
                     "Pool with UUID {pool_uuid} is encrypted but no unlock method was provided"
                 )));
             }
-            (Ok(Some(_)), Some(method), passphrase_fd) => {
+            (Ok(Some(_)), method, passphrase_fd) => {
                 let passphrase = if let Some(fd) = passphrase_fd {
                     let mut memory = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
                     let len = read_key_shared(fd, memory.as_mut())?;
@@ -333,16 +331,16 @@ impl LiminalDevices {
         &mut self,
         pools: &Table<PoolUuid, AnyPool>,
         pool_uuid: PoolUuid,
-        unlock_method: Option<UnlockMethod>,
+        token_slot: TokenUnlockMethod,
         passphrase_fd: Option<RawFd>,
     ) -> StratisResult<(Name, PoolUuid, AnyPool, Vec<DevUuid>)> {
         fn start_pool_failure(
             pools: &Table<PoolUuid, AnyPool>,
             pool_uuid: PoolUuid,
-            infos: &HashMap<DevUuid, LStratisDevInfo>,
+            infos: &HashMap<DevUuid, Box<LStratisDevInfo>>,
             bdas: HashMap<DevUuid, BDA>,
             meta_res: StratisResult<(DateTime<Utc>, PoolSave)>,
-            unlock_method: Option<UnlockMethod>,
+            token_slot: TokenUnlockMethod,
             passphrase_fd: Option<RawFd>,
         ) -> BDARecordResult<(Name, AnyPool)> {
             let (timestamp, metadata) = match meta_res {
@@ -352,10 +350,10 @@ impl LiminalDevices {
 
             let passphrase = match (
                 metadata.features.contains(&PoolFeatures::Encryption),
-                unlock_method,
+                token_slot,
                 passphrase_fd,
             ) {
-                (false, None, None) | (true, Some(_), None) => None,
+                (_, _, None) => None,
                 (false, _, _) => {
                     return Err((
                         StratisError::Msg(format!(
@@ -364,14 +362,14 @@ impl LiminalDevices {
                         bdas,
                     ));
                 }
-                (true, None, _) => return Err((
+                (true, TokenUnlockMethod::None, _) => return Err((
                     StratisError::Msg(
                         "Metadata reported that encryption enabled but no unlock method was provided"
                             .to_string()
                     ),
                     bdas,
                 )),
-                (true, Some(_), Some(fd)) => {
+                (true, _, Some(fd)) => {
                     let mut memory = match SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE) {
                         Ok(m) => m,
                         Err(e) => return Err((StratisError::from(e), bdas)),
@@ -385,14 +383,7 @@ impl LiminalDevices {
             };
 
             setup_pool(
-                pools,
-                pool_uuid,
-                infos,
-                bdas,
-                timestamp,
-                metadata,
-                unlock_method,
-                passphrase,
+                pools, pool_uuid, infos, bdas, timestamp, metadata, token_slot, passphrase,
             )
         }
 
@@ -418,7 +409,7 @@ impl LiminalDevices {
             &infos,
             bdas,
             res,
-            unlock_method,
+            token_slot,
             passphrase_fd,
         ) {
             Ok((name, pool)) => {
@@ -459,7 +450,7 @@ impl LiminalDevices {
         &mut self,
         pools: &Table<PoolUuid, AnyPool>,
         id: PoolIdentifier<PoolUuid>,
-        unlock_method: Option<UnlockMethod>,
+        token_slot: TokenUnlockMethod,
         passphrase_fd: Option<RawFd>,
     ) -> StratisResult<(Name, PoolUuid, AnyPool, Vec<DevUuid>)> {
         let pool_uuid = match id {
@@ -483,10 +474,10 @@ impl LiminalDevices {
 
         match metadata_version {
             StratSigblockVersion::V1 => {
-                self.start_pool_legacy(pools, pool_uuid, unlock_method, passphrase_fd)
+                self.start_pool_legacy(pools, pool_uuid, token_slot, passphrase_fd)
             }
             StratSigblockVersion::V2 => {
-                self.start_pool_new(pools, pool_uuid, unlock_method, passphrase_fd)
+                self.start_pool_new(pools, pool_uuid, token_slot, passphrase_fd)
             }
         }
     }
@@ -846,7 +837,7 @@ impl LiminalDevices {
             pools: &Table<PoolUuid, AnyPool>,
             pool_uuid: PoolUuid,
             luks_info: StratisResult<Option<PoolEncryptionInfo>>,
-            infos: &HashMap<DevUuid, LStratisDevInfo>,
+            infos: &HashMap<DevUuid, Box<LStratisDevInfo>>,
             bdas: HashMap<DevUuid, BDA>,
             metadata_version: StratisResult<StratSigblockVersion>,
             meta_res: StratisResult<(DateTime<Utc>, PoolSave)>,
@@ -865,24 +856,17 @@ impl LiminalDevices {
                         pools, pool_uuid, luks_info, infos, bdas, timestamp, metadata,
                     )
                     .map(Either::Left),
-                    StratSigblockVersion::V2 => {
-                        let is_encrypted = metadata.features.contains(&PoolFeatures::Encryption);
-                        setup_pool(
-                            pools,
-                            pool_uuid,
-                            infos,
-                            bdas,
-                            timestamp,
-                            metadata,
-                            if is_encrypted {
-                                Some(UnlockMethod::Any)
-                            } else {
-                                None
-                            },
-                            None,
-                        )
-                        .map(Either::Left)
-                    }
+                    StratSigblockVersion::V2 => setup_pool(
+                        pools,
+                        pool_uuid,
+                        infos,
+                        bdas,
+                        timestamp,
+                        metadata,
+                        TokenUnlockMethod::None,
+                        None,
+                    )
+                    .map(Either::Left),
                 }
             } else {
                 Ok(Either::Right(bdas))
@@ -1282,7 +1266,7 @@ fn setup_pool_legacy(
     pools: &Table<PoolUuid, AnyPool>,
     pool_uuid: PoolUuid,
     luks_info: StratisResult<Option<PoolEncryptionInfo>>,
-    infos: &HashMap<DevUuid, LStratisDevInfo>,
+    infos: &HashMap<DevUuid, Box<LStratisDevInfo>>,
     bdas: HashMap<DevUuid, BDA>,
     timestamp: DateTime<Utc>,
     metadata: PoolSave,
@@ -1359,11 +1343,11 @@ fn setup_pool_legacy(
 fn setup_pool(
     pools: &Table<PoolUuid, AnyPool>,
     pool_uuid: PoolUuid,
-    infos: &HashMap<DevUuid, LStratisDevInfo>,
+    infos: &HashMap<DevUuid, Box<LStratisDevInfo>>,
     bdas: HashMap<DevUuid, BDA>,
     timestamp: DateTime<Utc>,
     metadata: PoolSave,
-    unlock_method: Option<UnlockMethod>,
+    token_slot: TokenUnlockMethod,
     passphrase: Option<SizedKeyMemory>,
 ) -> BDARecordResult<(Name, AnyPool)> {
     if let Some((uuid, _)) = pools.get_by_name(&metadata.name) {
@@ -1399,7 +1383,7 @@ fn setup_pool(
         ));
     }
 
-    v2::StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata, unlock_method, passphrase)
+    v2::StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata, token_slot, passphrase)
             .map(|(name, pool)| {
                 (name, AnyPool::V2(pool))
             })

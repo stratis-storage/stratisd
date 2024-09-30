@@ -21,17 +21,20 @@ use crate::{
         structures::{AllLockReadGuard, AllLockWriteGuard, SomeLockReadGuard, SomeLockWriteGuard},
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, LockedPoolsInfo,
+            FilesystemUuid, GrowAction, InputEncryptionInfo, Key, KeyDescription, LockedPoolsInfo,
             MappingCreateAction, MappingDeleteAction, Name, PoolDiff, PoolEncryptionInfo,
             PoolIdentifier, PoolUuid, RegenAction, RenameAction, ReportType, SetCreateAction,
             SetDeleteAction, SetUnlockAction, StartAction, StopAction, StoppedPoolsInfo,
-            StratFilesystemDiff, StratSigblockVersion, UdevEngineEvent, UnlockMethod,
+            StratFilesystemDiff, StratSigblockVersion, UdevEngineEvent,
         },
     },
     stratis::StratisResult,
 };
 
-use super::{types::StratBlockDevDiff, PropChangeAction};
+use super::{
+    types::{OptionalTokenSlotInput, StratBlockDevDiff, TokenUnlockMethod},
+    PropChangeAction, UnlockMethod,
+};
 
 pub const DEV_PATH: &str = "/dev/stratis";
 /// The maximum size of pool passphrases stored in the kernel keyring
@@ -179,30 +182,70 @@ pub trait Pool: Debug + Send + Sync {
         tier: BlockDevTier,
     ) -> StratisResult<(SetCreateAction<DevUuid>, Option<PoolDiff>)>;
 
-    /// Bind all devices in the given pool for automated unlocking
-    /// using clevis.
+    /// V1: Binds all devices in the pool to a given Clevis config.
+    /// * token_slot is always Legacy
+    ///
+    /// V2: Binds crypt device to a given Clevis config.
+    /// * if token slot is Legacy bind with the assumption that there is only one Clevis token
+    ///   slot allowed.
+    /// * if token_slot is Some(_): bind to specific token slot
+    /// * if token_slot is None: bind to any available token_slot
     fn bind_clevis(
         &mut self,
+        token_slot: OptionalTokenSlotInput,
         pin: &str,
         clevis_info: &Value,
     ) -> StratisResult<CreateAction<Clevis>>;
 
-    /// Unbind all devices in the given pool from using clevis.
-    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>>;
+    /// V1: Binds all devices in the pool to a given key description.
+    /// * token_slot is always None
+    ///
+    /// V2: Binds crypt device to a given key description.
+    /// * if token slot is Legacy bind with the assumption that there is only one keyring token
+    ///   slot allowed.
+    /// * if token_slot is Some(_): bind to specific token slot
+    /// * if token_slot is None: bind to any available token slot
+    fn bind_keyring(
+        &mut self,
+        token_slot: OptionalTokenSlotInput,
+        key_desc: &KeyDescription,
+    ) -> StratisResult<CreateAction<Key>>;
 
-    /// Bind all devices in the given pool for unlocking using a passphrase
-    /// in the kernel keyring.
-    fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<CreateAction<Key>>;
+    /// V1: Rebinds all devices in the pool to a given key description.
+    /// * token_slot is always None
+    ///
+    /// V2: Rebinds crypt device to a given key description.
+    /// * if token_slot is Some(_): rebind specific token slot
+    /// * if token_slot is None: rebind first keyring token slot
+    fn rebind_keyring(
+        &mut self,
+        token_slot: Option<u32>,
+        new_key_desc: &KeyDescription,
+    ) -> StratisResult<RenameAction<Key>>;
 
-    /// Unbind all devices in the given pool from the registered keyring passphrase.
-    fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>>;
+    /// V1: Rebinds all devices in the pool to a given Clevis config.
+    /// * token_slot is always None
+    ///
+    /// V2: Rebinds crypt device to a given Clevis config.
+    /// * if token_slot is Some(_): rebind specific token slot
+    /// * if token_slot is None: rebind first Clevis token slot
+    fn rebind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<RegenAction>;
 
-    /// Change the key description and passphrase associated with a pool.
-    fn rebind_keyring(&mut self, new_key_desc: &KeyDescription)
-        -> StratisResult<RenameAction<Key>>;
+    /// V1: Unbinds crypt device from the key description token
+    /// * token_slot is always None
+    ///
+    /// V2: Unbinds crypt device from the given key description token specified by token slot.
+    /// * if token_slot is Some(_): unbind specific token slot
+    /// * if token_slot is None: unbind first key description token slot
+    fn unbind_keyring(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Key>>;
 
-    /// Regenerate the Clevis bindings associated with a pool.
-    fn rebind_clevis(&mut self) -> StratisResult<RegenAction>;
+    /// V1: Unbinds crypt device from the Clevis token
+    /// * token_slot is always None
+    ///
+    /// V2: Unbinds crypt device from the given Clevis token specified by token slot.
+    /// * if token_slot is Some(_): unbind specific token slot
+    /// * if token_slot is None: unbind first Clevis token slot
+    fn unbind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Clevis>>;
 
     /// Ensures that all designated filesystems are gone from pool.
     /// Returns a list of the filesystems found, and actually destroyed.
@@ -380,7 +423,7 @@ pub trait Engine: Debug + Report + Send + Sync {
         &self,
         name: &str,
         blockdev_paths: &[&Path],
-        encryption_info: Option<&EncryptionInfo>,
+        encryption_info: Option<&InputEncryptionInfo>,
     ) -> StratisResult<CreateAction<PoolUuid>>;
 
     /// Handle a libudev event.
@@ -414,7 +457,7 @@ pub trait Engine: Debug + Report + Send + Sync {
     async fn unlock_pool(
         &self,
         uuid: PoolUuid,
-        unlock_method: UnlockMethod,
+        token_slot: UnlockMethod,
     ) -> StratisResult<SetUnlockAction<DevUuid>>;
 
     /// Find the pool designated by name or UUID.
@@ -465,7 +508,7 @@ pub trait Engine: Debug + Report + Send + Sync {
     async fn start_pool(
         &self,
         pool_id: PoolIdentifier<PoolUuid>,
-        unlock_method: Option<UnlockMethod>,
+        token_slot: TokenUnlockMethod,
         passphrase_fd: Option<RawFd>,
     ) -> StratisResult<StartAction<PoolUuid>>;
 

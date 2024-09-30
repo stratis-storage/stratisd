@@ -14,9 +14,9 @@ use crate::{
         strat_engine::pool::{v1, v2},
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff, PoolEncryptionInfo,
-            PoolUuid, PropChangeAction, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction, StratSigblockVersion,
+            FilesystemUuid, GrowAction, Key, KeyDescription, Name, OptionalTokenSlotInput,
+            PoolDiff, PoolEncryptionInfo, PoolUuid, PropChangeAction, RegenAction, RenameAction,
+            SetCreateAction, SetDeleteAction, StratSigblockVersion,
         },
     },
     stratis::StratisResult,
@@ -44,53 +44,56 @@ impl Pool for AnyPool {
 
     fn bind_clevis(
         &mut self,
+        token_slot: OptionalTokenSlotInput,
         pin: &str,
         clevis_info: &Value,
     ) -> StratisResult<CreateAction<Clevis>> {
         match self {
-            AnyPool::V1(p) => p.bind_clevis(pin, clevis_info),
-            AnyPool::V2(p) => p.bind_clevis(pin, clevis_info),
-        }
-    }
-
-    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>> {
-        match self {
-            AnyPool::V1(p) => p.unbind_clevis(),
-            AnyPool::V2(p) => p.unbind_clevis(),
+            AnyPool::V1(p) => p.bind_clevis(token_slot, pin, clevis_info),
+            AnyPool::V2(p) => p.bind_clevis(token_slot, pin, clevis_info),
         }
     }
 
     fn bind_keyring(
         &mut self,
+        token_slot: OptionalTokenSlotInput,
         key_description: &KeyDescription,
     ) -> StratisResult<CreateAction<Key>> {
         match self {
-            AnyPool::V1(p) => p.bind_keyring(key_description),
-            AnyPool::V2(p) => p.bind_keyring(key_description),
-        }
-    }
-
-    fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>> {
-        match self {
-            AnyPool::V1(p) => p.unbind_keyring(),
-            AnyPool::V2(p) => p.unbind_keyring(),
+            AnyPool::V1(p) => p.bind_keyring(token_slot, key_description),
+            AnyPool::V2(p) => p.bind_keyring(token_slot, key_description),
         }
     }
 
     fn rebind_keyring(
         &mut self,
+        token_slot: Option<u32>,
         new_key_desc: &KeyDescription,
     ) -> StratisResult<RenameAction<Key>> {
         match self {
-            AnyPool::V1(p) => p.rebind_keyring(new_key_desc),
-            AnyPool::V2(p) => p.rebind_keyring(new_key_desc),
+            AnyPool::V1(p) => p.rebind_keyring(token_slot, new_key_desc),
+            AnyPool::V2(p) => p.rebind_keyring(token_slot, new_key_desc),
         }
     }
 
-    fn rebind_clevis(&mut self) -> StratisResult<RegenAction> {
+    fn rebind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<RegenAction> {
         match self {
-            AnyPool::V1(p) => p.rebind_clevis(),
-            AnyPool::V2(p) => p.rebind_clevis(),
+            AnyPool::V1(p) => p.rebind_clevis(token_slot),
+            AnyPool::V2(p) => p.rebind_clevis(token_slot),
+        }
+    }
+
+    fn unbind_keyring(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Key>> {
+        match self {
+            AnyPool::V1(p) => p.unbind_keyring(token_slot),
+            AnyPool::V2(p) => p.unbind_keyring(token_slot),
+        }
+    }
+
+    fn unbind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Clevis>> {
+        match self {
+            AnyPool::V1(p) => p.unbind_clevis(token_slot),
+            AnyPool::V2(p) => p.unbind_clevis(token_slot),
         }
     }
 

@@ -37,9 +37,10 @@ use crate::{
             SomeLockWriteGuard, Table,
         },
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockedPoolsInfo,
-            PoolDiff, PoolIdentifier, RenameAction, ReportType, SetUnlockAction, StartAction,
-            StopAction, StoppedPoolsInfo, StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
+            CreateAction, DeleteAction, DevUuid, FilesystemUuid, InputEncryptionInfo,
+            LockedPoolsInfo, PoolDiff, PoolIdentifier, RenameAction, ReportType, SetUnlockAction,
+            StartAction, StopAction, StoppedPoolsInfo, StratFilesystemDiff, TokenUnlockMethod,
+            UdevEngineEvent, UnlockMethod,
         },
         Engine, Name, Pool, PoolUuid, Report,
     },
@@ -103,7 +104,7 @@ impl StratEngine {
         &self,
         name: &str,
         blockdev_paths: &[&Path],
-        encryption_info: Option<&EncryptionInfo>,
+        encryption_info: Option<&InputEncryptionInfo>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
         validate_name(name)?;
         let name = Name::new(name.to_owned());
@@ -493,7 +494,7 @@ impl Engine for StratEngine {
         &self,
         name: &str,
         blockdev_paths: &[&Path],
-        encryption_info: Option<&EncryptionInfo>,
+        encryption_info: Option<&InputEncryptionInfo>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
         validate_name(name)?;
         let name = Name::new(name.to_owned());
@@ -679,7 +680,7 @@ impl Engine for StratEngine {
                 let (name, pool_uuid, pool, unlocked_uuids) = liminal.start_pool(
                     &pools,
                     PoolIdentifier::Uuid(pool_uuid),
-                    Some(unlock_method),
+                    TokenUnlockMethod::from(Some(unlock_method)),
                     None,
                 )?;
                 pools.insert(name, pool_uuid, pool);
@@ -784,16 +785,12 @@ impl Engine for StratEngine {
     async fn start_pool(
         &self,
         id: PoolIdentifier<PoolUuid>,
-        unlock_method: Option<UnlockMethod>,
+        token_slot: TokenUnlockMethod,
         passphrase_fd: Option<RawFd>,
     ) -> StratisResult<StartAction<PoolUuid>> {
         if let Some(lock) = self.pools.read(id.clone()).await {
             let (_, pool_uuid, pool) = lock.as_tuple();
-            if pool.is_encrypted() && unlock_method.is_none() {
-                return Err(StratisError::Msg(format!(
-                    "Pool with UUID {pool_uuid} is encrypted but no unlock method was provided"
-                )));
-            } else if !pool.is_encrypted() && unlock_method.is_some() {
+            if !pool.is_encrypted() && token_slot.is_some() {
                 return Err(StratisError::Msg(format!(
                     "Pool with UUID {pool_uuid} is not encrypted but an unlock method was provided"
                 )));
@@ -809,7 +806,7 @@ impl Engine for StratEngine {
             let mut liminal = self.liminal_devices.write().await;
             let pool_uuid = spawn_blocking!({
                 let (name, pool_uuid, pool, _) =
-                    liminal.start_pool(&pools, id, unlock_method, passphrase_fd)?;
+                    liminal.start_pool(&pools, id, token_slot, passphrase_fd)?;
                 pools.insert(name, pool_uuid, pool);
                 StratisResult::Ok(pool_uuid)
             })??;
@@ -898,7 +895,7 @@ mod test {
             ns::unshare_mount_namespace,
             tests::{crypt, loopbacked, real, FailDevice},
         },
-        types::{ActionAvailability, EngineAction, KeyDescription},
+        types::{ActionAvailability, EngineAction, KeyDescription, OptionalTokenSlotInput},
     };
 
     use super::*;
@@ -1063,9 +1060,9 @@ mod test {
         data_paths: &[&Path],
         cache_paths: Option<&[&Path]>,
         fail_device: &FailDevice,
-        encryption_info: &EncryptionInfo,
+        encryption_info: &InputEncryptionInfo,
         operation: F,
-        unlock_method: UnlockMethod,
+        unlock_method: TokenUnlockMethod,
     ) where
         F: FnOnce(&mut AnyPool) + UnwindSafe,
     {
@@ -1099,8 +1096,7 @@ mod test {
 
         test_async!(engine.stop_pool(PoolIdentifier::Uuid(uuid), true)).unwrap();
 
-        test_async!(engine.start_pool(PoolIdentifier::Uuid(uuid), Some(unlock_method), None))
-            .unwrap();
+        test_async!(engine.start_pool(PoolIdentifier::Uuid(uuid), unlock_method, None)).unwrap();
         test_async!(engine.destroy_pool(uuid)).unwrap();
         cmd::udev_settle().unwrap();
         engine.teardown().unwrap();
@@ -1127,17 +1123,23 @@ mod test {
                 paths_with_fail_device.as_slice(),
                 None,
                 &fail_device,
-                &EncryptionInfo::ClevisInfo((
-                    "tang".to_string(),
-                    json!({
-                        "url": tang_url,
-                        "stratis:tang:trust_url": true
-                    }),
-                )),
+                InputEncryptionInfo::new_legacy(
+                    None,
+                    Some((
+                        "tang".to_string(),
+                        json!({
+                            "url": tang_url,
+                            "stratis:tang:trust_url": true
+                        }),
+                    )),
+                )
+                .as_ref()
+                .expect("Passed Clevis info"),
                 |pool| {
-                    pool.bind_keyring(key_desc).unwrap();
+                    pool.bind_keyring(OptionalTokenSlotInput::Legacy, key_desc)
+                        .unwrap();
                 },
-                UnlockMethod::Clevis,
+                TokenUnlockMethod::from(Some(UnlockMethod::Clevis)),
             );
         }
 
@@ -1180,14 +1182,16 @@ mod test {
                 paths_with_fail_device.as_slice(),
                 None,
                 &fail_device,
-                &EncryptionInfo::KeyDesc(key_desc1.to_owned()),
+                InputEncryptionInfo::new_legacy(Some(key_desc1.to_owned()), None)
+                    .as_ref()
+                    .expect("Passed key description"),
                 |pool| {
-                    pool.rebind_keyring(key_desc2).unwrap();
+                    pool.rebind_keyring(None, key_desc2).unwrap();
                     // Change the key to ensure that the second key description
                     // is not the one that causes it to unlock successfully.
                     crypt::change_key(key_desc2);
                 },
-                UnlockMethod::Keyring,
+                TokenUnlockMethod::from(Some(UnlockMethod::Keyring)),
             );
         }
 
@@ -1231,20 +1235,22 @@ mod test {
                 paths_with_fail_device.as_slice(),
                 None,
                 &fail_device,
-                &EncryptionInfo::Both(
-                    key_desc.to_owned(),
-                    (
+                InputEncryptionInfo::new_legacy(
+                    Some(key_desc.to_owned()),
+                    Some((
                         "tang".to_string(),
                         json!({
                             "url": tang_url,
                             "stratis:tang:trust_url": true
                         }),
-                    ),
-                ),
+                    )),
+                )
+                .as_ref()
+                .expect("Passed both key description and CLevis Info"),
                 |pool| {
-                    pool.unbind_keyring().unwrap();
+                    pool.unbind_keyring(None).unwrap();
                 },
-                UnlockMethod::Keyring,
+                TokenUnlockMethod::from(Some(UnlockMethod::Keyring)),
             );
         }
 
@@ -1288,9 +1294,12 @@ mod test {
                 paths_with_fail_device.as_slice(),
                 None,
                 &fail_device,
-                &EncryptionInfo::KeyDesc(key_desc.to_owned()),
+                InputEncryptionInfo::new_legacy(Some(key_desc.to_owned()), None)
+                    .as_ref()
+                    .expect("Passed key description"),
                 |pool| {
                     pool.bind_clevis(
+                        OptionalTokenSlotInput::Legacy,
                         "tang",
                         &json!({
                             "url": tang_url,
@@ -1299,7 +1308,7 @@ mod test {
                     )
                     .unwrap();
                 },
-                UnlockMethod::Keyring,
+                TokenUnlockMethod::from(Some(UnlockMethod::Keyring)),
             );
         }
 
@@ -1339,17 +1348,22 @@ mod test {
             paths_with_fail_device.as_slice(),
             None,
             &fail_device,
-            &EncryptionInfo::ClevisInfo((
-                "tang".to_string(),
-                json!({
-                    "url": tang_url,
-                    "stratis:tang:trust_url": true
-                }),
-            )),
+            InputEncryptionInfo::new_legacy(
+                None,
+                Some((
+                    "tang".to_string(),
+                    json!({
+                        "url": tang_url,
+                        "stratis:tang:trust_url": true
+                    }),
+                )),
+            )
+            .as_ref()
+            .expect("Passed Clevis info"),
             |pool| {
-                pool.rebind_clevis().unwrap();
+                pool.rebind_clevis(None).unwrap();
             },
-            UnlockMethod::Clevis,
+            TokenUnlockMethod::from(Some(UnlockMethod::Clevis)),
         );
     }
 
@@ -1390,20 +1404,22 @@ mod test {
                 paths_with_fail_device.as_slice(),
                 None,
                 &fail_device,
-                &EncryptionInfo::Both(
-                    key_desc.to_owned(),
-                    (
+                InputEncryptionInfo::new_legacy(
+                    Some(key_desc.to_owned()),
+                    Some((
                         "tang".to_string(),
                         json!({
                             "url": tang_url,
                             "stratis:tang:trust_url": true
                         }),
-                    ),
-                ),
+                    )),
+                )
+                .as_ref()
+                .expect("Passed key description and Clevis info"),
                 |pool| {
-                    pool.unbind_clevis().unwrap();
+                    pool.unbind_clevis(None).unwrap();
                 },
-                UnlockMethod::Clevis,
+                TokenUnlockMethod::from(Some(UnlockMethod::Clevis)),
             );
         }
 
@@ -1445,14 +1461,16 @@ mod test {
                 data,
                 Some(cache),
                 &fail_device,
-                &EncryptionInfo::KeyDesc(key_desc1.to_owned()),
+                InputEncryptionInfo::new_legacy(Some(key_desc1.to_owned()), None)
+                    .as_ref()
+                    .expect("Passed key description"),
                 |pool| {
-                    pool.rebind_keyring(key_desc2).unwrap();
+                    pool.rebind_keyring(None, key_desc2).unwrap();
                     // Change the key to ensure that the second key description
                     // is not the one that causes it to unlock successfully.
                     crypt::change_key(key_desc2);
                 },
-                UnlockMethod::Keyring,
+                TokenUnlockMethod::from(Some(UnlockMethod::Keyring)),
             );
         }
 
@@ -1498,11 +1516,13 @@ mod test {
         assert_eq!(test_async!(engine.stopped_pools()).stopped.len(), 1);
         assert_eq!(test_async!(engine.pools()).len(), 0);
 
-        assert!(
-            test_async!(engine.start_pool(PoolIdentifier::Uuid(uuid), None, None))
-                .unwrap()
-                .is_changed()
-        );
+        assert!(test_async!(engine.start_pool(
+            PoolIdentifier::Uuid(uuid),
+            TokenUnlockMethod::None,
+            None
+        ))
+        .unwrap()
+        .is_changed());
         assert_eq!(test_async!(engine.stopped_pools()).stopped.len(), 0);
         assert_eq!(test_async!(engine.pools()).len(), 1);
     }

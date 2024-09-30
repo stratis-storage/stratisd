@@ -20,8 +20,8 @@ use crate::{
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
     engine::{
-        CreateAction, DeleteAction, EngineAction, FilesystemUuid, KeyDescription, Name, PoolUuid,
-        RenameAction,
+        CreateAction, DeleteAction, EngineAction, FilesystemUuid, KeyDescription, Name,
+        OptionalTokenSlotInput, PoolUuid, RenameAction,
     },
     stratis::StratisError,
 };
@@ -376,7 +376,7 @@ pub fn bind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         }
     };
     let msg = match handle_action!(
-        pool.bind_clevis(pin.as_str(), &json),
+        pool.bind_clevis(OptionalTokenSlotInput::Legacy, pin.as_str(), &json),
         dbus_context,
         pool_path.get_name()
     ) {
@@ -416,7 +416,7 @@ pub fn unbind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
 
     let mut pool = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
 
-    let msg = match handle_action!(pool.unbind_clevis(), dbus_context, pool_path.get_name()) {
+    let msg = match handle_action!(pool.unbind_clevis(None), dbus_context, pool_path.get_name()) {
         Ok(DeleteAction::Identity) => {
             return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
@@ -464,7 +464,7 @@ pub fn bind_keyring(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let mut pool = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
 
     let msg = match handle_action!(
-        pool.bind_keyring(&key_desc),
+        pool.bind_keyring(OptionalTokenSlotInput::Legacy, &key_desc),
         dbus_context,
         pool_path.get_name()
     ) {
@@ -504,7 +504,11 @@ pub fn unbind_keyring(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult 
 
     let mut pool = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
 
-    let msg = match handle_action!(pool.unbind_keyring(), dbus_context, pool_path.get_name()) {
+    let msg = match handle_action!(
+        pool.unbind_keyring(None),
+        dbus_context,
+        pool_path.get_name()
+    ) {
         Ok(DeleteAction::Identity) => {
             return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
@@ -552,7 +556,7 @@ pub fn rebind_keyring(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult 
     let mut pool = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
 
     let msg = match handle_action!(
-        pool.rebind_keyring(&key_desc),
+        pool.rebind_keyring(None, &key_desc),
         dbus_context,
         pool_path.get_name()
     ) {
@@ -599,7 +603,7 @@ pub fn rebind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
 
     let mut pool = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
 
-    let msg = match handle_action!(pool.rebind_clevis(), dbus_context, pool_path.get_name()) {
+    let msg = match handle_action!(pool.rebind_clevis(None), dbus_context, pool_path.get_name()) {
         Ok(_) => {
             dbus_context.push_pool_clevis_info_change(pool_path.get_name(), pool.encryption_info());
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())

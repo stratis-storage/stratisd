@@ -29,7 +29,8 @@ use crate::{
             serde_structs::{BaseBlockDevSave, Recordable},
             shared::bds_to_bdas,
         },
-        types::{DevUuid, EncryptionInfo, Name, PoolEncryptionInfo, PoolUuid},
+        types::{DevUuid, Name, PoolEncryptionInfo, PoolUuid},
+        InputEncryptionInfo,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -84,7 +85,7 @@ impl BlockDevMgr<v1::StratBlockDev> {
         pool_uuid: PoolUuid,
         devices: UnownedDevices,
         mda_data_size: MDADataSize,
-        encryption_info: Option<&EncryptionInfo>,
+        encryption_info: Option<&InputEncryptionInfo>,
         sector_size: Option<u32>,
     ) -> StratisResult<BlockDevMgr<v1::StratBlockDev>> {
         Ok(BlockDevMgr::new(
@@ -126,8 +127,8 @@ impl BlockDevMgr<v1::StratBlockDev> {
                     .first()
                     .expect("Must have at least one blockdev")
                     .physical_path(),
-                ei.key_description().is_some(),
-                ei.clevis_info().is_some(),
+                ei.single_key_description().is_some(),
+                ei.single_clevis_info().is_some(),
             ) {
                 return Err(StratisError::Msg(
                     "Either the key in the kernel keyring, Clevis, or both could not be used to perform encryption operations on the devices in the pool; check that the appropriate key in the keyring is set and that the Clevis key storage method is available depending on your provided unlock methods".to_string(),
@@ -144,7 +145,7 @@ impl BlockDevMgr<v1::StratBlockDev> {
             pool_name,
             pool_uuid,
             MDADataSize::default(),
-            encryption_info.as_ref(),
+            encryption_info.map(InputEncryptionInfo::from).as_ref(),
             sector_size,
         )?;
         let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
@@ -587,7 +588,7 @@ mod tests {
                     pool_uuid,
                     devices1,
                     MDADataSize::default(),
-                    Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
+                    InputEncryptionInfo::new_legacy(Some(key_desc.clone()), None).as_ref(),
                     None,
                 )
                 .unwrap();
@@ -634,7 +635,7 @@ mod tests {
                     pool_uuid,
                     devices1,
                     MDADataSize::default(),
-                    Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
+                    InputEncryptionInfo::new_legacy(Some(key_desc.clone()), None).as_ref(),
                     None,
                 )
                 .unwrap();

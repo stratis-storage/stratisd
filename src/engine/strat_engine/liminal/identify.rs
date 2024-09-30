@@ -513,7 +513,7 @@ mod tests {
                 tests::{crypt, loopbacked, real},
                 udev::block_device_apply,
             },
-            types::{DevicePath, EncryptionInfo, KeyDescription},
+            types::{DevicePath, KeyDescription},
         },
         stratis::StratisResult,
     };
@@ -591,6 +591,8 @@ mod tests {
     }
 
     mod v1 {
+        use crate::engine::InputEncryptionInfo;
+
         use super::*;
 
         /// Test that an encrypted device initialized by stratisd is properly
@@ -612,7 +614,7 @@ mod tests {
                     pool_name,
                     pool_uuid,
                     MDADataSize::default(),
-                    Some(&EncryptionInfo::KeyDesc(key_description.clone())),
+                    InputEncryptionInfo::new_legacy(Some(key_description.clone()), None).as_ref(),
                     None,
                 )
                 .unwrap();
@@ -641,10 +643,17 @@ mod tests {
                         );
                     }
 
-                    if info.encryption_info.key_description() != Some(key_description) {
+                    if info
+                        .encryption_info
+                        .single_key_description()
+                        .map(|(_, kd)| kd)
+                        != Some(key_description)
+                    {
                         panic!(
                             "Discovered key description {:?} != expected key description {:?}",
-                            info.encryption_info.key_description(),
+                            info.encryption_info
+                                .single_key_description()
+                                .map(|(_, kd)| kd),
                             Some(key_description.as_application_str())
                         );
                     }

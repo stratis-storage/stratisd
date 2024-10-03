@@ -31,7 +31,7 @@ use crate::{
         engine::MAX_STRATIS_PASS_SIZE,
         strat_engine::{
             backstore::get_devno_from_path,
-            cmd::{clevis_decrypt, clevis_luks_bind, clevis_luks_regen, clevis_luks_unbind},
+            cmd::{clevis_luks_bind, clevis_luks_regen, clevis_luks_unbind},
             crypt::{
                 consts::{
                     CLEVIS_LUKS_TOKEN_ID, DEFAULT_CRYPT_KEYSLOTS_SIZE, DEFAULT_CRYPT_METADATA_SIZE,
@@ -42,9 +42,10 @@ use crate::{
                 },
                 shared::{
                     acquire_crypt_device, activate, add_keyring_keyslot, check_luks2_token,
-                    clevis_info_from_metadata, device_from_physical_path, ensure_inactive,
-                    ensure_wiped, get_keyslot_number, interpret_clevis_config,
-                    key_desc_from_metadata, luks2_token_type_is_valid, read_key, wipe_fallback,
+                    clevis_decrypt, clevis_info_from_metadata, device_from_physical_path,
+                    ensure_inactive, ensure_wiped, get_keyslot_number, interpret_clevis_config,
+                    key_desc_from_metadata, luks2_token_type_is_valid, read_key, reencrypt_shared,
+                    wipe_fallback,
                 },
             },
             dm::DEVICEMAPPER_PATH,
@@ -956,7 +957,7 @@ impl CryptHandle {
     /// Add a keyring binding to the underlying LUKS2 volume.
     pub fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<()> {
         let mut device = self.acquire_crypt_device()?;
-        let key = Self::clevis_decrypt(&mut device)?.ok_or_else(|| {
+        let key = clevis_decrypt(&mut device)?.ok_or_else(|| {
             StratisError::Msg(
                 "The Clevis token appears to have been wiped outside of \
                     Stratis; cannot add a keyring key binding without an existing \
@@ -1024,28 +1025,15 @@ impl CryptHandle {
         Ok(())
     }
 
+    /// Encrypt an unencrypted pool.
+    pub fn reencrypt(&self) -> StratisResult<()> {
+        reencrypt_shared(self.luks2_device_path(), self.encryption_info())
+    }
+
     /// Rename the pool in the LUKS2 token.
     pub fn rename_pool_in_metadata(&mut self, pool_name: Name) -> StratisResult<()> {
         let mut device = self.acquire_crypt_device()?;
         replace_pool_name(&mut device, pool_name)
-    }
-
-    /// Decrypt a Clevis passphrase and return it securely.
-    fn clevis_decrypt(device: &mut CryptDevice) -> StratisResult<Option<SizedKeyMemory>> {
-        let mut token = match device.token_handle().json_get(CLEVIS_LUKS_TOKEN_ID).ok() {
-            Some(t) => t,
-            None => return Ok(None),
-        };
-        let jwe = token
-            .as_object_mut()
-            .and_then(|map| map.remove("jwe"))
-            .ok_or_else(|| {
-                StratisError::Msg(format!(
-                    "Token slot {CLEVIS_LUKS_TOKEN_ID} is occupied but does not appear to be a Clevis \
-                        token; aborting"
-                ))
-            })?;
-        clevis_decrypt(&jwe).map(Some)
     }
 
     /// Deactivate the device referenced by the current device handle.
@@ -1097,7 +1085,7 @@ impl CryptHandle {
                 StratisError::Msg("Failed to find key with key description".to_string())
             })?
         } else if self.encryption_info().clevis_info().is_some() {
-            Self::clevis_decrypt(&mut crypt)?.expect("Already checked token exists")
+            clevis_decrypt(&mut crypt)?.expect("Already checked token exists")
         } else {
             unreachable!("Must be encrypted")
         };

@@ -20,18 +20,20 @@ use devicemapper::{Bytes, DevId, DmName, DmOptions};
 use libcryptsetup_rs::{
     c_uint,
     consts::{
-        flags::{CryptActivate, CryptVolumeKey, CryptWipe},
+        flags::{CryptActivate, CryptReencrypt, CryptVolumeKey, CryptWipe},
         vals::{
-            CryptDebugLevel, CryptLogLevel, CryptStatusInfo, CryptWipePattern, EncryptionFormat,
+            CryptDebugLevel, CryptLogLevel, CryptReencryptDirectionInfo, CryptReencryptModeInfo,
+            CryptStatusInfo, CryptWipePattern, EncryptionFormat,
         },
     },
-    register, set_debug_level, set_log_callback, CryptDevice, CryptInit, LibcryptErr,
+    get_sector_size, register, set_debug_level, set_log_callback, CryptDevice, CryptInit,
+    CryptParamsLuks2, CryptParamsReencrypt, LibcryptErr,
 };
 
 use crate::{
     engine::{
         strat_engine::{
-            cmd::clevis_decrypt,
+            cmd,
             crypt::consts::{
                 CLEVIS_LUKS_TOKEN_ID, CLEVIS_RECURSION_LIMIT, CLEVIS_TANG_TRUST_URL,
                 CLEVIS_TOKEN_NAME, DEFAULT_CRYPT_KEYSLOTS_SIZE, DEFAULT_CRYPT_METADATA_SIZE,
@@ -42,6 +44,7 @@ use crate::{
             keys,
         },
         types::{KeyDescription, SizedKeyMemory, UnlockMethod},
+        EncryptionInfo,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -800,7 +803,7 @@ fn open_safe(device: &mut CryptDevice, token: libc::c_int) -> StratisResult<Size
     let token = device.token_handle().json_get(token as c_uint).ok();
     let jwe = token.as_ref().and_then(|t| t.get("jwe"));
     if let Some(jwe) = jwe {
-        clevis_decrypt(jwe)
+        cmd::clevis_decrypt(jwe)
     } else {
         Err(StratisError::Msg(format!(
             "Malformed Clevis token: {:?}",
@@ -855,5 +858,121 @@ pub fn register_clevis_token() -> StratisResult<()> {
         Some(validate),
         Some(dump),
     )?;
+    Ok(())
+}
+
+/// Decrypt a Clevis passphrase and return it securely.
+pub fn clevis_decrypt(device: &mut CryptDevice) -> StratisResult<Option<SizedKeyMemory>> {
+    let mut token = match device.token_handle().json_get(CLEVIS_LUKS_TOKEN_ID).ok() {
+        Some(t) => t,
+        None => return Ok(None),
+    };
+    let jwe = token
+        .as_object_mut()
+        .and_then(|map| map.remove("jwe"))
+        .ok_or_else(|| {
+            StratisError::Msg(format!(
+                "Token slot {CLEVIS_LUKS_TOKEN_ID} is occupied but does not appear to be a Clevis \
+                    token; aborting"
+            ))
+        })?;
+    cmd::clevis_decrypt(&jwe).map(Some)
+}
+
+/// Get one of the passphrases for the encrypted device.
+pub fn get_passphrase(
+    device: &mut CryptDevice,
+    encryption_info: &EncryptionInfo,
+) -> StratisResult<(c_uint, SizedKeyMemory)> {
+    match encryption_info {
+        EncryptionInfo::KeyDesc(kd) => Ok((
+            get_keyslot_number(device, LUKS2_TOKEN_ID)?
+                .expect("encryption info specified that there is a keyring binding"),
+            read_key(kd)?.ok_or_else(|| {
+                StratisError::Msg("Key description {kd} was not found in the keyring".to_string())
+            })?,
+        )),
+        EncryptionInfo::ClevisInfo(_) => Ok((
+            get_keyslot_number(device, CLEVIS_LUKS_TOKEN_ID)?
+                .expect("encryption info specified that there is a Clevis binding"),
+            clevis_decrypt(device)?
+                .expect("encryption info specified that there is a Clevis binding"),
+        )),
+        EncryptionInfo::Both(kd, _) => match read_key(kd) {
+            Ok(Some(key)) => Ok((
+                get_keyslot_number(device, LUKS2_TOKEN_ID)?
+                    .expect("encryption info specified that there is a keyring binding"),
+                key,
+            )),
+            Ok(None) => {
+                warn!(
+                    "Key description {} not found in keyring; falling back on Clevis",
+                    kd.as_application_str()
+                );
+                Ok((
+                    get_keyslot_number(device, CLEVIS_LUKS_TOKEN_ID)?
+                        .expect("encryption info specified that there is a Clevis binding"),
+                    clevis_decrypt(device)?
+                        .expect("encryption info specified that there is a Clevis binding"),
+                ))
+            }
+            Err(_) => {
+                warn!(
+                    "Fetching key description {} failed; falling back on Clevis",
+                    kd.as_application_str()
+                );
+                Ok((
+                    get_keyslot_number(device, CLEVIS_LUKS_TOKEN_ID)?
+                        .expect("encryption info specified that there is a Clevis binding"),
+                    clevis_decrypt(device)?
+                        .expect("encryption info specified that there is a Clevis binding"),
+                ))
+            }
+        },
+    }
+}
+
+pub fn reencrypt_shared(luks2_path: &Path, encryption_info: &EncryptionInfo) -> StratisResult<()> {
+    let mut device = CryptInit::init(luks2_path)?;
+
+    let (keyslot, key) = get_passphrase(&mut device, encryption_info)?;
+    let new_keyslot =
+        device
+            .keyslot_handle()
+            .add_by_key(None, None, key.as_ref(), CryptVolumeKey::NO_SEGMENT)?;
+
+    let cipher = device.status_handle().get_cipher()?;
+    let cipher_mode = device.status_handle().get_cipher_mode()?;
+    let sector_size = convert_int!(get_sector_size(Some(&mut device)), i32, u32)?;
+    device.reencrypt_handle().reencrypt_init_by_passphrase(
+        None,
+        key.as_ref(),
+        Some(keyslot),
+        new_keyslot,
+        (&cipher, &cipher_mode),
+        CryptParamsReencrypt {
+            mode: CryptReencryptModeInfo::Reencrypt,
+            direction: CryptReencryptDirectionInfo::Forward,
+            resilience: "checksum".to_string(),
+            hash: "sha256".to_string(),
+            data_shift: 0,
+            max_hotzone_size: 0,
+            device_size: 0,
+            luks2: CryptParamsLuks2 {
+                data_alignment: 0,
+                data_device: None,
+                integrity: None,
+                integrity_params: None,
+                pbkdf: None,
+                label: None,
+                sector_size,
+                subsystem: None,
+            },
+            flags: CryptReencrypt::INITIALIZE_ONLY,
+        },
+    )?;
+
+    device.reencrypt_handle().reencrypt2::<()>(None, None)?;
+
     Ok(())
 }

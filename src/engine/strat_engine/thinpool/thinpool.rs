@@ -38,7 +38,10 @@ use crate::{
             writing::wipe_sectors,
         },
         structures::Table,
-        types::{Compare, Diff, FilesystemUuid, Name, PoolUuid, StratFilesystemDiff, ThinPoolDiff},
+        types::{
+            Compare, Diff, FilesystemUuid, Name, OffsetDirection, PoolUuid, StratFilesystemDiff,
+            ThinPoolDiff,
+        },
     },
     stratis::{StratisError, StratisResult},
 };
@@ -888,72 +891,6 @@ impl ThinPool<v1::Backstore> {
             backstore: PhantomData,
         })
     }
-
-    /// Set the device on all DM devices
-    pub fn set_device(&mut self, backstore_device: Device) -> StratisResult<bool> {
-        if backstore_device == self.backstore_device {
-            return Ok(false);
-        }
-
-        let xform_target_line =
-            |line: &TargetLine<LinearDevTargetParams>| -> TargetLine<LinearDevTargetParams> {
-                let new_params = match line.params {
-                    LinearDevTargetParams::Linear(ref params) => LinearDevTargetParams::Linear(
-                        LinearTargetParams::new(backstore_device, params.start_offset),
-                    ),
-                    LinearDevTargetParams::Flakey(ref params) => {
-                        let feature_args = params.feature_args.iter().cloned().collect::<Vec<_>>();
-                        LinearDevTargetParams::Flakey(FlakeyTargetParams::new(
-                            backstore_device,
-                            params.start_offset,
-                            params.up_interval,
-                            params.down_interval,
-                            feature_args,
-                        ))
-                    }
-                };
-
-                TargetLine::new(line.start, line.length, new_params)
-            };
-
-        let meta_table = self
-            .thin_pool
-            .meta_dev()
-            .table()
-            .table
-            .clone()
-            .iter()
-            .map(&xform_target_line)
-            .collect::<Vec<_>>();
-
-        let data_table = self
-            .thin_pool
-            .data_dev()
-            .table()
-            .table
-            .clone()
-            .iter()
-            .map(&xform_target_line)
-            .collect::<Vec<_>>();
-
-        let mdv_table = self
-            .mdv
-            .device()
-            .table()
-            .table
-            .clone()
-            .iter()
-            .map(&xform_target_line)
-            .collect::<Vec<_>>();
-
-        self.thin_pool.set_meta_table(get_dm(), meta_table)?;
-        self.thin_pool.set_data_table(get_dm(), data_table)?;
-        self.mdv.set_table(mdv_table)?;
-
-        self.backstore_device = backstore_device;
-
-        Ok(true)
-    }
 }
 
 impl ThinPool<v2::Backstore> {
@@ -1752,6 +1689,111 @@ where
             self.mdv.save_fs(&name, fs_uuid, fs)?;
         }
         Ok(changed)
+    }
+
+    /// Set the device on all DM devices
+    pub fn set_device(
+        &mut self,
+        backstore_device: Device,
+        offset: Sectors,
+        dir: OffsetDirection,
+    ) -> StratisResult<bool> {
+        if backstore_device == self.backstore_device {
+            return Ok(false);
+        }
+
+        let xform_target_line =
+            |line: &TargetLine<LinearDevTargetParams>| -> TargetLine<LinearDevTargetParams> {
+                let new_params = match line.params {
+                    LinearDevTargetParams::Linear(ref params) => {
+                        LinearDevTargetParams::Linear(LinearTargetParams::new(
+                            backstore_device,
+                            match dir {
+                                OffsetDirection::Forwards => params.start_offset + offset,
+                                OffsetDirection::Backwards => params.start_offset - offset,
+                            },
+                        ))
+                    }
+                    LinearDevTargetParams::Flakey(ref params) => {
+                        let feature_args = params.feature_args.iter().cloned().collect::<Vec<_>>();
+                        LinearDevTargetParams::Flakey(FlakeyTargetParams::new(
+                            backstore_device,
+                            match dir {
+                                OffsetDirection::Forwards => params.start_offset + offset,
+                                OffsetDirection::Backwards => params.start_offset - offset,
+                            },
+                            params.up_interval,
+                            params.down_interval,
+                            feature_args,
+                        ))
+                    }
+                };
+
+                TargetLine::new(line.start, line.length, new_params)
+            };
+
+        let meta_table = self
+            .thin_pool
+            .meta_dev()
+            .table()
+            .table
+            .clone()
+            .iter()
+            .map(&xform_target_line)
+            .collect::<Vec<_>>();
+
+        let data_table = self
+            .thin_pool
+            .data_dev()
+            .table()
+            .table
+            .clone()
+            .iter()
+            .map(&xform_target_line)
+            .collect::<Vec<_>>();
+
+        let mdv_table = self
+            .mdv
+            .device()
+            .table()
+            .table
+            .clone()
+            .iter()
+            .map(&xform_target_line)
+            .collect::<Vec<_>>();
+
+        self.thin_pool.set_meta_table(get_dm(), meta_table)?;
+        self.thin_pool.set_data_table(get_dm(), data_table)?;
+        self.mdv.set_table(mdv_table)?;
+
+        for (start, _) in self.segments.meta_segments.iter_mut() {
+            match dir {
+                OffsetDirection::Forwards => *start += offset,
+                OffsetDirection::Backwards => *start -= offset,
+            }
+        }
+        for (start, _) in self.segments.meta_spare_segments.iter_mut() {
+            match dir {
+                OffsetDirection::Forwards => *start += offset,
+                OffsetDirection::Backwards => *start -= offset,
+            }
+        }
+        for (start, _) in self.segments.data_segments.iter_mut() {
+            match dir {
+                OffsetDirection::Forwards => *start += offset,
+                OffsetDirection::Backwards => *start -= offset,
+            }
+        }
+        for (start, _) in self.segments.mdv_segments.iter_mut() {
+            match dir {
+                OffsetDirection::Forwards => *start += offset,
+                OffsetDirection::Backwards => *start -= offset,
+            }
+        }
+
+        self.backstore_device = backstore_device;
+
+        Ok(true)
     }
 }
 
@@ -2706,7 +2748,8 @@ mod tests {
                 .device()
                 .expect("Space already allocated from backstore, backstore must have device");
             assert_ne!(old_device, new_device);
-            pool.set_device(new_device).unwrap();
+            pool.set_device(new_device, Sectors(0), OffsetDirection::Forwards)
+                .unwrap();
             pool.resume().unwrap();
 
             let mut buf = [0u8; 10];

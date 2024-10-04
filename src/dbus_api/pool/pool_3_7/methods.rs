@@ -74,16 +74,16 @@ pub fn destroy_filesystems(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodRe
                         dbus_context.push_remove(op, filesystem_interface_list());
                     }
 
-                    for sn_op in m.tree.iter().filter(|op| {
-                        op.get_data()
-                            .as_ref()
-                            .map(|data| match data.uuid {
-                                StratisUuid::Fs(uuid) => updated_uuids.contains(&uuid),
-                                _ => false,
-                            })
-                            .unwrap_or(false)
+                    for (sn_op, origin) in m.tree.iter().filter_map(|op| {
+                        op.get_data().as_ref().and_then(|data| match data.uuid {
+                            StratisUuid::Fs(uuid) => updated_uuids
+                                .iter()
+                                .find(|(u, _)| *u == uuid)
+                                .map(|(_, origin)| (op, *origin)),
+                            _ => None,
+                        })
                     }) {
-                        dbus_context.push_filesystem_origin_change(sn_op.get_name());
+                        dbus_context.push_filesystem_origin_change(sn_op.get_name(), origin);
                     }
 
                     changed_uuids

@@ -203,8 +203,7 @@ impl DbusTreeHandler {
         }
     }
 
-    fn handle_fs_origin_change(&self, item: Path<'static>) {
-        let origin_prop = fs_origin_to_prop(None);
+    fn handle_fs_origin_change(&self, item: Path<'static>, new_origin: Option<FilesystemUuid>) {
         if self
             .property_changed_invalidated_signal(
                 &item,
@@ -212,7 +211,7 @@ impl DbusTreeHandler {
                     consts::FILESYSTEM_INTERFACE_NAME_3_7 => {
                         vec![],
                         consts::FILESYSTEM_ORIGIN_PROP.to_string() =>
-                        box_variant!(origin_prop.clone())
+                        box_variant!(fs_origin_to_prop(new_origin))
                     }
                 },
             )
@@ -873,6 +872,25 @@ impl DbusTreeHandler {
         }
     }
 
+    /// Send a signal indicating that the filesystem merge scheduled value has
+    /// changed.
+    fn handle_fs_merge_scheduled_change(&self, path: Path<'static>, new_scheduled: bool) {
+        if let Err(e) = self.property_changed_invalidated_signal(
+            &path,
+            prop_hashmap!(
+                consts::FILESYSTEM_INTERFACE_NAME_3_7 => {
+                    Vec::new(),
+                    consts::FILESYSTEM_MERGE_SCHEDULED_PROP.to_string() =>
+                    box_variant!(new_scheduled)
+                }
+            ),
+        ) {
+            warn!(
+                "Failed to send a signal over D-Bus indicating filesystem merge scheduled value change: {e}"
+            );
+        }
+    }
+
     /// Send a signal indicating that the blockdev user info has changed.
     fn handle_blockdev_user_info_change(&self, path: Path<'static>, new_user_info: Option<String>) {
         let user_info_prop = blockdev_user_info_to_prop(new_user_info);
@@ -1216,8 +1234,8 @@ impl DbusTreeHandler {
                 self.handle_fs_name_change(item, new_name);
                 Ok(true)
             }
-            DbusAction::FsOriginChange(item) => {
-                self.handle_fs_origin_change(item);
+            DbusAction::FsOriginChange(item, new_origin) => {
+                self.handle_fs_origin_change(item, new_origin);
                 Ok(true)
             }
             DbusAction::PoolNameChange(item, new_name) => {
@@ -1252,6 +1270,10 @@ impl DbusTreeHandler {
             }
             DbusAction::FsSizeLimitChange(path, new_limit) => {
                 self.handle_fs_size_limit_change(path, new_limit);
+                Ok(true)
+            }
+            DbusAction::FsMergeScheduledChange(path, new_scheduled) => {
+                self.handle_fs_merge_scheduled_change(path, new_scheduled);
                 Ok(true)
             }
             DbusAction::PoolOverprovModeChange(path, new_mode) => {

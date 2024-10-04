@@ -1,14 +1,25 @@
 stratisd 3.7.0 (UNRELEASED)
 ===========================
-Recommended Rust toolchain version: 1.79.0
+Recommended Rust toolchain version: 1.81.0
 Recommended development platform for Python development: Fedora 39
 
-- Increase D-Bus revision number to 6:
+- Increase D-Bus revision number to 7:
   https://github.com/stratis-storage/stratisd/pull/3483
+
+- Introduce metadata version v2:
+  https://github.com/stratis-storage/stratisd/pull/3679
+  https://github.com/stratis-storage/stratisd/pull/3678
+  https://github.com/stratis-storage/stratisd/pull/3673
+  https://github.com/stratis-storage/stratisd/pull/3671
+  https://github.com/stratis-storage/stratisd/pull/3655
+  https://github.com/stratis-storage/stratisd/pull/3637
 
 - Add origin field to StratFilesystem:
   https://github.com/stratis-storage/stratisd/issues/3515
   https://github.com/stratis-storage/stratisd/pull/3516
+
+- Add D-Bus method to return Stratis filesystem metadata:
+  https://github.com/stratis-storage/stratisd/pull/3656
 
 - Add D-Bus method to return Stratis pool-level metadata:
   https://github.com/stratis-storage/stratisd/pull/3618
@@ -51,6 +62,13 @@ Recommended development platform for Python development: Fedora 39
   https://github.com/stratis-storage/stratisd/pull/3592
   https://github.com/stratis-storage/stratisd/pull/3528
 
+- Ensure filesystem Used signal if filesystem check updates used value:
+  https://github.com/stratis-storage/stratisd/issues/3634
+  https://github.com/stratis-storage/stratisd/pull/3639
+
+- Multiply size prediction for meta requirement in backstore by 2:
+  https://github.com/stratis-storage/stratisd/issues/3647
+
 - Add script to get Stratis info from devicemapper path:
   https://github.com/stratis-storage/stratisd/pull/3556
 
@@ -65,6 +83,9 @@ Recommended development platform for Python development: Fedora 39
 
 - Simplify allocation procedure:
   https://github.com/stratis-storage/stratisd/pull/3491
+
+- Allow logging in stratis-predict-usage utility:
+  https://github.com/stratis-storage/stratisd/pull/3672
 
 - Improve dispatch for stratis-utils:
   https://github.com/stratis-storage/stratisd/pull/3549
@@ -90,6 +111,17 @@ Recommended development platform for Python development: Fedora 39
 - Increase lower bounds of Stratis project dependencies:
   https://github.com/stratis-storage/stratisd/pull/3585
 
+- Increase syn dependency lower bound to 2.0.0:
+  https://github.com/stratis-storage/stratisd/issues/3650
+  https://github.com/stratis-storage/stratisd/pull/3682
+
+- Increase devicemapper dependency lower bound to 0.34.4:
+  https://github.com/stratis-storage/stratisd/pull/3693
+  https://github.com/stratis-storage/stratisd/pull/3676
+
+- Increase libcryptsetup-rs dependency lower bound to 0.10.0:
+  https://github.com/stratis-storage/stratisd/pull/3659
+
 - Increase env_logger dependency lower bound to 0.11.0:
   https://github.com/stratis-storage/stratisd/pull/3559
 
@@ -106,9 +138,13 @@ Recommended development platform for Python development: Fedora 39
   https://github.com/stratis-storage/stratisd/pull/3627
   https://github.com/stratis-storage/stratisd/pull/3519
 
-- Increase nix dependency lower bound to 0.28.0,
-  Create pipe so file descriptor is not dropped early:
+- Increase nix dependency lower bound to 0.29.0,
+  Create pipe so file descriptor is not dropped early,
+  Remove deprecated usage of flock:
+  https://github.com/stratis-storage/stratisd/issues/3582
   https://github.com/stratis-storage/stratisd/issues/3586
+  https://github.com/stratis-storage/stratisd/pull/3649
+  https://github.com/stratis-storage/stratisd/pull/3624
   https://github.com/stratis-storage/stratisd/pull/3588
   https://github.com/stratis-storage/stratisd/pull/3580
   https://github.com/stratis-storage/stratisd/pull/3500
@@ -125,7 +161,14 @@ Recommended development platform for Python development: Fedora 39
 - Use LIBEXECDIR as a substitution variable in all scripts:
   https://github.com/stratis-storage/stratisd/pull/3514
 
+- Assert snapshot name is already in use in thinpool:
+  https://github.com/stratis-storage/stratisd/pull/3675
+
+- Enforce set invariant in destroy_filesystems:
+  https://github.com/stratis-storage/stratisd/pull/3674
+
 - Improve test coverage of stratis-min:
+  https://github.com/stratis-storage/stratisd/pull/3644
   https://github.com/stratis-storage/stratisd/pull/3631
   https://github.com/stratis-storage/stratisd/pull/3630
   https://github.com/stratis-storage/stratisd/pull/3610
@@ -133,10 +176,31 @@ Recommended development platform for Python development: Fedora 39
   https://github.com/stratis-storage/stratisd/pull/3602
 
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3688
+  https://github.com/stratis-storage/stratisd/pull/3687
+  https://github.com/stratis-storage/stratisd/pull/3685
+  https://github.com/stratis-storage/stratisd/pull/3684
+  https://github.com/stratis-storage/stratisd/pull/3683
+  https://github.com/stratis-storage/stratisd/pull/3681
+  https://github.com/stratis-storage/stratisd/pull/3677
+  https://github.com/stratis-storage/stratisd/pull/3670
+  https://github.com/stratis-storage/stratisd/pull/3668
+  https://github.com/stratis-storage/stratisd/pull/3667
+  https://github.com/stratis-storage/stratisd/pull/3664
+  https://github.com/stratis-storage/stratisd/pull/3662
+  https://github.com/stratis-storage/stratisd/pull/3661
+  https://github.com/stratis-storage/stratisd/pull/3660
+  https://github.com/stratis-storage/stratisd/pull/3658
+  https://github.com/stratis-storage/stratisd/pull/3654
+  https://github.com/stratis-storage/stratisd/pull/3653
+  https://github.com/stratis-storage/stratisd/pull/3646
+  https://github.com/stratis-storage/stratisd/pull/3642
+  https://github.com/stratis-storage/stratisd/pull/3636
   https://github.com/stratis-storage/stratisd/pull/3632
   https://github.com/stratis-storage/stratisd/pull/3629
   https://github.com/stratis-storage/stratisd/pull/3628
   https://github.com/stratis-storage/stratisd/pull/3625
+  https://github.com/stratis-storage/stratisd/pull/3620
   https://github.com/stratis-storage/stratisd/pull/3617
   https://github.com/stratis-storage/stratisd/pull/3616
   https://github.com/stratis-storage/stratisd/pull/3615

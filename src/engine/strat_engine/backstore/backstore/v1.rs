@@ -19,7 +19,7 @@ use crate::{
             backstore::{
                 backstore::InternalBackstore,
                 blockdev::{v1::StratBlockDev, InternalBlockDev},
-                blockdevmgr::BlockDevMgr,
+                blockdevmgr::{BlockDevMgr, BlockDevMgrMetaSize, BlockDevMgrSize},
                 cache_tier::CacheTier,
                 data_tier::DataTier,
                 devices::UnownedDevices,
@@ -125,11 +125,11 @@ impl InternalBackstore for Backstore {
     }
 
     fn datatier_usable_size(&self) -> Sectors {
-        self.data_tier.usable_size()
+        self.data_tier.usable_size().sectors()
     }
 
     fn available_in_backstore(&self) -> Sectors {
-        self.data_tier.usable_size() - self.next
+        self.data_tier.usable_size().sectors() - self.next
     }
 
     fn alloc(
@@ -513,7 +513,7 @@ impl Backstore {
     }
 
     /// The current size of all the blockdevs in the data tier.
-    pub fn datatier_size(&self) -> Sectors {
+    pub fn datatier_size(&self) -> BlockDevMgrSize {
         self.data_tier.size()
     }
 
@@ -605,7 +605,7 @@ impl Backstore {
 
     /// The number of sectors in the backstore given up to Stratis metadata
     /// on devices in the data tier.
-    pub fn datatier_metadata_size(&self) -> Sectors {
+    pub fn datatier_metadata_size(&self) -> BlockDevMgrMetaSize {
         self.data_tier.metadata_size()
     }
 

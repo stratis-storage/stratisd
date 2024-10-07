@@ -192,6 +192,7 @@ jobs:
       - name: Install dependencies
         run: >
           dnf install -y
+          bandit
           make
           pylint
           python3-dbus

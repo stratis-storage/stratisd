@@ -16,7 +16,7 @@ Classes to implement dbus interface.
 """
 
 # isort: STDLIB
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # nosec B405
 
 # isort: FIRSTPARTY
 from dbus_client_gen import managed_object_class, mo_query_builder
@@ -31,9 +31,9 @@ from ._constants import (
 )
 from ._introspect import SPECS
 
-_POOL_SPEC = ET.fromstring(SPECS[POOL_INTERFACE])
-_FILESYSTEM_SPEC = ET.fromstring(SPECS[FILESYSTEM_INTERFACE])
-_BLOCKDEV_SPEC = ET.fromstring(SPECS[BLOCKDEV_INTERFACE])
+_POOL_SPEC = ET.fromstring(SPECS[POOL_INTERFACE])  # nosec B314
+_FILESYSTEM_SPEC = ET.fromstring(SPECS[FILESYSTEM_INTERFACE])  # nosec B314
+_BLOCKDEV_SPEC = ET.fromstring(SPECS[BLOCKDEV_INTERFACE])  # nosec B314
 
 pools = mo_query_builder(_POOL_SPEC)
 filesystems = mo_query_builder(_FILESYSTEM_SPEC)
@@ -46,11 +46,15 @@ TIME_OUT = 360  # In seconds
 
 ObjectManager = make_class(
     "ObjectManager",
-    ET.fromstring(SPECS["org.freedesktop.DBus.ObjectManager"]),
+    ET.fromstring(SPECS["org.freedesktop.DBus.ObjectManager"]),  # nosec B314
     TIME_OUT,
 )
-Report = make_class("Report", ET.fromstring(SPECS[REPORT_INTERFACE]), TIME_OUT)
-Manager = make_class("Manager", ET.fromstring(SPECS[MANAGER_INTERFACE]), TIME_OUT)
+Report = make_class(
+    "Report", ET.fromstring(SPECS[REPORT_INTERFACE]), TIME_OUT  # nosec B314
+)
+Manager = make_class(
+    "Manager", ET.fromstring(SPECS[MANAGER_INTERFACE]), TIME_OUT  # nosec B314
+)
 Filesystem = make_class("Filesystem", _FILESYSTEM_SPEC, TIME_OUT)
 Pool = make_class("Pool", _POOL_SPEC, TIME_OUT)
 Blockdev = make_class("Blockdev", _BLOCKDEV_SPEC, TIME_OUT)

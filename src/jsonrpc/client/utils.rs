@@ -10,7 +10,7 @@ use std::{
 use nix::unistd::isatty;
 use termios::{tcsetattr, Termios, ECHO, ECHONL, TCSADRAIN};
 
-use crate::stratis::StratisResult;
+use crate::stratis::{StratisError, StratisResult};
 
 #[macro_export]
 macro_rules! do_request {
@@ -217,8 +217,8 @@ pub fn to_suffix_repr(size: u128) -> String {
     })
 }
 
-pub fn prompt_password() -> StratisResult<Option<String>> {
-    print!("Enter passphrase followed by return: ");
+pub fn get_passphrase(msg: &str) -> StratisResult<Option<String>> {
+    print!("{}", msg);
     stdout().flush()?;
 
     let stdin = stdin();
@@ -249,6 +249,16 @@ pub fn prompt_password() -> StratisResult<Option<String>> {
         Ok(None)
     } else {
         Ok(Some(password.trim().to_string()))
+    }
+}
+
+pub fn prompt_password() -> StratisResult<Option<String>> {
+    let pass = get_passphrase("Enter passphrase followed by return: ")?;
+    let verify_pass = get_passphrase("Verify passphrase: ")?;
+    if pass != verify_pass {
+        Err(StratisError::Msg("Passphrases did not match".to_string()))
+    } else {
+        Ok(pass)
     }
 }
 

@@ -1,6 +1,6 @@
 [package]
 name = "stratisd"
-version = "3.7.0"
+version = "3.7.1"
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true

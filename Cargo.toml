@@ -122,7 +122,7 @@ version ="0.11.0"
 optional = true
 
 [dependencies.futures]
-version = "0.3.11"
+version = "0.3.31"
 optional = true
 
 [dependencies.iocuddle]
@@ -138,11 +138,11 @@ version = "0.3.2"
 optional = true
 
 [dependencies.libc]
-version = "0.2.147"
+version = "0.2.155"
 optional = true
 
 [dependencies.libcryptsetup-rs]
-version = "0.10.0"
+version = "0.11.0"
 features = ["mutex"]
 optional = true
 
@@ -180,7 +180,7 @@ version = "0.8.0"
 optional = true
 
 [dependencies.regex]
-version = "1.5.4"
+version = "1.5.5"
 optional = true
 
 [dependencies.retry]
@@ -214,7 +214,7 @@ optional = true
 path = "./stratisd_proc_macros"
 
 [dependencies.tempfile]
-version = "3.0.2"
+version = "3.4.0"
 optional = true
 
 [dependencies.termios]
@@ -222,7 +222,7 @@ version = "0.3.3"
 optional = true
 
 [dependencies.tokio]
-version = "1.5.0"
+version = "1.24.2"
 optional = true
 features = ["sync", "macros", "rt", "rt-multi-thread", "signal", "net", "time"]
 

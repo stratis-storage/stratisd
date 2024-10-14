@@ -932,20 +932,11 @@ impl Backstore {
             })?;
 
         let mut parsed_config = clevis_info.clone();
-        let yes = interpret_clevis_config(pin, &mut parsed_config)?;
+        interpret_clevis_config(pin, &mut parsed_config)?;
 
         if let Some((ref existing_pin, ref existing_info)) = handle.encryption_info().clevis_info()
         {
-            // Ignore thumbprint if stratis:tang:trust_url is set in the clevis_info
-            // config.
-            let mut config_to_check = existing_info.clone();
-            if yes {
-                if let Value::Object(ref mut ei) = config_to_check {
-                    ei.remove("thp");
-                }
-            }
-
-            if (existing_pin.as_str(), &config_to_check) == (pin, &parsed_config) {
+            if existing_pin.as_str() == pin {
                 Ok(false)
             } else {
                 Err(StratisError::Msg(format!(

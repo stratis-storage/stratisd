@@ -690,19 +690,10 @@ impl Backstore {
         };
 
         let mut parsed_config = clevis_info.clone();
-        let yes = interpret_clevis_config(pin, &mut parsed_config)?;
+        interpret_clevis_config(pin, &mut parsed_config)?;
 
         if let Some((ref existing_pin, ref existing_info)) = encryption_info.clevis_info() {
-            // Ignore thumbprint if stratis:tang:trust_url is set in the clevis_info
-            // config.
-            let mut config_to_check = existing_info.clone();
-            if yes {
-                if let Value::Object(ref mut ei) = config_to_check {
-                    ei.remove("thp");
-                }
-            }
-
-            if (existing_pin.as_str(), &config_to_check) == (pin, &parsed_config)
+            if existing_pin.as_str() == pin
                 && CryptHandle::can_unlock(
                     self.blockdevs()
                         .first()
@@ -716,7 +707,7 @@ impl Backstore {
                 Ok(false)
             } else {
                 Err(StratisError::Msg(format!(
-                    "Block devices have already been bound with pin {existing_pin} and config {config_to_check}; \
+                    "Block devices have already been bound with pin {existing_pin} and config {existing_info}; \
                         requested pin {pin} and config {parsed_config} can't be applied"
                 )))
             }

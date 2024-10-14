@@ -4,7 +4,7 @@
 
 // Code to handle the backing store of a pool.
 
-use std::{cmp, collections::HashMap, iter::once, path::PathBuf};
+use std::{cmp, collections::HashMap, iter::once, path::Path, path::PathBuf};
 
 use chrono::{DateTime, Utc};
 use either::Either;
@@ -29,6 +29,7 @@ use crate::{
             names::{format_backstore_ids, CacheRole},
             serde_structs::{BackstoreSave, CapSave, PoolFeatures, PoolSave, Recordable},
             shared::bds_to_bdas,
+            thinpool::ThinPool,
             types::BDARecordResult,
             writing::wipe_sectors,
         },
@@ -1106,6 +1107,37 @@ impl Backstore {
 
     pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
         self.data_tier.grow(dev)
+    }
+
+    pub fn encrypt(
+        &mut self,
+        pool_uuid: PoolUuid,
+        thinpool: &mut ThinPool<Self>,
+        encryption_info: &EncryptionInfo,
+    ) -> StratisResult<()> {
+        let (dm_name, _) = format_backstore_ids(pool_uuid, CacheRole::Cache);
+        let handle = CryptHandle::encrypt(
+            pool_uuid,
+            thinpool,
+            Path::new(&format!("/dev/mapper/{}", &dm_name.to_string())),
+            encryption_info,
+        )?;
+        self.enc = Some(Either::Right(handle));
+        Ok(())
+    }
+
+    pub fn reencrypt(&self) -> StratisResult<()> {
+        match self.enc {
+            Some(Either::Left(_)) => {
+                Err(StratisError::Msg("Encrypted pool where the encrypted device has not yet been created cannot be reencrypted".to_string()))
+            }
+            Some(Either::Right(ref handle)) => {
+                handle.reencrypt()
+            }
+            None => {
+                Err(StratisError::Msg("Unencrypted device cannot be reencrypted".to_string()))
+            }
+        }
     }
 
     /// A summary of block sizes

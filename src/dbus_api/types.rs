@@ -108,6 +108,7 @@ pub enum DbusAction {
     BlockdevTotalPhysicalSizeChange(Path<'static>, Sectors),
     FsOriginChange(Path<'static>),
     FsSizeLimitChange(Path<'static>, Option<Sectors>),
+    PoolEncryptionChange(Path<'static>, bool),
     FsBackgroundChange(
         FilesystemUuid,
         SignalChange<Option<Bytes>>,
@@ -460,6 +461,19 @@ impl DbusContext {
         {
             warn!(
                 "Block device total physical size change event could not be sent to the processing thread; no signal will be sent out for the block device total physical size state change: {}",
+                e,
+            )
+        }
+    }
+
+    /// Send changed signal for changed encryption status of pool.
+    pub fn push_pool_encryption_status_change(&self, path: &Path<'static>, encrypted: bool) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::PoolEncryptionChange(path.clone(), encrypted))
+        {
+            warn!(
+                "Encryption status change event could not be sent to the processing thread; no signal will be sent out for the encryption status state change: {}",
                 e,
             )
         }

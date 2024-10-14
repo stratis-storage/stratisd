@@ -204,14 +204,40 @@ pub fn clevis_info_from_metadata(
     pin_dispatch(&subjson, CLEVIS_RECURSION_LIMIT).map(Some)
 }
 
-/// Returns true if the Tang config has a thumbprint or an advertisement
-/// or all Tang configs in the nested sss config have thumbprints or
-/// advertisements.
-fn all_tang_configs_have_url_trust_info(
+/// Generic traversal of a Clevis config.
+/// Apply the specified simple functions to tang and tpm2 configs.
+/// The sss parameter is the initial value and function for a try_fold
+/// action for an sss pin. The sss function is a FnMut in order to be
+/// able to update the accumulator.
+///
+/// fn example(
+///    pin: &str,
+///    clevis_config: &Value,
+///    recursion_limit: u64,
+/// ) -> StratisResult<Vec<u32>> {
+///    traverse_clevis_config(
+///        pin,
+///        clevis_config,
+///        recursion_limit,
+///        &|_obj| Ok(Vec::new()),
+///        &|_| Ok(Vec::new()),
+///        &mut (&Vec::new(), &mut |mut acc, _premise| {
+///            acc.push(2);
+///            Ok(acc)
+///        }),
+///    )
+/// }
+fn traverse_clevis_config<T>(
     pin: &str,
     clevis_config: &Value,
     recursion_limit: u64,
-) -> StratisResult<bool> {
+    tang_func: &dyn Fn(&Map<String, Value>) -> StratisResult<T>,
+    tpm2_func: &dyn Fn(&Map<String, Value>) -> StratisResult<T>,
+    sss: &mut (&T, &mut dyn FnMut(T, T) -> StratisResult<T>),
+) -> StratisResult<T>
+where
+    T: Clone,
+{
     if recursion_limit == 0 {
         return Err(StratisError::Msg(
             "Reached the recursion limit for parsing nested SSS tokens".to_string(),
@@ -220,14 +246,7 @@ fn all_tang_configs_have_url_trust_info(
 
     if pin == "tang" {
         if let Some(obj) = clevis_config.as_object() {
-            Ok(obj
-                .get("thp")
-                .map(|val| val.as_str().is_some())
-                .or_else(|| {
-                    obj.get("adv")
-                        .map(|val| val.as_str().is_some() || val.as_object().is_some())
-                })
-                .unwrap_or(false))
+            tang_func(obj)
         } else {
             Err(StratisError::Msg(format!(
                 "configuration for Clevis is is not in JSON object format: {clevis_config}"
@@ -236,14 +255,16 @@ fn all_tang_configs_have_url_trust_info(
     } else if pin == "sss" {
         if let Some(obj) = clevis_config.as_object() {
             if let Some(obj) = obj.get("pins").and_then(|val| val.as_object()) {
-                obj.iter().try_fold(true, |b, (pin, config)| {
-                    Ok(
-                        b && all_tang_configs_have_url_trust_info(
-                            pin,
-                            config,
-                            recursion_limit - 1,
-                        )?,
-                    )
+                obj.iter().try_fold(sss.0.clone(), |acc, (pin, config)| {
+                    let res = traverse_clevis_config(
+                        pin,
+                        config,
+                        recursion_limit - 1,
+                        tang_func,
+                        tpm2_func,
+                        sss,
+                    )?;
+                    sss.1(acc, res)
                 })
             } else {
                 Err(StratisError::Msg(
@@ -256,10 +277,43 @@ fn all_tang_configs_have_url_trust_info(
             )))
         }
     } else if pin == "tpm2" {
-        Ok(true)
+        if let Some(obj) = clevis_config.as_object() {
+            tpm2_func(obj)
+        } else {
+            Err(StratisError::Msg(format!(
+                "configuration for Clevis is is not in JSON object format: {clevis_config}"
+            )))
+        }
     } else {
         Err(StratisError::Msg(format!("Unrecognized pin {pin}")))
     }
+}
+
+/// Returns true if the Tang config has a thumbprint or an advertisement
+/// or all Tang configs in the nested sss config have thumbprints or
+/// advertisements.
+fn all_tang_configs_have_url_trust_info(
+    pin: &str,
+    clevis_config: &Value,
+    recursion_limit: u64,
+) -> StratisResult<bool> {
+    traverse_clevis_config(
+        pin,
+        clevis_config,
+        recursion_limit,
+        &|obj| {
+            Ok(obj
+                .get("thp")
+                .map(|val| val.as_str().is_some())
+                .or_else(|| {
+                    obj.get("adv")
+                        .map(|val| val.as_str().is_some() || val.as_object().is_some())
+                })
+                .unwrap_or(false))
+        },
+        &|_| Ok(true),
+        &mut (&true, &mut |acc, premise| Ok(acc && premise)),
+    )
 }
 
 /// Interpret non-Clevis keys that may contain additional information about

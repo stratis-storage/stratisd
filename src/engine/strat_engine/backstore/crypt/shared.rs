@@ -533,7 +533,10 @@ fn all_tang_configs_have_url_trust_info(
             Ok(obj
                 .get("thp")
                 .map(|val| val.as_str().is_some())
-                .or_else(|| Some(obj.get("adv").is_some()))
+                .or_else(|| {
+                    obj.get("adv")
+                        .map(|val| val.as_str().is_some() || val.as_object().is_some())
+                })
                 .unwrap_or(false))
         } else {
             Err(StratisError::Msg(format!(

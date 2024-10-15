@@ -12,7 +12,7 @@ mod shared;
 pub use self::{
     consts::CLEVIS_TANG_TRUST_URL,
     shared::{
-        back_up_luks_header, crypt_metadata_size, interpret_clevis_config, register_clevis_token,
-        restore_luks_header, set_up_crypt_logging,
+        back_up_luks_header, crypt_metadata_size, register_clevis_token, restore_luks_header,
+        set_up_crypt_logging,
     },
 };

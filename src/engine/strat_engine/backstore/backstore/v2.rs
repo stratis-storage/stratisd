@@ -1412,6 +1412,14 @@ mod tests {
         assert_matches!(
             backstore.bind_clevis(
                 "tang",
+                &json!({"url": env::var("TANG_URL").expect("TANG_URL env var required")})
+            ),
+            Ok(false)
+        );
+
+        assert_matches!(
+            backstore.bind_clevis(
+                "tang",
                 &json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true})
             ),
             Ok(false)

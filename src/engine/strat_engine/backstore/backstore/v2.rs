@@ -1421,7 +1421,7 @@ mod tests {
         backstore.alloc(pool_uuid, &[Sectors(512)]).unwrap();
         cmd::udev_settle().unwrap();
 
-        matches!(
+        assert_matches!(
             backstore.bind_clevis(
                 "tang",
                 &json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true})

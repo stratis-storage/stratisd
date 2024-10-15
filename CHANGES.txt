@@ -1,3 +1,19 @@
+stratisd 3.7.2
+==============
+Recommended Rust toolchain version: 1.81.0
+Recommended development platform for Python development: Fedora 40
+
+* Accept "adv" key as well as "thp" key:
+  https://github.com/stratis-storage/stratisd/issues/3699
+  https://github.com/stratis-storage/stratisd/pull/3701
+
+
+stratisd 3.7.1
+==============
+Recommended Rust toolchain version: 1.81.0
+Recommended development platform for Python development: Fedora 40
+
+
 stratisd 3.7.0
 ==============
 Recommended Rust toolchain version: 1.81.0

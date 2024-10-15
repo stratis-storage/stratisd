@@ -1324,6 +1324,14 @@ mod tests {
         .unwrap();
         cmd::udev_settle().unwrap();
 
+        assert_matches!(
+            backstore.bind_clevis(
+                "tang",
+                &json!({"url": env::var("TANG_URL").expect("TANG_URL env var required")})
+            ),
+            Ok(false)
+        );
+
         matches!(
             backstore.bind_clevis(
                 "tang",

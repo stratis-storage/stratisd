@@ -1230,3 +1230,59 @@ pub fn register_clevis_token() -> StratisResult<()> {
     )?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_missing_thp_1() {
+        assert_matches!(
+            all_tang_configs_have_url_trust_info("tang", &json!({"url": "https://aurl"}), 12),
+            Ok(false)
+        )
+    }
+
+    #[test]
+    fn test_missing_thp_2() {
+        assert_matches!(
+            all_tang_configs_have_url_trust_info(
+                "sss",
+                &json!({"t": 1, "pins": {"tang": {"url": "https://myurl"}, "tpm2": {}}}),
+                12
+            ),
+            Ok(false)
+        )
+    }
+
+    #[test]
+    fn test_present_adv_1() {
+        assert_matches!(
+            all_tang_configs_have_url_trust_info(
+                "sss",
+                &json!({"t": 1, "pins": {"tang": {"url": "https://myurl", "adv": "file"}, "tang": {"url": "https://junk", "thp": "abc"}}}),
+                12
+            ),
+            Ok(true)
+        )
+    }
+
+    #[test]
+    fn test_present_no_check() {
+        assert_matches!(
+            all_tang_configs_have_url_trust_info(
+                "sss",
+                &json!({
+                    "t": 1,
+                    "stratis:tang:trust_url": true,
+                    "pins": {
+                        "tang": {"url": "https://myurl"},
+                        "tpm2": {}
+                    }
+                }),
+                12
+            ),
+            Ok(false)
+        )
+    }
+}

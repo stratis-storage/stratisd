@@ -20,9 +20,7 @@ use crate::{
                 blockdev::StratBlockDev,
                 blockdevmgr::BlockDevMgr,
                 cache_tier::CacheTier,
-                crypt::{
-                    back_up_luks_header, interpret_clevis_config, restore_luks_header, CryptHandle,
-                },
+                crypt::{back_up_luks_header, restore_luks_header, CryptHandle},
                 data_tier::DataTier,
                 devices::UnownedDevices,
                 shared::BlockSizeSummary,
@@ -707,9 +705,6 @@ impl Backstore {
             }
         };
 
-        let mut parsed_config = clevis_info.clone();
-        interpret_clevis_config(pin, &mut parsed_config)?;
-
         if let Some((ref existing_pin, ref existing_info)) = encryption_info.clevis_info() {
             if existing_pin.as_str() == pin
                 && CryptHandle::can_unlock(
@@ -726,7 +721,7 @@ impl Backstore {
             } else {
                 Err(StratisError::Msg(format!(
                     "Block devices have already been bound with pin {existing_pin} and config {existing_info}; \
-                        requested pin {pin} and config {parsed_config} can't be applied"
+                        requested pin {pin} and config {clevis_info} can't be applied"
                 )))
             }
         } else {

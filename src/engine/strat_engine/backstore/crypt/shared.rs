@@ -577,7 +577,7 @@ fn all_tang_configs_have_url_trust_info(
 /// from the configuration.
 /// The only value to be returned is whether or not the bind command should be
 /// passed the argument yes.
-pub fn interpret_clevis_config(pin: &str, clevis_config: &mut Value) -> StratisResult<bool> {
+pub(super) fn interpret_clevis_config(pin: &str, clevis_config: &mut Value) -> StratisResult<bool> {
     let all_tang_has_trust_info =
         all_tang_configs_have_url_trust_info(pin, clevis_config, CLEVIS_RECURSION_LIMIT)?;
     let yes = if pin == "tang" || pin == "sss" {

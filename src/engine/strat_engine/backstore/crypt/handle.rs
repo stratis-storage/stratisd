@@ -427,6 +427,17 @@ impl CryptHandle {
         }
     }
 
+    /// Reload the required information for Stratis from the LUKS2 metadata.
+    pub fn reload_metadata(&mut self) -> StratisResult<()> {
+        match setup_crypt_device(self.luks2_device_path())? {
+            Some(ref mut device) => {
+                self.metadata = load_crypt_metadata(device, self.luks2_device_path())?.ok_or_else(|| StratisError::Msg("Found no crypt metadata on this device".to_string()))?;
+                Ok(())
+            }
+            None => Err(StratisError::Msg("Expected device to be an encrypted device but could not acquire handle to crypt device".to_string())),
+        }
+    }
+
     /// Get the encryption info for this encrypted device.
     pub fn encryption_info(&self) -> &EncryptionInfo {
         &self.metadata.encryption_info

@@ -1021,6 +1021,18 @@ where
                     level: ActionAvailability::NoRequests,
                 };
             }
+            if let Err(e) = blockdev.reload_crypt_metadata() {
+                warn!(
+                    "Failed to reload on-disk metadata for device {}: {}",
+                    blockdev.physical_path().display(),
+                    e,
+                );
+                return StratisError::RollbackError {
+                    causal_error: Box::new(causal_error),
+                    rollback_error: Box::new(e),
+                    level: ActionAvailability::NoRequests,
+                };
+            }
         }
 
         causal_error

@@ -238,6 +238,15 @@ impl StratBlockDev {
             .map(|ch| ch.pool_name())
     }
 
+    /// Reload the crypt metadata from disk and store in the crypt handle if the device is
+    /// encrypted.
+    pub fn reload_crypt_metadata(&mut self) -> StratisResult<()> {
+        match self.underlying_device.crypt_handle_mut() {
+            Some(handle) => handle.reload_metadata(),
+            None => Ok(()),
+        }
+    }
+
     /// Bind encrypted device using the given clevis configuration.
     pub fn bind_clevis(&mut self, pin: &str, clevis_info: &Value) -> StratisResult<()> {
         let crypt_handle = self.underlying_device.crypt_handle_mut().ok_or_else(|| {

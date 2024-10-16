@@ -605,7 +605,6 @@ impl Recordable<BaseBlockDevSave> for StratBlockDev {
             uuid: self.uuid(),
             user_info: self.user_info.clone(),
             hardware_info: self.hardware_info.clone(),
-            raid_meta_allocs: Vec::new(),
             integrity_meta_allocs: Vec::new(),
         }
     }

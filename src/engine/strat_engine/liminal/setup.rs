@@ -547,7 +547,6 @@ fn get_blockdev(
     // conclusion is metadata corruption.
     let segments = segment_table.get(&dev_uuid);
     let meta = data_map.get(&dev_uuid);
-    let raid = meta.map(|base| &base.1.raid_meta_allocs);
     let integrity = meta.map(|base| &base.1.integrity_meta_allocs);
 
     assert_eq!(info.luks, None);
@@ -557,7 +556,6 @@ fn get_blockdev(
             info.dev_info.device_number,
             bda,
             segments.unwrap_or(&vec![]),
-            raid.unwrap_or(&vec![]),
             integrity.unwrap_or(&vec![]),
             bd_save.user_info.clone(),
             bd_save.hardware_info.clone(),

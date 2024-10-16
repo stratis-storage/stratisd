@@ -13,7 +13,7 @@ mod range_alloc;
 mod shared;
 
 pub use self::{
-    blockdev::v2::{integrity_meta_space, raid_meta_space},
+    blockdev::v2::integrity_meta_space,
     devices::{find_stratis_devs_by_uuid, get_devno_from_path, ProcessedPathInfos, UnownedDevices},
 };
 

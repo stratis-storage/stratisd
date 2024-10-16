@@ -642,7 +642,6 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action("NoRequests")]
-    #[pool_rollback]
     fn bind_clevis(
         &mut self,
         pin: &str,
@@ -657,7 +656,6 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action("NoRequests")]
-    #[pool_rollback]
     fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>> {
         let changed = self.backstore.unbind_clevis()?;
         if changed {
@@ -668,7 +666,6 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action("NoRequests")]
-    #[pool_rollback]
     fn bind_keyring(
         &mut self,
         key_description: &KeyDescription,
@@ -682,7 +679,6 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action("NoRequests")]
-    #[pool_rollback]
     fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>> {
         let changed = self.backstore.unbind_keyring()?;
         if changed {
@@ -693,7 +689,6 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action("NoRequests")]
-    #[pool_rollback]
     fn rebind_keyring(
         &mut self,
         new_key_desc: &KeyDescription,
@@ -706,7 +701,6 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action("NoRequests")]
-    #[pool_rollback]
     fn rebind_clevis(&mut self) -> StratisResult<RegenAction> {
         self.backstore.rebind_clevis().map(|_| RegenAction)
     }

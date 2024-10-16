@@ -814,6 +814,17 @@ impl CryptHandle {
         }
     }
 
+    /// Reload the required information for Stratis from the LUKS2 metadata.
+    pub fn reload_metadata(&mut self) -> StratisResult<()> {
+        match setup_crypt_device(self.luks2_device_path())? {
+            Some(ref mut device) => {
+                self.metadata = load_crypt_metadata(device, self.luks2_device_path())?.ok_or_else(|| StratisError::Msg("Found no crypt metadata on this device".to_string()))?;
+                Ok(())
+            }
+            None => Err(StratisError::Msg("Expected device to be an encrypted device but could not acquire handle to crypt device".to_string())),
+        }
+    }
+
     /// Get the encryption info for this encrypted device.
     pub fn encryption_info(&self) -> &EncryptionInfo {
         &self.metadata.encryption_info
@@ -988,11 +999,7 @@ impl CryptHandle {
         let mut device = self.acquire_crypt_device()?;
         let keyslot = get_keyslot_number(&mut device, LUKS2_TOKEN_ID)?
             .ok_or_else(|| StratisError::Msg("No LUKS2 keyring token was found".to_string()))?;
-        log_on_failure!(
-            device.keyslot_handle().destroy(keyslot),
-            "Failed partway through the kernel keyring unbinding operation \
-            which cannot be rolled back; manual intervention may be required"
-        );
+        device.keyslot_handle().destroy(keyslot)?;
         device
             .token_handle()
             .json_set(TokenInput::RemoveToken(LUKS2_TOKEN_ID))?;

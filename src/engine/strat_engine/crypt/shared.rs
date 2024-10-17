@@ -204,9 +204,10 @@ pub fn clevis_info_from_metadata(
     pin_dispatch(&subjson, CLEVIS_RECURSION_LIMIT).map(Some)
 }
 
-/// Returns true if the Tang config has a thumbprint or all Tang configs in the nested sss config
-/// have thumbprints.
-fn all_tang_configs_have_thp(
+/// Returns true if the Tang config has a thumbprint or an advertisement
+/// or all Tang configs in the nested sss config have thumbprints or
+/// advertisements.
+fn all_tang_configs_have_url_trust_info(
     pin: &str,
     clevis_config: &Value,
     recursion_limit: u64,
@@ -222,6 +223,10 @@ fn all_tang_configs_have_thp(
             Ok(obj
                 .get("thp")
                 .map(|val| val.as_str().is_some())
+                .or_else(|| {
+                    obj.get("adv")
+                        .map(|val| val.as_str().is_some() || val.as_object().is_some())
+                })
                 .unwrap_or(false))
         } else {
             Err(StratisError::Msg(format!(
@@ -232,7 +237,13 @@ fn all_tang_configs_have_thp(
         if let Some(obj) = clevis_config.as_object() {
             if let Some(obj) = obj.get("pins").and_then(|val| val.as_object()) {
                 obj.iter().try_fold(true, |b, (pin, config)| {
-                    Ok(b && all_tang_configs_have_thp(pin, config, recursion_limit - 1)?)
+                    Ok(
+                        b && all_tang_configs_have_url_trust_info(
+                            pin,
+                            config,
+                            recursion_limit - 1,
+                        )?,
+                    )
                 })
             } else {
                 Err(StratisError::Msg(
@@ -256,8 +267,9 @@ fn all_tang_configs_have_thp(
 /// from the configuration.
 /// The only value to be returned is whether or not the bind command should be
 /// passed the argument yes.
-pub fn interpret_clevis_config(pin: &str, clevis_config: &mut Value) -> StratisResult<bool> {
-    let all_tang_has_thp = all_tang_configs_have_thp(pin, clevis_config, CLEVIS_RECURSION_LIMIT)?;
+pub(super) fn interpret_clevis_config(pin: &str, clevis_config: &mut Value) -> StratisResult<bool> {
+    let all_tang_has_trust_info =
+        all_tang_configs_have_url_trust_info(pin, clevis_config, CLEVIS_RECURSION_LIMIT)?;
     let yes = if pin == "tang" || pin == "sss" {
         if let Some(map) = clevis_config.as_object_mut() {
             map.remove(CLEVIS_TANG_TRUST_URL)
@@ -272,9 +284,9 @@ pub fn interpret_clevis_config(pin: &str, clevis_config: &mut Value) -> StratisR
         false
     };
 
-    if !all_tang_has_thp && !yes {
+    if !all_tang_has_trust_info && !yes {
         return Err(StratisError::Msg(
-            "Either thumbprints for all Tang servers or a directive to trust all Tang servers is required".to_string()
+            "A thumbprint or advertisement must be provided for every Tang server or a directive to trust all Tang servers is required".to_string()
         ));
     }
 
@@ -856,4 +868,60 @@ pub fn register_clevis_token() -> StratisResult<()> {
         Some(dump),
     )?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_missing_thp_1() {
+        assert_matches!(
+            all_tang_configs_have_url_trust_info("tang", &json!({"url": "https://aurl"}), 12),
+            Ok(false)
+        )
+    }
+
+    #[test]
+    fn test_missing_thp_2() {
+        assert_matches!(
+            all_tang_configs_have_url_trust_info(
+                "sss",
+                &json!({"t": 1, "pins": {"tang": {"url": "https://myurl"}, "tpm2": {}}}),
+                12
+            ),
+            Ok(false)
+        )
+    }
+
+    #[test]
+    fn test_present_adv_1() {
+        assert_matches!(
+            all_tang_configs_have_url_trust_info(
+                "sss",
+                &json!({"t": 1, "pins": {"tang": {"url": "https://myurl", "adv": "file"}, "tang": {"url": "https://junk", "thp": "abc"}}}),
+                12
+            ),
+            Ok(true)
+        )
+    }
+
+    #[test]
+    fn test_present_no_check() {
+        assert_matches!(
+            all_tang_configs_have_url_trust_info(
+                "sss",
+                &json!({
+                    "t": 1,
+                    "stratis:tang:trust_url": true,
+                    "pins": {
+                        "tang": {"url": "https://myurl"},
+                        "tpm2": {}
+                    }
+                }),
+                12
+            ),
+            Ok(false)
+        )
+    }
 }

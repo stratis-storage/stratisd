@@ -25,10 +25,7 @@ use crate::{
                 devices::UnownedDevices,
                 shared::BlockSizeSummary,
             },
-            crypt::{
-                back_up_luks_header, handle::v1::CryptHandle, interpret_clevis_config,
-                restore_luks_header,
-            },
+            crypt::{back_up_luks_header, handle::v1::CryptHandle, restore_luks_header},
             dm::{get_dm, list_of_backstore_devices, remove_optional_devices},
             metadata::{MDADataSize, BDA},
             names::{format_backstore_ids, CacheRole},
@@ -689,20 +686,8 @@ impl Backstore {
             }
         };
 
-        let mut parsed_config = clevis_info.clone();
-        let yes = interpret_clevis_config(pin, &mut parsed_config)?;
-
         if let Some((ref existing_pin, ref existing_info)) = encryption_info.clevis_info() {
-            // Ignore thumbprint if stratis:tang:trust_url is set in the clevis_info
-            // config.
-            let mut config_to_check = existing_info.clone();
-            if yes {
-                if let Value::Object(ref mut ei) = config_to_check {
-                    ei.remove("thp");
-                }
-            }
-
-            if (existing_pin.as_str(), &config_to_check) == (pin, &parsed_config)
+            if existing_pin.as_str() == pin
                 && CryptHandle::can_unlock(
                     self.blockdevs()
                         .first()
@@ -716,8 +701,8 @@ impl Backstore {
                 Ok(false)
             } else {
                 Err(StratisError::Msg(format!(
-                    "Block devices have already been bound with pin {existing_pin} and config {config_to_check}; \
-                        requested pin {pin} and config {parsed_config} can't be applied"
+                    "Block devices have already been bound with pin {existing_pin} and config {existing_info}; \
+                        requested pin {pin} and config {clevis_info} can't be applied"
                 )))
             }
         } else {
@@ -1332,6 +1317,14 @@ mod tests {
         )
         .unwrap();
         cmd::udev_settle().unwrap();
+
+        assert_matches!(
+            backstore.bind_clevis(
+                "tang",
+                &json!({"url": env::var("TANG_URL").expect("TANG_URL env var required")})
+            ),
+            Ok(false)
+        );
 
         assert_matches!(
             backstore.bind_clevis(

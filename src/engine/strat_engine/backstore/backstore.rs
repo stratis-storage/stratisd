@@ -1021,6 +1021,18 @@ where
                     level: ActionAvailability::NoRequests,
                 };
             }
+            if let Err(e) = blockdev.reload_crypt_metadata() {
+                warn!(
+                    "Failed to reload on-disk metadata for device {}: {}",
+                    blockdev.physical_path().display(),
+                    e,
+                );
+                return StratisError::RollbackError {
+                    causal_error: Box::new(causal_error),
+                    rollback_error: Box::new(e),
+                    level: ActionAvailability::NoRequests,
+                };
+            }
         }
 
         causal_error
@@ -1332,7 +1344,7 @@ mod tests {
             Ok(false)
         );
 
-        matches!(
+        assert_matches!(
             backstore.bind_clevis(
                 "tang",
                 &json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true})

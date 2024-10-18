@@ -1,3 +1,14 @@
+stratisd 3.7.3
+==============
+Recommended Rust toolchain version: 1.81.0
+Recommended development platform for Python development: Fedora 40
+
+* Cherry-picked commits:
+  * Allow improper ctypes in bindgen-generated bindings
+  * Build f40 and f39 copr repos with additional repo
+  * Tidies
+  * Change matches macro expansion to assert_matches
+
 stratisd 3.7.2
 ==============
 Recommended Rust toolchain version: 1.81.0

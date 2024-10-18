@@ -13,9 +13,7 @@ use serde_json::{json, Value};
 
 use devicemapper::{Bytes, Sectors};
 
-use stratisd::engine::{
-    crypt_metadata_size, integrity_meta_space, raid_meta_space, ThinPoolSizeParams, BDA,
-};
+use stratisd::engine::{crypt_metadata_size, integrity_meta_space, ThinPoolSizeParams, BDA};
 
 // 2^FS_SIZE_START_POWER is the logical size of the smallest Stratis
 // filesystem for which usage data exists in FSSizeLookup::internal, i.e.,
@@ -164,7 +162,6 @@ pub fn predict_filesystem_usage(
 }
 
 fn predict_pool_metadata_usage(device_sizes: Vec<Sectors>) -> Result<Sectors, Box<dyn Error>> {
-    let raid_metadata_alloc = raid_meta_space();
     let stratis_metadata_alloc = BDA::default().extended_size().sectors();
     let stratis_avail_sizes = device_sizes
         .iter()
@@ -178,9 +175,7 @@ fn predict_pool_metadata_usage(device_sizes: Vec<Sectors>) -> Result<Sectors, Bo
             );
 
             info!("Deduction for integrity space: {:}", integrity_deduction);
-            info!("Deduction for raid space: {:}", raid_metadata_alloc);
             (*s).checked_sub(*stratis_metadata_alloc)
-                .and_then(|r| r.checked_sub(*raid_metadata_alloc))
                 .and_then(|r| r.checked_sub(*integrity_deduction))
                 .map(Sectors)
                 .map(|x| {

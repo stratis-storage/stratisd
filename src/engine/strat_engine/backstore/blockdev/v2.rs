@@ -53,14 +53,6 @@ pub fn integrity_meta_space(total_space: Sectors) -> Sectors {
         + Bytes::from((*total_space * 32u64 + 4095) & !4095).sectors()
 }
 
-/// Return the amount of space required for RAID for a device of the given size.
-///
-/// This is a slight overestimation for the sake of simplicity. The maximum metadata size is used
-/// to leave adequate room for any sized device's metadata.
-pub fn raid_meta_space() -> Sectors {
-    Bytes::from(129 * IEC::Mi).sectors()
-}
-
 #[derive(Debug)]
 pub struct StratBlockDev {
     dev: Device,
@@ -71,7 +63,6 @@ pub struct StratBlockDev {
     devnode: DevicePath,
     new_size: Option<Sectors>,
     blksizes: StratSectorSizes,
-    raid_meta_allocs: Vec<(Sectors, Sectors)>,
     integrity_meta_allocs: Vec<(Sectors, Sectors)>,
 }
 
@@ -103,7 +94,6 @@ impl StratBlockDev {
         dev: Device,
         bda: BDA,
         other_segments: &[(Sectors, Sectors)],
-        raid_meta_allocs: &[(Sectors, Sectors)],
         integrity_meta_allocs: &[(Sectors, Sectors)],
         user_info: Option<String>,
         hardware_info: Option<String>,
@@ -111,7 +101,6 @@ impl StratBlockDev {
     ) -> BDAResult<StratBlockDev> {
         let mut segments = vec![(Sectors(0), bda.extended_size().sectors())];
         segments.extend(other_segments);
-        segments.extend(raid_meta_allocs);
         segments.extend(integrity_meta_allocs);
 
         let allocator = match RangeAllocator::new(bda.dev_size(), &segments) {
@@ -143,7 +132,6 @@ impl StratBlockDev {
             devnode,
             new_size: None,
             blksizes,
-            raid_meta_allocs: raid_meta_allocs.to_owned(),
             integrity_meta_allocs: integrity_meta_allocs.to_owned(),
         })
     }
@@ -188,14 +176,6 @@ impl StratBlockDev {
     /// Scan the block device specified by physical_path for its size.
     pub fn scan_blkdev_size(physical_path: &Path) -> StratisResult<Sectors> {
         Ok(blkdev_size(&File::open(physical_path)?)?.sectors())
-    }
-
-    /// Allocate room for RAID metadata from the back of the device.
-    pub fn alloc_raid_meta(&mut self, size: Sectors) {
-        let segs = self.used.alloc_front(size);
-        for (start, len) in segs.iter() {
-            self.raid_meta_allocs.push((*start, *len));
-        }
     }
 
     /// Allocate room for integrity metadata from the back of the device.
@@ -264,7 +244,6 @@ impl InternalBlockDev for StratBlockDev {
     fn metadata_size(&self) -> Sectors {
         self.bda.extended_size().sectors()
             + self.integrity_meta_allocs.iter().map(|(_, len)| *len).sum()
-            + self.raid_meta_allocs.iter().map(|(_, len)| *len).sum()
     }
 
     fn max_stratis_metadata_size(&self) -> MDADataSize {
@@ -432,7 +411,6 @@ impl Recordable<BaseBlockDevSave> for StratBlockDev {
             uuid: self.uuid(),
             user_info: self.user_info.clone(),
             hardware_info: self.hardware_info.clone(),
-            raid_meta_allocs: self.raid_meta_allocs.clone(),
             integrity_meta_allocs: self.integrity_meta_allocs.clone(),
         }
     }

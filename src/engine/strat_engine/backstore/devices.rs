@@ -837,7 +837,7 @@ pub fn initialize_devices(
 
         bda.initialize(&mut f)?;
 
-        v2::StratBlockDev::new(devno, bda, &[], &[], &[], None, hw_id, devnode).map_err(|(e, _)| e)
+        v2::StratBlockDev::new(devno, bda, &[], &[], None, hw_id, devnode).map_err(|(e, _)| e)
     }
 
     /// Clean up an unencrypted device after initialization failure.

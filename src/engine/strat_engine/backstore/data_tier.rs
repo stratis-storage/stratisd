@@ -15,7 +15,7 @@ use crate::{
             backstore::{
                 blockdev::{
                     v1,
-                    v2::{self, integrity_meta_space, raid_meta_space},
+                    v2::{self, integrity_meta_space},
                     InternalBlockDev,
                 },
                 blockdevmgr::BlockDevMgr,
@@ -107,7 +107,6 @@ impl DataTier<v2::StratBlockDev> {
     /// WARNING: metadata changing event
     pub fn new(mut block_mgr: BlockDevMgr<v2::StratBlockDev>) -> DataTier<v2::StratBlockDev> {
         for (_, bd) in block_mgr.blockdevs_mut() {
-            bd.alloc_raid_meta(raid_meta_space());
             // NOTE: over-allocates integrity metadata slightly. Some of the
             // total size of the device will not make use of the integrity
             // metadata.
@@ -142,7 +141,6 @@ impl DataTier<v2::StratBlockDev> {
             .collect::<Vec<_>>();
         assert_eq!(bds.len(), uuids.len());
         for bd in bds {
-            bd.alloc_raid_meta(raid_meta_space());
             bd.alloc_int_meta_back(integrity_meta_space(
                 // NOTE: Subtracting metadata size works here because the only metadata currently
                 // recorded in a newly created block device is the BDA. If this becomes untrue in

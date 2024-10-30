@@ -106,8 +106,9 @@ pub enum DbusAction {
     StoppedPoolsChange(StoppedPoolsInfo),
     BlockdevUserInfoChange(Path<'static>, Option<String>),
     BlockdevTotalPhysicalSizeChange(Path<'static>, Sectors),
-    FsOriginChange(Path<'static>),
+    FsOriginChange(Path<'static>, Option<FilesystemUuid>),
     FsSizeLimitChange(Path<'static>, Option<Sectors>),
+    FsMergeScheduledChange(Path<'static>, bool),
     FsBackgroundChange(
         FilesystemUuid,
         SignalChange<Option<Bytes>>,
@@ -490,11 +491,30 @@ impl DbusContext {
     }
 
     /// Send changed signal for changed filesystem origin property.
-    pub fn push_filesystem_origin_change(&self, path: &Path<'static>) {
-        if let Err(e) = self.sender.send(DbusAction::FsOriginChange(path.clone())) {
+    pub fn push_filesystem_origin_change(
+        &self,
+        path: &Path<'static>,
+        origin: Option<FilesystemUuid>,
+    ) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::FsOriginChange(path.clone(), origin))
+        {
             warn!(
                 "Filesystem origin change event could not be sent to the processing thread; no signal will be sent out for the filesystem origin state change: {}",
                 e,
+            )
+        }
+    }
+
+    /// Send changed signal for pool MergeScheduled property.
+    pub fn push_fs_merge_scheduled_change(&self, item: &Path<'static>, new_merge_scheduled: bool) {
+        if let Err(e) = self.sender.send(DbusAction::FsMergeScheduledChange(
+            item.clone(),
+            new_merge_scheduled,
+        )) {
+            warn!(
+                "D-Bus filesystem merge scheduled change event could not be sent to the processing thread; no signal will be sent out for the merge scheduled change of filesystem with path {item}: {e}"
             )
         }
     }

@@ -125,13 +125,6 @@ impl SimPool {
         }
     }
 
-    fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut SimFilesystem)> {
-        self.filesystems
-            .iter_mut()
-            .map(|(name, uuid, x)| (name.clone(), *uuid, x))
-            .collect()
-    }
-
     pub fn record(&self, name: &str) -> PoolSave {
         PoolSave {
             name: name.to_owned(),
@@ -488,31 +481,59 @@ impl Pool for SimPool {
         &mut self,
         _pool_name: &str,
         fs_uuids: &HashSet<FilesystemUuid>,
-    ) -> StratisResult<SetDeleteAction<FilesystemUuid, FilesystemUuid>> {
-        let mut removed = Vec::new();
-        for &uuid in fs_uuids {
-            if self.filesystems.remove_by_uuid(uuid).is_some() {
-                removed.push(uuid);
-            }
-        }
-
-        let updated_origins: Vec<FilesystemUuid> = self
-            .filesystems_mut()
-            .iter_mut()
+    ) -> StratisResult<SetDeleteAction<FilesystemUuid, (FilesystemUuid, Option<FilesystemUuid>)>>
+    {
+        let mut snapshots = self
+            .filesystems()
+            .iter()
             .filter_map(|(_, u, fs)| {
                 fs.origin().and_then(|x| {
-                    if removed.contains(&x) {
-                        if fs.unset_origin() {
-                            Some(*u)
-                        } else {
-                            None
-                        }
+                    if fs_uuids.contains(&x) {
+                        Some((x, (*u, fs.merge_scheduled())))
                     } else {
                         None
                     }
                 })
             })
-            .collect();
+            .fold(HashMap::new(), |mut acc, (u, v)| {
+                acc.entry(u)
+                    .and_modify(|e: &mut Vec<_>| e.push(v))
+                    .or_insert(vec![v]);
+                acc
+            });
+
+        let scheduled_for_merge = snapshots
+            .iter()
+            .filter(|(_, snaps)| snaps.iter().any(|(_, scheduled)| *scheduled))
+            .collect::<Vec<_>>();
+        if !scheduled_for_merge.is_empty() {
+            let err_str = format!("The filesystem destroy operation can not be begun until the revert operations for the following filesystem snapshots have been cancelled: {}", scheduled_for_merge.iter().map(|(u, _)| u.to_string()).collect::<Vec<_>>().join(", "));
+            return Err(StratisError::Msg(err_str));
+        }
+
+        let (mut removed, mut updated_origins) = (Vec::new(), Vec::new());
+        for &uuid in fs_uuids {
+            if let Some((_, fs)) = self.get_filesystem(uuid) {
+                let fs_origin = fs.origin();
+                self.filesystems
+                    .remove_by_uuid(uuid)
+                    .expect("just looked up");
+                removed.push(uuid);
+
+                for (sn_uuid, _) in snapshots.remove(&uuid).unwrap_or_else(Vec::new) {
+                    // The filesystems may have been removed; any one of
+                    // them may also be a filesystem that was scheduled for
+                    // removal.
+                    if let Some((_, sn)) = self.filesystems.get_mut_by_uuid(sn_uuid) {
+                        assert!(
+                            sn.set_origin(fs_origin),
+                            "A snapshot can only have one origin, so it can be in snapshots.values() only once, so its origin value can be set only once"
+                        );
+                        updated_origins.push((sn_uuid, fs_origin));
+                    };
+                }
+            }
+        }
 
         Ok(SetDeleteAction::new(removed, updated_origins))
     }
@@ -780,6 +801,77 @@ impl Pool for SimPool {
         // The sim pool doesn't write data, so the last fs metadata and the
         // current fs metadata are, by definition, the same.
         self.current_fs_metadata(fs_name)
+    }
+
+    fn set_fs_merge_scheduled(
+        &mut self,
+        fs_uuid: FilesystemUuid,
+        scheduled: bool,
+    ) -> StratisResult<PropChangeAction<bool>> {
+        let (_, fs) = self
+            .filesystems
+            .get_by_uuid(fs_uuid)
+            .ok_or_else(|| StratisError::Msg(format!("No filesystem with UUID {fs_uuid} found")))?;
+
+        let origin = fs.origin().ok_or_else(|| {
+            StratisError::Msg(format!(
+                "Filesystem {fs_uuid} has no origin, revert cannot be scheduled"
+            ))
+        })?;
+
+        if fs.merge_scheduled() == scheduled {
+            return Ok(PropChangeAction::Identity);
+        }
+
+        if scheduled {
+            if self
+                .filesystems
+                .get_by_uuid(origin)
+                .map(|(_, fs)| fs.merge_scheduled())
+                .unwrap_or(false)
+            {
+                return Err(StratisError::Msg(format!(
+                    "Filesystem {fs_uuid} is scheduled to replace filesystem {origin}, but filesystem {origin} is already scheduled to replace another filesystem. Since the order in which the filesystems should replace each other is unknown, this operation can not be performed."
+                )));
+            }
+
+            let (others_scheduled, into_scheduled) = self.filesystems.iter().fold(
+                (Vec::new(), Vec::new()),
+                |(mut o_s, mut i_s), (u, n, f)| {
+                    if f.origin().map(|o| o == origin).unwrap_or(false) && f.merge_scheduled() {
+                        o_s.push((u, n, f));
+                    }
+                    if f.origin().map(|o| o == fs_uuid).unwrap_or(false) && f.merge_scheduled() {
+                        i_s.push((u, n, f));
+                    }
+                    (o_s, i_s)
+                },
+            );
+
+            if let Some((n, u, _)) = others_scheduled.first() {
+                return Err(StratisError::Msg(format!(
+                    "Filesystem {n} with UUID {u} is already scheduled to be reverted into origin filesystem {origin}"
+                )));
+            }
+
+            if let Some((n, u, _)) = into_scheduled.first() {
+                return Err(StratisError::Msg(format!(
+                    "Filesystem {n} with UUID {u} is already scheduled to be reverted into this filesystem {origin}. The ordering is ambiguous, unwilling to schedule a revert"
+                )));
+            }
+        }
+
+        assert!(
+            self.filesystems
+                .get_mut_by_uuid(fs_uuid)
+                .expect("Looked up above")
+                .1
+                .set_merge_scheduled(scheduled)
+                .expect("fs.origin() is not None"),
+            "Already returned from this method if value to set is the same as current"
+        );
+
+        Ok(PropChangeAction::NewValue(scheduled))
     }
 }
 

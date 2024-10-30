@@ -123,7 +123,8 @@ impl Pool for AnyPool {
         &mut self,
         pool_name: &str,
         fs_uuids: &HashSet<FilesystemUuid>,
-    ) -> StratisResult<SetDeleteAction<FilesystemUuid, FilesystemUuid>> {
+    ) -> StratisResult<SetDeleteAction<FilesystemUuid, (FilesystemUuid, Option<FilesystemUuid>)>>
+    {
         match self {
             AnyPool::V1(p) => p.destroy_filesystems(pool_name, fs_uuids),
             AnyPool::V2(p) => p.destroy_filesystems(pool_name, fs_uuids),
@@ -360,6 +361,17 @@ impl Pool for AnyPool {
         match self {
             AnyPool::V1(p) => p.last_fs_metadata(fs_name),
             AnyPool::V2(p) => p.last_fs_metadata(fs_name),
+        }
+    }
+
+    fn set_fs_merge_scheduled(
+        &mut self,
+        fs_uuid: FilesystemUuid,
+        new_scheduled: bool,
+    ) -> StratisResult<PropChangeAction<bool>> {
+        match self {
+            AnyPool::V1(p) => p.set_fs_merge_scheduled(fs_uuid, new_scheduled),
+            AnyPool::V2(p) => p.set_fs_merge_scheduled(fs_uuid, new_scheduled),
         }
     }
 }

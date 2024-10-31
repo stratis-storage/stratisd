@@ -112,6 +112,22 @@ fn test_stratis_min_create_with_clevis_url() {
     test_with_stratisd_min_sim(stratis_min_create_with_clevis_url);
 }
 
+// Test parsing when creating a pool w/ clevis TPM2.
+fn stratis_min_create_with_clevis_tpm() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool")
+        .arg("create")
+        .arg("--clevis")
+        .arg("tpm2")
+        .arg("pn")
+        .arg("/dev/n");
+    cmd.assert().success();
+}
+
+#[test]
+fn test_stratis_min_create_with_clevis_tpm() {
+    test_with_stratisd_min_sim(stratis_min_create_with_clevis_tpm);
+}
 
 #[test]
 // Test parsing when creating a pool with an invalid Clevis method.

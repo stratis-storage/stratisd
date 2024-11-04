@@ -440,6 +440,61 @@ fn test_stratis_min_create_destroy() {
     test_with_stratisd_min_sim(stratis_min_create_destroy);
 }
 
+fn stratis_min_create_encrypted_keydesc() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.write_stdin("thisisatestpassphrase\n")
+        .arg("key")
+        .arg("set")
+        .arg("--capture-key")
+        .arg("testkey");
+    cmd.assert().success();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool")
+        .arg("create")
+        .arg("--key-desc")
+        .arg("testkey")
+        .arg("pn")
+        .arg("/dev/n");
+    cmd.assert().success();
+}
+
+#[test]
+fn test_stratis_min_create_encrypted_keydesc() {
+    test_with_stratisd_min_sim(stratis_min_create_encrypted_keydesc);
+}
+
+fn stratis_min_create_encrypted_keydesc_bind_clevis() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.write_stdin("thisisatestpassphrase\n")
+        .arg("key")
+        .arg("set")
+        .arg("--capture-key")
+        .arg("testkey");
+    cmd.assert().success();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool")
+        .arg("create")
+        .arg("--key-desc")
+        .arg("testkey")
+        .arg("pn")
+        .arg("/dev/n");
+    cmd.assert().success();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool")
+        .arg("bind")
+        .arg("tang")
+        .arg("--name")
+        .arg("pn")
+        .arg("url")
+        .arg("--trust-url");
+    cmd.assert().success();
+}
+
+#[test]
+fn test_stratis_min_create_encrypted_keydesc_bind_clevis() {
+    test_with_stratisd_min_sim(stratis_min_create_encrypted_keydesc_bind_clevis);
+}
+
 fn stratis_min_destroy_with_fs() {
     stratis_min_create_pool_and_fs();
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();

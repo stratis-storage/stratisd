@@ -29,7 +29,10 @@ pub use self::{backstore::ProcessedPathInfos, pool::v1::StratPool};
 pub use self::pool::inspection as pool_inspection;
 
 pub use self::{
-    backstore::integrity_meta_space,
+    backstore::{
+        integrity_meta_space, DEFAULT_INTEGRITY_BLOCK_SIZE, DEFAULT_INTEGRITY_JOURNAL_SIZE,
+        DEFAULT_INTEGRITY_TAG_SIZE,
+    },
     crypt::{
         crypt_metadata_size, register_clevis_token, set_up_crypt_logging, CLEVIS_TANG_TRUST_URL,
     },

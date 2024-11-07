@@ -165,6 +165,15 @@ impl BlockDevMgr<v1::StratBlockDev> {
         self.encryption_info().is_some()
     }
 
+    pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
+        let bd = self
+            .block_devs
+            .iter_mut()
+            .find(|bd| bd.uuid() == dev)
+            .ok_or_else(|| StratisError::Msg(format!("Block device with UUID {dev} not found")))?;
+        bd.grow()
+    }
+
     #[cfg(test)]
     fn invariant(&self) {
         let pool_uuids = self
@@ -232,6 +241,25 @@ impl BlockDevMgr<v2::StratBlockDev> {
         let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
         self.block_devs.extend(bds);
         Ok(bdev_uuids)
+    }
+
+    pub fn grow(
+        &mut self,
+        dev: DevUuid,
+        integrity_journal_size: Sectors,
+        integrity_block_size: Bytes,
+        integrity_tag_size: Bytes,
+    ) -> StratisResult<bool> {
+        let bd = self
+            .block_devs
+            .iter_mut()
+            .find(|bd| bd.uuid() == dev)
+            .ok_or_else(|| StratisError::Msg(format!("Block device with UUID {dev} not found")))?;
+        bd.grow(
+            integrity_journal_size,
+            integrity_block_size,
+            integrity_tag_size,
+        )
     }
 
     #[cfg(test)]
@@ -465,15 +493,6 @@ where
     /// self.allocated_size() - self.metadata_size() >= self.avail_space()
     pub fn metadata_size(&self) -> Sectors {
         self.block_devs.iter().map(|bd| bd.metadata_size()).sum()
-    }
-
-    pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
-        let bd = self
-            .block_devs
-            .iter_mut()
-            .find(|bd| bd.uuid() == dev)
-            .ok_or_else(|| StratisError::Msg(format!("Block device with UUID {dev} not found")))?;
-        bd.grow()
     }
 
     /// Tear down devicemapper devices for the block devices in this BlockDevMgr.

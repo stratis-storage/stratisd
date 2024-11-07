@@ -14,7 +14,7 @@
 
 use serde::{Serialize, Serializer};
 
-use devicemapper::{Sectors, ThinDevId};
+use devicemapper::{Bytes, Sectors, ThinDevId};
 
 use crate::engine::types::{DevUuid, Features, FilesystemUuid};
 
@@ -117,6 +117,12 @@ pub struct BackstoreSave {
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DataTierSave {
     pub blockdev: BlockDevSave,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub integrity_journal_size: Option<Sectors>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub integrity_block_size: Option<Bytes>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub integrity_tag_size: Option<Bytes>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]

@@ -3157,6 +3157,8 @@ mod tests {
                 devices,
                 MDADataSize::default(),
                 None,
+                None,
+                None,
             )
             .unwrap();
             let size = ThinPoolSizeParams::new(backstore.datatier_usable_size()).unwrap();
@@ -3258,6 +3260,8 @@ mod tests {
                 pool_uuid,
                 first_devices,
                 MDADataSize::default(),
+                None,
+                None,
                 None,
             )
             .unwrap();
@@ -3394,6 +3398,8 @@ mod tests {
                 devices,
                 MDADataSize::default(),
                 None,
+                None,
+                None,
             )
             .unwrap();
             warn!("Available: {}", backstore.available_in_backstore());
@@ -3519,6 +3525,8 @@ mod tests {
                 devices,
                 MDADataSize::default(),
                 None,
+                None,
+                None,
             )
             .unwrap();
             let mut pool = ThinPool::<backstore::v2::Backstore>::new(
@@ -3587,6 +3595,8 @@ mod tests {
                 pool_uuid,
                 devices,
                 MDADataSize::default(),
+                None,
+                None,
                 None,
             )
             .unwrap();
@@ -3667,6 +3677,8 @@ mod tests {
                 devices,
                 MDADataSize::default(),
                 None,
+                None,
+                None,
             )
             .unwrap();
             let mut pool = ThinPool::<backstore::v2::Backstore>::new(
@@ -3733,6 +3745,8 @@ mod tests {
                 devices,
                 MDADataSize::default(),
                 None,
+                None,
+                None,
             )
             .unwrap();
             let mut pool = ThinPool::<backstore::v2::Backstore>::new(
@@ -3793,6 +3807,8 @@ mod tests {
                 pool_uuid,
                 devices,
                 MDADataSize::default(),
+                None,
+                None,
                 None,
             )
             .unwrap();
@@ -3899,6 +3915,8 @@ mod tests {
                 pool_uuid,
                 devices,
                 MDADataSize::default(),
+                None,
+                None,
                 None,
             )
             .unwrap();
@@ -4037,6 +4055,8 @@ mod tests {
                 pool_uuid,
                 devices,
                 MDADataSize::default(),
+                None,
+                None,
                 None,
             )
             .unwrap();

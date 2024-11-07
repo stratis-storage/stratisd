@@ -336,72 +336,16 @@ impl StratBlockDev {
         }
     }
 
-    #[cfg(test)]
-    pub fn invariant(&self) {
-        assert!(self.total_size() == self.used.size());
-    }
-}
-
-impl InternalBlockDev for StratBlockDev {
-    fn uuid(&self) -> DevUuid {
-        self.bda.dev_uuid()
-    }
-
-    fn device(&self) -> &Device {
-        &self.dev
-    }
-
-    fn physical_path(&self) -> &Path {
-        self.devnode()
-    }
-
-    fn blksizes(&self) -> StratSectorSizes {
-        self.blksizes
-    }
-
-    fn metadata_version(&self) -> StratSigblockVersion {
-        self.bda.sigblock_version()
-    }
-
-    fn total_size(&self) -> BlockdevSize {
-        self.bda.dev_size()
-    }
-
-    fn available(&self) -> Sectors {
-        self.used.available()
-    }
-
-    fn metadata_size(&self) -> Sectors {
-        self.bda.extended_size().sectors()
-    }
-
-    fn max_stratis_metadata_size(&self) -> MDADataSize {
-        self.bda.max_data_size()
-    }
-
-    fn in_use(&self) -> bool {
-        self.used.used() > self.metadata_size()
-    }
-
-    fn alloc(&mut self, size: Sectors) -> PerDevSegments {
-        self.used.alloc_front(size)
-    }
-
-    fn calc_new_size(&self) -> StratisResult<Option<Sectors>> {
-        let s = Self::scan_blkdev_size(
-            self.physical_path(),
-            self.underlying_device.crypt_handle().is_some(),
-        )?;
-        if Some(s) == self.new_size
-            || (self.new_size.is_none() && s == self.bda.dev_size().sectors())
-        {
-            Ok(None)
-        } else {
-            Ok(Some(s))
-        }
-    }
-
-    fn grow(&mut self) -> StratisResult<bool> {
+    /// Grow the block device if the underlying physical device has grown in size.
+    /// Return an error and leave the size as is if the device has shrunk.
+    /// Do nothing if the device is the same size as recorded in the metadata.
+    ///
+    /// This method does not need to block IO to the extended crypt device prior
+    /// to rollback because of per-pool locking. Growing the device will acquire
+    /// an exclusive lock on the pool and therefore the thin pool cannot be
+    /// extended to use the larger or unencrypted block device size until the
+    /// transaction has been completed successfully.
+    pub fn grow(&mut self) -> StratisResult<bool> {
         /// Precondition: size > h.blkdev_size
         fn needs_rollback(bd: &mut StratBlockDev, size: BlockdevSize) -> StratisResult<()> {
             let mut f = OpenOptions::new()
@@ -470,6 +414,70 @@ impl InternalBlockDev for StratBlockDev {
 
                 Ok(true)
             }
+        }
+    }
+    #[cfg(test)]
+    pub fn invariant(&self) {
+        assert!(self.total_size() == self.used.size());
+    }
+}
+
+impl InternalBlockDev for StratBlockDev {
+    fn uuid(&self) -> DevUuid {
+        self.bda.dev_uuid()
+    }
+
+    fn device(&self) -> &Device {
+        &self.dev
+    }
+
+    fn physical_path(&self) -> &Path {
+        self.devnode()
+    }
+
+    fn blksizes(&self) -> StratSectorSizes {
+        self.blksizes
+    }
+
+    fn metadata_version(&self) -> StratSigblockVersion {
+        self.bda.sigblock_version()
+    }
+
+    fn total_size(&self) -> BlockdevSize {
+        self.bda.dev_size()
+    }
+
+    fn available(&self) -> Sectors {
+        self.used.available()
+    }
+
+    fn metadata_size(&self) -> Sectors {
+        self.bda.extended_size().sectors()
+    }
+
+    fn max_stratis_metadata_size(&self) -> MDADataSize {
+        self.bda.max_data_size()
+    }
+
+    fn in_use(&self) -> bool {
+        self.used.used() > self.metadata_size()
+    }
+
+    fn alloc(&mut self, size: Sectors) -> PerDevSegments {
+        self.used.alloc_front(size)
+    }
+
+    fn calc_new_size(&self) -> StratisResult<Option<Sectors>> {
+        let s = Self::scan_blkdev_size(
+            self.physical_path(),
+            self.underlying_device.crypt_handle().is_some(),
+        )?;
+        if Some(s) == self.new_size
+            || (self.new_size.is_none() && s == self.bda.dev_size().sectors())
+        {
+            Ok(None)
+        } else {
+            Ok(Some(s))
         }
     }
 

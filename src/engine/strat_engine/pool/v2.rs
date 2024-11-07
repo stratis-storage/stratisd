@@ -159,8 +159,14 @@ impl StratPool {
         // FIXME: Initializing with the minimum MDA size is not necessarily
         // enough. If there are enough devices specified, more space will be
         // required.
-        let mut backstore =
-            Backstore::initialize(pool_uuid, devices, MDADataSize::default(), encryption_info)?;
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            devices,
+            MDADataSize::default(),
+            encryption_info,
+            None,
+            None,
+        )?;
 
         let thinpool = ThinPool::<Backstore>::new(
             pool_uuid,

@@ -7,7 +7,7 @@
 #[cfg(test)]
 use std::collections::HashSet;
 
-use devicemapper::Sectors;
+use devicemapper::{Bytes, Sectors, IEC};
 
 use crate::{
     engine::{
@@ -32,6 +32,10 @@ use crate::{
     stratis::StratisResult,
 };
 
+pub const DEFAULT_INTEGRITY_JOURNAL_SIZE: Bytes = Bytes(128 * IEC::Mi as u128);
+pub const DEFAULT_INTEGRITY_BLOCK_SIZE: Bytes = Bytes(4 * IEC::Ki as u128);
+pub const DEFAULT_INTEGRITY_TAG_SIZE: Bytes = Bytes(64u128);
+
 /// Handles the lowest level, base layer of this tier.
 #[derive(Debug)]
 pub struct DataTier<B> {
@@ -39,6 +43,12 @@ pub struct DataTier<B> {
     pub(super) block_mgr: BlockDevMgr<B>,
     /// The list of segments granted by block_mgr and used by dm_device
     pub(super) segments: AllocatedAbove,
+    /// Integrity journal size.
+    integrity_journal_size: Option<Sectors>,
+    /// Integrity block size.
+    integrity_block_size: Option<Bytes>,
+    /// Integrity tag size.
+    integrity_tag_size: Option<Bytes>,
 }
 
 impl DataTier<v1::StratBlockDev> {
@@ -52,6 +62,9 @@ impl DataTier<v1::StratBlockDev> {
         DataTier {
             block_mgr,
             segments: AllocatedAbove { inner: vec![] },
+            integrity_journal_size: None,
+            integrity_block_size: None,
+            integrity_tag_size: None,
         }
     }
 
@@ -97,6 +110,10 @@ impl DataTier<v1::StratBlockDev> {
     pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut v1::StratBlockDev)> {
         self.block_mgr.blockdevs_mut()
     }
+
+    pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
+        self.block_mgr.grow(dev)
+    }
 }
 
 impl DataTier<v2::StratBlockDev> {
@@ -105,16 +122,33 @@ impl DataTier<v2::StratBlockDev> {
     /// Initially 0 segments are allocated.
     ///
     /// WARNING: metadata changing event
-    pub fn new(mut block_mgr: BlockDevMgr<v2::StratBlockDev>) -> DataTier<v2::StratBlockDev> {
+    pub fn new(
+        mut block_mgr: BlockDevMgr<v2::StratBlockDev>,
+        integrity_journal_size: Option<Sectors>,
+        integrity_block_size: Option<Bytes>,
+        integrity_tag_size: Option<Bytes>,
+    ) -> DataTier<v2::StratBlockDev> {
+        let integrity_journal_size =
+            integrity_journal_size.unwrap_or_else(|| DEFAULT_INTEGRITY_JOURNAL_SIZE.sectors());
+        let integrity_block_size = integrity_block_size.unwrap_or(DEFAULT_INTEGRITY_BLOCK_SIZE);
+        let integrity_tag_size = integrity_tag_size.unwrap_or(DEFAULT_INTEGRITY_TAG_SIZE);
         for (_, bd) in block_mgr.blockdevs_mut() {
             // NOTE: over-allocates integrity metadata slightly. Some of the
             // total size of the device will not make use of the integrity
             // metadata.
-            bd.alloc_int_meta_back(integrity_meta_space(bd.total_size().sectors()));
+            bd.alloc_int_meta_back(integrity_meta_space(
+                bd.total_size().sectors(),
+                integrity_journal_size,
+                integrity_block_size,
+                integrity_tag_size,
+            ));
         }
         DataTier {
             block_mgr,
             segments: AllocatedAbove { inner: vec![] },
+            integrity_journal_size: Some(integrity_journal_size),
+            integrity_block_size: Some(integrity_block_size),
+            integrity_tag_size: Some(integrity_tag_size),
         }
     }
 
@@ -142,10 +176,10 @@ impl DataTier<v2::StratBlockDev> {
         assert_eq!(bds.len(), uuids.len());
         for bd in bds {
             bd.alloc_int_meta_back(integrity_meta_space(
-                // NOTE: Subtracting metadata size works here because the only metadata currently
-                // recorded in a newly created block device is the BDA. If this becomes untrue in
-                // the future, this code will no longer work.
-                bd.total_size().sectors() - bd.metadata_size(),
+                bd.total_size().sectors(),
+                self.integrity_journal_size.expect("Must be some in V2"),
+                self.integrity_block_size.expect("Must be some in V2"),
+                self.integrity_tag_size.expect("Must be some in V2"),
             ));
         }
         Ok(uuids)
@@ -179,6 +213,15 @@ impl DataTier<v2::StratBlockDev> {
     pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut v2::StratBlockDev)> {
         self.block_mgr.blockdevs_mut()
     }
+
+    pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
+        self.block_mgr.grow(
+            dev,
+            self.integrity_journal_size.expect("Must be Some in V2"),
+            self.integrity_block_size.expect("Must be Some in V2"),
+            self.integrity_tag_size.expect("Must be Some in V2"),
+        )
+    }
 }
 
 impl<B> DataTier<B>
@@ -207,6 +250,9 @@ where
         Ok(DataTier {
             block_mgr,
             segments,
+            integrity_journal_size: data_tier_save.integrity_journal_size,
+            integrity_block_size: data_tier_save.integrity_block_size,
+            integrity_tag_size: data_tier_save.integrity_tag_size,
         })
     }
 
@@ -265,10 +311,6 @@ where
         self.block_mgr.load_state()
     }
 
-    pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
-        self.block_mgr.grow(dev)
-    }
-
     /// Return the partition of the block devs that are in use and those
     /// that are not.
     pub fn partition_by_use(&self) -> BlockDevPartition<'_, B> {
@@ -301,6 +343,9 @@ where
                 allocs: vec![self.segments.record()],
                 devs: self.block_mgr.record(),
             },
+            integrity_journal_size: self.integrity_journal_size,
+            integrity_block_size: self.integrity_block_size,
+            integrity_tag_size: self.integrity_tag_size,
         }
     }
 }
@@ -439,7 +484,7 @@ mod tests {
             )
             .unwrap();
 
-            let mut data_tier = DataTier::<blockdev::v2::StratBlockDev>::new(mgr);
+            let mut data_tier = DataTier::<blockdev::v2::StratBlockDev>::new(mgr, None, None, None);
             data_tier.invariant();
 
             // A data_tier w/ some devices but nothing allocated

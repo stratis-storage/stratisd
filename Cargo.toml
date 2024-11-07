@@ -249,46 +249,46 @@ proptest = "1.0.0"
 
 [features]
 engine = [
-    "async-trait",
-    "byteorder",
-    "chrono",
-    "clap",
-    "crc",
-    "data-encoding",
-    "devicemapper",
-    "either",
-    "env_logger",
-    "futures",
-    "iocuddle",
-    "itertools",
-    "libblkid-rs",
-    "libc",
-    "libcryptsetup-rs",
-    "libcryptsetup-rs-sys",
-    "libmount",
-    "libudev",
-    "log",
-    "nix",
-    "once_cell",
-    "rand",
-    "regex",
-    "retry",
-    "semver",
-    "serde",
-    "serde_derive",
-    "serde_json",
-    "sha2",
-    "stratisd_proc_macros",
-    "tempfile",
-    "tokio",
-    "uuid"
+    "dep:async-trait",
+    "dep:byteorder",
+    "dep:chrono",
+    "dep:clap",
+    "dep:crc",
+    "dep:data-encoding",
+    "dep:devicemapper",
+    "dep:either",
+    "dep:env_logger",
+    "dep:futures",
+    "dep:iocuddle",
+    "dep:itertools",
+    "dep:libblkid-rs",
+    "dep:libc",
+    "dep:libcryptsetup-rs",
+    "dep:libcryptsetup-rs-sys",
+    "dep:libmount",
+    "dep:libudev",
+    "dep:log",
+    "dep:nix",
+    "dep:once_cell",
+    "dep:rand",
+    "dep:regex",
+    "dep:retry",
+    "dep:semver",
+    "dep:serde",
+    "dep:serde_derive",
+    "dep:serde_json",
+    "dep:sha2",
+    "dep:stratisd_proc_macros",
+    "dep:tempfile",
+    "dep:tokio",
+    "dep:uuid"
 ]
 default = ["dbus_enabled", "engine"]
-dbus_enabled = ["dbus", "dbus-tree"]
-extras = ["pretty-hex"]
-min = ["termios"]
-systemd_compat = ["bindgen"]
-udev_scripts = ["data-encoding"]
+dbus_enabled = ["dep:dbus", "dep:dbus-tree"]
+extras = ["dep:pretty-hex"]
+min = ["dep:termios"]
+systemd_compat = ["dep:bindgen"]
+udev_scripts = ["dep:data-encoding"]
 test_extras = ["engine"]
 
 [lints.rust]

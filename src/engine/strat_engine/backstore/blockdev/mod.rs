@@ -95,17 +95,6 @@ pub trait InternalBlockDev {
     /// * Otherwise, `Some(_)`
     fn calc_new_size(&self) -> StratisResult<Option<Sectors>>;
 
-    /// Grow the block device if the underlying physical device has grown in size.
-    /// Return an error and leave the size as is if the device has shrunk.
-    /// Do nothing if the device is the same size as recorded in the metadata.
-    ///
-    /// This method does not need to block IO to the extended crypt device prior
-    /// to rollback because of per-pool locking. Growing the device will acquire
-    /// an exclusive lock on the pool and therefore the thin pool cannot be
-    /// extended to use the larger or unencrypted block device size until the
-    /// transaction has been completed successfully.
-    fn grow(&mut self) -> StratisResult<bool>;
-
     /// Load the pool-level metadata for the given block device.
     fn load_state(&self) -> StratisResult<Option<(Vec<u8>, &DateTime<Utc>)>>;
 

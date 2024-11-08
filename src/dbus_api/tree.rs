@@ -194,6 +194,11 @@ impl DbusTreeHandler {
                         vec![consts::FILESYSTEM_DEVNODE_PROP.into()],
                         consts::FILESYSTEM_NAME_PROP.to_string() =>
                         Variant(new_name.box_clone())
+                    },
+                    consts::FILESYSTEM_INTERFACE_NAME_3_8 => {
+                        vec![consts::FILESYSTEM_DEVNODE_PROP.into()],
+                        consts::FILESYSTEM_NAME_PROP.to_string() =>
+                        Variant(new_name.box_clone())
                     }
                 },
             )
@@ -209,6 +214,11 @@ impl DbusTreeHandler {
                 &item,
                 prop_hashmap! {
                     consts::FILESYSTEM_INTERFACE_NAME_3_7 => {
+                        vec![],
+                        consts::FILESYSTEM_ORIGIN_PROP.to_string() =>
+                        box_variant!(fs_origin_to_prop(new_origin))
+                    },
+                    consts::FILESYSTEM_INTERFACE_NAME_3_8 => {
                         vec![],
                         consts::FILESYSTEM_ORIGIN_PROP.to_string() =>
                         box_variant!(fs_origin_to_prop(new_origin))
@@ -271,6 +281,11 @@ impl DbusTreeHandler {
                         Vec::new(),
                         consts::POOL_NAME_PROP.to_string() =>
                         Variant(new_name.box_clone())
+                    },
+                    consts::POOL_INTERFACE_NAME_3_8 => {
+                        Vec::new(),
+                        consts::POOL_NAME_PROP.to_string() =>
+                        Variant(new_name.box_clone())
                     }
                 },
             )
@@ -317,6 +332,9 @@ impl DbusTreeHandler {
                                 vec![consts::FILESYSTEM_DEVNODE_PROP.into()]
                             },
                             consts::FILESYSTEM_INTERFACE_NAME_3_7 => {
+                                vec![consts::FILESYSTEM_DEVNODE_PROP.into()]
+                            },
+                            consts::FILESYSTEM_INTERFACE_NAME_3_8 => {
                                 vec![consts::FILESYSTEM_DEVNODE_PROP.into()]
                             }
                         },
@@ -378,6 +396,11 @@ impl DbusTreeHandler {
                     consts::POOL_INTERFACE_NAME_3_7 => {
                         Vec::new(),
                         consts::POOL_AVAIL_ACTIONS_PROP.to_string() =>
+                        box_variant!(avail_prop.clone())
+                    },
+                    consts::POOL_INTERFACE_NAME_3_8 => {
+                        Vec::new(),
+                        consts::POOL_AVAIL_ACTIONS_PROP.to_string() =>
                         box_variant!(avail_prop)
                     }
                 },
@@ -431,6 +454,11 @@ impl DbusTreeHandler {
                         box_variant!(kd_prop.clone())
                     },
                     consts::POOL_INTERFACE_NAME_3_7 => {
+                        Vec::new(),
+                        consts::POOL_KEY_DESC_PROP.to_string() =>
+                        box_variant!(kd_prop.clone())
+                    },
+                    consts::POOL_INTERFACE_NAME_3_8 => {
                         Vec::new(),
                         consts::POOL_KEY_DESC_PROP.to_string() =>
                         box_variant!(kd_prop)
@@ -488,6 +516,11 @@ impl DbusTreeHandler {
                     consts::POOL_INTERFACE_NAME_3_7 => {
                         Vec::new(),
                         consts::POOL_CLEVIS_INFO_PROP.to_string() =>
+                        box_variant!(ci_prop.clone())
+                    },
+                    consts::POOL_INTERFACE_NAME_3_8 => {
+                        Vec::new(),
+                        consts::POOL_CLEVIS_INFO_PROP.to_string() =>
                         box_variant!(ci_prop)
                     }
                 },
@@ -533,6 +566,10 @@ impl DbusTreeHandler {
                         consts::POOL_HAS_CACHE_PROP.to_string() => box_variant!(b)
                     },
                     consts::POOL_INTERFACE_NAME_3_7 => {
+                        Vec::new(),
+                        consts::POOL_HAS_CACHE_PROP.to_string() => box_variant!(b)
+                    },
+                    consts::POOL_INTERFACE_NAME_3_8 => {
                         Vec::new(),
                         consts::POOL_HAS_CACHE_PROP.to_string() => box_variant!(b)
                     }
@@ -600,6 +637,11 @@ impl DbusTreeHandler {
                         box_variant!(stopped_pools_to_prop(&stopped_pools, false))
                     },
                     consts::MANAGER_INTERFACE_NAME_3_7 => {
+                        Vec::new(),
+                        consts::STOPPED_POOLS_PROP.to_string() =>
+                        box_variant!(stopped_pools_to_prop(&stopped_pools, false))
+                    },
+                    consts::MANAGER_INTERFACE_NAME_3_8 => {
                         Vec::new(),
                         consts::STOPPED_POOLS_PROP.to_string() =>
                         box_variant!(stopped_pools_to_prop(&stopped_pools, true))
@@ -684,6 +726,14 @@ impl DbusTreeHandler {
                 new_size
             },
             consts::FILESYSTEM_INTERFACE_NAME_3_7 => {
+                consts::FILESYSTEM_USED_PROP.to_string(),
+                fs_used_to_prop,
+                new_used,
+                consts::FILESYSTEM_SIZE_PROP.to_string(),
+                fs_size_to_prop,
+                new_size
+            },
+            consts::FILESYSTEM_INTERFACE_NAME_3_8 => {
                 consts::FILESYSTEM_USED_PROP.to_string(),
                 fs_used_to_prop,
                 new_used,
@@ -794,6 +844,17 @@ impl DbusTreeHandler {
                 consts::POOL_NO_ALLOCABLE_SPACE_PROP.to_string(),
                 |x| x,
                 new_no_space
+            },
+            consts::POOL_INTERFACE_NAME_3_8 => {
+                consts::POOL_TOTAL_USED_PROP.to_string(),
+                pool_used_to_prop,
+                new_used,
+                consts::POOL_ALLOC_SIZE_PROP.to_string(),
+                pool_alloc_to_prop,
+                new_alloc,
+                consts::POOL_NO_ALLOCABLE_SPACE_PROP.to_string(),
+                |x| x,
+                new_no_space
             }
         );
     }
@@ -837,6 +898,11 @@ impl DbusTreeHandler {
                     Vec::new(),
                     consts::POOL_FS_LIMIT_PROP.to_string() =>
                     box_variant!(new_fs_limit)
+                },
+                consts::POOL_INTERFACE_NAME_3_8 => {
+                    Vec::new(),
+                    consts::POOL_FS_LIMIT_PROP.to_string() =>
+                    box_variant!(new_fs_limit)
                 }
             ),
         ) {
@@ -859,6 +925,11 @@ impl DbusTreeHandler {
                     box_variant!(size_limit.clone())
                 },
                 consts::FILESYSTEM_INTERFACE_NAME_3_7 => {
+                    Vec::new(),
+                    consts::FILESYSTEM_SIZE_LIMIT_PROP.to_string() =>
+                    box_variant!(size_limit.clone())
+                },
+                consts::FILESYSTEM_INTERFACE_NAME_3_8 => {
                     Vec::new(),
                     consts::FILESYSTEM_SIZE_LIMIT_PROP.to_string() =>
                     box_variant!(size_limit)
@@ -918,6 +989,11 @@ impl DbusTreeHandler {
                     box_variant!(user_info_prop.clone())
                 },
                 consts::BLOCKDEV_INTERFACE_NAME_3_7 => {
+                    Vec::new(),
+                    consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
+                    box_variant!(user_info_prop.clone())
+                },
+                consts::BLOCKDEV_INTERFACE_NAME_3_8 => {
                     Vec::new(),
                     consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
                     box_variant!(user_info_prop)
@@ -981,6 +1057,11 @@ impl DbusTreeHandler {
                 consts::BLOCKDEV_INTERFACE_NAME_3_7 => {
                     Vec::new(),
                     consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                    box_variant!(total_physical_size_prop.clone())
+                },
+                consts::BLOCKDEV_INTERFACE_NAME_3_8 => {
+                    Vec::new(),
+                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
                     box_variant!(total_physical_size_prop)
                 }
             ),
@@ -1028,6 +1109,11 @@ impl DbusTreeHandler {
                     box_variant!(new_mode)
                 },
                 consts::POOL_INTERFACE_NAME_3_7 => {
+                    Vec::new(),
+                    consts::POOL_OVERPROV_PROP.to_string() =>
+                    box_variant!(new_mode)
+                },
+                consts::POOL_INTERFACE_NAME_3_8 => {
                     Vec::new(),
                     consts::POOL_OVERPROV_PROP.to_string() =>
                     box_variant!(new_mode)
@@ -1162,6 +1248,20 @@ impl DbusTreeHandler {
                 consts::POOL_NO_ALLOCABLE_SPACE_PROP.to_string(),
                 |x| x,
                 new_no_space
+            },
+            consts::POOL_INTERFACE_NAME_3_8 => {
+                consts::POOL_TOTAL_USED_PROP.to_string(),
+                pool_used_to_prop,
+                new_used,
+                consts::POOL_ALLOC_SIZE_PROP.to_string(),
+                pool_alloc_to_prop,
+                new_alloc,
+                consts::POOL_TOTAL_SIZE_PROP.to_string(),
+                pool_size_to_prop,
+                new_size,
+                consts::POOL_NO_ALLOCABLE_SPACE_PROP.to_string(),
+                |x| x,
+                new_no_space
             }
         );
     }
@@ -1199,6 +1299,11 @@ impl DbusTreeHandler {
                 new_size
             },
             consts::BLOCKDEV_INTERFACE_NAME_3_7 => {
+                consts::BLOCKDEV_NEW_SIZE_PROP.to_string(),
+                blockdev_new_size_to_prop,
+                new_size
+            },
+            consts::BLOCKDEV_INTERFACE_NAME_3_8 => {
                 consts::BLOCKDEV_NEW_SIZE_PROP.to_string(),
                 blockdev_new_size_to_prop,
                 new_size

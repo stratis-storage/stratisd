@@ -1,18 +1,30 @@
-stratisd 3.7.0 (UNRELEASED)
+stratisd 3.8.0 (UNRELEASED)
 ===========================
-Recommended Rust toolchain version: 1.81.0
-Recommended development platform for Python development: Fedora 39
+Recommended Rust toolchain version: 1.82.0
+Recommended development platform for Python development: Fedora 40
 
-- Increase D-Bus revision number to 7:
-  https://github.com/stratis-storage/stratisd/pull/3483
+* Indicates new for minor version 8
 
-- Introduce metadata version v2:
+
+* Increase D-Bus revision number to 8:
+  https://github.com/stratis-storage/stratisd/pull/3652
+
+* Introduce metadata version v2:
+  https://github.com/stratis-storage/stratisd/pull/3706
+  https://github.com/stratis-storage/stratisd/pull/3705
   https://github.com/stratis-storage/stratisd/pull/3679
   https://github.com/stratis-storage/stratisd/pull/3678
   https://github.com/stratis-storage/stratisd/pull/3673
   https://github.com/stratis-storage/stratisd/pull/3671
   https://github.com/stratis-storage/stratisd/pull/3655
   https://github.com/stratis-storage/stratisd/pull/3637
+
+- Increase D-Bus revision number to 7:
+  https://github.com/stratis-storage/stratisd/pull/3483
+
+- Support snapshot revert:
+  https://github.com/stratis-storage/stratisd/issues/3712
+  https://github.com/stratis-storage/stratisd/pull/3621
 
 - Add origin field to StratFilesystem:
   https://github.com/stratis-storage/stratisd/issues/3515
@@ -24,6 +36,10 @@ Recommended development platform for Python development: Fedora 39
 - Add D-Bus method to return Stratis pool-level metadata:
   https://github.com/stratis-storage/stratisd/pull/3618
   https://github.com/stratis-storage/stratisd/pull/3599
+
+- Accept "adv" key as well as "thp" key in Clevis config:
+  https://github.com/stratis-storage/stratisd/issues/3699
+  https://github.com/stratis-storage/stratisd/pull/3700
 
 - Fix a bug where unencrypted pools can't be started in stratisd-min:
   https://github.com/stratis-storage/stratisd/pull/3538
@@ -108,6 +124,14 @@ Recommended development platform for Python development: Fedora 39
 - Use loopdev-3 instead of loopdev crate:
   https://github.com/stratis-storage/stratisd/pull/3498
 
+- Increase libcryptsetup dependency lower bound to 0.11.0,
+  increase libc dependency lower bound to 0.2.155,
+  increase futures dependency lower bound to 0.3.31,
+  increase tokio dependency lower bound to 1.24.2,
+  increase regex dependency lower bound to 1.5.5,
+  increase tempfile dependency lower bound to 3.4.0:
+  https://github.com/stratis-storage/stratisd/pull/3698
+
 - Increase lower bounds of Stratis project dependencies:
   https://github.com/stratis-storage/stratisd/pull/3585
 
@@ -168,6 +192,8 @@ Recommended development platform for Python development: Fedora 39
   https://github.com/stratis-storage/stratisd/pull/3674
 
 - Improve test coverage of stratis-min:
+  https://github.com/stratis-storage/stratisd/pull/3714
+  https://github.com/stratis-storage/stratisd/pull/3713
   https://github.com/stratis-storage/stratisd/pull/3644
   https://github.com/stratis-storage/stratisd/pull/3631
   https://github.com/stratis-storage/stratisd/pull/3630
@@ -176,6 +202,11 @@ Recommended development platform for Python development: Fedora 39
   https://github.com/stratis-storage/stratisd/pull/3602
 
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3715
+  https://github.com/stratis-storage/stratisd/pull/3711
+  https://github.com/stratis-storage/stratisd/pull/3709
+  https://github.com/stratis-storage/stratisd/pull/3707
+  https://github.com/stratis-storage/stratisd/pull/3704
   https://github.com/stratis-storage/stratisd/pull/3688
   https://github.com/stratis-storage/stratisd/pull/3687
   https://github.com/stratis-storage/stratisd/pull/3685

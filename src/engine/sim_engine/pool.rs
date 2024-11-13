@@ -311,7 +311,7 @@ impl Pool for SimPool {
         token_slot: OptionalTokenSlotInput,
         pin: &str,
         clevis_info: &Value,
-    ) -> StratisResult<CreateAction<Clevis>> {
+    ) -> StratisResult<CreateAction<(Clevis, u32)>> {
         let encryption_info = match self.encryption_info.as_mut() {
             Some(ei) => ei,
             None => {
@@ -361,14 +361,14 @@ impl Pool for SimPool {
             token_slot_to_add,
             UnlockMechanism::ClevisInfo((pin.to_owned(), clevis_info.to_owned())),
         )?;
-        Ok(CreateAction::Created(Clevis))
+        Ok(CreateAction::Created((Clevis, token_slot_to_add)))
     }
 
     fn bind_keyring(
         &mut self,
         token_slot: OptionalTokenSlotInput,
         key_description: &KeyDescription,
-    ) -> StratisResult<CreateAction<Key>> {
+    ) -> StratisResult<CreateAction<(Key, u32)>> {
         let encryption_info = match self.encryption_info.as_mut() {
             Some(ei) => ei,
             None => {
@@ -434,7 +434,7 @@ impl Pool for SimPool {
             token_slot_to_add,
             UnlockMechanism::KeyDesc(key_description.to_owned()),
         )?;
-        Ok(CreateAction::Created(Key))
+        Ok(CreateAction::Created((Key, token_slot_to_add)))
     }
 
     fn unbind_keyring(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Key>> {

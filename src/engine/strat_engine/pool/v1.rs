@@ -38,6 +38,7 @@ use crate::{
                 blockdev::{v1::StratBlockDev, InternalBlockDev},
                 ProcessedPathInfos,
             },
+            crypt::{CLEVIS_LUKS_TOKEN_ID, LUKS2_TOKEN_ID},
             liminal::DeviceSet,
             metadata::BDA,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
@@ -708,14 +709,14 @@ impl Pool for StratPool {
         token_slot: OptionalTokenSlotInput,
         pin: &str,
         clevis_info: &Value,
-    ) -> StratisResult<CreateAction<Clevis>> {
+    ) -> StratisResult<CreateAction<(Clevis, u32)>> {
         if token_slot != OptionalTokenSlotInput::Legacy {
             return Err(StratisError::Msg("Specifying the token slot for binding is not supported in V1 pools; please migrate to V2 pools to use this feature".to_string()));
         }
 
         let changed = self.backstore.bind_clevis(pin, clevis_info)?;
         if changed {
-            Ok(CreateAction::Created(Clevis))
+            Ok(CreateAction::Created((Clevis, CLEVIS_LUKS_TOKEN_ID)))
         } else {
             Ok(CreateAction::Identity)
         }
@@ -727,14 +728,14 @@ impl Pool for StratPool {
         &mut self,
         token_slot: OptionalTokenSlotInput,
         key_description: &KeyDescription,
-    ) -> StratisResult<CreateAction<Key>> {
+    ) -> StratisResult<CreateAction<(Key, u32)>> {
         if token_slot != OptionalTokenSlotInput::Legacy {
             return Err(StratisError::Msg("Specifying the token slot for binding is not supported in V1 pools; please migrate to V2 pools to use this feature".to_string()));
         }
 
         let changed = self.backstore.bind_keyring(key_description)?;
         if changed {
-            Ok(CreateAction::Created(Key))
+            Ok(CreateAction::Created((Key, LUKS2_TOKEN_ID)))
         } else {
             Ok(CreateAction::Identity)
         }

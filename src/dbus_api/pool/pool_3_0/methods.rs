@@ -384,8 +384,11 @@ pub fn bind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
             return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Ok(CreateAction::Created(_)) => {
-            dbus_context
-                .push_pool_clevis_info_change(pool_path.get_name(), pool.encryption_info_legacy());
+            dbus_context.push_pool_clevis_info_change(
+                pool_path.get_name(),
+                pool.encryption_info()
+                    .map(|either| either.map_left(|ei| (true, ei))),
+            );
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(e) => {
@@ -422,8 +425,11 @@ pub fn unbind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
             return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Ok(DeleteAction::Deleted(_)) => {
-            dbus_context
-                .push_pool_clevis_info_change(pool_path.get_name(), pool.encryption_info_legacy());
+            dbus_context.push_pool_clevis_info_change(
+                pool_path.get_name(),
+                pool.encryption_info()
+                    .map(|either| either.map_left(|ei| (true, ei))),
+            );
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(e) => {
@@ -474,8 +480,11 @@ pub fn bind_keyring(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
             return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Ok(CreateAction::Created(_)) => {
-            dbus_context
-                .push_pool_key_desc_change(pool_path.get_name(), pool.encryption_info_legacy());
+            dbus_context.push_pool_key_desc_change(
+                pool_path.get_name(),
+                pool.encryption_info()
+                    .map(|either| either.map_left(|ei| (true, ei))),
+            );
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(e) => {
@@ -516,8 +525,11 @@ pub fn unbind_keyring(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult 
             return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Ok(DeleteAction::Deleted(_)) => {
-            dbus_context
-                .push_pool_key_desc_change(pool_path.get_name(), pool.encryption_info_legacy());
+            dbus_context.push_pool_key_desc_change(
+                pool_path.get_name(),
+                pool.encryption_info()
+                    .map(|either| either.map_left(|ei| (true, ei))),
+            );
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(e) => {
@@ -568,8 +580,11 @@ pub fn rebind_keyring(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult 
             return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Ok(RenameAction::Renamed(_)) => {
-            dbus_context
-                .push_pool_key_desc_change(pool_path.get_name(), pool.encryption_info_legacy());
+            dbus_context.push_pool_key_desc_change(
+                pool_path.get_name(),
+                pool.encryption_info()
+                    .map(|either| either.map_left(|ei| (true, ei))),
+            );
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Ok(RenameAction::NoSource) => {
@@ -610,8 +625,11 @@ pub fn rebind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
 
     let msg = match handle_action!(pool.rebind_clevis(None), dbus_context, pool_path.get_name()) {
         Ok(_) => {
-            dbus_context
-                .push_pool_clevis_info_change(pool_path.get_name(), pool.encryption_info_legacy());
+            dbus_context.push_pool_clevis_info_change(
+                pool_path.get_name(),
+                pool.encryption_info()
+                    .map(|either| either.map_left(|ei| (true, ei))),
+            );
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(e) => {

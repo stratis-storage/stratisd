@@ -75,13 +75,13 @@ impl Display for CreateAction<PoolUuid> {
     }
 }
 
-impl Display for CreateAction<Clevis> {
+impl Display for CreateAction<(Clevis, u32)> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CreateAction::Created(Clevis) => {
+            CreateAction::Created((_, t)) => {
                 write!(
                     f,
-                    "Pool successfully bound to an unlocking mechanism using clevis"
+                    "Pool successfully bound an unlocking mechanism to token slot {t} using clevis"
                 )
             }
             CreateAction::Identity => {
@@ -94,13 +94,13 @@ impl Display for CreateAction<Clevis> {
     }
 }
 
-impl Display for CreateAction<Key> {
+impl Display for CreateAction<(Key, u32)> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CreateAction::Created(Key) => {
+            CreateAction::Created((_, t)) => {
                 write!(
                     f,
-                    "Pool successfully bound to a passphrase in the kernel keyring"
+                    "Pool successfully bound to a passphrase to token slot {t} in the kernel keyring"
                 )
             }
             CreateAction::Identity => {

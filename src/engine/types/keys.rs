@@ -390,6 +390,23 @@ impl EncryptionInfo {
     pub fn is_empty(&self) -> bool {
         self.encryption_infos.is_empty()
     }
+
+    /// Returns the values that are in &self but not in &other.
+    pub fn diff(&self, other: &Self) -> Option<u32> {
+        self.encryption_infos
+            .keys()
+            .cloned()
+            .collect::<HashSet<_>>()
+            .difference(
+                &other
+                    .encryption_infos
+                    .keys()
+                    .cloned()
+                    .collect::<HashSet<_>>(),
+            )
+            .next()
+            .cloned()
+    }
 }
 
 impl IntoIterator for EncryptionInfo {

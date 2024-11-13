@@ -18,6 +18,7 @@ use dbus::{
     Path,
 };
 use dbus_tree::{MTSync, ObjectPath};
+use either::Either;
 use tokio::sync::{broadcast::Receiver, mpsc::UnboundedReceiver};
 
 use devicemapper::{Bytes, Sectors};
@@ -44,11 +45,13 @@ use crate::{
         util::{poll_exit_and_future, thread_safe_to_dbus_sendable},
     },
     engine::{
-        ActionAvailability, DevUuid, FilesystemUuid, LockedPoolsInfo, PoolEncryptionInfo, PoolUuid,
-        StoppedPoolsInfo, StratisUuid,
+        ActionAvailability, DevUuid, EncryptionInfo, FilesystemUuid, LockedPoolsInfo,
+        PoolEncryptionInfo, PoolUuid, StoppedPoolsInfo, StratisUuid,
     },
     stratis::{StratisError, StratisResult},
 };
+
+use super::pool::prop_conv::{clevis_infos_to_prop, key_descs_to_prop};
 
 type PropertySignal = HashMap<String, (HashMap<String, Variant<Box<dyn RefArg>>>, Vec<String>)>;
 
@@ -412,56 +415,76 @@ impl DbusTreeHandler {
     }
 
     /// Handle a change of the key description for a pool in the engine.
-    fn handle_pool_key_desc_change(&self, item: Path<'static>, ei: Option<PoolEncryptionInfo>) {
-        let kd_prop = key_desc_to_prop(ei);
+    fn handle_pool_key_desc_change(
+        &self,
+        item: Path<'static>,
+        ei: Option<Either<(bool, EncryptionInfo), PoolEncryptionInfo>>,
+    ) {
+        let kd_prop = key_desc_to_prop(ei.clone().map(|either| either.map_left(|(_, ei)| ei)));
+        if ei
+            .as_ref()
+            .map(|either| {
+                either.as_ref().left().map(|(b, _)| *b).unwrap_or(false) || either.is_right()
+            })
+            .expect("Should be encrypted to send signal")
+            && self
+                .property_changed_invalidated_signal(
+                    &item,
+                    prop_hashmap! {
+                        consts::POOL_INTERFACE_NAME_3_0 => {
+                            Vec::new(),
+                            consts::POOL_KEY_DESC_PROP.to_string() =>
+                            box_variant!(kd_prop.clone())
+                        },
+                        consts::POOL_INTERFACE_NAME_3_1 => {
+                            Vec::new(),
+                            consts::POOL_KEY_DESC_PROP.to_string() =>
+                            box_variant!(kd_prop.clone())
+                        },
+                        consts::POOL_INTERFACE_NAME_3_2 => {
+                            Vec::new(),
+                            consts::POOL_KEY_DESC_PROP.to_string() =>
+                            box_variant!(kd_prop.clone())
+                        },
+                        consts::POOL_INTERFACE_NAME_3_3 => {
+                            Vec::new(),
+                            consts::POOL_KEY_DESC_PROP.to_string() =>
+                            box_variant!(kd_prop.clone())
+                        },
+                        consts::POOL_INTERFACE_NAME_3_4 => {
+                            Vec::new(),
+                            consts::POOL_KEY_DESC_PROP.to_string() =>
+                            box_variant!(kd_prop.clone())
+                        },
+                        consts::POOL_INTERFACE_NAME_3_5 => {
+                            Vec::new(),
+                            consts::POOL_KEY_DESC_PROP.to_string() =>
+                            box_variant!(kd_prop.clone())
+                        },
+                        consts::POOL_INTERFACE_NAME_3_6 => {
+                            Vec::new(),
+                            consts::POOL_KEY_DESC_PROP.to_string() =>
+                            box_variant!(kd_prop.clone())
+                        },
+                        consts::POOL_INTERFACE_NAME_3_7 => {
+                            Vec::new(),
+                            consts::POOL_KEY_DESC_PROP.to_string() =>
+                            box_variant!(kd_prop.clone())
+                        }
+                    },
+                )
+                .is_err()
+        {
+            warn!("Signal on pool key description change was not sent to the D-Bus client");
+        }
         if self
             .property_changed_invalidated_signal(
                 &item,
                 prop_hashmap! {
-                    consts::POOL_INTERFACE_NAME_3_0 => {
-                        Vec::new(),
-                        consts::POOL_KEY_DESC_PROP.to_string() =>
-                        box_variant!(kd_prop.clone())
-                    },
-                    consts::POOL_INTERFACE_NAME_3_1 => {
-                        Vec::new(),
-                        consts::POOL_KEY_DESC_PROP.to_string() =>
-                        box_variant!(kd_prop.clone())
-                    },
-                    consts::POOL_INTERFACE_NAME_3_2 => {
-                        Vec::new(),
-                        consts::POOL_KEY_DESC_PROP.to_string() =>
-                        box_variant!(kd_prop.clone())
-                    },
-                    consts::POOL_INTERFACE_NAME_3_3 => {
-                        Vec::new(),
-                        consts::POOL_KEY_DESC_PROP.to_string() =>
-                        box_variant!(kd_prop.clone())
-                    },
-                    consts::POOL_INTERFACE_NAME_3_4 => {
-                        Vec::new(),
-                        consts::POOL_KEY_DESC_PROP.to_string() =>
-                        box_variant!(kd_prop.clone())
-                    },
-                    consts::POOL_INTERFACE_NAME_3_5 => {
-                        Vec::new(),
-                        consts::POOL_KEY_DESC_PROP.to_string() =>
-                        box_variant!(kd_prop.clone())
-                    },
-                    consts::POOL_INTERFACE_NAME_3_6 => {
-                        Vec::new(),
-                        consts::POOL_KEY_DESC_PROP.to_string() =>
-                        box_variant!(kd_prop.clone())
-                    },
-                    consts::POOL_INTERFACE_NAME_3_7 => {
-                        Vec::new(),
-                        consts::POOL_KEY_DESC_PROP.to_string() =>
-                        box_variant!(kd_prop.clone())
-                    },
                     consts::POOL_INTERFACE_NAME_3_8 => {
                         Vec::new(),
-                        consts::POOL_KEY_DESC_PROP.to_string() =>
-                        box_variant!(kd_prop)
+                        consts::POOL_KEY_DESCS_PROP.to_string() =>
+                        key_descs_to_prop(ei.clone().map(|either| either.map_left(|(_, ei)| ei)))
                     }
                 },
             )
@@ -471,57 +494,78 @@ impl DbusTreeHandler {
         }
     }
 
-    /// Handle a change of the key description for a pool in the engine.
-    fn handle_pool_clevis_info_change(&self, item: Path<'static>, ei: Option<PoolEncryptionInfo>) {
-        let ci_prop = clevis_info_to_prop(ei);
+    /// Handle a change of the Clevis info for a pool in the engine.
+    fn handle_pool_clevis_info_change(
+        &self,
+        item: Path<'static>,
+        ei: Option<Either<(bool, EncryptionInfo), PoolEncryptionInfo>>,
+    ) {
+        let ci_prop = clevis_info_to_prop(ei.clone().map(|either| either.map_left(|(_, ei)| ei)));
+
+        if ei
+            .as_ref()
+            .map(|either| {
+                either.as_ref().left().map(|(b, _)| *b).unwrap_or(false) || either.is_right()
+            })
+            .expect("Should be encrypted to send signal")
+            && self
+                .property_changed_invalidated_signal(
+                    &item,
+                    prop_hashmap! {
+                        consts::POOL_INTERFACE_NAME_3_0 => {
+                            Vec::new(),
+                            consts::POOL_CLEVIS_INFO_PROP.to_string() =>
+                            box_variant!(ci_prop.clone())
+                        },
+                        consts::POOL_INTERFACE_NAME_3_1 => {
+                            Vec::new(),
+                            consts::POOL_CLEVIS_INFO_PROP.to_string() =>
+                            box_variant!(ci_prop.clone())
+                        },
+                        consts::POOL_INTERFACE_NAME_3_2 => {
+                            Vec::new(),
+                            consts::POOL_CLEVIS_INFO_PROP.to_string() =>
+                            box_variant!(ci_prop.clone())
+                        },
+                        consts::POOL_INTERFACE_NAME_3_3 => {
+                            Vec::new(),
+                            consts::POOL_CLEVIS_INFO_PROP.to_string() =>
+                            box_variant!(ci_prop.clone())
+                        },
+                        consts::POOL_INTERFACE_NAME_3_4 => {
+                            Vec::new(),
+                            consts::POOL_CLEVIS_INFO_PROP.to_string() =>
+                            box_variant!(ci_prop.clone())
+                        },
+                        consts::POOL_INTERFACE_NAME_3_5 => {
+                            Vec::new(),
+                            consts::POOL_CLEVIS_INFO_PROP.to_string() =>
+                            box_variant!(ci_prop.clone())
+                        },
+                        consts::POOL_INTERFACE_NAME_3_6 => {
+                            Vec::new(),
+                            consts::POOL_CLEVIS_INFO_PROP.to_string() =>
+                            box_variant!(ci_prop.clone())
+                        },
+                        consts::POOL_INTERFACE_NAME_3_7 => {
+                            Vec::new(),
+                            consts::POOL_CLEVIS_INFO_PROP.to_string() =>
+                            box_variant!(ci_prop.clone())
+                        }
+                    },
+                )
+                .is_err()
+        {
+            warn!("Signal on pool Clevis information change was not sent to the D-Bus client");
+        }
         if self
             .property_changed_invalidated_signal(
                 &item,
                 prop_hashmap! {
-                    consts::POOL_INTERFACE_NAME_3_0 => {
-                        Vec::new(),
-                        consts::POOL_CLEVIS_INFO_PROP.to_string() =>
-                        box_variant!(ci_prop.clone())
-                    },
-                    consts::POOL_INTERFACE_NAME_3_1 => {
-                        Vec::new(),
-                        consts::POOL_CLEVIS_INFO_PROP.to_string() =>
-                        box_variant!(ci_prop.clone())
-                    },
-                    consts::POOL_INTERFACE_NAME_3_2 => {
-                        Vec::new(),
-                        consts::POOL_CLEVIS_INFO_PROP.to_string() =>
-                        box_variant!(ci_prop.clone())
-                    },
-                    consts::POOL_INTERFACE_NAME_3_3 => {
-                        Vec::new(),
-                        consts::POOL_CLEVIS_INFO_PROP.to_string() =>
-                        box_variant!(ci_prop.clone())
-                    },
-                    consts::POOL_INTERFACE_NAME_3_4 => {
-                        Vec::new(),
-                        consts::POOL_CLEVIS_INFO_PROP.to_string() =>
-                        box_variant!(ci_prop.clone())
-                    },
-                    consts::POOL_INTERFACE_NAME_3_5 => {
-                        Vec::new(),
-                        consts::POOL_CLEVIS_INFO_PROP.to_string() =>
-                        box_variant!(ci_prop.clone())
-                    },
-                    consts::POOL_INTERFACE_NAME_3_6 => {
-                        Vec::new(),
-                        consts::POOL_CLEVIS_INFO_PROP.to_string() =>
-                        box_variant!(ci_prop.clone())
-                    },
-                    consts::POOL_INTERFACE_NAME_3_7 => {
-                        Vec::new(),
-                        consts::POOL_CLEVIS_INFO_PROP.to_string() =>
-                        box_variant!(ci_prop.clone())
-                    },
                     consts::POOL_INTERFACE_NAME_3_8 => {
                         Vec::new(),
-                        consts::POOL_CLEVIS_INFO_PROP.to_string() =>
-                        box_variant!(ci_prop)
+                        consts::POOL_CLEVIS_INFOS_PROP.to_string() =>
+                        clevis_infos_to_prop(ei.clone().map(|either| either.map_left(|(_, ei)| ei)))
                     }
                 },
             )

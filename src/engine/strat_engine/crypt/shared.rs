@@ -103,7 +103,7 @@ pub fn add_keyring_keyslot(
     token_slot: Option<u32>,
     key_description: &KeyDescription,
     pass: Option<Either<SizedKeyMemory, &KeyDescription>>,
-) -> StratisResult<()> {
+) -> StratisResult<u32> {
     let key = key_desc_to_passphrase(key_description)?;
     let keyslot = match pass {
         Some(Either::Left(ref pass)) => {
@@ -156,7 +156,7 @@ pub fn add_keyring_keyslot(
         "Failed to assign the LUKS2 keyring token to the Stratis keyslot"
     );
 
-    Ok(())
+    Ok(new_token_slot)
 }
 
 /// Create a device handle and load the LUKS2 header into memory from

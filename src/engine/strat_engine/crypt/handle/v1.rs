@@ -1592,7 +1592,7 @@ mod tests {
                 None,
                 Some((
                     "tang".to_string(),
-                    json!({"url": env::var("TANG_URL").expect("TANG_URL env var required")}),
+                    json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
                 )),
             )
             .as_ref()

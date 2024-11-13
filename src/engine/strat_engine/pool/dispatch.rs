@@ -48,7 +48,7 @@ impl Pool for AnyPool {
         token_slot: OptionalTokenSlotInput,
         pin: &str,
         clevis_info: &Value,
-    ) -> StratisResult<CreateAction<Clevis>> {
+    ) -> StratisResult<CreateAction<(Clevis, u32)>> {
         match self {
             AnyPool::V1(p) => p.bind_clevis(token_slot, pin, clevis_info),
             AnyPool::V2(p) => p.bind_clevis(token_slot, pin, clevis_info),
@@ -59,7 +59,7 @@ impl Pool for AnyPool {
         &mut self,
         token_slot: OptionalTokenSlotInput,
         key_description: &KeyDescription,
-    ) -> StratisResult<CreateAction<Key>> {
+    ) -> StratisResult<CreateAction<(Key, u32)>> {
         match self {
             AnyPool::V1(p) => p.bind_keyring(token_slot, key_description),
             AnyPool::V2(p) => p.bind_keyring(token_slot, key_description),

@@ -943,7 +943,7 @@ impl Backstore {
         token_slot: OptionalTokenSlotInput,
         pin: &str,
         clevis_info: &Value,
-    ) -> StratisResult<bool> {
+    ) -> StratisResult<Option<u32>> {
         let handle = self
             .enc
             .as_mut()
@@ -959,7 +959,7 @@ impl Backstore {
                 let ci = handle.encryption_info().single_clevis_info();
                 if let Some((_, (existing_pin, existing_info))) = ci {
                     if existing_pin.as_str() == pin {
-                        Ok(false)
+                        Ok(None)
                     } else {
                         Err(StratisError::Msg(format!(
                             "Crypt device has already been bound with pin {existing_pin} and config {existing_info}; \
@@ -967,8 +967,7 @@ impl Backstore {
                         )))
                     }
                 } else {
-                    handle.bind_clevis(None, pin, clevis_info)?;
-                    Ok(true)
+                    handle.bind_clevis(None, pin, clevis_info).map(Some)
                 }
             }
             OptionalTokenSlotInput::Some(k) => {
@@ -977,7 +976,7 @@ impl Backstore {
                 let ci = handle.encryption_info().get_info(k);
                 if let Some(UnlockMechanism::ClevisInfo((existing_pin, existing_info))) = ci {
                     if existing_pin == pin {
-                        Ok(false)
+                        Ok(None)
                     } else {
                         Err(StratisError::Msg(format!(
                             "Crypt device has already been bound with pin {existing_pin} and config {existing_info}; \
@@ -985,16 +984,14 @@ impl Backstore {
                         )))
                     }
                 } else {
-                    handle.bind_clevis(Some(k), pin, clevis_info)?;
-                    Ok(true)
+                    handle.bind_clevis(Some(k), pin, clevis_info).map(Some)
                 }
             }
             OptionalTokenSlotInput::None => {
                 // Because idemptotence is checked based on pin, we can't reliably check whether
                 // the binding has already been applied when no token slot is specified. As a
                 // result, we default to adding the new config unless a token slot is specified.
-                handle.bind_clevis(None, pin, clevis_info)?;
-                Ok(true)
+                handle.bind_clevis(None, pin, clevis_info).map(Some)
             }
         }
     }
@@ -1094,7 +1091,7 @@ impl Backstore {
         &mut self,
         token_slot: OptionalTokenSlotInput,
         key_desc: &KeyDescription,
-    ) -> StratisResult<bool> {
+    ) -> StratisResult<Option<u32>> {
         let handle = self
             .enc
             .as_mut()
@@ -1110,7 +1107,7 @@ impl Backstore {
                 let info = handle.encryption_info().single_key_description();
                 if let Some((_, kd)) = info {
                     if kd == key_desc {
-                        Ok(false)
+                        Ok(None)
                     } else {
                         Err(StratisError::Msg(format!(
                             "Crypt device has already been bound with key description {}; \
@@ -1120,8 +1117,7 @@ impl Backstore {
                         )))
                     }
                 } else {
-                    handle.bind_keyring(None, key_desc)?;
-                    Ok(true)
+                    handle.bind_keyring(None, key_desc).map(Some)
                 }
             }
             OptionalTokenSlotInput::Some(k) => {
@@ -1130,7 +1126,7 @@ impl Backstore {
                 let info = handle.encryption_info().get_info(k);
                 if let Some(UnlockMechanism::KeyDesc(ref kd)) = info {
                     if kd == key_desc {
-                        Ok(false)
+                        Ok(None)
                     } else {
                         Err(StratisError::Msg(format!(
                             "Crypt device has already been bound with key description {}; \
@@ -1140,8 +1136,7 @@ impl Backstore {
                         )))
                     }
                 } else {
-                    handle.bind_keyring(Some(k), key_desc)?;
-                    Ok(true)
+                    handle.bind_keyring(Some(k), key_desc).map(Some)
                 }
             }
             OptionalTokenSlotInput::None => {
@@ -1152,10 +1147,9 @@ impl Backstore {
                     .all_key_descriptions()
                     .find(|(_, kd)| *kd == key_desc);
                 if existing_config.is_some() {
-                    Ok(false)
+                    Ok(None)
                 } else {
-                    handle.bind_keyring(None, key_desc)?;
-                    Ok(true)
+                    handle.bind_keyring(None, key_desc).map(Some)
                 }
             }
         }
@@ -1591,18 +1585,9 @@ mod tests {
             backstore.bind_clevis(
                 OptionalTokenSlotInput::None,
                 "tang",
-                &json!({"url": env::var("TANG_URL").expect("TANG_URL env var required")})
-            ),
-            Ok(false)
-        );
-
-        assert_matches!(
-            backstore.bind_clevis(
-                OptionalTokenSlotInput::None,
-                "tang",
                 &json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true})
             ),
-            Ok(false)
+            Ok(Some(_))
         );
 
         invariant(&backstore);
@@ -1686,7 +1671,7 @@ mod tests {
                 OptionalTokenSlotInput::Some(ci_slot),
                 "tang",
                 &json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
-            ).unwrap() {
+            ).unwrap().is_some() {
                 panic!(
                     "Clevis bind idempotence test failed"
                 );
@@ -1697,6 +1682,7 @@ mod tests {
             if backstore
                 .bind_keyring(OptionalTokenSlotInput::None, key_desc)
                 .unwrap()
+                .is_some()
             {
                 panic!("Keyring bind idempotence test failed")
             }
@@ -1704,6 +1690,7 @@ mod tests {
             if backstore
                 .bind_keyring(OptionalTokenSlotInput::Some(kd_slot), key_desc)
                 .unwrap()
+                .is_some()
             {
                 panic!("Keyring bind idempotence test failed")
             }
@@ -1728,11 +1715,11 @@ mod tests {
 
             invariant(&backstore);
 
-            if !backstore.bind_clevis(
+            if backstore.bind_clevis(
                 OptionalTokenSlotInput::Some(10),
                 "tang",
                 &json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
-            ).unwrap() {
+            ).unwrap().is_none() {
                 panic!(
                     "Clevis bind test failed"
                 );
@@ -1758,16 +1745,18 @@ mod tests {
 
             invariant(&backstore);
 
-            if !backstore
+            if backstore
                 .bind_keyring(OptionalTokenSlotInput::Some(11), key_desc)
                 .unwrap()
+                .is_none()
             {
                 panic!("Keyring bind test failed");
             }
 
-            if !backstore
+            if backstore
                 .bind_keyring(OptionalTokenSlotInput::Some(12), key_desc)
                 .unwrap()
+                .is_none()
             {
                 panic!("Keyring bind test failed");
             }

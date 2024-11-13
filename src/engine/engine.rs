@@ -193,7 +193,7 @@ pub trait Pool: Debug + Send + Sync {
         token_slot: OptionalTokenSlotInput,
         pin: &str,
         clevis_info: &Value,
-    ) -> StratisResult<CreateAction<Clevis>>;
+    ) -> StratisResult<CreateAction<(Clevis, u32)>>;
 
     /// V1: Binds all devices in the pool to a given key description.
     /// * token_slot is always None
@@ -207,7 +207,7 @@ pub trait Pool: Debug + Send + Sync {
         &mut self,
         token_slot: OptionalTokenSlotInput,
         key_desc: &KeyDescription,
-    ) -> StratisResult<CreateAction<Key>>;
+    ) -> StratisResult<CreateAction<(Key, u32)>>;
 
     /// V1: Rebinds all devices in the pool to a given key description.
     /// * token_slot is always None

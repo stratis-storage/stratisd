@@ -38,6 +38,7 @@ use crate::{
                 blockdev::{v1::StratBlockDev, InternalBlockDev},
                 ProcessedPathInfos,
             },
+            crypt::{CLEVIS_LUKS_TOKEN_ID, LUKS2_TOKEN_ID},
             liminal::DeviceSet,
             metadata::BDA,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
@@ -708,14 +709,14 @@ impl Pool for StratPool {
         token_slot: OptionalTokenSlotInput,
         pin: &str,
         clevis_info: &Value,
-    ) -> StratisResult<CreateAction<Clevis>> {
+    ) -> StratisResult<CreateAction<(Clevis, u32)>> {
         if token_slot != OptionalTokenSlotInput::Legacy {
             return Err(StratisError::Msg("Specifying the token slot for binding is not supported in V1 pools; please migrate to V2 pools to use this feature".to_string()));
         }
 
         let changed = self.backstore.bind_clevis(pin, clevis_info)?;
         if changed {
-            Ok(CreateAction::Created(Clevis))
+            Ok(CreateAction::Created((Clevis, CLEVIS_LUKS_TOKEN_ID)))
         } else {
             Ok(CreateAction::Identity)
         }
@@ -727,14 +728,14 @@ impl Pool for StratPool {
         &mut self,
         token_slot: OptionalTokenSlotInput,
         key_description: &KeyDescription,
-    ) -> StratisResult<CreateAction<Key>> {
+    ) -> StratisResult<CreateAction<(Key, u32)>> {
         if token_slot != OptionalTokenSlotInput::Legacy {
             return Err(StratisError::Msg("Specifying the token slot for binding is not supported in V1 pools; please migrate to V2 pools to use this feature".to_string()));
         }
 
         let changed = self.backstore.bind_keyring(key_description)?;
         if changed {
-            Ok(CreateAction::Created(Key))
+            Ok(CreateAction::Created((Key, LUKS2_TOKEN_ID)))
         } else {
             Ok(CreateAction::Identity)
         }
@@ -1838,7 +1839,7 @@ mod tests {
             .tempdir()
             .unwrap();
         let new_file = tmp_dir.path().join("stratis_test.txt");
-        let write_block = &[0; 512_000];
+        let write_block = vec![0; 512_000];
 
         {
             let (_, fs) = pool.get_filesystem(fs_uuid).unwrap();
@@ -1859,7 +1860,7 @@ mod tests {
             .open(new_file)
             .unwrap();
         while !pool.out_of_alloc_space() {
-            f.write_all(write_block).unwrap();
+            f.write_all(&write_block).unwrap();
             f.sync_all().unwrap();
             match pool {
                 AnyPool::V1(p) => p.event_on(pool_uuid, &pool_name).unwrap(),

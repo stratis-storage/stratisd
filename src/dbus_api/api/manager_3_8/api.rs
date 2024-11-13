@@ -6,7 +6,10 @@ use dbus_tree::{Access, EmitsChangedSignal, Factory, MTSync, Method, Property};
 
 use crate::dbus_api::{
     api::{
-        manager_3_8::{methods::start_pool, props::get_stopped_pools},
+        manager_3_8::{
+            methods::{create_pool, start_pool},
+            props::get_stopped_pools,
+        },
         prop_conv::StoppedOrLockedPools,
     },
     consts,
@@ -17,7 +20,7 @@ pub fn start_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TDa
     f.method("StartPool", (), start_pool)
         .in_arg(("id", "s"))
         .in_arg(("id_type", "s"))
-        .in_arg(("unlock_method", "(bs)"))
+        .in_arg(("unlock_method", "(b(bi))"))
         .in_arg(("key_fd", "(bh)"))
         // In order from left to right:
         // b: true if the pool was newly started
@@ -27,6 +30,38 @@ pub fn start_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TDa
         //
         // Rust representation: bool
         .out_arg(("result", "(b(oaoao))"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"))
+}
+
+pub fn create_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+    f.method("CreatePool", (), create_pool)
+        .in_arg(("name", "s"))
+        .in_arg(("devices", "as"))
+        // Optional key descriptions of key in the kernel keyring
+        // a: array of zero or more elements
+        // b: true if a token slot is specified
+        // i: token slot
+        // s: key description
+        //
+        // Rust representation: Vec<((bool, u32), String)>
+        .in_arg(("key_desc", "a((bi)s)"))
+        // Optional Clevis infos for binding on initialization.
+        // a: array of zero or more elements
+        // b: true if a token slot is specified
+        // i: token slot
+        // s: pin name
+        // s: JSON config for Clevis use
+        //
+        // Rust representation: Vec<((bool, u32), String, String)>
+        .in_arg(("clevis_info", "a((bi)ss)"))
+        // In order from left to right:
+        // b: true if a pool was created and object paths were returned
+        // o: Object path for Pool
+        // a(o): Array of object paths for block devices
+        //
+        // Rust representation: (bool, (dbus::Path, Vec<dbus::Path>))
+        .out_arg(("result", "(b(oao))"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"))
 }

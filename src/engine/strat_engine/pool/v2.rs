@@ -643,12 +643,11 @@ impl Pool for StratPool {
         token_slot: OptionalTokenSlotInput,
         pin: &str,
         clevis_info: &Value,
-    ) -> StratisResult<CreateAction<Clevis>> {
+    ) -> StratisResult<CreateAction<(Clevis, u32)>> {
         let changed = self.backstore.bind_clevis(token_slot, pin, clevis_info)?;
-        if changed {
-            Ok(CreateAction::Created(Clevis))
-        } else {
-            Ok(CreateAction::Identity)
+        match changed {
+            Some(t) => Ok(CreateAction::Created((Clevis, t))),
+            None => Ok(CreateAction::Identity),
         }
     }
 
@@ -657,12 +656,11 @@ impl Pool for StratPool {
         &mut self,
         token_slot: OptionalTokenSlotInput,
         key_description: &KeyDescription,
-    ) -> StratisResult<CreateAction<Key>> {
+    ) -> StratisResult<CreateAction<(Key, u32)>> {
         let changed = self.backstore.bind_keyring(token_slot, key_description)?;
-        if changed {
-            Ok(CreateAction::Created(Key))
-        } else {
-            Ok(CreateAction::Identity)
+        match changed {
+            Some(t) => Ok(CreateAction::Created((Key, t))),
+            None => Ok(CreateAction::Identity),
         }
     }
 
@@ -1693,7 +1691,7 @@ mod tests {
             .tempdir()
             .unwrap();
         let new_file = tmp_dir.path().join("stratis_test.txt");
-        let write_block = &[0; 512_000];
+        let write_block = vec![0; 512_000];
 
         {
             let (_, fs) = pool.get_filesystem(fs_uuid).unwrap();
@@ -1714,7 +1712,7 @@ mod tests {
             .open(new_file)
             .unwrap();
         while !pool.out_of_alloc_space() {
-            f.write_all(write_block).unwrap();
+            f.write_all(&write_block).unwrap();
             f.sync_all().unwrap();
             match pool {
                 AnyPool::V1(p) => p.event_on(pool_uuid, &pool_name).unwrap(),

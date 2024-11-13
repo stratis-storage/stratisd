@@ -565,14 +565,11 @@ impl CryptHandle {
         token_slot: Option<u32>,
         pin: &str,
         json: &Value,
-    ) -> StratisResult<()> {
+    ) -> StratisResult<u32> {
         let mut json_owned = json.clone();
         let yes = interpret_clevis_config(pin, &mut json_owned)?;
 
-        let t = match token_slot {
-            Some(t) => t,
-            None => self.metadata.encryption_info.free_token_slot(),
-        };
+        let old_encryption_info = self.encryption_info();
 
         let (_, key) = get_passphrase(
             &mut acquire_crypt_device(self.luks2_device_path())?,
@@ -582,17 +579,25 @@ impl CryptHandle {
         clevis_luks_bind(
             self.luks2_device_path(),
             &Either::Right(key),
-            Some(t),
+            token_slot,
             pin,
             &json_owned,
             yes,
         )?;
+
+        let encryption_info =
+            encryption_info_from_metadata(&mut acquire_crypt_device(self.luks2_device_path())?)?;
+
+        let new_slot = encryption_info
+            .diff(old_encryption_info)
+            .expect("just added a token slot");
+
         self.metadata.encryption_info.add_info(
-            t,
+            new_slot,
             UnlockMechanism::ClevisInfo((pin.to_owned(), json.to_owned())),
         )?;
 
-        Ok(())
+        Ok(new_slot)
     }
 
     /// Unbind the given device using clevis.
@@ -658,7 +663,7 @@ impl CryptHandle {
         &mut self,
         token_slot: Option<u32>,
         key_desc: &KeyDescription,
-    ) -> StratisResult<()> {
+    ) -> StratisResult<u32> {
         let mut device = self.acquire_crypt_device()?;
         let (_, key) = get_passphrase(&mut device, self.encryption_info())?;
 
@@ -667,12 +672,13 @@ impl CryptHandle {
             None => self.metadata.encryption_info.free_token_slot(),
         };
 
-        add_keyring_keyslot(&mut device, Some(t), key_desc, Some(Either::Left(key)))?;
+        let token_slot =
+            add_keyring_keyslot(&mut device, Some(t), key_desc, Some(Either::Left(key)))?;
 
         self.metadata
             .encryption_info
             .add_info(t, UnlockMechanism::KeyDesc(key_desc.to_owned()))?;
-        Ok(())
+        Ok(token_slot)
     }
 
     /// Remove keyring binding from the underlying LUKS2 volume.

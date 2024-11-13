@@ -16,6 +16,7 @@ use std::{
 use libudev::EventType;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use strum_macros::EnumString;
 use uuid::Uuid;
 
 pub use crate::engine::{
@@ -206,21 +207,10 @@ impl fmt::Display for Name {
 ///
 /// * `ErroredPoolDevices` returns the state of devices that caused an error while
 ///   attempting to reconstruct a pool.
+#[derive(EnumString)]
+#[strum(serialize_all = "snake_case")]
 pub enum ReportType {
     StoppedPools,
-}
-
-impl<'a> TryFrom<&'a str> for ReportType {
-    type Error = StratisError;
-
-    fn try_from(name: &str) -> StratisResult<ReportType> {
-        match name {
-            "stopped_pools" => Ok(ReportType::StoppedPools),
-            _ => Err(StratisError::Msg(format!(
-                "Report name {name} not understood"
-            ))),
-        }
-    }
 }
 
 #[derive(Debug, Eq, PartialEq)]

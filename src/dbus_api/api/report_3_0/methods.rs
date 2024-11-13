@@ -11,6 +11,7 @@ use crate::{
         util::{engine_to_dbus_err_tuple, get_next_arg},
     },
     engine::ReportType,
+    stratis::StratisError,
 };
 
 pub fn get_report(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
@@ -21,7 +22,9 @@ pub fn get_report(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
     let default_return = String::new();
 
-    let report_type = match ReportType::try_from(report_name) {
+    let report_type = match ReportType::try_from(report_name)
+        .map_err(|_| StratisError::Msg(format!("Report name {report_name} not understood")))
+    {
         Ok(rt) => rt,
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e);

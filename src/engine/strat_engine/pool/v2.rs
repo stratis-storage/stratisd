@@ -649,12 +649,11 @@ impl Pool for StratPool {
         token_slot: OptionalTokenSlotInput,
         pin: &str,
         clevis_info: &Value,
-    ) -> StratisResult<CreateAction<Clevis>> {
+    ) -> StratisResult<CreateAction<(Clevis, u32)>> {
         let changed = self.backstore.bind_clevis(token_slot, pin, clevis_info)?;
-        if changed {
-            Ok(CreateAction::Created(Clevis))
-        } else {
-            Ok(CreateAction::Identity)
+        match changed {
+            Some(t) => Ok(CreateAction::Created((Clevis, t))),
+            None => Ok(CreateAction::Identity),
         }
     }
 
@@ -663,12 +662,11 @@ impl Pool for StratPool {
         &mut self,
         token_slot: OptionalTokenSlotInput,
         key_description: &KeyDescription,
-    ) -> StratisResult<CreateAction<Key>> {
+    ) -> StratisResult<CreateAction<(Key, u32)>> {
         let changed = self.backstore.bind_keyring(token_slot, key_description)?;
-        if changed {
-            Ok(CreateAction::Created(Key))
-        } else {
-            Ok(CreateAction::Identity)
+        match changed {
+            Some(t) => Ok(CreateAction::Created((Key, t))),
+            None => Ok(CreateAction::Identity),
         }
     }
 

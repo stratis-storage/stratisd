@@ -179,7 +179,9 @@ pub fn unlock_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     };
     let unlock_method = {
         let unlock_method_str: &str = get_next_arg(&mut iter, 1)?;
-        match UnlockMethod::try_from(unlock_method_str) {
+        match UnlockMethod::try_from(unlock_method_str).map_err(|_| {
+            StratisError::Msg(format!("{unlock_method_str} is an invalid unlock method"))
+        }) {
             Ok(um) => um,
             Err(e) => {
                 let (rc, rs) = engine_to_dbus_err_tuple(&e);

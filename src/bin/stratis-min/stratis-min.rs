@@ -13,7 +13,7 @@ use stratisd::{
         CLEVIS_TANG_TRUST_URL,
     },
     jsonrpc::client::{filesystem, key, pool, report},
-    stratis::VERSION,
+    stratis::{StratisError, VERSION},
 };
 
 fn parse_args() -> Command {
@@ -237,7 +237,9 @@ fn main() -> Result<(), String> {
                 };
                 let unlock_method =
                     match args.get_one::<String>("unlock_method").map(|s| s.as_str()) {
-                        Some(um) => Some(UnlockMethod::try_from(um)?),
+                        Some(um) => Some(UnlockMethod::try_from(um).map_err(|_| {
+                            StratisError::Msg(format!("{um} is an invalid unlock method"))
+                        })?),
                         None => None,
                     };
                 let prompt = args.get_flag("prompt");

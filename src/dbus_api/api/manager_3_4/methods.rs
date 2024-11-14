@@ -52,13 +52,17 @@ pub fn start_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let unlock_method = {
         let unlock_method_tup: (bool, &str) = get_next_arg(&mut iter, 2)?;
         match tuple_to_option(unlock_method_tup) {
-            Some(unlock_method_str) => match UnlockMethod::try_from(unlock_method_str) {
-                Ok(um) => Some(um),
-                Err(e) => {
-                    let (rc, rs) = engine_to_dbus_err_tuple(&e);
-                    return Ok(vec![return_message.append3(default_return, rc, rs)]);
+            Some(unlock_method_str) => {
+                match UnlockMethod::try_from(unlock_method_str).map_err(|_| {
+                    StratisError::Msg(format!("{unlock_method_str} is an invalid unlock method"))
+                }) {
+                    Ok(um) => Some(um),
+                    Err(e) => {
+                        let (rc, rs) = engine_to_dbus_err_tuple(&e);
+                        return Ok(vec![return_message.append3(default_return, rc, rs)]);
+                    }
                 }
-            },
+            }
             None => None,
         }
     };

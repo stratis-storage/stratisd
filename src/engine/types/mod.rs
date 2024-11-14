@@ -131,26 +131,12 @@ impl Display for StratisUuid {
 }
 
 /// Use Clevis or keyring to unlock LUKS volume.
-#[derive(Serialize, Deserialize, Clone, Copy, Eq, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, Copy, Eq, PartialEq, Debug, EnumString)]
+#[strum(serialize_all = "snake_case")]
 pub enum UnlockMethod {
     Clevis,
     Keyring,
     Any,
-}
-
-impl<'a> TryFrom<&'a str> for UnlockMethod {
-    type Error = StratisError;
-
-    fn try_from(s: &str) -> StratisResult<UnlockMethod> {
-        match s {
-            "keyring" => Ok(UnlockMethod::Keyring),
-            "clevis" => Ok(UnlockMethod::Clevis),
-            "any" => Ok(UnlockMethod::Any),
-            _ => Err(StratisError::Msg(format!(
-                "{s} is an invalid unlock method"
-            ))),
-        }
-    }
 }
 
 /// Blockdev tier. Used to distinguish between blockdevs used for

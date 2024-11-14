@@ -6,6 +6,8 @@
 
 use std::fmt::{self, Display};
 
+use strum_macros::{self};
+
 use devicemapper::{DmNameBuf, DmUuidBuf};
 
 pub use crate::engine::types::KeyDescription;
@@ -90,23 +92,16 @@ pub fn format_crypt_backstore_name(pool_uuid: &PoolUuid) -> DmNameBuf {
     DmNameBuf::new(value).expect("FORMAT_VERSION display length < 73")
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, strum_macros::Display)]
 pub enum FlexRole {
+    #[strum(serialize = "mdv")]
     MetadataVolume,
+    #[strum(serialize = "thindata")]
     ThinData,
+    #[strum(serialize = "thinmeta")]
     ThinMeta,
+    #[strum(serialize = "thinmetaspare")]
     ThinMetaSpare,
-}
-
-impl Display for FlexRole {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            FlexRole::MetadataVolume => write!(f, "mdv"),
-            FlexRole::ThinData => write!(f, "thindata"),
-            FlexRole::ThinMeta => write!(f, "thinmeta"),
-            FlexRole::ThinMetaSpare => write!(f, "thinmetaspare"),
-        }
-    }
 }
 
 #[derive(Clone, Copy)]
@@ -122,21 +117,15 @@ impl Display for ThinRole {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, strum_macros::Display)]
+#[strum(serialize_all = "lowercase")]
 pub enum ThinPoolRole {
     Pool,
 }
 
-impl Display for ThinPoolRole {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            ThinPoolRole::Pool => write!(f, "pool"),
-        }
-    }
-}
-
 /// The various roles taken on by DM devices in the cache tier.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, strum_macros::Display)]
+#[strum(serialize_all = "lowercase")]
 pub enum CacheRole {
     /// The DM cache device, contains the other three devices.
     Cache,
@@ -146,17 +135,6 @@ pub enum CacheRole {
     MetaSub,
     /// The origin sub-device of the DM cache device, holds the actual data.
     OriginSub,
-}
-
-impl Display for CacheRole {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            CacheRole::Cache => write!(f, "cache"),
-            CacheRole::CacheSub => write!(f, "cachesub"),
-            CacheRole::MetaSub => write!(f, "metasub"),
-            CacheRole::OriginSub => write!(f, "originsub"),
-        }
-    }
 }
 
 /// Format a name & uuid for the flex layer.

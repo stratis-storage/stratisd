@@ -16,7 +16,7 @@ use std::{
 use libudev::EventType;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use strum_macros::EnumString;
+use strum_macros::{self, EnumString};
 use uuid::Uuid;
 
 pub use crate::engine::{
@@ -360,29 +360,18 @@ impl Deref for DevicePath {
 }
 
 /// Represents what actions this pool can accept.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, strum_macros::Display)]
 pub enum ActionAvailability {
     /// Full set of actions may be taken
+    #[strum(serialize = "fully_operational")]
     Full = 0,
     /// No requests via an IPC mechanism may be taken
+    #[strum(serialize = "no_ipc_requests")]
     NoRequests = 1,
     /// No changes may be made to the pool including background changes
     /// like reacting to devicemapper events
+    #[strum(serialize = "no_pool_changes")]
     NoPoolChanges = 2,
-}
-
-impl Display for ActionAvailability {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                ActionAvailability::Full => "fully_operational",
-                ActionAvailability::NoRequests => "no_ipc_requests",
-                ActionAvailability::NoPoolChanges => "no_pool_changes",
-            }
-        )
-    }
 }
 
 /// Indicates that a property that should be consistent across block devices

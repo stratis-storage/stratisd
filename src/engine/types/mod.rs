@@ -16,7 +16,7 @@ use std::{
 use libudev::EventType;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use strum_macros::{self, EnumString};
+use strum_macros::{self, EnumString, FromRepr};
 use uuid::Uuid;
 
 pub use crate::engine::{
@@ -475,31 +475,9 @@ impl UuidOrConflict {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, FromRepr)]
+#[repr(u8)]
 pub enum StratSigblockVersion {
     V1 = 1,
     V2 = 2,
-}
-
-impl TryFrom<u8> for StratSigblockVersion {
-    type Error = StratisError;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            1u8 => Ok(StratSigblockVersion::V1),
-            2u8 => Ok(StratSigblockVersion::V2),
-            _ => Err(StratisError::Msg(format!(
-                "Unknown sigblock version: {value}"
-            ))),
-        }
-    }
-}
-
-impl From<StratSigblockVersion> for u8 {
-    fn from(version: StratSigblockVersion) -> Self {
-        match version {
-            StratSigblockVersion::V1 => 1u8,
-            StratSigblockVersion::V2 => 2u8,
-        }
-    }
 }

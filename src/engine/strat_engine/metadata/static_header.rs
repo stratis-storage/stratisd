@@ -497,7 +497,7 @@ impl StaticHeader {
         let mut buf = [0u8; bytes!(static_header_size::SIGBLOCK_SECTORS)];
         buf[4..20].clone_from_slice(STRAT_MAGIC);
         LittleEndian::write_u64(&mut buf[20..28], *self.blkdev_size.sectors());
-        buf[28] = u8::from(self.sigblock_version);
+        buf[28] = self.sigblock_version as u8;
         buf[32..64].clone_from_slice(uuid_to_string!(self.identifiers.pool_uuid).as_bytes());
         buf[64..96].clone_from_slice(uuid_to_string!(self.identifiers.device_uuid).as_bytes());
         LittleEndian::write_u64(&mut buf[96..104], *self.mda_size.sectors());
@@ -532,7 +532,8 @@ impl StaticHeader {
         let blkdev_size = BlockdevSize::new(Sectors(LittleEndian::read_u64(&buf[20..28])));
 
         let version_buf = buf[28];
-        let version = StratSigblockVersion::try_from(version_buf)?;
+        let version = StratSigblockVersion::from_repr(version_buf)
+            .ok_or_else(|| StratisError::Msg(format!("Unknown sigblock version: {version_buf}")))?;
 
         let pool_uuid = PoolUuid::parse_str(from_utf8(&buf[32..64])?)?;
         let dev_uuid = DevUuid::parse_str(from_utf8(&buf[64..96])?)?;

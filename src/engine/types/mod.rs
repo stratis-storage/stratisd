@@ -16,6 +16,7 @@ use std::{
 use libudev::EventType;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use strum_macros::{self, EnumString, FromRepr};
 use uuid::Uuid;
 
 pub use crate::engine::{
@@ -130,26 +131,12 @@ impl Display for StratisUuid {
 }
 
 /// Use Clevis or keyring to unlock LUKS volume.
-#[derive(Serialize, Deserialize, Clone, Copy, Eq, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, Copy, Eq, PartialEq, Debug, EnumString)]
+#[strum(serialize_all = "snake_case")]
 pub enum UnlockMethod {
     Clevis,
     Keyring,
     Any,
-}
-
-impl<'a> TryFrom<&'a str> for UnlockMethod {
-    type Error = StratisError;
-
-    fn try_from(s: &str) -> StratisResult<UnlockMethod> {
-        match s {
-            "keyring" => Ok(UnlockMethod::Keyring),
-            "clevis" => Ok(UnlockMethod::Clevis),
-            "any" => Ok(UnlockMethod::Any),
-            _ => Err(StratisError::Msg(format!(
-                "{s} is an invalid unlock method"
-            ))),
-        }
-    }
 }
 
 /// Blockdev tier. Used to distinguish between blockdevs used for
@@ -206,21 +193,10 @@ impl fmt::Display for Name {
 ///
 /// * `ErroredPoolDevices` returns the state of devices that caused an error while
 ///   attempting to reconstruct a pool.
+#[derive(EnumString)]
+#[strum(serialize_all = "snake_case")]
 pub enum ReportType {
     StoppedPools,
-}
-
-impl<'a> TryFrom<&'a str> for ReportType {
-    type Error = StratisError;
-
-    fn try_from(name: &str) -> StratisResult<ReportType> {
-        match name {
-            "stopped_pools" => Ok(ReportType::StoppedPools),
-            _ => Err(StratisError::Msg(format!(
-                "Report name {name} not understood"
-            ))),
-        }
-    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -384,29 +360,18 @@ impl Deref for DevicePath {
 }
 
 /// Represents what actions this pool can accept.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, strum_macros::Display)]
 pub enum ActionAvailability {
     /// Full set of actions may be taken
+    #[strum(serialize = "fully_operational")]
     Full = 0,
     /// No requests via an IPC mechanism may be taken
+    #[strum(serialize = "no_ipc_requests")]
     NoRequests = 1,
     /// No changes may be made to the pool including background changes
     /// like reacting to devicemapper events
+    #[strum(serialize = "no_pool_changes")]
     NoPoolChanges = 2,
-}
-
-impl Display for ActionAvailability {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                ActionAvailability::Full => "fully_operational",
-                ActionAvailability::NoRequests => "no_ipc_requests",
-                ActionAvailability::NoPoolChanges => "no_pool_changes",
-            }
-        )
-    }
 }
 
 /// Indicates that a property that should be consistent across block devices
@@ -510,31 +475,9 @@ impl UuidOrConflict {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, FromRepr)]
+#[repr(u8)]
 pub enum StratSigblockVersion {
     V1 = 1,
     V2 = 2,
-}
-
-impl TryFrom<u8> for StratSigblockVersion {
-    type Error = StratisError;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            1u8 => Ok(StratSigblockVersion::V1),
-            2u8 => Ok(StratSigblockVersion::V2),
-            _ => Err(StratisError::Msg(format!(
-                "Unknown sigblock version: {value}"
-            ))),
-        }
-    }
-}
-
-impl From<StratSigblockVersion> for u8 {
-    fn from(version: StratSigblockVersion) -> Self {
-        match version {
-            StratSigblockVersion::V1 => 1u8,
-            StratSigblockVersion::V2 => 2u8,
-        }
-    }
 }

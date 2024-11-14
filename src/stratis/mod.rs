@@ -3,11 +3,13 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 pub use self::{
+    command_line::UnlockMethod,
     errors::{StratisError, StratisResult},
     run::run,
     stratis::VERSION,
 };
 
+mod command_line;
 mod dm;
 mod errors;
 mod ipc_support;

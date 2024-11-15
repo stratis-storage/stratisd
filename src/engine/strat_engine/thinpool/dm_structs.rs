@@ -41,21 +41,21 @@ impl From<&ThinPoolStatus> for ThinPoolStatusDigest {
 }
 
 pub mod thin_pool_status_parser {
-    use devicemapper::{MetaBlocks, ThinPoolStatus, ThinPoolUsage};
-
-    /// Convert the thin pool status to usage information.
-    pub fn usage(status: &ThinPoolStatus) -> Option<&ThinPoolUsage> {
-        if let ThinPoolStatus::Working(w) = status {
-            Some(&w.usage)
-        } else {
-            None
-        }
-    }
+    use devicemapper::{DataBlocks, MetaBlocks, ThinPoolStatus};
 
     /// Convert the thin pool status to the metadata low water mark.
     pub fn meta_lowater(status: &ThinPoolStatus) -> Option<MetaBlocks> {
         if let ThinPoolStatus::Working(w) = status {
             w.meta_low_water.map(MetaBlocks)
+        } else {
+            None
+        }
+    }
+
+    /// Convert the thin pool status to the used information.
+    pub fn used(status: &ThinPoolStatus) -> Option<(DataBlocks, MetaBlocks)> {
+        if let ThinPoolStatus::Working(w) = status {
+            Some((w.usage.used_data, w.usage.used_meta))
         } else {
             None
         }

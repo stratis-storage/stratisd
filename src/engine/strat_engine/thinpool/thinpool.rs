@@ -273,8 +273,8 @@ impl<B> ThinPool<B> {
     fn used(&self) -> Option<(Sectors, MetaBlocks)> {
         self.thin_pool_status
             .as_ref()
-            .and_then(thin_pool_status_parser::usage)
-            .map(|u| (datablocks_to_sectors(u.used_data), u.used_meta))
+            .and_then(thin_pool_status_parser::used)
+            .map(|(d, m)| (datablocks_to_sectors(d), m))
     }
 
     /// Sum the logical size of all filesystems on the pool.

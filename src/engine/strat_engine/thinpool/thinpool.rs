@@ -35,7 +35,7 @@ use crate::{
             serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave},
             shared::merge,
             thinpool::{
-                dm_structs::{status_to_meta_lowater, status_to_usage, ThinPoolStatusDigest},
+                dm_structs::{thin_pool_status_parser, ThinPoolStatusDigest},
                 filesystem::StratFilesystem,
                 mdv::MetadataVol,
                 thinids::ThinDevIdPool,
@@ -273,7 +273,7 @@ impl<B> ThinPool<B> {
     fn used(&self) -> Option<(Sectors, MetaBlocks)> {
         self.thin_pool_status
             .as_ref()
-            .and_then(status_to_usage)
+            .and_then(thin_pool_status_parser::usage)
             .map(|u| (datablocks_to_sectors(u.used_data), u.used_meta))
     }
 
@@ -1346,7 +1346,7 @@ where
                     .and_then(|(_, mu)| {
                         self.thin_pool_status
                             .as_ref()
-                            .and_then(status_to_meta_lowater)
+                            .and_then(thin_pool_status_parser::meta_lowater)
                             .map(|ml| self.thin_pool.meta_dev().size().metablocks() - mu < ml)
                     })
                     .unwrap_or(false),

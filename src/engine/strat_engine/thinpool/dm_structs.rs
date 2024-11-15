@@ -4,7 +4,7 @@
 
 // Functions for interpreting and manipulation representation of DM structs.
 
-use devicemapper::{MetaBlocks, ThinPoolStatus, ThinPoolStatusSummary, ThinPoolUsage};
+use devicemapper::{ThinPoolStatus, ThinPoolStatusSummary};
 
 /// A way of digesting the status reported on the thinpool into a value
 /// that can be checked for equality. This way, two statuses,
@@ -40,20 +40,24 @@ impl From<&ThinPoolStatus> for ThinPoolStatusDigest {
     }
 }
 
-/// Convert the thin pool status to usage information.
-pub fn status_to_usage(status: &ThinPoolStatus) -> Option<&ThinPoolUsage> {
-    if let ThinPoolStatus::Working(w) = status {
-        Some(&w.usage)
-    } else {
-        None
-    }
-}
+pub mod thin_pool_status_parser {
+    use devicemapper::{MetaBlocks, ThinPoolStatus, ThinPoolUsage};
 
-/// Convert the thin pool status to the metadata low water mark.
-pub fn status_to_meta_lowater(status: &ThinPoolStatus) -> Option<MetaBlocks> {
-    if let ThinPoolStatus::Working(w) = status {
-        w.meta_low_water.map(MetaBlocks)
-    } else {
-        None
+    /// Convert the thin pool status to usage information.
+    pub fn usage(status: &ThinPoolStatus) -> Option<&ThinPoolUsage> {
+        if let ThinPoolStatus::Working(w) = status {
+            Some(&w.usage)
+        } else {
+            None
+        }
+    }
+
+    /// Convert the thin pool status to the metadata low water mark.
+    pub fn meta_lowater(status: &ThinPoolStatus) -> Option<MetaBlocks> {
+        if let ThinPoolStatus::Working(w) = status {
+            w.meta_low_water.map(MetaBlocks)
+        } else {
+            None
+        }
     }
 }

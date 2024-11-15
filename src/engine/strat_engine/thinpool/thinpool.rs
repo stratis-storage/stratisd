@@ -271,7 +271,9 @@ impl<B> ThinPool<B> {
     /// Get the last cached value for the total amount of space used on the
     /// thin pool in the data and metadata devices.
     fn used(&self) -> Option<(Sectors, MetaBlocks)> {
-        status_to_usage(self.thin_pool_status.as_ref())
+        self.thin_pool_status
+            .as_ref()
+            .and_then(status_to_usage)
             .map(|u| (datablocks_to_sectors(u.used_data), u.used_meta))
     }
 
@@ -1342,7 +1344,9 @@ where
                 None,
                 self.used()
                     .and_then(|(_, mu)| {
-                        status_to_meta_lowater(self.thin_pool_status.as_ref())
+                        self.thin_pool_status
+                            .as_ref()
+                            .and_then(status_to_meta_lowater)
                             .map(|ml| self.thin_pool.meta_dev().size().metablocks() - mu < ml)
                     })
                     .unwrap_or(false),

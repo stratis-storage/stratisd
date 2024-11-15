@@ -41,23 +41,19 @@ impl From<&ThinPoolStatus> for ThinPoolStatusDigest {
 }
 
 /// Convert the thin pool status to usage information.
-pub fn status_to_usage(status: Option<&ThinPoolStatus>) -> Option<&ThinPoolUsage> {
-    status.and_then(|s| {
-        if let ThinPoolStatus::Working(w) = s {
-            Some(&w.usage)
-        } else {
-            None
-        }
-    })
+pub fn status_to_usage(status: &ThinPoolStatus) -> Option<&ThinPoolUsage> {
+    if let ThinPoolStatus::Working(w) = status {
+        Some(&w.usage)
+    } else {
+        None
+    }
 }
 
 /// Convert the thin pool status to the metadata low water mark.
-pub fn status_to_meta_lowater(status: Option<&ThinPoolStatus>) -> Option<MetaBlocks> {
-    status.and_then(|s| {
-        if let ThinPoolStatus::Working(w) = s {
-            w.meta_low_water.map(MetaBlocks)
-        } else {
-            None
-        }
-    })
+pub fn status_to_meta_lowater(status: &ThinPoolStatus) -> Option<MetaBlocks> {
+    if let ThinPoolStatus::Working(w) = status {
+        w.meta_low_water.map(MetaBlocks)
+    } else {
+        None
+    }
 }

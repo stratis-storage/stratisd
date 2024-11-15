@@ -18,7 +18,7 @@ use serde_json::{Map, Value};
 use devicemapper::{
     device_exists, message, Bytes, DataBlocks, Device, DmDevice, DmName, DmNameBuf, DmOptions,
     FlakeyTargetParams, LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors,
-    TargetLine, ThinDevId, ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, ThinPoolUsage, IEC,
+    TargetLine, ThinDevId, ThinPoolDev, ThinPoolStatus, IEC,
 };
 
 use crate::{
@@ -34,7 +34,12 @@ use crate::{
             },
             serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave},
             shared::merge,
-            thinpool::{filesystem::StratFilesystem, mdv::MetadataVol, thinids::ThinDevIdPool},
+            thinpool::{
+                dm_structs::{status_to_meta_lowater, status_to_usage, ThinPoolStatusDigest},
+                filesystem::StratFilesystem,
+                mdv::MetadataVol,
+                thinids::ThinDevIdPool,
+            },
             writing::wipe_sectors,
         },
         structures::Table,
@@ -174,40 +179,6 @@ struct Segments {
     mdv_segments: Vec<(Sectors, Sectors)>,
 }
 
-/// A way of digesting the status reported on the thinpool into a value
-/// that can be checked for equality. This way, two statuses,
-/// collected at different times can be checked to determine whether their
-/// gross, as opposed to fine, differences are significant.
-/// In this implementation convert the status designations to strings which
-/// match those strings that the kernel uses to identify the different states
-#[derive(Clone, Copy, Debug, Eq, PartialEq, strum_macros::AsRefStr)]
-pub enum ThinPoolStatusDigest {
-    #[strum(serialize = "Fail")]
-    Fail,
-    #[strum(serialize = "Error")]
-    Error,
-    #[strum(serialize = "rw")]
-    Good,
-    #[strum(serialize = "ro")]
-    ReadOnly,
-    #[strum(serialize = "out_of_data_space")]
-    OutOfSpace,
-}
-
-impl From<&ThinPoolStatus> for ThinPoolStatusDigest {
-    fn from(status: &ThinPoolStatus) -> ThinPoolStatusDigest {
-        match status {
-            ThinPoolStatus::Working(status) => match status.summary {
-                ThinPoolStatusSummary::Good => ThinPoolStatusDigest::Good,
-                ThinPoolStatusSummary::ReadOnly => ThinPoolStatusDigest::ReadOnly,
-                ThinPoolStatusSummary::OutOfSpace => ThinPoolStatusDigest::OutOfSpace,
-            },
-            ThinPoolStatus::Fail => ThinPoolStatusDigest::Fail,
-            ThinPoolStatus::Error => ThinPoolStatusDigest::Error,
-        }
-    }
-}
-
 /// Calculate the room available for data that is not taken up by metadata.
 fn room_for_data(usable_size: Sectors, meta_size: Sectors) -> Sectors {
     Sectors(
@@ -251,28 +222,6 @@ impl ThinPoolSizeParams {
     pub fn mdv_size(&self) -> Sectors {
         self.mdv_size
     }
-}
-
-/// Convert the thin pool status to usage information.
-fn status_to_usage(status: Option<&ThinPoolStatus>) -> Option<&ThinPoolUsage> {
-    status.and_then(|s| {
-        if let ThinPoolStatus::Working(w) = s {
-            Some(&w.usage)
-        } else {
-            None
-        }
-    })
-}
-
-/// Convert the thin pool status to the metadata low water mark.
-fn status_to_meta_lowater(status: Option<&ThinPoolStatus>) -> Option<MetaBlocks> {
-    status.and_then(|s| {
-        if let ThinPoolStatus::Working(w) = s {
-            w.meta_low_water.map(MetaBlocks)
-        } else {
-            None
-        }
-    })
 }
 
 /// The number of physical sectors in use by this thinpool abstraction.
@@ -2218,7 +2167,7 @@ mod tests {
 
     use nix::mount::{mount, MsFlags};
 
-    use devicemapper::{Bytes, SECTOR_SIZE};
+    use devicemapper::{Bytes, ThinPoolStatusSummary, SECTOR_SIZE};
 
     use crate::engine::{
         engine::Filesystem,

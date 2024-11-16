@@ -17,8 +17,7 @@ use serde_json::{Map, Value};
 
 use devicemapper::{
     device_exists, message, Bytes, DataBlocks, Device, DmDevice, DmName, DmNameBuf, DmOptions,
-    FlakeyTargetParams, LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors,
-    TargetLine, ThinDevId, ThinPoolDev, ThinPoolStatus, IEC,
+    LinearDev, MetaBlocks, Sectors, ThinDevId, ThinPoolDev, ThinPoolStatus, IEC,
 };
 
 use crate::{
@@ -35,7 +34,9 @@ use crate::{
             serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave},
             shared::merge,
             thinpool::{
-                dm_structs::{thin_pool_status_parser, ThinPoolStatusDigest},
+                dm_structs::{
+                    linear_table, thin_pool_status_parser, thin_table, ThinPoolStatusDigest,
+                },
                 filesystem::StratFilesystem,
                 mdv::MetadataVol,
                 thinids::ThinDevIdPool,
@@ -107,28 +108,6 @@ fn thin_pool_identifiers(thin_pool: &ThinPoolDev) -> String {
         thin_pool.device(),
         thin_pool.devnode().display()
     )
-}
-
-/// Transform a list of segments belonging to a single device into a
-/// list of target lines for a linear device.
-fn segs_to_table(
-    dev: Device,
-    segments: &[(Sectors, Sectors)],
-) -> Vec<TargetLine<LinearDevTargetParams>> {
-    let mut table = Vec::new();
-    let mut logical_start_offset = Sectors(0);
-
-    for &(start_offset, length) in segments {
-        let params = LinearTargetParams::new(dev, start_offset);
-        let line = TargetLine::new(
-            logical_start_offset,
-            length,
-            LinearDevTargetParams::Linear(params),
-        );
-        table.push(line);
-        logical_start_offset += length;
-    }
-    table
 }
 
 /// Append the second list of segments to the first, or if the last
@@ -400,12 +379,8 @@ impl<B> ThinPool<B> {
 
     /// Returns true if the pool has run out of available space to allocate.
     pub fn out_of_alloc_space(&self) -> bool {
-        self.thin_pool
-            .table()
-            .table
-            .params
-            .feature_args
-            .contains(FeatureArg::ErrorIfNoSpace.as_ref())
+        thin_table::get_feature_args(self.thin_pool.table())
+            .contains(&FeatureArg::ErrorIfNoSpace.as_ref().to_string())
     }
 
     pub fn get_filesystem_by_uuid(&self, uuid: FilesystemUuid) -> Option<(Name, &StratFilesystem)> {
@@ -771,7 +746,7 @@ impl ThinPool<v1::Backstore> {
             get_dm(),
             &dm_name,
             Some(&dm_uuid),
-            segs_to_table(backstore_device, &[meta_segments]),
+            linear_table::segs_to_table(backstore_device, &[meta_segments]),
         )?;
 
         // Wipe the first 4 KiB, i.e. 8 sectors as recommended in kernel DM
@@ -788,7 +763,7 @@ impl ThinPool<v1::Backstore> {
             get_dm(),
             &dm_name,
             Some(&dm_uuid),
-            segs_to_table(backstore_device, &[data_segments]),
+            linear_table::segs_to_table(backstore_device, &[data_segments]),
         )?;
 
         let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::MetadataVolume);
@@ -796,7 +771,7 @@ impl ThinPool<v1::Backstore> {
             get_dm(),
             &dm_name,
             Some(&dm_uuid),
-            segs_to_table(backstore_device, &[mdv_segments]),
+            linear_table::segs_to_table(backstore_device, &[mdv_segments]),
         )?;
         let mdv = MetadataVol::initialize(pool_uuid, mdv_dev)?;
 
@@ -852,56 +827,12 @@ impl ThinPool<v1::Backstore> {
             return Ok(false);
         }
 
-        let xform_target_line =
-            |line: &TargetLine<LinearDevTargetParams>| -> TargetLine<LinearDevTargetParams> {
-                let new_params = match line.params {
-                    LinearDevTargetParams::Linear(ref params) => LinearDevTargetParams::Linear(
-                        LinearTargetParams::new(backstore_device, params.start_offset),
-                    ),
-                    LinearDevTargetParams::Flakey(ref params) => {
-                        let feature_args = params.feature_args.iter().cloned().collect::<Vec<_>>();
-                        LinearDevTargetParams::Flakey(FlakeyTargetParams::new(
-                            backstore_device,
-                            params.start_offset,
-                            params.up_interval,
-                            params.down_interval,
-                            feature_args,
-                        ))
-                    }
-                };
-
-                TargetLine::new(line.start, line.length, new_params)
-            };
-
-        let meta_table = self
-            .thin_pool
-            .meta_dev()
-            .table()
-            .table
-            .clone()
-            .iter()
-            .map(&xform_target_line)
-            .collect::<Vec<_>>();
-
-        let data_table = self
-            .thin_pool
-            .data_dev()
-            .table()
-            .table
-            .clone()
-            .iter()
-            .map(&xform_target_line)
-            .collect::<Vec<_>>();
-
-        let mdv_table = self
-            .mdv
-            .device()
-            .table()
-            .table
-            .clone()
-            .iter()
-            .map(&xform_target_line)
-            .collect::<Vec<_>>();
+        let meta_table =
+            linear_table::set_target_device(self.thin_pool.meta_dev().table(), backstore_device);
+        let data_table =
+            linear_table::set_target_device(self.thin_pool.data_dev().table(), backstore_device);
+        let mdv_table =
+            linear_table::set_target_device(self.mdv.device().table(), backstore_device);
 
         self.thin_pool.set_meta_table(get_dm(), meta_table)?;
         self.thin_pool.set_data_table(get_dm(), data_table)?;
@@ -958,7 +889,7 @@ impl ThinPool<v2::Backstore> {
             get_dm(),
             &dm_name,
             Some(&dm_uuid),
-            segs_to_table(backstore_device, &[meta_segments]),
+            linear_table::segs_to_table(backstore_device, &[meta_segments]),
         )?;
 
         // Wipe the first 4 KiB, i.e. 8 sectors as recommended in kernel DM
@@ -975,7 +906,7 @@ impl ThinPool<v2::Backstore> {
             get_dm(),
             &dm_name,
             Some(&dm_uuid),
-            segs_to_table(backstore_device, &[data_segments]),
+            linear_table::segs_to_table(backstore_device, &[data_segments]),
         )?;
 
         let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::MetadataVolume);
@@ -983,7 +914,7 @@ impl ThinPool<v2::Backstore> {
             get_dm(),
             &dm_name,
             Some(&dm_uuid),
-            segs_to_table(backstore_device, &[mdv_segments]),
+            linear_table::segs_to_table(backstore_device, &[mdv_segments]),
         )?;
         let mdv = MetadataVol::initialize(pool_uuid, mdv_dev)?;
 
@@ -1064,7 +995,7 @@ where
             get_dm(),
             &dm_name,
             Some(&dm_uuid),
-            segs_to_table(backstore_device, &mdv_segments),
+            linear_table::segs_to_table(backstore_device, &mdv_segments),
         )?;
         let mdv = MetadataVol::setup(pool_uuid, mdv_dev)?;
 
@@ -1172,7 +1103,7 @@ where
             get_dm(),
             &dm_name,
             Some(&dm_uuid),
-            segs_to_table(backstore_device, &data_segments),
+            linear_table::segs_to_table(backstore_device, &data_segments),
         )?;
 
         // TODO: Remove in stratisd 4.0.
@@ -1526,7 +1457,8 @@ where
                     if let Some(mut ds) = data_segments {
                         thinpooldev.suspend(get_dm(), DmOptions::default())?;
                         // Leaves data device suspended
-                        let res = thinpooldev.set_data_table(get_dm(), segs_to_table(device, &ds));
+                        let res = thinpooldev
+                            .set_data_table(get_dm(), linear_table::segs_to_table(device, &ds));
 
                         if res.is_ok() {
                             data_existing_segments.clear();
@@ -1633,7 +1565,8 @@ where
                         thinpooldev.suspend(get_dm(), DmOptions::default())?;
 
                         // Leaves meta device suspended
-                        let res = thinpooldev.set_meta_table(get_dm(), segs_to_table(device, &ms));
+                        let res = thinpooldev
+                            .set_meta_table(get_dm(), linear_table::segs_to_table(device, &ms));
 
                         if res.is_ok() {
                             meta_existing_segments.clear();
@@ -2083,11 +2016,7 @@ impl<B> Recordable<ThinPoolDevSave> for ThinPool<B> {
         ThinPoolDevSave {
             data_block_size: self.thin_pool.data_block_size(),
             feature_args: Some(
-                self.thin_pool
-                    .table()
-                    .table
-                    .params
-                    .feature_args
+                thin_table::get_feature_args(self.thin_pool.table())
                     .iter()
                     .sorted()
                     .cloned()
@@ -2118,7 +2047,7 @@ fn setup_metadev(
         get_dm(),
         &dm_name,
         Some(&dm_uuid),
-        segs_to_table(device, &meta_segments),
+        linear_table::segs_to_table(device, &meta_segments),
     )?;
 
     if !device_exists(get_dm(), thinpool_name)? {
@@ -2149,7 +2078,7 @@ fn attempt_thin_repair(
         get_dm(),
         &dm_name,
         Some(&dm_uuid),
-        segs_to_table(device, spare_segments),
+        linear_table::segs_to_table(device, spare_segments),
     )?;
 
     thin_repair(&meta_dev.devnode(), &new_meta_dev.devnode())?;

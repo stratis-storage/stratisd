@@ -254,12 +254,7 @@ fn test_stratis_min_pool_start_invalid_unlock_method() {
         .arg("--name")
         .arg("pn")
         .arg("--unlock-method=bogus");
-    cmd.assert()
-        .failure()
-        .code(1)
-        .stderr(predicate::str::contains(
-            "bogus is an invalid unlock method",
-        ));
+    cmd.assert().failure().code(2);
 }
 
 #[test]

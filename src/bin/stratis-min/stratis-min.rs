@@ -9,11 +9,10 @@ use serde_json::{json, Map, Value};
 
 use stratisd::{
     engine::{
-        EncryptionInfo, KeyDescription, Name, PoolIdentifier, PoolUuid, UnlockMethod,
-        CLEVIS_TANG_TRUST_URL,
+        EncryptionInfo, KeyDescription, Name, PoolIdentifier, PoolUuid, CLEVIS_TANG_TRUST_URL,
     },
     jsonrpc::client::{filesystem, key, pool, report},
-    stratis::{StratisError, VERSION},
+    stratis::{UnlockMethod, VERSION},
 };
 
 fn parse_args() -> Command {
@@ -41,7 +40,12 @@ fn parse_args() -> Command {
                 Command::new("start")
                     .arg(Arg::new("id").required(true))
                     .arg(Arg::new("name").long("name").num_args(0))
-                    .arg(Arg::new("unlock_method").long("unlock-method").num_args(1))
+                    .arg(
+                        Arg::new("unlock_method")
+                            .long("unlock-method")
+                            .num_args(1)
+                            .value_parser(clap::value_parser!(UnlockMethod)),
+                    )
                     .arg(
                         Arg::new("prompt")
                             .long("prompt")
@@ -235,13 +239,7 @@ fn main() -> Result<(), String> {
                             .expect("required"),
                     )?)
                 };
-                let unlock_method =
-                    match args.get_one::<String>("unlock_method").map(|s| s.as_str()) {
-                        Some(um) => Some(UnlockMethod::try_from(um).map_err(|_| {
-                            StratisError::Msg(format!("{um} is an invalid unlock method"))
-                        })?),
-                        None => None,
-                    };
+                let unlock_method = args.get_one::<UnlockMethod>("unlock_method").copied();
                 let prompt = args.get_flag("prompt");
                 pool::pool_start(id, unlock_method, prompt)?;
                 Ok(())

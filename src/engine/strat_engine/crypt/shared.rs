@@ -221,7 +221,7 @@ pub fn clevis_info_from_metadata(
 ///        recursion_limit,
 ///        &|_obj| Ok(Vec::new()),
 ///        &|_| Ok(Vec::new()),
-///        &mut (&Vec::new(), &mut |mut acc, _premise| {
+///        &mut (Vec::new(), &mut |mut acc, _premise| {
 ///            acc.push(2);
 ///            Ok(acc)
 ///        }),
@@ -233,7 +233,7 @@ fn traverse_clevis_config<T>(
     recursion_limit: u64,
     tang_func: &dyn Fn(&Map<String, Value>) -> StratisResult<T>,
     tpm2_func: &dyn Fn(&Map<String, Value>) -> StratisResult<T>,
-    sss: &mut (&T, &mut dyn FnMut(T, T) -> StratisResult<T>),
+    sss: &mut (T, &mut dyn FnMut(T, T) -> StratisResult<T>),
 ) -> StratisResult<T>
 where
     T: Clone,
@@ -312,7 +312,7 @@ fn all_tang_configs_have_url_trust_info(
                 .unwrap_or(false))
         },
         &|_| Ok(true),
-        &mut (&true, &mut |acc, premise| Ok(acc && premise)),
+        &mut (true, &mut |acc, premise| Ok(acc && premise)),
     )
 }
 

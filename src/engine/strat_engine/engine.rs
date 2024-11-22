@@ -17,7 +17,7 @@ use tokio::{
     task::{spawn_blocking, JoinHandle},
 };
 
-use devicemapper::DmNameBuf;
+use devicemapper::{Bytes, DmNameBuf};
 
 use crate::{
     engine::{
@@ -494,9 +494,20 @@ impl Engine for StratEngine {
         name: &str,
         blockdev_paths: &[&Path],
         encryption_info: Option<&EncryptionInfo>,
+        journal_size: Option<Bytes>,
+        tag_size: Option<Bytes>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
         validate_name(name)?;
         let name = Name::new(name.to_owned());
+        let rounded_journal_size = match journal_size {
+            Some(b) => {
+                if b % 4096u64 != Bytes(0) {
+                    return Err(StratisError::Msg(format!("{b} is not a multiple of 4096")));
+                }
+                Some(b.sectors())
+            }
+            None => None,
+        };
 
         validate_paths(blockdev_paths)?;
 
@@ -558,6 +569,8 @@ impl Engine for StratEngine {
                         &cloned_name,
                         unowned_devices,
                         cloned_enc_info.as_ref(),
+                        rounded_journal_size,
+                        tag_size,
                     )
                 })??;
                 pools.insert(Name::new(name.to_string()), pool_uuid, AnyPool::V2(pool));
@@ -909,7 +922,7 @@ mod test {
         let engine = StratEngine::initialize().unwrap();
 
         let name1 = "name1";
-        let uuid1 = test_async!(engine.create_pool(name1, paths, None))
+        let uuid1 = test_async!(engine.create_pool(name1, paths, None, None, None))
             .unwrap()
             .changed()
             .unwrap();
@@ -1014,13 +1027,13 @@ mod test {
         let engine = StratEngine::initialize().unwrap();
 
         let name1 = "name1";
-        let uuid1 = test_async!(engine.create_pool(name1, paths1, None))
+        let uuid1 = test_async!(engine.create_pool(name1, paths1, None, None, None))
             .unwrap()
             .changed()
             .unwrap();
 
         let name2 = "name2";
-        let uuid2 = test_async!(engine.create_pool(name2, paths2, None))
+        let uuid2 = test_async!(engine.create_pool(name2, paths2, None, None, None))
             .unwrap()
             .changed()
             .unwrap();
@@ -1480,7 +1493,7 @@ mod test {
     fn test_start_stop(paths: &[&Path]) {
         let engine = StratEngine::initialize().unwrap();
         let name = "pool_name";
-        let uuid = test_async!(engine.create_pool(name, paths, None))
+        let uuid = test_async!(engine.create_pool(name, paths, None, None, None))
             .unwrap()
             .changed()
             .unwrap();

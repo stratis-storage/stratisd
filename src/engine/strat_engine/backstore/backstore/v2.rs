@@ -444,7 +444,6 @@ impl Backstore {
         let data_tier = DataTier::<StratBlockDev>::new(
             BlockDevMgr::<StratBlockDev>::initialize(pool_uuid, devices, mda_data_size)?,
             integrity_journal_size,
-            None,
             integrity_tag_size,
         );
 

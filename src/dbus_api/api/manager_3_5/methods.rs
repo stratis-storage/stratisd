@@ -65,6 +65,8 @@ pub fn create_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         name,
         &devs.map(Path::new).collect::<Vec<&Path>>(),
         EncryptionInfo::from_options((key_desc, clevis_info)).as_ref(),
+        None,
+        None,
     )));
     match create_result {
         Ok(pool_uuid_action) => match pool_uuid_action {

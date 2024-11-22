@@ -125,12 +125,11 @@ impl DataTier<v2::StratBlockDev> {
     pub fn new(
         mut block_mgr: BlockDevMgr<v2::StratBlockDev>,
         integrity_journal_size: Option<Sectors>,
-        integrity_block_size: Option<Bytes>,
         integrity_tag_size: Option<Bytes>,
     ) -> DataTier<v2::StratBlockDev> {
         let integrity_journal_size =
             integrity_journal_size.unwrap_or_else(|| DEFAULT_INTEGRITY_JOURNAL_SIZE.sectors());
-        let integrity_block_size = integrity_block_size.unwrap_or(DEFAULT_INTEGRITY_BLOCK_SIZE);
+        let integrity_block_size = DEFAULT_INTEGRITY_BLOCK_SIZE;
         let integrity_tag_size = integrity_tag_size.unwrap_or(DEFAULT_INTEGRITY_TAG_SIZE);
         for (_, bd) in block_mgr.blockdevs_mut() {
             // NOTE: over-allocates integrity metadata slightly. Some of the
@@ -484,7 +483,7 @@ mod tests {
             )
             .unwrap();
 
-            let mut data_tier = DataTier::<blockdev::v2::StratBlockDev>::new(mgr, None, None, None);
+            let mut data_tier = DataTier::<blockdev::v2::StratBlockDev>::new(mgr, None, None);
             data_tier.invariant();
 
             // A data_tier w/ some devices but nothing allocated

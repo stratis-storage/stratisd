@@ -152,7 +152,7 @@ pub fn get_base_tree<'a>(
         )
         .add(
             f.interface(consts::MANAGER_INTERFACE_NAME_3_8, ())
-                .add_m(manager_3_5::create_pool_method(&f))
+                .add_m(manager_3_8::create_pool_method(&f))
                 .add_m(manager_3_0::set_key_method(&f))
                 .add_m(manager_3_0::unset_key_method(&f))
                 .add_m(manager_3_0::list_keys_method(&f))

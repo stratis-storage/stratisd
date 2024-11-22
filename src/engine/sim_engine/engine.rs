@@ -14,6 +14,8 @@ use futures::executor::block_on;
 use serde_json::{json, Value};
 use tokio::sync::RwLock;
 
+use devicemapper::Bytes;
+
 use crate::{
     engine::{
         engine::{Engine, HandleEvents, KeyActions, Pool, Report},
@@ -129,6 +131,8 @@ impl Engine for SimEngine {
         name: &str,
         blockdev_paths: &[&Path],
         encryption_info: Option<&EncryptionInfo>,
+        _: Option<Bytes>,
+        _: Option<Bytes>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
         validate_name(name)?;
         let name = Name::new(name.to_owned());
@@ -440,6 +444,8 @@ mod tests {
             "name",
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
+            None,
+            None
         ))
         .unwrap()
         .changed()
@@ -451,10 +457,11 @@ mod tests {
     /// Destroying a pool with devices should succeed
     fn destroy_pool_w_devices() {
         let engine = SimEngine::default();
-        let uuid = test_async!(engine.create_pool("name", strs_to_paths!(["/s/d"]), None))
-            .unwrap()
-            .changed()
-            .unwrap();
+        let uuid =
+            test_async!(engine.create_pool("name", strs_to_paths!(["/s/d"]), None, None, None))
+                .unwrap()
+                .changed()
+                .unwrap();
         assert!(test_async!(engine.destroy_pool(uuid)).is_ok());
     }
 
@@ -463,10 +470,11 @@ mod tests {
     fn destroy_pool_w_filesystem() {
         let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = test_async!(engine.create_pool(pool_name, strs_to_paths!(["/s/d"]), None))
-            .unwrap()
-            .changed()
-            .unwrap();
+        let uuid =
+            test_async!(engine.create_pool(pool_name, strs_to_paths!(["/s/d"]), None, None, None))
+                .unwrap()
+                .changed()
+                .unwrap();
         {
             let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
             pool.create_filesystems(pool_name, uuid, &[("test", None, None)])
@@ -482,9 +490,9 @@ mod tests {
         let name = "name";
         let engine = SimEngine::default();
         let devices = strs_to_paths!(["/s/d"]);
-        test_async!(engine.create_pool(name, devices, None)).unwrap();
+        test_async!(engine.create_pool(name, devices, None, None, None)).unwrap();
         assert_matches!(
-            test_async!(engine.create_pool(name, devices, None)),
+            test_async!(engine.create_pool(name, devices, None, None, None)),
             Ok(CreateAction::Identity)
         );
     }
@@ -494,10 +502,12 @@ mod tests {
     fn create_pool_name_collision_different_args() {
         let name = "name";
         let engine = SimEngine::default();
-        test_async!(engine.create_pool(name, strs_to_paths!(["/s/d"]), None)).unwrap();
+        test_async!(engine.create_pool(name, strs_to_paths!(["/s/d"]), None, None, None)).unwrap();
         assert!(test_async!(engine.create_pool(
             name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
             None,
         ))
         .is_err());
@@ -509,7 +519,7 @@ mod tests {
         let path = "/s/d";
         let engine = SimEngine::default();
         assert_matches!(
-            test_async!(engine.create_pool("name", strs_to_paths!([path, path]), None))
+            test_async!(engine.create_pool("name", strs_to_paths!([path, path]), None, None, None))
                 .unwrap()
                 .changed()
                 .map(
@@ -541,6 +551,8 @@ mod tests {
             name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
+            None,
+            None,
         ))
         .unwrap()
         .changed()
@@ -558,6 +570,8 @@ mod tests {
         let uuid = test_async!(engine.create_pool(
             "old_name",
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
             None,
         ))
         .unwrap()
@@ -578,6 +592,8 @@ mod tests {
             "old_name",
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
+            None,
+            None,
         ))
         .unwrap()
         .changed()
@@ -585,6 +601,8 @@ mod tests {
         test_async!(engine.create_pool(
             new_name,
             strs_to_paths!(["/dev/four", "/dev/five", "/dev/six"]),
+            None,
+            None,
             None,
         ))
         .unwrap();
@@ -599,6 +617,8 @@ mod tests {
         test_async!(engine.create_pool(
             new_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
             None,
         ))
         .unwrap();

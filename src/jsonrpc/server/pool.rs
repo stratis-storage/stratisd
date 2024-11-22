@@ -45,7 +45,10 @@ pub async fn pool_create<'a>(
     enc_info: Option<&'a EncryptionInfo>,
 ) -> StratisResult<bool> {
     Ok(
-        match engine.create_pool(name, blockdev_paths, enc_info).await? {
+        match engine
+            .create_pool(name, blockdev_paths, enc_info, None, None)
+            .await?
+        {
             CreateAction::Created(_) => true,
             CreateAction::Identity => false,
         },

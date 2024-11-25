@@ -187,7 +187,7 @@ pub fn create_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         None => None,
     };
 
-    let journal_size = tuple_to_option(journal_size_tuple).map(|i| Bytes::from(i));
+    let journal_size = tuple_to_option(journal_size_tuple).map(Bytes::from);
     let tag_size = tuple_to_option(tag_size_tuple).map(Bytes::from);
 
     let dbus_context = m.tree.get_data();

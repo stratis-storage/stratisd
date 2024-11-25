@@ -84,6 +84,20 @@ pool is encrypted, setting this option has no effect on the prediction."),
                         .action(ArgAction::Append)
                         .help("Size of filesystem to be made for this pool. May be specified multiple times, one for each filesystem. Units are bytes. Must be at least 512 MiB and less than 4 PiB.")
                         .next_line_help(true)
+                     )
+                     .arg(
+                         Arg::new("integrity_tag_size")
+                         .long("integrity-tag-size")
+                         .num_args(1)
+                         .help("Size of the integrity checksums to be stored in the integrity metadata. The checksum size depends on the algorithm used for checksums. Units are bytes.")
+                         .next_line_help(true)
+                     )
+                     .arg(
+                         Arg::new("integrity_journal_size")
+                         .long("integrity-journal-size")
+                         .num_args(1)
+                         .help("Size of the integrity journal. Default is 128 MiB. Units are bytes.")
+                         .next_line_help(true)
                     ),
                 Command::new("filesystem")
                     .about("Predicts the space usage when creating a Stratis filesystem.")
@@ -129,6 +143,22 @@ impl<'a> UtilCommand<'a> for StratisPredictUsage {
                         szs.map(|sz| sz.parse::<u128>().map(Bytes))
                             .collect::<Result<Vec<_>, _>>()
                     })
+                    .transpose()?,
+                sub_m
+                    .get_one::<String>("integrity_journal_size")
+                    .map(|s| s.parse::<u64>().map(Bytes::from))
+                    .transpose()?
+                    .map(|b| {
+                        if b % 4096u64 != Bytes(0) {
+                            Err(format!("Value {b} is not aligned to 4096"))
+                        } else {
+                            Ok(b.sectors())
+                        }
+                    })
+                    .transpose()?,
+                sub_m
+                    .get_one::<String>("integrity_tag_size")
+                    .map(|s| s.parse::<u8>().map(Bytes::from))
                     .transpose()?,
                 LevelFilter::from_str(
                     matches

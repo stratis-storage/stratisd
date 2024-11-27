@@ -141,12 +141,7 @@ impl DataTier<v2::StratBlockDev> {
             .collect::<Vec<_>>();
         assert_eq!(bds.len(), uuids.len());
         for bd in bds {
-            bd.alloc_int_meta_back(integrity_meta_space(
-                // NOTE: Subtracting metadata size works here because the only metadata currently
-                // recorded in a newly created block device is the BDA. If this becomes untrue in
-                // the future, this code will no longer work.
-                bd.total_size().sectors() - bd.metadata_size(),
-            ));
+            bd.alloc_int_meta_back(integrity_meta_space(bd.total_size().sectors()));
         }
         Ok(uuids)
     }

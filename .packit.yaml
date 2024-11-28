@@ -30,21 +30,7 @@ jobs:
     - job: copr_build
       trigger: pull_request
       targets:
-          - fedora-development
-
-    - job: copr_build
-      trigger: pull_request
-      additional_repos:
-          - https://dl.fedoraproject.org/pub/fedora/linux/updates/testing/40/Everything/x86_64/
-      targets:
-          - fedora-40
-
-    - job: copr_build
-      trigger: pull_request
-      additional_repos:
-          - https://dl.fedoraproject.org/pub/fedora/linux/updates/testing/39/Everything/x86_64/
-      targets:
-          - fedora-39
+          - fedora-all
 
     - job: tests
       identifier: local

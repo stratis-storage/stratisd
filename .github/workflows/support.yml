@@ -39,6 +39,7 @@ jobs:
       matrix:
         include:
           - dependencies: >
+              bandit
               pylint
               python3-dbus-client-gen
               python3-dbus-python-client-gen

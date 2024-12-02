@@ -432,6 +432,7 @@ clippy: clippy-macros clippy-min clippy-udev-utils clippy-no-ipc clippy-utils cl
 ## Lint Python parts of the source code
 pylint:
 	pylint --disable=invalid-name ./src/bin/utils/stratis-decode-dm
+	bandit ./src/bin/utils/stratis-decode-dm --skip B101
 
 .PHONY:
 	audit

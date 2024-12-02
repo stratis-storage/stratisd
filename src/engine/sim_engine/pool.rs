@@ -136,7 +136,7 @@ impl SimPool {
 
 // Precondition: SimDev::into() always returns a value that matches Value::Object(_).
 // Precondition: SimFilesystem::into() always returns a value that matches Value::Object(_).
-impl<'a> Into<Value> for &'a SimPool {
+impl Into<Value> for &SimPool {
     fn into(self) -> Value {
         json!({
             "available_actions": ActionAvailability::Full.to_string(),

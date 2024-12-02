@@ -1923,7 +1923,7 @@ where
     }
 }
 
-impl<'a, B> Into<Value> for &'a ThinPool<B> {
+impl<B> Into<Value> for &ThinPool<B> {
     fn into(self) -> Value {
         json!({
             "filesystems": Value::Array(

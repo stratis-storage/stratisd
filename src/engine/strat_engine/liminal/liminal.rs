@@ -1183,7 +1183,7 @@ impl LiminalDevices {
     }
 }
 
-impl<'a> Into<Value> for &'a LiminalDevices {
+impl Into<Value> for &LiminalDevices {
     fn into(self) -> Value {
         json!({
             "stopped_pools": Value::Array(

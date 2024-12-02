@@ -51,7 +51,7 @@ impl Default for SimEngine {
     }
 }
 
-impl<'a> Into<Value> for &'a SimEngine {
+impl Into<Value> for &SimEngine {
     // Precondition: SimPool Into<Value> impl return value always pattern matches
     // Value::Object(_)
     fn into(self) -> Value {

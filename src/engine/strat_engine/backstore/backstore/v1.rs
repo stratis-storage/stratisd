@@ -944,7 +944,7 @@ impl Backstore {
     }
 }
 
-impl<'a> Into<Value> for &'a Backstore {
+impl Into<Value> for &Backstore {
     fn into(self) -> Value {
         json!({
             "blockdevs": {

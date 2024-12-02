@@ -360,7 +360,7 @@ impl StratEngine {
     }
 }
 
-impl<'a> Into<Value> for &'a StratEngine {
+impl Into<Value> for &StratEngine {
     // Precondition: (&StratPool).into() pattern matches Value::Object(_)
     // Precondition: (&LiminalDevices).into() pattern matches Value::Object(_)
     fn into(self) -> Value {

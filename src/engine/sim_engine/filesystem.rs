@@ -156,7 +156,7 @@ impl Filesystem for SimFilesystem {
     }
 }
 
-impl<'a> Into<Value> for &'a SimFilesystem {
+impl Into<Value> for &SimFilesystem {
     fn into(self) -> Value {
         let mut json = Map::new();
         json.insert("size".to_string(), Value::from(self.size().to_string()));

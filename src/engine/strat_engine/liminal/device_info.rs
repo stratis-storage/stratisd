@@ -68,7 +68,7 @@ impl From<LuksInfo> for LLuksInfo {
     }
 }
 
-impl<'a> Into<Value> for &'a LLuksInfo {
+impl Into<Value> for &LLuksInfo {
     // Precondition: (&StratisInfo).into() pattern matches Value::Object()
     // Precondition: (&EncryptionInfo).into() pattern matches Value::Object()
     fn into(self) -> Value {
@@ -236,7 +236,7 @@ impl From<StratisInfo> for LStratisInfo {
     }
 }
 
-impl<'a> Into<Value> for &'a LStratisInfo {
+impl Into<Value> for &LStratisInfo {
     // Precondition: (&StratisInfo).into() pattern matches Value::Object()
     // Precondition: (&LLuksInfo).into() pattern matches Value::Object()
     fn into(self) -> Value {
@@ -310,7 +310,7 @@ impl From<DeviceInfo> for LInfo {
     }
 }
 
-impl<'a> Into<Value> for &'a LInfo {
+impl Into<Value> for &LInfo {
     // Precondition: (&LStratisInfo).into() pattern matches Value::Object()
     // Precondition: (&LLuksInfo).into() pattern matches Value::Object()
     fn into(self) -> Value {
@@ -820,7 +820,7 @@ impl DeviceSet {
     }
 }
 
-impl<'a> Into<Value> for &'a DeviceSet {
+impl Into<Value> for &DeviceSet {
     fn into(self) -> Value {
         Value::Array(self.internal.values().map(|info| info.into()).collect())
     }
@@ -851,7 +851,7 @@ impl DeviceBag {
     }
 }
 
-impl<'a> Into<Value> for &'a DeviceBag {
+impl Into<Value> for &DeviceBag {
     fn into(self) -> Value {
         Value::Array(self.internal.iter().map(|info| info.into()).collect())
     }

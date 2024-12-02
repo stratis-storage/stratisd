@@ -71,7 +71,7 @@ pub struct StratisDevInfo {
     pub devnode: PathBuf,
 }
 
-impl<'a> Into<Value> for &'a StratisDevInfo {
+impl Into<Value> for &StratisDevInfo {
     // Precondition: (&StratisIdentifiers).into() pattern matches
     // Value::Object()
     fn into(self) -> Value {

@@ -87,7 +87,7 @@ impl SimDev {
     }
 }
 
-impl<'a> Into<Value> for &'a SimDev {
+impl Into<Value> for &SimDev {
     fn into(self) -> Value {
         let mut json = Map::new();
         json.insert(

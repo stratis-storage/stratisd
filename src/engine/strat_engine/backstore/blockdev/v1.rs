@@ -533,7 +533,7 @@ impl InternalBlockDev for StratBlockDev {
     }
 }
 
-impl<'a> Into<Value> for &'a StratBlockDev {
+impl Into<Value> for &StratBlockDev {
     fn into(self) -> Value {
         let mut json = json!({
             "path": self.underlying_device.physical_path(),
@@ -630,7 +630,7 @@ impl StateDiff for StratBlockDevState {
     }
 }
 
-impl<'a> DumpState<'a> for StratBlockDev {
+impl DumpState<'_> for StratBlockDev {
     type State = StratBlockDevState;
     type DumpInput = Sectors;
 

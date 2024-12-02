@@ -149,7 +149,7 @@ impl Hash for EncryptionInfo {
     }
 }
 
-impl<'a> Into<Value> for &'a EncryptionInfo {
+impl Into<Value> for &EncryptionInfo {
     fn into(self) -> Value {
         let mut json = Map::new();
         if let Some(kd) = self.key_description() {
@@ -369,7 +369,7 @@ impl TryFrom<String> for KeyDescription {
     }
 }
 
-impl<'a> TryFrom<&'a String> for KeyDescription {
+impl TryFrom<&String> for KeyDescription {
     type Error = StratisError;
 
     fn try_from(s: &String) -> StratisResult<KeyDescription> {

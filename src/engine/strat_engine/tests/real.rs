@@ -125,7 +125,7 @@ fn get_device_runs<'a>(
 
     let avail = matches.len();
     let needed = maybe_upper.unwrap_or(lower);
-    let must_generate = if avail > needed { 0 } else { needed - avail };
+    let must_generate = needed.saturating_sub(avail);
     let avail_specs = {
         let mut avail_specs = vec![];
         while avail_specs.len() < must_generate && (!too_large.is_empty() || !matches.is_empty()) {

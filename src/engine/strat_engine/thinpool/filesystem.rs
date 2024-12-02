@@ -545,7 +545,7 @@ impl StateDiff for StratFilesystemState {
         }
     }
 }
-impl<'a> DumpState<'a> for StratFilesystem {
+impl DumpState<'_> for StratFilesystem {
     type State = StratFilesystemState;
     type DumpInput = ();
 
@@ -582,7 +582,7 @@ pub fn fs_usage(mount_point: &Path) -> StratisResult<(Bytes, Bytes)> {
     ))
 }
 
-impl<'a> Into<Value> for &'a StratFilesystem {
+impl Into<Value> for &StratFilesystem {
     fn into(self) -> Value {
         let mut json = Map::new();
         json.insert(

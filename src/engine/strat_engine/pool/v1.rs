@@ -516,7 +516,7 @@ impl StratPool {
     }
 }
 
-impl<'a> Into<Value> for &'a StratPool {
+impl Into<Value> for &StratPool {
     // Precondition: (&ThinPool).into() pattern matches Value::Object(_)
     // Precondition: (&Backstore).into() pattern matches Value::Object(_)
     fn into(self) -> Value {
@@ -1319,7 +1319,7 @@ impl StateDiff for StratPoolState {
     }
 }
 
-impl<'a> DumpState<'a> for StratPool {
+impl DumpState<'_> for StratPool {
     type State = StratPoolState;
     type DumpInput = ();
 

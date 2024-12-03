@@ -20,8 +20,9 @@ if $(stratis-min pool is-stopped "$STRATIS_ROOTFS_UUID"); then
 		ATTEMPTS_REMAINING=3
 		if
 			! while [ $((ATTEMPTS_REMAINING--)) -gt 0 ]; do
-				systemd-ask-password --id="stratis:$STRATIS_ROOTFS_UUID" "Enter password for Stratis pool with UUID $STRATIS_ROOTFS_UUID containing root filesystem" |
-					stratis-min pool start --prompt --unlock-method=keyring "$STRATIS_ROOTFS_UUID" && break
+				PASSWORD=$(systemd-ask-password --id="stratis:$STRATIS_ROOTFS_UUID" "Enter password for Stratis pool with UUID $STRATIS_ROOTFS_UUID containing root filesystem")
+
+				echo -e "$PASSWORD\n$PASSWORD\n" | stratis-min pool start --prompt --unlock-method=keyring "$STRATIS_ROOTFS_UUID" && break
 			done
 		then
 			echo Failed to start pool with UUID $STRATIS_ROOTFS_UUID using a passphrase >&2

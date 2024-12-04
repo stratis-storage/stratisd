@@ -28,7 +28,8 @@ pub use self::{backstore::ProcessedPathInfos, pool::v1::StratPool};
 pub use self::{
     backstore::integrity_meta_space,
     crypt::{
-        crypt_metadata_size, register_clevis_token, set_up_crypt_logging, CLEVIS_TANG_TRUST_URL,
+        crypt_metadata_size, register_clevis_token, set_up_crypt_logging, CLEVIS_LUKS_TOKEN_ID,
+        CLEVIS_TANG_TRUST_URL, LUKS2_TOKEN_ID,
     },
     dm::{get_dm, get_dm_init},
     engine::StratEngine,

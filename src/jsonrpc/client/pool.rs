@@ -9,7 +9,10 @@ use nix::unistd::{pipe, write};
 use serde_json::Value;
 
 use crate::{
-    engine::{EncryptionInfo, KeyDescription, PoolIdentifier, PoolUuid, UnlockMethod},
+    engine::{
+        InputEncryptionInfo, KeyDescription, OptionalTokenSlotInput, PoolIdentifier, PoolUuid,
+        TokenUnlockMethod,
+    },
     jsonrpc::client::utils::{prompt_password, to_suffix_repr},
     print_table,
     stratis::{StratisError, StratisResult},
@@ -19,7 +22,7 @@ use crate::{
 pub fn pool_create(
     name: String,
     blockdevs: Vec<PathBuf>,
-    enc_info: Option<EncryptionInfo>,
+    enc_info: Option<InputEncryptionInfo>,
 ) -> StratisResult<()> {
     do_request_standard!(PoolCreate, name, blockdevs, enc_info)
 }
@@ -27,7 +30,7 @@ pub fn pool_create(
 // stratis-min pool start
 pub fn pool_start(
     id: PoolIdentifier<PoolUuid>,
-    unlock_method: Option<UnlockMethod>,
+    unlock_method: TokenUnlockMethod,
     prompt: bool,
 ) -> StratisResult<()> {
     if prompt {
@@ -161,46 +164,48 @@ pub fn pool_has_passphrase(id: PoolIdentifier<PoolUuid>) -> StratisResult<bool> 
     }
 }
 
-// stratis-min pool clevis-pin
-pub fn pool_clevis_pin(id: PoolIdentifier<PoolUuid>) -> StratisResult<String> {
-    let (clevis_pin, rc, rs) = do_request!(PoolClevisPin, id);
-    if rc != 0 {
-        Err(StratisError::Msg(rs))
-    } else {
-        Ok(clevis_pin.unwrap_or_else(|| "None".to_string()))
-    }
-}
-
 pub fn pool_bind_keyring(
     id: PoolIdentifier<PoolUuid>,
+    token_slot: OptionalTokenSlotInput,
     key_desc: KeyDescription,
 ) -> StratisResult<()> {
-    do_request_standard!(PoolBindKeyring, id, key_desc)
+    do_request_standard!(PoolBindKeyring, id, token_slot, key_desc)
 }
 
 pub fn pool_bind_clevis(
     id: PoolIdentifier<PoolUuid>,
+    token_slot: OptionalTokenSlotInput,
     pin: String,
     clevis_info: Value,
 ) -> StratisResult<()> {
-    do_request_standard!(PoolBindClevis, id, pin, clevis_info)
+    do_request_standard!(PoolBindClevis, id, token_slot, pin, clevis_info)
 }
 
-pub fn pool_unbind_keyring(id: PoolIdentifier<PoolUuid>) -> StratisResult<()> {
-    do_request_standard!(PoolUnbindKeyring, id)
+pub fn pool_unbind_keyring(
+    id: PoolIdentifier<PoolUuid>,
+    token_slot: Option<u32>,
+) -> StratisResult<()> {
+    do_request_standard!(PoolUnbindKeyring, id, token_slot)
 }
 
-pub fn pool_unbind_clevis(id: PoolIdentifier<PoolUuid>) -> StratisResult<()> {
-    do_request_standard!(PoolUnbindClevis, id)
+pub fn pool_unbind_clevis(
+    id: PoolIdentifier<PoolUuid>,
+    token_slot: Option<u32>,
+) -> StratisResult<()> {
+    do_request_standard!(PoolUnbindClevis, id, token_slot)
 }
 
 pub fn pool_rebind_keyring(
     id: PoolIdentifier<PoolUuid>,
+    token_slot: Option<u32>,
     key_desc: KeyDescription,
 ) -> StratisResult<()> {
-    do_request_standard!(PoolRebindKeyring, id, key_desc)
+    do_request_standard!(PoolRebindKeyring, id, token_slot, key_desc)
 }
 
-pub fn pool_rebind_clevis(id: PoolIdentifier<PoolUuid>) -> StratisResult<()> {
-    do_request_standard!(PoolRebindClevis, id)
+pub fn pool_rebind_clevis(
+    id: PoolIdentifier<PoolUuid>,
+    token_slot: Option<u32>,
+) -> StratisResult<()> {
+    do_request_standard!(PoolRebindClevis, id, token_slot)
 }

@@ -36,11 +36,12 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            Diff, EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
-            PoolEncryptionInfo, PoolUuid, PropChangeAction, RegenAction, RenameAction,
-            SetCreateAction, SetDeleteAction, SizedKeyMemory, StratFilesystemDiff, StratPoolDiff,
-            StratSigblockVersion, UnlockMethod,
+            Diff, FilesystemUuid, GrowAction, InputEncryptionInfo, Key, KeyDescription, Name,
+            OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolUuid, PropChangeAction,
+            RegenAction, RenameAction, SetCreateAction, SetDeleteAction, SizedKeyMemory,
+            StratFilesystemDiff, StratPoolDiff, StratSigblockVersion,
         },
+        TokenUnlockMethod,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -152,7 +153,7 @@ impl StratPool {
     pub fn initialize(
         name: &str,
         devices: UnownedDevices,
-        encryption_info: Option<&EncryptionInfo>,
+        encryption_info: Option<&InputEncryptionInfo>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = PoolUuid::new_v4();
 
@@ -225,7 +226,7 @@ impl StratPool {
         cachedevs: Vec<StratBlockDev>,
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
-        unlock_method: Option<UnlockMethod>,
+        token_slot: TokenUnlockMethod,
         passphrase: Option<SizedKeyMemory>,
     ) -> BDARecordResult<(Name, StratPool)> {
         if let Err(e) = check_metadata(metadata) {
@@ -233,13 +234,7 @@ impl StratPool {
         }
 
         let backstore = Backstore::setup(
-            uuid,
-            metadata,
-            datadevs,
-            cachedevs,
-            timestamp,
-            unlock_method,
-            passphrase,
+            uuid, metadata, datadevs, cachedevs, timestamp, token_slot, passphrase,
         )?;
         let action_avail = backstore.action_availability();
 
@@ -644,10 +639,11 @@ impl Pool for StratPool {
     #[pool_mutating_action("NoRequests")]
     fn bind_clevis(
         &mut self,
+        token_slot: OptionalTokenSlotInput,
         pin: &str,
         clevis_info: &Value,
     ) -> StratisResult<CreateAction<Clevis>> {
-        let changed = self.backstore.bind_clevis(pin, clevis_info)?;
+        let changed = self.backstore.bind_clevis(token_slot, pin, clevis_info)?;
         if changed {
             Ok(CreateAction::Created(Clevis))
         } else {
@@ -656,21 +652,12 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action("NoRequests")]
-    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>> {
-        let changed = self.backstore.unbind_clevis()?;
-        if changed {
-            Ok(DeleteAction::Deleted(Clevis))
-        } else {
-            Ok(DeleteAction::Identity)
-        }
-    }
-
-    #[pool_mutating_action("NoRequests")]
     fn bind_keyring(
         &mut self,
+        token_slot: OptionalTokenSlotInput,
         key_description: &KeyDescription,
     ) -> StratisResult<CreateAction<Key>> {
-        let changed = self.backstore.bind_keyring(key_description)?;
+        let changed = self.backstore.bind_keyring(token_slot, key_description)?;
         if changed {
             Ok(CreateAction::Created(Key))
         } else {
@@ -679,8 +666,28 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action("NoRequests")]
-    fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>> {
-        let changed = self.backstore.unbind_keyring()?;
+    fn rebind_keyring(
+        &mut self,
+        token_slot: Option<u32>,
+        new_key_desc: &KeyDescription,
+    ) -> StratisResult<RenameAction<Key>> {
+        match self.backstore.rebind_keyring(token_slot, new_key_desc)? {
+            Some(true) => Ok(RenameAction::Renamed(Key)),
+            Some(false) => Ok(RenameAction::Identity),
+            None => Ok(RenameAction::NoSource),
+        }
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn rebind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<RegenAction> {
+        self.backstore
+            .rebind_clevis(token_slot)
+            .map(|_| RegenAction)
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn unbind_keyring(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Key>> {
+        let changed = self.backstore.unbind_keyring(token_slot)?;
         if changed {
             Ok(DeleteAction::Deleted(Key))
         } else {
@@ -689,20 +696,13 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action("NoRequests")]
-    fn rebind_keyring(
-        &mut self,
-        new_key_desc: &KeyDescription,
-    ) -> StratisResult<RenameAction<Key>> {
-        match self.backstore.rebind_keyring(new_key_desc)? {
-            Some(true) => Ok(RenameAction::Renamed(Key)),
-            Some(false) => Ok(RenameAction::Identity),
-            None => Ok(RenameAction::NoSource),
+    fn unbind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Clevis>> {
+        let changed = self.backstore.unbind_clevis(token_slot)?;
+        if changed {
+            Ok(DeleteAction::Deleted(Clevis))
+        } else {
+            Ok(DeleteAction::Identity)
         }
-    }
-
-    #[pool_mutating_action("NoRequests")]
-    fn rebind_clevis(&mut self) -> StratisResult<RegenAction> {
-        self.backstore.rebind_clevis().map(|_| RegenAction)
     }
 
     #[pool_mutating_action("NoRequests")]

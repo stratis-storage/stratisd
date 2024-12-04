@@ -24,9 +24,9 @@ use crate::{
         structures::Table,
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
-            PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction, StratSigblockVersion,
+            EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name,
+            OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolUuid, RegenAction,
+            RenameAction, SetCreateAction, SetDeleteAction, StratSigblockVersion, UnlockMechanism,
         },
         PropChangeAction,
     },
@@ -92,28 +92,6 @@ impl SimPool {
         self.encryption_info
             .as_ref()
             .map(|p| PoolEncryptionInfo::from(once(p)))
-    }
-
-    fn add_clevis_info(&mut self, pin: &str, config: &Value) {
-        self.encryption_info = self
-            .encryption_info
-            .take()
-            .map(|ei| ei.set_clevis_info((pin.to_owned(), config.to_owned())));
-    }
-
-    fn clear_clevis_info(&mut self) {
-        self.encryption_info = self.encryption_info.take().map(|ei| ei.unset_clevis_info());
-    }
-
-    fn add_key_desc(&mut self, key_desc: &KeyDescription) {
-        self.encryption_info = self
-            .encryption_info
-            .take()
-            .map(|ei| ei.set_key_desc(key_desc.to_owned()));
-    }
-
-    fn clear_key_desc(&mut self) {
-        self.encryption_info = self.encryption_info.take().map(|ei| ei.unset_key_desc());
     }
 
     /// Check the limit of filesystems on a pool and return an error if it has been passed.
@@ -318,10 +296,11 @@ impl Pool for SimPool {
 
     fn bind_clevis(
         &mut self,
+        token_slot: OptionalTokenSlotInput,
         pin: &str,
         clevis_info: &Value,
     ) -> StratisResult<CreateAction<Clevis>> {
-        let encryption_info = match pool_enc_to_enc!(self.encryption_info()) {
+        let encryption_info = match self.encryption_info.as_mut() {
             Some(ei) => ei,
             None => {
                 return Err(StratisError::Msg(
@@ -330,24 +309,55 @@ impl Pool for SimPool {
             }
         };
 
-        let clevis_info_current = encryption_info.clevis_info();
-        if let Some((current_pin, current_info)) = clevis_info_current {
-            if (current_pin.as_str(), current_info) == (pin, clevis_info) {
-                Ok(CreateAction::Identity)
-            } else {
-                Err(StratisError::Msg(format!(
-                    "This pool is already bound with clevis pin {current_pin} and config {current_info};
-                        this differs from the requested pin {pin} and config {clevis_info}"
-                )))
+        let token_slot_to_add = match token_slot {
+            OptionalTokenSlotInput::Some(t) => {
+                if let Some(info) = encryption_info.get_info(t) {
+                    match info {
+                        UnlockMechanism::KeyDesc(_) => {
+                            return Err(StratisError::Msg(format!(
+                                "Key slot {t} is already in use by a key description"
+                            )));
+                        }
+                        &UnlockMechanism::ClevisInfo((ref current_pin, ref current_config)) => {
+                            if (current_pin.as_str(), current_config) != (pin, clevis_info) {
+                                return Err(StratisError::Msg(format!(
+                                    "Key slot {t} is already in use by Clevis info ({current_pin}, {current_config}); requested ({pin}, {clevis_info})"
+                                )));
+                            } else {
+                                return Ok(CreateAction::Identity);
+                            }
+                        }
+                    }
+                } else {
+                    t
+                }
             }
-        } else {
-            self.add_clevis_info(pin, clevis_info);
-            Ok(CreateAction::Created(Clevis))
-        }
+            OptionalTokenSlotInput::None => encryption_info.free_token_slot(),
+            OptionalTokenSlotInput::Legacy => match encryption_info.single_clevis_info() {
+                Some((_, (current_pin, current_config))) => {
+                    if (current_pin.as_str(), current_config) == (pin, clevis_info) {
+                        return Ok(CreateAction::Identity);
+                    } else {
+                        return Err(StratisError::Msg(format!("Attempted to bind to Clevis with ({pin}, {clevis_info}); already bound with ({current_pin}, {current_config})")));
+                    }
+                }
+                None => encryption_info.free_token_slot(),
+            },
+        };
+
+        encryption_info.add_info(
+            token_slot_to_add,
+            UnlockMechanism::ClevisInfo((pin.to_owned(), clevis_info.to_owned())),
+        )?;
+        Ok(CreateAction::Created(Clevis))
     }
 
-    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>> {
-        let encryption_info = match pool_enc_to_enc!(self.encryption_info()) {
+    fn bind_keyring(
+        &mut self,
+        token_slot: OptionalTokenSlotInput,
+        key_description: &KeyDescription,
+    ) -> StratisResult<CreateAction<Key>> {
+        let encryption_info = match self.encryption_info.as_mut() {
             Some(ei) => ei,
             None => {
                 return Err(StratisError::Msg(
@@ -356,27 +366,84 @@ impl Pool for SimPool {
             }
         };
 
-        if encryption_info.key_description().is_none() {
-            return Err(StratisError::Msg(
-                "This device is not bound to a keyring passphrase; refusing to remove \
-                the only unlocking method"
-                    .to_string(),
-            ));
-        }
+        let token_slot_to_add = match token_slot {
+            OptionalTokenSlotInput::Some(t) => {
+                if let Some(info) = encryption_info.get_info(t) {
+                    match info {
+                        UnlockMechanism::KeyDesc(ref key_desc) => {
+                            if key_description != key_desc {
+                                return Err(StratisError::Msg(format!(
+                                    "Key slot {t} is already in use by key description {}; requested {}",
+                                    key_desc.as_application_str(),
+                                    key_description.as_application_str(),
+                                )));
+                            } else {
+                                return Ok(CreateAction::Identity);
+                            }
+                        }
+                        UnlockMechanism::ClevisInfo(_) => {
+                            return Err(StratisError::Msg(format!(
+                                "Key slot {t} is already in use by a Clevis token"
+                            )));
+                        }
+                    }
+                } else {
+                    t
+                }
+            }
+            OptionalTokenSlotInput::None => encryption_info.free_token_slot(),
+            OptionalTokenSlotInput::Legacy => match encryption_info.single_key_description() {
+                Some((_, kd)) => {
+                    if kd == key_description {
+                        return Ok(CreateAction::Identity);
+                    } else {
+                        return Err(StratisError::Msg(format!(
+                            "Attempted to bind to key description with {}; already bound with {}",
+                            key_description.as_application_str(),
+                            kd.as_application_str(),
+                        )));
+                    }
+                }
+                None => encryption_info.free_token_slot(),
+            },
+        };
 
-        Ok(if encryption_info.clevis_info().is_some() {
-            self.clear_clevis_info();
-            DeleteAction::Deleted(Clevis)
+        encryption_info.add_info(
+            token_slot_to_add,
+            UnlockMechanism::KeyDesc(key_description.to_owned()),
+        )?;
+        Ok(CreateAction::Created(Key))
+    }
+
+    fn unbind_keyring(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Key>> {
+        let encryption_info = match self.encryption_info.as_mut() {
+            Some(ei) => ei,
+            None => {
+                return Err(StratisError::Msg(
+                    "Requested pool does not appear to be encrypted".to_string(),
+                ))
+            }
+        };
+
+        let t = token_slot
+            .ok_or_else(|| StratisError::Msg("Token slot required for V2 pools".to_string()))?;
+
+        if let Some(UnlockMechanism::ClevisInfo(_)) = encryption_info.get_info(t) {
+            return Err(StratisError::Msg(format!(
+                "Cannot unbind token slot {t} from keyring; bound to Clevis",
+            )));
+        };
+
+        let slot = encryption_info.remove(t);
+        Ok(if slot {
+            DeleteAction::Deleted(Key)
         } else {
             DeleteAction::Identity
         })
     }
 
-    fn bind_keyring(
-        &mut self,
-        key_description: &KeyDescription,
-    ) -> StratisResult<CreateAction<Key>> {
-        let encryption_info = match pool_enc_to_enc!(self.encryption_info()) {
+    fn unbind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Clevis>> {
+        let encryption_info = match self.encryption_info.as_mut() {
             Some(ei) => ei,
             None => {
                 return Err(StratisError::Msg(
@@ -385,44 +452,18 @@ impl Pool for SimPool {
             }
         };
 
-        if let Some(kd) = encryption_info.key_description() {
-            if key_description == kd {
-                Ok(CreateAction::Identity)
-            } else {
-                Err(StratisError::Msg(format!(
-                    "This pool is already bound with key description {};
-                        this differs from the requested key description {}",
-                    kd.as_application_str(),
-                    key_description.as_application_str(),
-                )))
-            }
-        } else {
-            self.add_key_desc(key_description);
-            Ok(CreateAction::Created(Key))
-        }
-    }
+        let t = token_slot
+            .ok_or_else(|| StratisError::Msg("Token slot required for V2 pools".to_string()))?;
 
-    fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>> {
-        let encryption_info = match pool_enc_to_enc!(self.encryption_info()) {
-            Some(ei) => ei,
-            None => {
-                return Err(StratisError::Msg(
-                    "Requested pool does not appear to be encrypted".to_string(),
-                ))
-            }
+        if let Some(UnlockMechanism::KeyDesc(_)) = encryption_info.get_info(t) {
+            return Err(StratisError::Msg(format!(
+                "Cannot unbind token slot {t} from Clevis; bound to keyring",
+            )));
         };
 
-        if encryption_info.clevis_info().is_none() {
-            return Err(StratisError::Msg(
-                "This device is not bound to Clevis; refusing to remove the only \
-                unlocking method"
-                    .to_string(),
-            ));
-        }
-
-        Ok(if encryption_info.key_description().is_some() {
-            self.clear_key_desc();
-            DeleteAction::Deleted(Key)
+        let slot = encryption_info.remove(t);
+        Ok(if slot {
+            DeleteAction::Deleted(Clevis)
         } else {
             DeleteAction::Identity
         })
@@ -430,9 +471,14 @@ impl Pool for SimPool {
 
     fn rebind_keyring(
         &mut self,
+        token_slot: Option<u32>,
         new_key_desc: &KeyDescription,
     ) -> StratisResult<RenameAction<Key>> {
-        let encryption_info = match pool_enc_to_enc!(self.encryption_info()) {
+        let token_slot = token_slot.ok_or_else(|| {
+            StratisError::Msg("Keyslot parameter required for V2 pools".to_string())
+        })?;
+
+        let encryption_info = match self.encryption_info.as_mut() {
             Some(ei) => ei,
             None => {
                 return Err(StratisError::Msg(
@@ -441,25 +487,35 @@ impl Pool for SimPool {
             }
         };
 
-        if encryption_info.key_description().is_none() {
-            return Err(StratisError::Msg(
-                "This device is not bound to a keyring passphrase; cannot change the passphrase"
-                    .to_string(),
-            ));
-        }
-
-        Ok(if encryption_info.key_description() != Some(new_key_desc) {
-            self.add_key_desc(new_key_desc);
-            RenameAction::Renamed(Key)
+        if let Some(info) = encryption_info.get_info(token_slot) {
+            match info {
+                UnlockMechanism::KeyDesc(ref key) => {
+                    if key != new_key_desc {
+                        encryption_info.set_info(token_slot, UnlockMechanism::KeyDesc(new_key_desc.to_owned()))?;
+                        Ok(RenameAction::Renamed(Key))
+                    } else {
+                        Ok(RenameAction::Identity)
+                    }
+                }
+                UnlockMechanism::ClevisInfo(_) => Err(StratisError::Msg(format!(
+                    "Cannot rebind slot {token_slot} with a key description; slot is bound to a Clevis config"
+                ))),
+            }
         } else {
-            RenameAction::Identity
-        })
+            Err(StratisError::Msg(format!(
+                "Cannot rebind empty slot {token_slot}"
+            )))
+        }
     }
 
     // The sim engine does not store token info so this method will always return
     // RenameAction::Identity.
-    fn rebind_clevis(&mut self) -> StratisResult<RegenAction> {
-        let encryption_info = match pool_enc_to_enc!(self.encryption_info()) {
+    fn rebind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<RegenAction> {
+        let token_slot = token_slot.ok_or_else(|| {
+            StratisError::Msg("Keyslot parameter required for V2 pools".to_string())
+        })?;
+
+        let encryption_info = match self.encryption_info.as_ref() {
             Some(ei) => ei,
             None => {
                 return Err(StratisError::Msg(
@@ -468,12 +524,17 @@ impl Pool for SimPool {
             }
         };
 
-        if encryption_info.clevis_info().is_none() {
-            Err(StratisError::Msg(
-                "This device is not bound to Clevis; cannot regenerate bindings".to_string(),
-            ))
+        if let Some(info) = encryption_info.get_info(token_slot) {
+            match info {
+                UnlockMechanism::KeyDesc(_) => Err(StratisError::Msg(format!(
+                    "Cannot rebind slot {token_slot} with a key description; slot is bound to a key config"
+                ))),
+                UnlockMechanism::ClevisInfo(_) => Ok(RegenAction),
+            }
         } else {
-            Ok(RegenAction)
+            Err(StratisError::Msg(format!(
+                "Cannot rebind empty slot {token_slot}"
+            )))
         }
     }
 

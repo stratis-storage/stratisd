@@ -29,6 +29,7 @@ use crate::{
             },
             liminal::DeviceSet,
             metadata::{MDADataSize, BDA},
+            pool::inspection,
             serde_structs::{FlexDevsSave, PoolFeatures, PoolSave, Recordable},
             shared::tiers_to_bdas,
             thinpool::{StratFilesystem, ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
@@ -229,6 +230,11 @@ impl StratPool {
         passphrase: Option<SizedKeyMemory>,
     ) -> BDARecordResult<(Name, StratPool)> {
         if let Err(e) = check_metadata(metadata) {
+            return Err((e, tiers_to_bdas(datadevs, cachedevs, None)));
+        }
+
+        // TEMPORARY
+        if let Err(e) = inspection::inspectors::check(metadata) {
             return Err((e, tiers_to_bdas(datadevs, cachedevs, None)));
         }
 

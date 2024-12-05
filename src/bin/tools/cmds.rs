@@ -2,6 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::path::PathBuf;
+
 use clap::{Arg, ArgAction, Command};
 
 use crate::tools::dump_metadata;
@@ -19,6 +21,7 @@ impl StratisDumpMetadata {
             .next_line_help(true)
             .arg(
                 Arg::new("dev")
+                    .value_parser(clap::value_parser!(PathBuf))
                     .required(true)
                     .help("Print metadata of given device"),
             )
@@ -49,8 +52,7 @@ impl<'a> ToolCommand<'a> for StratisDumpMetadata {
     fn run(&self, command_line_args: Vec<String>) -> Result<(), String> {
         let matches = StratisDumpMetadata::cmd().get_matches_from(command_line_args);
         let devpath = matches
-            .get_one::<String>("dev")
-            .map(|s| s.as_str())
+            .get_one::<PathBuf>("dev")
             .expect("'dev' is a mandatory argument");
 
         dump_metadata::run(

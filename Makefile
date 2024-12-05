@@ -262,6 +262,7 @@ install-binaries:
 
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratisd-tools
 	ln --force --verbose $(DESTDIR)$(BINDIR)/stratisd-tools $(DESTDIR)$(BINDIR)/stratis-dumpmetadata
+	ln --force --verbose $(DESTDIR)$(BINDIR)/stratisd-tools $(DESTDIR)$(BINDIR)/stratis-checkmetadata
 
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratis-utils
 	mv --force --verbose $(DESTDIR)$(BINDIR)/stratis-utils $(DESTDIR)$(BINDIR)/stratis-predict-usage

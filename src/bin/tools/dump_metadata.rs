@@ -5,6 +5,7 @@
 use std::{
     fs::OpenOptions,
     io::{Seek, SeekFrom},
+    path::PathBuf,
 };
 
 use pretty_hex::pretty_hex;
@@ -111,7 +112,7 @@ fn print_pool_metadata(pool_metadata: &Option<Vec<u8>>, only_pool: bool) -> Resu
 // Otherwise display the StaticHeader fields of both sigblocks.
 // If print_bytes flag is set to True, display the bytes buffer
 // of the sigblock alongside the StaticHeader.
-pub fn run(devpath: &str, print_bytes: bool, pool_only: bool) -> Result<(), String> {
+pub fn run(devpath: &PathBuf, print_bytes: bool, pool_only: bool) -> Result<(), String> {
     let mut devfile = OpenOptions::new()
         .read(true)
         .open(devpath)

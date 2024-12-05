@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use clap::{Arg, ArgAction, Command};
 
-use crate::tools::dump_metadata;
+use crate::tools::{check_metadata, dump_metadata};
 
 use stratisd::stratis::VERSION;
 
@@ -70,8 +70,47 @@ impl<'a> ToolCommand<'a> for StratisDumpMetadata {
     }
 }
 
+struct StratisCheckMetadata;
+
+impl StratisCheckMetadata {
+    fn cmd() -> Command {
+        Command::new("stratis-checkmetadata")
+            .next_line_help(true)
+            .arg(
+                Arg::new("file")
+                    .value_parser(clap::value_parser!(PathBuf))
+                    .required(true)
+                    .help("File containing pool-level metadata as JSON"),
+            )
+            .arg(
+                Arg::new("print")
+                    .long("print")
+                    .action(ArgAction::SetTrue)
+                    .num_args(0)
+                    .help("Print a representation of the metadata"),
+            )
+    }
+}
+
+impl<'a> ToolCommand<'a> for StratisCheckMetadata {
+    fn name(&self) -> &'a str {
+        "stratis-checkmetadata"
+    }
+
+    fn run(&self, command_line_args: Vec<String>) -> Result<(), String> {
+        let matches = StratisCheckMetadata::cmd().get_matches_from(command_line_args);
+        let infile = matches
+            .get_one::<PathBuf>("file")
+            .expect("'file' is a mandatory argument");
+
+        check_metadata::run(infile, matches.get_flag("print"))
+    }
+}
 pub fn cmds<'a>() -> Vec<Box<dyn ToolCommand<'a>>> {
-    vec![Box::new(StratisDumpMetadata)]
+    vec![
+        Box::new(StratisDumpMetadata),
+        Box::new(StratisCheckMetadata),
+    ]
 }
 
 #[cfg(test)]

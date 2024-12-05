@@ -10,9 +10,10 @@ pub use self::{
     shared::{total_allocated, total_used},
     sim_engine::SimEngine,
     strat_engine::{
-        crypt_metadata_size, get_dm, get_dm_init, integrity_meta_space, register_clevis_token,
-        set_up_crypt_logging, unshare_mount_namespace, StaticHeader, StaticHeaderResult,
-        StratEngine, StratKeyActions, ThinPoolSizeParams, BDA, CLEVIS_TANG_TRUST_URL,
+        crypt_metadata_size, get_dm, get_dm_init, integrity_meta_space, pool_inspection,
+        register_clevis_token, set_up_crypt_logging, unshare_mount_namespace, StaticHeader,
+        StaticHeaderResult, StratEngine, StratKeyActions, ThinPoolSizeParams, BDA,
+        CLEVIS_TANG_TRUST_URL,
     },
     structures::{AllLockReadGuard, ExclusiveGuard, SharedGuard, Table},
     types::{

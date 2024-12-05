@@ -138,6 +138,7 @@ jobs:
           dbus-python-client-gen
           psutil
           pyudev
+          tenacity
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
@@ -196,6 +197,7 @@ jobs:
           python3-dbus-python-client-gen
           python3-psutil
           python3-pyudev
+          python3-tenacity
           systemd-devel
           systemd-udev
           valgrind

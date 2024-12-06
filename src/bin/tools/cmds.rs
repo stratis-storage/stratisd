@@ -8,6 +8,8 @@ use clap::{Arg, ArgAction, Command};
 
 use crate::tools::dump_metadata;
 
+use stratisd::stratis::VERSION;
+
 pub trait ToolCommand<'a> {
     fn name(&self) -> &'a str;
     fn run(&self, command_line_args: Vec<String>) -> Result<(), String>;
@@ -18,6 +20,8 @@ struct StratisDumpMetadata;
 impl StratisDumpMetadata {
     fn cmd() -> Command {
         Command::new("stratis-dumpmetadata")
+            .version(VERSION)
+            .about("Reads Stratis metadata from a Stratis device and displays it")
             .next_line_help(true)
             .arg(
                 Arg::new("dev")

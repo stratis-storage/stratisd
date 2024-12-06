@@ -136,8 +136,8 @@ impl<'a> ToolCommand<'a> for StratisPrintMetadata {
 
 pub fn cmds<'a>() -> Vec<Box<dyn ToolCommand<'a>>> {
     vec![
-        Box::new(StratisDumpMetadata),
         Box::new(StratisCheckMetadata),
+        Box::new(StratisDumpMetadata),
         Box::new(StratisPrintMetadata),
     ]
 }

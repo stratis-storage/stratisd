@@ -22,6 +22,8 @@ use crate::{
     engine::{AllLockReadGuard, DevUuid, Engine, FilesystemUuid, Pool, PoolUuid, StratisUuid},
 };
 
+pub type EncryptionParams = (Option<(bool, String)>, Option<(bool, (String, String))>);
+
 pub fn get_managed_objects_method(
     f: &Factory<MTSync<TData>, TData>,
 ) -> Method<MTSync<TData>, TData> {

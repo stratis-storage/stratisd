@@ -11,6 +11,8 @@ use env_logger::Builder;
 
 use crate::tools::cmds;
 
+use stratisd::stratis::VERSION;
+
 fn basename(path: &str) -> Option<&Path> {
     Path::new(path).file_name().map(Path::new)
 }
@@ -42,6 +44,8 @@ fn main() {
         .unwrap_or(false)
     {
         let command = Command::new(executable_name)
+            .version(VERSION)
+            .about("Top-level command used to invoke one of a set of stratisd tools")
             .arg(
                 Arg::new("executable")
                     .required(true)

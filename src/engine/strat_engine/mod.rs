@@ -35,6 +35,7 @@ pub use self::{
     keys::StratKeyActions,
     metadata::{StaticHeader, StaticHeaderResult, BDA},
     ns::unshare_mount_namespace,
+    pool::inspection as pool_inspection,
     thinpool::ThinPoolSizeParams,
 };
 

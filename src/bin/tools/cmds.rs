@@ -145,10 +145,12 @@ pub fn cmds<'a>() -> Vec<Box<dyn ToolCommand<'a>>> {
 #[cfg(test)]
 mod tests {
 
-    use super::StratisDumpMetadata;
+    use super::{StratisDumpMetadata, StratisCheckMetadata, StratisPrintMetadata};
 
     #[test]
     fn test_dumpmetadata_parse_args() {
         StratisDumpMetadata::cmd().debug_assert();
+        StratisCheckMetadata::cmd().debug_assert();
+        StratisPrintMetadata::cmd().debug_assert();
     }
 }

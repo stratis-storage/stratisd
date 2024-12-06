@@ -6,10 +6,7 @@ use std::{cmp::max, collections::HashMap, fmt};
 
 use devicemapper::Sectors;
 
-use crate::{
-    engine::strat_engine::serde_structs::PoolSave,
-    stratis::{StratisError, StratisResult},
-};
+use crate::{engine::strat_engine::serde_structs::PoolSave, stratis::StratisResult};
 
 const SIZE_OF_CRYPT_METADATA_SECTORS: Sectors = Sectors(32768);
 
@@ -53,26 +50,24 @@ fn max_extent<U>(extents: &HashMap<Sectors, (U, Sectors)>, start_offset: Sectors
 }
 
 // Check whether any extents overlap with each other.
-fn check_overlap<U>(
-    extents: &HashMap<Sectors, (U, Sectors)>,
-    start_offset: Sectors,
-) -> StratisResult<()>
+fn check_overlap<U>(extents: &HashMap<Sectors, (U, Sectors)>, start_offset: Sectors) -> Vec<String>
 where
-    U: Copy,
+    U: Copy + fmt::Display,
 {
+    let mut errors = vec![];
     let mut current_offset = start_offset;
     let mut starts: Vec<&Sectors> = extents.keys().collect();
     starts.sort();
 
     for &start in starts {
-        let (_, length) = extents[&start];
+        let (used, length) = extents[&start];
         if start < current_offset {
-            return Err(StratisError::Msg("Place holder".into()));
+            errors.push(format!("allocation ({start}, {length}) for {used} overlaps with previous allocation which extends to {current_offset}"))
         }
         current_offset = start + length;
     }
 
-    Ok(())
+    errors
 }
 
 #[derive(strum_macros::Display)]
@@ -171,20 +166,22 @@ impl FlexDevice {
 
     // Verify that both thin meta devices, the one currently in use and the
     // spare, are the same size.
-    fn _check_thin_metas_equal(&self) -> StratisResult<()> {
+    fn _check_thin_metas_equal(&self) -> Vec<String> {
         let thin_meta_total = self.sum(Some(&[FlexDeviceUse::ThinMetaDev]));
         let thin_meta_spare_total = self.sum(Some(&[FlexDeviceUse::ThinMetaDevSpare]));
         if thin_meta_total == thin_meta_spare_total {
-            Ok(())
+            vec![]
         } else {
-            Err(StratisError::Msg("Place holder".into()))
+            vec![format!("The sum of the allocations for the thin meta device, {thin_meta_total}, does not equal the sum of the allocations for the thin meta spare device, {thin_meta_spare_total}.")]
         }
     }
 
     // Check some properties of the device.
-    fn check(&self) -> StratisResult<()> {
-        self._check_thin_metas_equal()
-            .and_then(|()| check_overlap(&self.extents, self.offset()))
+    fn check(&self) -> Vec<String> {
+        let mut errors = Vec::new();
+        errors.extend(self._check_thin_metas_equal());
+        errors.extend(check_overlap(&self.extents, self.offset()));
+        errors
     }
 }
 
@@ -225,10 +222,19 @@ fn flex_device(metadata: &PoolSave, encrypted: bool) -> FlexDevice {
 pub mod inspectors {
     use super::{flex_device, PoolSave, StratisResult};
 
+    use crate::stratis::StratisError;
+
     /// Check that the metadata is well-formed.
     pub fn check(metadata: &PoolSave) -> StratisResult<()> {
+        let mut errors = Vec::new();
         let flex_device = flex_device(metadata, false);
-        flex_device.check()
+        errors.extend(flex_device.check());
+
+        if !errors.is_empty() {
+            Err(StratisError::Msg(errors.join("\n")))
+        } else {
+            Ok(())
+        }
     }
 
     /// Print a human-useful representation of the metadata's meaning.

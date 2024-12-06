@@ -82,13 +82,6 @@ impl StratisCheckMetadata {
                     .required(true)
                     .help("File containing pool-level metadata as JSON"),
             )
-            .arg(
-                Arg::new("print")
-                    .long("print")
-                    .action(ArgAction::SetTrue)
-                    .num_args(0)
-                    .help("Print a representation of the metadata"),
-            )
     }
 }
 
@@ -103,13 +96,45 @@ impl<'a> ToolCommand<'a> for StratisCheckMetadata {
             .get_one::<PathBuf>("file")
             .expect("'file' is a mandatory argument");
 
-        check_metadata::run(infile, matches.get_flag("print"))
+        check_metadata::run(infile, false)
     }
 }
+
+struct StratisPrintMetadata;
+
+impl StratisPrintMetadata {
+    fn cmd() -> Command {
+        Command::new("stratis-printmetadata")
+            .next_line_help(true)
+            .arg(
+                Arg::new("file")
+                    .value_parser(clap::value_parser!(PathBuf))
+                    .required(true)
+                    .help("File containing pool-level metadata as JSON"),
+            )
+    }
+}
+
+impl<'a> ToolCommand<'a> for StratisPrintMetadata {
+    fn name(&self) -> &'a str {
+        "stratis-printmetadata"
+    }
+
+    fn run(&self, command_line_args: Vec<String>) -> Result<(), String> {
+        let matches = StratisPrintMetadata::cmd().get_matches_from(command_line_args);
+        let infile = matches
+            .get_one::<PathBuf>("file")
+            .expect("'file' is a mandatory argument");
+
+        check_metadata::run(infile, true)
+    }
+}
+
 pub fn cmds<'a>() -> Vec<Box<dyn ToolCommand<'a>>> {
     vec![
         Box::new(StratisDumpMetadata),
         Box::new(StratisCheckMetadata),
+        Box::new(StratisPrintMetadata),
     ]
 }
 

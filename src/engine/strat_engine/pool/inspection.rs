@@ -6,7 +6,10 @@ use std::{cmp::max, collections::HashMap, fmt};
 
 use devicemapper::Sectors;
 
-use crate::{engine::strat_engine::serde_structs::PoolSave, stratis::StratisResult};
+use crate::{
+    engine::strat_engine::serde_structs::PoolSave,
+    stratis::{StratisError, StratisResult},
+};
 
 const SIZE_OF_CRYPT_METADATA_SECTORS: Sectors = Sectors(32768);
 
@@ -100,9 +103,14 @@ impl FlexDevice {
         thin_meta_dev_spare: Option<&Vec<(Sectors, Sectors)>>,
         meta_dev: Option<&Vec<(Sectors, Sectors)>>,
         thin_data_dev: Option<&Vec<(Sectors, Sectors)>>,
-    ) {
+    ) -> StratisResult<()> {
         if let Some(extents) = thin_meta_dev {
             for (start, length) in extents.iter() {
+                if self.extents.contains_key(start) {
+                    return Err(StratisError::Msg(format!(
+                        "Key collision: {start} already in extents table"
+                    )));
+                }
                 self.extents
                     .insert(*start, (FlexDeviceUse::ThinMetaDev, *length));
             }
@@ -110,6 +118,11 @@ impl FlexDevice {
 
         if let Some(extents) = thin_meta_dev_spare {
             for (start, length) in extents.iter() {
+                if self.extents.contains_key(start) {
+                    return Err(StratisError::Msg(format!(
+                        "Key collision: {start} already in extents table"
+                    )));
+                }
                 self.extents
                     .insert(*start, (FlexDeviceUse::ThinMetaDevSpare, *length));
             }
@@ -117,6 +130,11 @@ impl FlexDevice {
 
         if let Some(extents) = meta_dev {
             for (start, length) in extents.iter() {
+                if self.extents.contains_key(start) {
+                    return Err(StratisError::Msg(format!(
+                        "Key collision: {start} already in extents table"
+                    )));
+                }
                 self.extents
                     .insert(*start, (FlexDeviceUse::MetaDev, *length));
             }
@@ -124,10 +142,17 @@ impl FlexDevice {
 
         if let Some(extents) = thin_data_dev {
             for (start, length) in extents.iter() {
+                if self.extents.contains_key(start) {
+                    return Err(StratisError::Msg(format!(
+                        "Key collision: {start} already in extents table"
+                    )));
+                }
                 self.extents
                     .insert(*start, (FlexDeviceUse::ThinDataDev, *length));
             }
         }
+
+        Ok(())
     }
 
     // Offset from start of devices where allocations from the device begin.
@@ -204,7 +229,7 @@ impl fmt::Display for FlexDevice {
 }
 
 // Calculate the flex device from the metadata.
-fn flex_device(metadata: &PoolSave, encrypted: bool) -> FlexDevice {
+fn flex_device(metadata: &PoolSave, encrypted: bool) -> StratisResult<FlexDevice> {
     let mut flex_device = FlexDevice::new(encrypted);
     let flex_device_metadata = &metadata.flex_devs;
 
@@ -213,9 +238,9 @@ fn flex_device(metadata: &PoolSave, encrypted: bool) -> FlexDevice {
         Some(&flex_device_metadata.thin_meta_dev_spare),
         Some(&flex_device_metadata.meta_dev),
         Some(&flex_device_metadata.thin_data_dev),
-    );
+    )?;
 
-    flex_device
+    Ok(flex_device)
 }
 
 /// Some ways of inspecting the pool-level metadata.
@@ -227,7 +252,7 @@ pub mod inspectors {
     /// Check that the metadata is well-formed.
     pub fn check(metadata: &PoolSave) -> StratisResult<()> {
         let mut errors = Vec::new();
-        let flex_device = flex_device(metadata, false);
+        let flex_device = flex_device(metadata, false)?;
         errors.extend(flex_device.check());
 
         if !errors.is_empty() {
@@ -238,8 +263,9 @@ pub mod inspectors {
     }
 
     /// Print a human-useful representation of the metadata's meaning.
-    pub fn print(metadata: &PoolSave) {
-        let flex_device = flex_device(metadata, false);
+    pub fn print(metadata: &PoolSave) -> StratisResult<()> {
+        let flex_device = flex_device(metadata, false)?;
         print!("{}", flex_device);
+        Ok(())
     }
 }

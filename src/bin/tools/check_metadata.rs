@@ -13,8 +13,7 @@ pub fn run(infile: &Path, print: bool) -> Result<(), String> {
         .map_err(|the_json_error| format!("Error parsing json into structs: {}", the_json_error))?;
 
     if print {
-        inspectors::print(&metadata);
-        Ok(())
+        inspectors::print(&metadata).map_err(|the_error| format!("Error: {}", the_error))
     } else {
         inspectors::check(&metadata).map_err(|the_error| format!("Error: {}", the_error))
     }

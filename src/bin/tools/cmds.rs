@@ -75,6 +75,8 @@ struct StratisCheckMetadata;
 impl StratisCheckMetadata {
     fn cmd() -> Command {
         Command::new("stratis-checkmetadata")
+            .version(VERSION)
+            .about("Check valididty of Stratis metadata")
             .next_line_help(true)
             .arg(
                 Arg::new("file")
@@ -105,6 +107,8 @@ struct StratisPrintMetadata;
 impl StratisPrintMetadata {
     fn cmd() -> Command {
         Command::new("stratis-printmetadata")
+            .version(VERSION)
+            .about("Print a human-suitable representation of Stratis metadata")
             .next_line_help(true)
             .arg(
                 Arg::new("file")

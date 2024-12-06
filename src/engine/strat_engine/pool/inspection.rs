@@ -76,6 +76,89 @@ where
 #[derive(strum_macros::Display)]
 #[strum(serialize_all = "snake_case")]
 #[derive(Clone, Copy, Eq, PartialEq)]
+enum CryptAllocsUse {
+    Metadata,
+}
+
+struct CryptAllocs {
+    extents: HashMap<Sectors, (CryptAllocsUse, Sectors)>,
+}
+
+impl CryptAllocs {
+    fn new() -> CryptAllocs {
+        CryptAllocs {
+            extents: HashMap::new(),
+        }
+    }
+
+    fn add(&mut self, allocs: Option<&Vec<(Sectors, Sectors)>>) -> StratisResult<()> {
+        if let Some(extents) = allocs {
+            for (start, length) in extents.iter() {
+                if self.extents.contains_key(start) {
+                    return Err(StratisError::Msg(format!(
+                        "Key collision: {start} already in extents table"
+                    )));
+                }
+                self.extents
+                    .insert(*start, (CryptAllocsUse::Metadata, *length));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn check(&self) -> Vec<String> {
+        let mut errors = vec![];
+
+        if self.extents.is_empty() {
+            errors.push("No allocations for crypt metadata".into());
+        }
+
+        if self.extents.len() > 1 {
+            errors.push("Multiple allocations for crypt metadata".into());
+        }
+
+        let (&start, &(_, length)) = self
+            .extents
+            .iter()
+            .collect::<Vec<_>>()
+            .pop()
+            .expect("Exactly one extents in the extent map");
+
+        if start != Sectors(0) {
+            errors.push(format!("Crypt meta allocs offset, {start} is not 0"));
+        }
+
+        if length != SIZE_OF_CRYPT_METADATA_SECTORS {
+            errors.push(format!(
+                "Crypt meta allocs entry has unexpected length {length}"
+            ));
+        }
+
+        errors
+    }
+}
+
+impl fmt::Display for CryptAllocs {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut starts: Vec<&Sectors> = self.extents.keys().collect();
+        starts.sort();
+        for (index, &&start) in starts.iter().enumerate() {
+            let (used, length) = self.extents[&start];
+            let end = start + length;
+            let (start, length, end) = (*start, *length, *end);
+            writeln!(
+                f,
+                "{index}: Use: {used:20} {start:12} + {length:12} = {end:12} sectors"
+            )?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(strum_macros::Display)]
+#[strum(serialize_all = "snake_case")]
+#[derive(Clone, Copy, Eq, PartialEq)]
 enum FlexDeviceUse {
     MetaDev,
     ThinDataDev,
@@ -228,6 +311,15 @@ impl fmt::Display for FlexDevice {
     }
 }
 
+fn crypt_allocs(metadata: &PoolSave) -> StratisResult<CryptAllocs> {
+    let mut crypt_allocs = CryptAllocs::new();
+    let crypt_metadata = &metadata.backstore.cap.crypt_meta_allocs;
+
+    crypt_allocs.add(Some(crypt_metadata))?;
+
+    Ok(crypt_allocs)
+}
+
 // Calculate the flex device from the metadata.
 fn flex_device(metadata: &PoolSave, encrypted: bool) -> StratisResult<FlexDevice> {
     let mut flex_device = FlexDevice::new(encrypted);
@@ -245,13 +337,16 @@ fn flex_device(metadata: &PoolSave, encrypted: bool) -> StratisResult<FlexDevice
 
 /// Some ways of inspecting the pool-level metadata.
 pub mod inspectors {
-    use super::{flex_device, PoolSave, StratisResult};
+    use super::{crypt_allocs, flex_device, PoolSave, StratisResult};
 
     use crate::stratis::StratisError;
 
     /// Check that the metadata is well-formed.
     pub fn check(metadata: &PoolSave) -> StratisResult<()> {
         let mut errors = Vec::new();
+        let crypt_allocs = crypt_allocs(metadata)?;
+        errors.extend(crypt_allocs.check());
+
         let flex_device = flex_device(metadata, false)?;
         errors.extend(flex_device.check());
 
@@ -264,7 +359,14 @@ pub mod inspectors {
 
     /// Print a human-useful representation of the metadata's meaning.
     pub fn print(metadata: &PoolSave) -> StratisResult<()> {
+        let crypt_allocs = crypt_allocs(metadata)?;
         let flex_device = flex_device(metadata, false)?;
+
+        println!("Allocations for crypt metadata:");
+        print!("{}", crypt_allocs);
+
+        println!();
+        println!("Allocations from flex device:");
         print!("{}", flex_device);
         Ok(())
     }

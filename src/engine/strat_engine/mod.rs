@@ -25,6 +25,9 @@ mod writing;
 #[cfg(feature = "test_extras")]
 pub use self::{backstore::ProcessedPathInfos, pool::v1::StratPool};
 
+#[cfg(feature = "extras")]
+pub use self::pool::inspection as pool_inspection;
+
 pub use self::{
     backstore::integrity_meta_space,
     crypt::{

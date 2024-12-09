@@ -3,6 +3,8 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 mod dispatch;
+#[cfg(feature = "extras")]
+pub mod inspection;
 pub mod v1;
 pub mod v2;
 

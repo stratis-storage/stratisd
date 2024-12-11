@@ -293,8 +293,8 @@ jobs:
         working-directory: ./testing
       - name: Switch
         run: |
-          git checkout -b mulkieran-use-stratisd-tools master
-          git pull https://github.com/mulkieran/testing.git use-stratisd-tools
+          git checkout -b mulkieran-smallify-test-devices master
+          git pull https://github.com/mulkieran/testing.git smallify-test-devices
         working-directory: ./testing
       - name: Run stratisd_cert.py
         run: >

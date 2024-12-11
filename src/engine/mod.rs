@@ -5,6 +5,9 @@
 #[cfg(feature = "test_extras")]
 pub use self::strat_engine::{ProcessedPathInfos, StratPool};
 
+#[cfg(feature = "extras")]
+pub use self::strat_engine::pool_inspection;
+
 pub use self::{
     engine::{BlockDev, Engine, Filesystem, KeyActions, Pool, Report},
     shared::{total_allocated, total_used},

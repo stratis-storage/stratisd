@@ -118,11 +118,6 @@ jobs:
         run: cp stratisd.conf /usr/share/dbus-1/system.d
       - name: Check out stratis-cli
         run: git clone https://github.com/stratis-storage/stratis-cli.git
-      - name: Switch
-        run: |
-          git checkout -b mulkieran-improve-metadata-testing master
-          git pull https://github.com/mulkieran/testing.git improve-metadata-testing
-        working-directory: ./stratis-cli
       - name: Run stratis-cli tests
         run: >
           RUST_LOG=stratisd=debug
@@ -298,8 +293,8 @@ jobs:
         working-directory: ./testing
       - name: Switch
         run: |
-          git checkout -b mulkieran-improve-metadata-testing master
-          git pull https://github.com/mulkieran/testing.git improve-metadata-testing
+          git checkout -b mulkieran-use-stratisd-tools master
+          git pull https://github.com/mulkieran/testing.git use-stratisd-tools
         working-directory: ./testing
       - name: Run stratisd_cert.py
         run: >

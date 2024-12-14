@@ -75,7 +75,7 @@ where
     for &start in starts {
         let (used, length) = extents[&start];
         if start > current_offset {
-            result.insert(start, (filler, start - current_offset));
+            result.insert(current_offset, (filler, start - current_offset));
         }
         result.insert(start, (used, length));
         current_offset = start + length;

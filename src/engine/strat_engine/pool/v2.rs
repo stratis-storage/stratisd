@@ -36,10 +36,10 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            Diff, EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
-            PoolEncryptionInfo, PoolUuid, PropChangeAction, RegenAction, RenameAction,
-            SetCreateAction, SetDeleteAction, SizedKeyMemory, StratFilesystemDiff, StratPoolDiff,
-            StratSigblockVersion, UnlockMethod,
+            Diff, EncryptionInfo, FilesystemUuid, GrowAction, IntegrityTagSpec, Key,
+            KeyDescription, Name, PoolDiff, PoolEncryptionInfo, PoolUuid, PropChangeAction,
+            RegenAction, RenameAction, SetCreateAction, SetDeleteAction, SizedKeyMemory,
+            StratFilesystemDiff, StratPoolDiff, StratSigblockVersion, UnlockMethod,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -154,7 +154,7 @@ impl StratPool {
         devices: UnownedDevices,
         encryption_info: Option<&EncryptionInfo>,
         journal_size: Option<Sectors>,
-        tag_size: Option<Bytes>,
+        tag_spec: Option<IntegrityTagSpec>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = PoolUuid::new_v4();
 
@@ -167,7 +167,7 @@ impl StratPool {
             MDADataSize::default(),
             encryption_info,
             journal_size,
-            tag_size,
+            tag_spec,
         )?;
 
         let thinpool = ThinPool::<Backstore>::new(

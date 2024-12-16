@@ -34,8 +34,8 @@ use crate::{
             types::BDAResult,
         },
         types::{
-            Compare, DevUuid, DevicePath, Diff, PoolUuid, StateDiff, StratBlockDevDiff,
-            StratSigblockVersion,
+            Compare, DevUuid, DevicePath, Diff, IntegrityTagSpec, PoolUuid, StateDiff,
+            StratBlockDevDiff, StratSigblockVersion,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -51,11 +51,14 @@ pub fn integrity_meta_space(
     total_space: Sectors,
     journal_size: Sectors,
     block_size: Bytes,
-    tag_size: Bytes,
+    tag_spec: IntegrityTagSpec,
 ) -> Sectors {
     Bytes(4096).sectors()
         + journal_size
-        + Bytes::from(((*total_space.bytes() / *block_size) * *tag_size + 4095) & !4095).sectors()
+        + Bytes::from(
+            (*((total_space.bytes() / block_size) * tag_spec.as_bytes_ceil()) + 4095) & !4095,
+        )
+        .sectors()
 }
 
 #[derive(Debug)]
@@ -221,7 +224,7 @@ impl StratBlockDev {
         &mut self,
         integrity_journal_size: Sectors,
         integrity_block_size: Bytes,
-        integrity_tag_size: Bytes,
+        integrity_tag_spec: IntegrityTagSpec,
     ) -> StratisResult<bool> {
         let size = BlockdevSize::new(Self::scan_blkdev_size(self.devnode())?);
         let metadata_size = self.bda.dev_size();
@@ -253,7 +256,7 @@ impl StratBlockDev {
                     size.sectors(),
                     integrity_journal_size,
                     integrity_block_size,
-                    integrity_tag_size,
+                    integrity_tag_spec,
                 ) - self
                     .integrity_meta_allocs
                     .iter()

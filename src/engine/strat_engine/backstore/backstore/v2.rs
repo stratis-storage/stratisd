@@ -11,9 +11,8 @@ use either::Either;
 use serde_json::Value;
 
 use devicemapper::{
-    Bytes, CacheDev, CacheDevTargetTable, CacheTargetParams, DevId, Device, DmDevice, DmFlags,
-    DmOptions, LinearDev, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine,
-    TargetTable,
+    CacheDev, CacheDevTargetTable, CacheTargetParams, DevId, Device, DmDevice, DmFlags, DmOptions,
+    LinearDev, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine, TargetTable,
 };
 
 use crate::{
@@ -34,8 +33,8 @@ use crate::{
             writing::wipe_sectors,
         },
         types::{
-            ActionAvailability, BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, PoolUuid,
-            SizedKeyMemory, UnlockMethod,
+            ActionAvailability, BlockDevTier, DevUuid, EncryptionInfo, IntegrityTagSpec,
+            KeyDescription, PoolUuid, SizedKeyMemory, UnlockMethod,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -439,12 +438,12 @@ impl Backstore {
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
         integrity_journal_size: Option<Sectors>,
-        integrity_tag_size: Option<Bytes>,
+        integrity_tag_spec: Option<IntegrityTagSpec>,
     ) -> StratisResult<Backstore> {
         let data_tier = DataTier::<StratBlockDev>::new(
             BlockDevMgr::<StratBlockDev>::initialize(pool_uuid, devices, mda_data_size)?,
             integrity_journal_size,
-            integrity_tag_size,
+            integrity_tag_spec,
         );
 
         let mut backstore = Backstore {

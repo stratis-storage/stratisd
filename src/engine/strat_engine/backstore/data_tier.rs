@@ -27,14 +27,14 @@ use crate::{
             },
             types::BDARecordResult,
         },
-        types::{BlockDevTier, DevUuid, Name, PoolUuid},
+        types::{BlockDevTier, DevUuid, IntegrityTagSpec, Name, PoolUuid},
     },
     stratis::StratisResult,
 };
 
 pub const DEFAULT_INTEGRITY_JOURNAL_SIZE: Bytes = Bytes(128 * IEC::Mi as u128);
 pub const DEFAULT_INTEGRITY_BLOCK_SIZE: Bytes = Bytes(4 * IEC::Ki as u128);
-pub const DEFAULT_INTEGRITY_TAG_SIZE: Bytes = Bytes(64u128);
+pub const DEFAULT_INTEGRITY_TAG_SPEC: IntegrityTagSpec = IntegrityTagSpec::B512;
 
 /// Handles the lowest level, base layer of this tier.
 #[derive(Debug)]
@@ -47,8 +47,8 @@ pub struct DataTier<B> {
     integrity_journal_size: Option<Sectors>,
     /// Integrity block size.
     integrity_block_size: Option<Bytes>,
-    /// Integrity tag size.
-    integrity_tag_size: Option<Bytes>,
+    /// Integrity tag spec.
+    integrity_tag_spec: Option<IntegrityTagSpec>,
 }
 
 impl DataTier<v1::StratBlockDev> {
@@ -64,7 +64,7 @@ impl DataTier<v1::StratBlockDev> {
             segments: AllocatedAbove { inner: vec![] },
             integrity_journal_size: None,
             integrity_block_size: None,
-            integrity_tag_size: None,
+            integrity_tag_spec: None,
         }
     }
 
@@ -125,12 +125,12 @@ impl DataTier<v2::StratBlockDev> {
     pub fn new(
         mut block_mgr: BlockDevMgr<v2::StratBlockDev>,
         integrity_journal_size: Option<Sectors>,
-        integrity_tag_size: Option<Bytes>,
+        integrity_tag_spec: Option<IntegrityTagSpec>,
     ) -> DataTier<v2::StratBlockDev> {
         let integrity_journal_size =
             integrity_journal_size.unwrap_or_else(|| DEFAULT_INTEGRITY_JOURNAL_SIZE.sectors());
         let integrity_block_size = DEFAULT_INTEGRITY_BLOCK_SIZE;
-        let integrity_tag_size = integrity_tag_size.unwrap_or(DEFAULT_INTEGRITY_TAG_SIZE);
+        let integrity_tag_spec = integrity_tag_spec.unwrap_or(DEFAULT_INTEGRITY_TAG_SPEC);
         for (_, bd) in block_mgr.blockdevs_mut() {
             // NOTE: over-allocates integrity metadata slightly. Some of the
             // total size of the device will not make use of the integrity
@@ -139,7 +139,7 @@ impl DataTier<v2::StratBlockDev> {
                 bd.total_size().sectors(),
                 integrity_journal_size,
                 integrity_block_size,
-                integrity_tag_size,
+                integrity_tag_spec,
             ));
         }
         DataTier {
@@ -147,7 +147,7 @@ impl DataTier<v2::StratBlockDev> {
             segments: AllocatedAbove { inner: vec![] },
             integrity_journal_size: Some(integrity_journal_size),
             integrity_block_size: Some(integrity_block_size),
-            integrity_tag_size: Some(integrity_tag_size),
+            integrity_tag_spec: Some(integrity_tag_spec),
         }
     }
 
@@ -178,7 +178,7 @@ impl DataTier<v2::StratBlockDev> {
                 bd.total_size().sectors(),
                 self.integrity_journal_size.expect("Must be some in V2"),
                 self.integrity_block_size.expect("Must be some in V2"),
-                self.integrity_tag_size.expect("Must be some in V2"),
+                self.integrity_tag_spec.expect("Must be some in V2"),
             ));
         }
         Ok(uuids)
@@ -218,7 +218,7 @@ impl DataTier<v2::StratBlockDev> {
             dev,
             self.integrity_journal_size.expect("Must be Some in V2"),
             self.integrity_block_size.expect("Must be Some in V2"),
-            self.integrity_tag_size.expect("Must be Some in V2"),
+            self.integrity_tag_spec.expect("Must be Some in V2"),
         )
     }
 }
@@ -251,7 +251,7 @@ where
             segments,
             integrity_journal_size: data_tier_save.integrity_journal_size,
             integrity_block_size: data_tier_save.integrity_block_size,
-            integrity_tag_size: data_tier_save.integrity_tag_size,
+            integrity_tag_spec: data_tier_save.integrity_tag_spec,
         })
     }
 
@@ -344,7 +344,7 @@ where
             },
             integrity_journal_size: self.integrity_journal_size,
             integrity_block_size: self.integrity_block_size,
-            integrity_tag_size: self.integrity_tag_size,
+            integrity_tag_spec: self.integrity_tag_spec,
         }
     }
 }

@@ -16,7 +16,7 @@ use serde::{Serialize, Serializer};
 
 use devicemapper::{Bytes, Sectors, ThinDevId};
 
-use crate::engine::types::{DevUuid, Features, FilesystemUuid};
+use crate::engine::types::{DevUuid, Features, FilesystemUuid, IntegrityTagSpec};
 
 const MAXIMUM_STRING_SIZE: usize = 255;
 
@@ -122,7 +122,7 @@ pub struct DataTierSave {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub integrity_block_size: Option<Bytes>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub integrity_tag_size: Option<Bytes>,
+    pub integrity_tag_spec: Option<IntegrityTagSpec>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]

@@ -14,8 +14,8 @@ use serde_json::{json, Value};
 use devicemapper::{Bytes, Sectors};
 
 use stratisd::engine::{
-    crypt_metadata_size, integrity_meta_space, ThinPoolSizeParams, BDA,
-    DEFAULT_INTEGRITY_BLOCK_SIZE, DEFAULT_INTEGRITY_TAG_SIZE,
+    crypt_metadata_size, integrity_meta_space, IntegrityTagSpec, ThinPoolSizeParams, BDA,
+    DEFAULT_INTEGRITY_BLOCK_SIZE,
 };
 
 // 2^FS_SIZE_START_POWER is the logical size of the smallest Stratis
@@ -167,7 +167,7 @@ pub fn predict_filesystem_usage(
 fn predict_pool_metadata_usage(
     device_sizes: Vec<Sectors>,
     journal_size: Sectors,
-    tag_size: Option<Bytes>,
+    tag_spec: IntegrityTagSpec,
 ) -> Result<Sectors, Box<dyn Error>> {
     let stratis_metadata_alloc = BDA::default().extended_size().sectors();
     let stratis_avail_sizes = device_sizes
@@ -175,12 +175,8 @@ fn predict_pool_metadata_usage(
         .map(|&s| {
             info!("Total size of device: {:}", s);
 
-            let integrity_deduction = integrity_meta_space(
-                s,
-                journal_size,
-                DEFAULT_INTEGRITY_BLOCK_SIZE,
-                tag_size.unwrap_or(DEFAULT_INTEGRITY_TAG_SIZE),
-            );
+            let integrity_deduction =
+                integrity_meta_space(s, journal_size, DEFAULT_INTEGRITY_BLOCK_SIZE, tag_spec);
             info!(
                 "Deduction for stratis metadata: {:}",
                 stratis_metadata_alloc
@@ -218,7 +214,7 @@ pub fn predict_pool_usage(
     device_sizes: Vec<Bytes>,
     filesystem_sizes: Option<Vec<Bytes>>,
     journal_size: Sectors,
-    tag_size: Option<Bytes>,
+    tag_spec: IntegrityTagSpec,
     log_level: LevelFilter,
 ) -> Result<(), Box<dyn Error>> {
     Builder::new().filter(None, log_level).init();
@@ -230,7 +226,7 @@ pub fn predict_pool_usage(
     let device_sizes = device_sizes.iter().map(|s| s.sectors()).collect::<Vec<_>>();
     let total_size: Sectors = device_sizes.iter().cloned().sum();
 
-    let non_metadata_size = predict_pool_metadata_usage(device_sizes, journal_size, tag_size)?;
+    let non_metadata_size = predict_pool_metadata_usage(device_sizes, journal_size, tag_spec)?;
 
     let size_params = ThinPoolSizeParams::new(non_metadata_size)?;
     let total_non_data = 2usize * size_params.meta_size() + size_params.mdv_size();

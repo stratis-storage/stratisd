@@ -16,8 +16,10 @@ use std::{
 use libudev::EventType;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use strum_macros::{self, EnumString, FromRepr, VariantNames};
+use strum_macros::{self, AsRefStr, EnumString, FromRepr, VariantNames};
 use uuid::Uuid;
+
+use devicemapper::Bytes;
 
 pub use crate::engine::{
     engine::StateDiff,
@@ -480,4 +482,42 @@ impl UuidOrConflict {
 pub enum StratSigblockVersion {
     V1 = 1,
     V2 = 2,
+}
+
+/// A way to specify an integrity tag size. It is possible for the specification
+/// to be non-numeric but translatable to some number of bits.
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    Serialize,
+    Deserialize,
+    VariantNames,
+    EnumString,
+    AsRefStr,
+)]
+pub enum IntegrityTagSpec {
+    #[strum(serialize = "0b")]
+    #[serde(rename = "0b")]
+    B0,
+    #[strum(serialize = "32b")]
+    #[serde(rename = "32b")]
+    B32,
+    #[strum(serialize = "512b")]
+    #[serde(rename = "512b")]
+    B512,
+}
+
+impl IntegrityTagSpec {
+    /// The smallest number of bytes containing the bits represented.
+    pub fn as_bytes_ceil(self) -> Bytes {
+        match self {
+            IntegrityTagSpec::B0 => Bytes(0),
+            IntegrityTagSpec::B32 => Bytes(4),
+            IntegrityTagSpec::B512 => Bytes(64),
+        }
+    }
 }

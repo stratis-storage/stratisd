@@ -27,9 +27,9 @@ use crate::{
         },
         types::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, Features, FilesystemUuid,
-            LockedPoolsInfo, Name, PoolDevice, PoolDiff, PoolIdentifier, PoolUuid, RenameAction,
-            ReportType, SetUnlockAction, StartAction, StopAction, StoppedPoolInfo,
-            StoppedPoolsInfo, StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
+            IntegrityTagSpec, LockedPoolsInfo, Name, PoolDevice, PoolDiff, PoolIdentifier,
+            PoolUuid, RenameAction, ReportType, SetUnlockAction, StartAction, StopAction,
+            StoppedPoolInfo, StoppedPoolsInfo, StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
         },
         StratSigblockVersion,
     },
@@ -132,7 +132,7 @@ impl Engine for SimEngine {
         blockdev_paths: &[&Path],
         encryption_info: Option<&EncryptionInfo>,
         _: Option<Bytes>,
-        _: Option<Bytes>,
+        _: Option<IntegrityTagSpec>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
         validate_name(name)?;
         let name = Name::new(name.to_owned());

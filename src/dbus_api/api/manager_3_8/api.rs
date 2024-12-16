@@ -60,13 +60,14 @@ pub fn create_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TD
         //
         // Rust representation: (bool, u64)
         .in_arg(("journal_size", "(bt)"))
-        // Optional tag size for integrity metadata reservation.
+        // Optional tag size or specification for integrity metadata
+        // reservation.
         // b: true if the size should be specified.
         //    false if the default should be used.
-        // i: Integer representing tag size in bytes.
+        // s: Tag size specification.
         //
-        // Rust representation: (bool, u8)
-        .in_arg(("tag_size", "(by)"))
+        // Rust representation: (bool, String)
+        .in_arg(("tag_spec", "(bs)"))
         // In order from left to right:
         // b: true if a pool was created and object paths were returned
         // o: Object path for Pool

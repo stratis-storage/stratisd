@@ -37,9 +37,10 @@ use crate::{
             SomeLockWriteGuard, Table,
         },
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockedPoolsInfo,
-            PoolDiff, PoolIdentifier, RenameAction, ReportType, SetUnlockAction, StartAction,
-            StopAction, StoppedPoolsInfo, StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
+            CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, IntegrityTagSpec,
+            LockedPoolsInfo, PoolDiff, PoolIdentifier, RenameAction, ReportType, SetUnlockAction,
+            StartAction, StopAction, StoppedPoolsInfo, StratFilesystemDiff, UdevEngineEvent,
+            UnlockMethod,
         },
         Engine, Name, Pool, PoolUuid, Report,
     },
@@ -495,7 +496,7 @@ impl Engine for StratEngine {
         blockdev_paths: &[&Path],
         encryption_info: Option<&EncryptionInfo>,
         journal_size: Option<Bytes>,
-        tag_size: Option<Bytes>,
+        tag_size: Option<IntegrityTagSpec>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
         validate_name(name)?;
         let name = Name::new(name.to_owned());

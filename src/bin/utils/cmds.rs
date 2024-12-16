@@ -8,15 +8,18 @@ use std::{
     str::FromStr,
 };
 
-use clap::{Arg, ArgAction, Command};
+use clap::{builder::PossibleValuesParser, Arg, ArgAction, Command};
 
 #[cfg(feature = "systemd_compat")]
 use clap::builder::Str;
 use log::LevelFilter;
+use strum::VariantNames;
 
 use devicemapper::Bytes;
 
-use stratisd::engine::DEFAULT_INTEGRITY_JOURNAL_SIZE;
+use stratisd::engine::{
+    IntegrityTagSpec, DEFAULT_INTEGRITY_JOURNAL_SIZE, DEFAULT_INTEGRITY_TAG_SPEC,
+};
 
 use crate::utils::predict_usage;
 
@@ -90,10 +93,12 @@ pool is encrypted, setting this option has no effect on the prediction."),
                         .next_line_help(true)
                      )
                      .arg(
-                         Arg::new("integrity_tag_size")
-                         .long("integrity-tag-size")
+                         Arg::new("integrity_tag_spec")
+                         .long("integrity-tag-spec")
                          .num_args(1)
-                         .help("Size of the integrity checksums to be stored in the integrity metadata. The checksum size depends on the algorithm used for checksums. Units are bytes.")
+                         .value_parser(PossibleValuesParser::new(IntegrityTagSpec::VARIANTS))
+                         .default_value(DEFAULT_INTEGRITY_TAG_SPEC.as_ref())
+                         .help("Integrity tag specification defining the size of the tag to store a checksum or other value for each block on a device.")
                          .next_line_help(true)
                      )
                      .arg(
@@ -157,9 +162,11 @@ impl<'a> UtilCommand<'a> for StratisPredictUsage {
                     .transpose()?
                     .expect("default specified by parser"),
                 sub_m
-                    .get_one::<String>("integrity_tag_size")
-                    .map(|s| s.parse::<u8>().map(Bytes::from))
-                    .transpose()?,
+                    .get_one::<String>("integrity_tag_spec")
+                    .map(|sz| {
+                        IntegrityTagSpec::try_from(sz.as_str()).expect("parser ensures valid value")
+                    })
+                    .expect("default specified by parser"),
                 LevelFilter::from_str(
                     matches
                         .get_one::<String>("log-level")

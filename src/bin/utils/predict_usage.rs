@@ -15,7 +15,7 @@ use devicemapper::{Bytes, Sectors};
 
 use stratisd::engine::{
     crypt_metadata_size, integrity_meta_space, ThinPoolSizeParams, BDA,
-    DEFAULT_INTEGRITY_BLOCK_SIZE, DEFAULT_INTEGRITY_JOURNAL_SIZE, DEFAULT_INTEGRITY_TAG_SIZE,
+    DEFAULT_INTEGRITY_BLOCK_SIZE, DEFAULT_INTEGRITY_TAG_SIZE,
 };
 
 // 2^FS_SIZE_START_POWER is the logical size of the smallest Stratis
@@ -166,7 +166,7 @@ pub fn predict_filesystem_usage(
 
 fn predict_pool_metadata_usage(
     device_sizes: Vec<Sectors>,
-    journal_size: Option<Sectors>,
+    journal_size: Sectors,
     tag_size: Option<Bytes>,
 ) -> Result<Sectors, Box<dyn Error>> {
     let stratis_metadata_alloc = BDA::default().extended_size().sectors();
@@ -177,7 +177,7 @@ fn predict_pool_metadata_usage(
 
             let integrity_deduction = integrity_meta_space(
                 s,
-                journal_size.unwrap_or(DEFAULT_INTEGRITY_JOURNAL_SIZE.sectors()),
+                journal_size,
                 DEFAULT_INTEGRITY_BLOCK_SIZE,
                 tag_size.unwrap_or(DEFAULT_INTEGRITY_TAG_SIZE),
             );
@@ -217,7 +217,7 @@ pub fn predict_pool_usage(
     overprovisioned: bool,
     device_sizes: Vec<Bytes>,
     filesystem_sizes: Option<Vec<Bytes>>,
-    journal_size: Option<Sectors>,
+    journal_size: Sectors,
     tag_size: Option<Bytes>,
     log_level: LevelFilter,
 ) -> Result<(), Box<dyn Error>> {

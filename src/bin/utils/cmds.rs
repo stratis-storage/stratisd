@@ -16,6 +16,8 @@ use log::LevelFilter;
 
 use devicemapper::Bytes;
 
+use stratisd::engine::DEFAULT_INTEGRITY_JOURNAL_SIZE;
+
 use crate::utils::predict_usage;
 
 #[cfg(feature = "systemd_compat")]
@@ -98,6 +100,8 @@ pool is encrypted, setting this option has no effect on the prediction."),
                          Arg::new("integrity_journal_size")
                          .long("integrity-journal-size")
                          .num_args(1)
+                         .value_parser(clap::value_parser!(u64))
+                         .default_value(Box::leak((*DEFAULT_INTEGRITY_JOURNAL_SIZE).to_string().into_boxed_str()) as &'static str)
                          .help("Size of the integrity journal. Default is 128 MiB. Units are bytes.")
                          .next_line_help(true)
                     ),
@@ -141,9 +145,8 @@ impl<'a> UtilCommand<'a> for StratisPredictUsage {
                     .get_many::<u128>("filesystem-size")
                     .map(|szs| szs.map(|n| Bytes(*n)).collect::<Vec<_>>()),
                 sub_m
-                    .get_one::<String>("integrity_journal_size")
-                    .map(|s| s.parse::<u64>().map(Bytes::from))
-                    .transpose()?
+                    .get_one::<u64>("integrity_journal_size")
+                    .map(|n| Bytes::from(*n))
                     .map(|b| {
                         if b % 4096u64 != Bytes(0) {
                             Err(format!("Value {b} is not aligned to 4096"))
@@ -151,7 +154,8 @@ impl<'a> UtilCommand<'a> for StratisPredictUsage {
                             Ok(b.sectors())
                         }
                     })
-                    .transpose()?,
+                    .transpose()?
+                    .expect("default specified by parser"),
                 sub_m
                     .get_one::<String>("integrity_tag_size")
                     .map(|s| s.parse::<u8>().map(Bytes::from))

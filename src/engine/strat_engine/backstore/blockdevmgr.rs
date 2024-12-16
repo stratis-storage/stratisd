@@ -29,7 +29,7 @@ use crate::{
             serde_structs::{BaseBlockDevSave, Recordable},
             shared::bds_to_bdas,
         },
-        types::{DevUuid, EncryptionInfo, Name, PoolEncryptionInfo, PoolUuid},
+        types::{DevUuid, EncryptionInfo, IntegrityTagSpec, Name, PoolEncryptionInfo, PoolUuid},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -248,7 +248,7 @@ impl BlockDevMgr<v2::StratBlockDev> {
         dev: DevUuid,
         integrity_journal_size: Sectors,
         integrity_block_size: Bytes,
-        integrity_tag_size: Bytes,
+        integrity_tag_spec: IntegrityTagSpec,
     ) -> StratisResult<bool> {
         let bd = self
             .block_devs
@@ -258,7 +258,7 @@ impl BlockDevMgr<v2::StratBlockDev> {
         bd.grow(
             integrity_journal_size,
             integrity_block_size,
-            integrity_tag_size,
+            integrity_tag_spec,
         )
     }
 

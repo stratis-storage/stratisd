@@ -36,10 +36,10 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            Diff, EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
-            PoolEncryptionInfo, PoolUuid, PropChangeAction, RegenAction, RenameAction,
-            SetCreateAction, SetDeleteAction, SizedKeyMemory, StratFilesystemDiff, StratPoolDiff,
-            StratSigblockVersion, UnlockMethod,
+            Diff, EncryptionInfo, FilesystemUuid, GrowAction, IntegrityTagSpec, Key,
+            KeyDescription, Name, PoolDiff, PoolEncryptionInfo, PoolUuid, PropChangeAction,
+            RegenAction, RenameAction, SetCreateAction, SetDeleteAction, SizedKeyMemory,
+            StratFilesystemDiff, StratPoolDiff, StratSigblockVersion, UnlockMethod,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -154,7 +154,7 @@ impl StratPool {
         devices: UnownedDevices,
         encryption_info: Option<&EncryptionInfo>,
         journal_size: Option<Sectors>,
-        tag_size: Option<Bytes>,
+        tag_size: Option<IntegrityTagSpec>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = PoolUuid::new_v4();
 

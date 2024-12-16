@@ -74,6 +74,7 @@ pool is encrypted, setting this option has no effect on the prediction."),
                             .num_args(1)
                             .action(ArgAction::Append)
                             .required(true)
+                            .value_parser(clap::value_parser!(u128))
                             .help("Size of device to be included in the pool. May be specified multiple times. Units are bytes.")
                             .next_line_help(true)
                     )
@@ -82,6 +83,7 @@ pool is encrypted, setting this option has no effect on the prediction."),
                         .long("filesystem-size")
                         .num_args(1)
                         .action(ArgAction::Append)
+                        .value_parser(clap::value_parser!(u128))
                         .help("Size of filesystem to be made for this pool. May be specified multiple times, one for each filesystem. Units are bytes. Must be at least 512 MiB and less than 4 PiB.")
                         .next_line_help(true)
                     ),
@@ -92,6 +94,7 @@ pool is encrypted, setting this option has no effect on the prediction."),
                         .long("filesystem-size")
                         .num_args(1)
                         .action(ArgAction::Append)
+                        .value_parser(clap::value_parser!(u128))
                         .required(true)
                         .help("Size of filesystem to be made for this pool. May be specified multiple times, one for each filesystem. Units are bytes. Must be at least 512 MiB and less than 4 PiB.")
                         .next_line_help(true)
@@ -117,19 +120,12 @@ impl<'a> UtilCommand<'a> for StratisPredictUsage {
             Some(("pool", sub_m)) => predict_usage::predict_pool_usage(
                 !sub_m.get_flag("no-overprovision"),
                 sub_m
-                    .get_many::<String>("device-size")
-                    .map(|szs| {
-                        szs.map(|sz| sz.parse::<u128>().map(Bytes))
-                            .collect::<Result<Vec<_>, _>>()
-                    })
-                    .expect("required argument")?,
+                    .get_many::<u128>("device-size")
+                    .map(|szs| szs.map(|n| Bytes(*n)).collect::<Vec<_>>())
+                    .expect("required argument"),
                 sub_m
-                    .get_many::<String>("filesystem-size")
-                    .map(|szs| {
-                        szs.map(|sz| sz.parse::<u128>().map(Bytes))
-                            .collect::<Result<Vec<_>, _>>()
-                    })
-                    .transpose()?,
+                    .get_many::<u128>("filesystem-size")
+                    .map(|szs| szs.map(|n| Bytes(*n)).collect::<Vec<_>>()),
                 LevelFilter::from_str(
                     matches
                         .get_one::<String>("log-level")
@@ -140,12 +136,9 @@ impl<'a> UtilCommand<'a> for StratisPredictUsage {
             Some(("filesystem", sub_m)) => predict_usage::predict_filesystem_usage(
                 !sub_m.get_flag("no-overprovision"),
                 sub_m
-                    .get_many::<String>("filesystem-size")
-                    .map(|szs| {
-                        szs.map(|sz| sz.parse::<u128>().map(Bytes))
-                            .collect::<Result<Vec<_>, _>>()
-                    })
-                    .expect("required argument")?,
+                    .get_many::<u128>("filesystem-size")
+                    .map(|szs| szs.map(|n| Bytes(*n)).collect::<Vec<_>>())
+                    .expect("required argument"),
                 LevelFilter::from_str(
                     matches
                         .get_one::<String>("log-level")

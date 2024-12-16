@@ -897,6 +897,8 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
+            None,
+            None,
         ))
         .unwrap()
         .changed()
@@ -916,6 +918,8 @@ mod tests {
         let uuid = test_async!(engine.create_pool(
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
             None,
         ))
         .unwrap()
@@ -944,6 +948,8 @@ mod tests {
         let uuid = test_async!(engine.create_pool(
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
             None,
         ))
         .unwrap()
@@ -976,6 +982,8 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
+            None,
+            None,
         ))
         .unwrap()
         .changed()
@@ -995,6 +1003,8 @@ mod tests {
         let uuid = test_async!(engine.create_pool(
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
             None,
         ))
         .unwrap()
@@ -1016,6 +1026,8 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
+            None,
+            None,
         ))
         .unwrap()
         .changed()
@@ -1035,6 +1047,8 @@ mod tests {
         let uuid = test_async!(engine.create_pool(
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
             None,
         ))
         .unwrap()
@@ -1064,6 +1078,8 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
+            None,
+            None,
         ))
         .unwrap()
         .changed()
@@ -1081,6 +1097,8 @@ mod tests {
         let uuid = test_async!(engine.create_pool(
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
             None,
         ))
         .unwrap()
@@ -1107,6 +1125,8 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
+            None,
+            None,
         ))
         .unwrap()
         .changed()
@@ -1129,6 +1149,8 @@ mod tests {
         let uuid = test_async!(engine.create_pool(
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
             None,
         ))
         .unwrap()
@@ -1156,6 +1178,8 @@ mod tests {
         let uuid = test_async!(engine.create_pool(
             "pool_name",
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
             None,
         ))
         .unwrap()

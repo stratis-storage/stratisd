@@ -36,10 +36,10 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            Diff, EncryptionInfo, FilesystemUuid, GrowAction, IntegrityTagSpec, Key,
-            KeyDescription, Name, PoolDiff, PoolEncryptionInfo, PoolUuid, PropChangeAction,
-            RegenAction, RenameAction, SetCreateAction, SetDeleteAction, SizedKeyMemory,
-            StratFilesystemDiff, StratPoolDiff, StratSigblockVersion, UnlockMethod,
+            Diff, EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
+            PoolEncryptionInfo, PoolUuid, PropChangeAction, RegenAction, RenameAction,
+            SetCreateAction, SetDeleteAction, SizedKeyMemory, StratFilesystemDiff, StratPoolDiff,
+            StratSigblockVersion, UnlockMethod, ValidatedIntegritySpec,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -153,8 +153,7 @@ impl StratPool {
         name: &str,
         devices: UnownedDevices,
         encryption_info: Option<&EncryptionInfo>,
-        journal_size: Option<Sectors>,
-        tag_spec: Option<IntegrityTagSpec>,
+        integrity_spec: ValidatedIntegritySpec,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = PoolUuid::new_v4();
 
@@ -166,8 +165,7 @@ impl StratPool {
             devices,
             MDADataSize::default(),
             encryption_info,
-            journal_size,
-            tag_spec,
+            integrity_spec,
         )?;
 
         let thinpool = ThinPool::<Backstore>::new(
@@ -1308,8 +1306,13 @@ mod tests {
         stratis_devices.error_on_not_empty().unwrap();
 
         let name = "stratis-test-pool";
-        let (uuid, mut pool) =
-            StratPool::initialize(name, unowned_devices2, None, None, None).unwrap();
+        let (uuid, mut pool) = StratPool::initialize(
+            name,
+            unowned_devices2,
+            None,
+            ValidatedIntegritySpec::default(),
+        )
+        .unwrap();
         invariant(&pool, name);
 
         let metadata1 = pool.record(name);
@@ -1397,8 +1400,13 @@ mod tests {
         stratis_devices.error_on_not_empty().unwrap();
 
         let name = "stratis-test-pool";
-        let (uuid, mut pool) =
-            StratPool::initialize(name, unowned_devices, None, None, None).unwrap();
+        let (uuid, mut pool) = StratPool::initialize(
+            name,
+            unowned_devices,
+            None,
+            ValidatedIntegritySpec::default(),
+        )
+        .unwrap();
         invariant(&pool, name);
 
         pool.init_cache(uuid, name, cache_path, true).unwrap();
@@ -1438,8 +1446,13 @@ mod tests {
         stratis_devices.error_on_not_empty().unwrap();
 
         let name = "stratis-test-pool";
-        let (pool_uuid, mut pool) =
-            StratPool::initialize(name, unowned_devices1, None, None, None).unwrap();
+        let (pool_uuid, mut pool) = StratPool::initialize(
+            name,
+            unowned_devices1,
+            None,
+            ValidatedIntegritySpec::default(),
+        )
+        .unwrap();
         invariant(&pool, name);
 
         let fs_name = "stratis_test_filesystem";
@@ -1523,8 +1536,13 @@ mod tests {
         let (stratis_devices, unowned_devices) = devices.unpack();
         stratis_devices.error_on_not_empty().unwrap();
 
-        let (uuid, mut pool) =
-            StratPool::initialize(name, unowned_devices, None, None, None).unwrap();
+        let (uuid, mut pool) = StratPool::initialize(
+            name,
+            unowned_devices,
+            None,
+            ValidatedIntegritySpec::default(),
+        )
+        .unwrap();
         invariant(&pool, name);
 
         assert_eq!(pool.action_avail, ActionAvailability::Full);
@@ -1540,7 +1558,13 @@ mod tests {
         let (stratis_devices, unowned_devices) = devices.unpack();
         stratis_devices.error_on_not_empty().unwrap();
 
-        let (_, mut pool) = StratPool::initialize(name, unowned_devices, None, None, None).unwrap();
+        let (_, mut pool) = StratPool::initialize(
+            name,
+            unowned_devices,
+            None,
+            ValidatedIntegritySpec::default(),
+        )
+        .unwrap();
         invariant(&pool, name);
 
         assert_eq!(pool.action_avail, ActionAvailability::Full);
@@ -1579,8 +1603,13 @@ mod tests {
         let (stratis_devices, unowned_devices) = devices.unpack();
         stratis_devices.error_on_not_empty().unwrap();
 
-        let (pool_uuid, mut pool) =
-            StratPool::initialize(pool_name, unowned_devices, None, None, None).unwrap();
+        let (pool_uuid, mut pool) = StratPool::initialize(
+            pool_name,
+            unowned_devices,
+            None,
+            ValidatedIntegritySpec::default(),
+        )
+        .unwrap();
 
         let (_, fs_uuid, _) = pool
             .create_filesystems(

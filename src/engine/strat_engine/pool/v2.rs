@@ -36,10 +36,10 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            Diff, EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
-            PoolEncryptionInfo, PoolUuid, PropChangeAction, RegenAction, RenameAction,
-            SetCreateAction, SetDeleteAction, SizedKeyMemory, StratFilesystemDiff, StratPoolDiff,
-            StratSigblockVersion, UnlockMethod,
+            Diff, EncryptionInfo, FilesystemUuid, GrowAction, IntegrityTagSpec, Key,
+            KeyDescription, Name, PoolDiff, PoolEncryptionInfo, PoolUuid, PropChangeAction,
+            RegenAction, RenameAction, SetCreateAction, SetDeleteAction, SizedKeyMemory,
+            StratFilesystemDiff, StratPoolDiff, StratSigblockVersion, UnlockMethod,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -153,14 +153,22 @@ impl StratPool {
         name: &str,
         devices: UnownedDevices,
         encryption_info: Option<&EncryptionInfo>,
+        journal_size: Option<Sectors>,
+        tag_spec: Option<IntegrityTagSpec>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = PoolUuid::new_v4();
 
         // FIXME: Initializing with the minimum MDA size is not necessarily
         // enough. If there are enough devices specified, more space will be
         // required.
-        let mut backstore =
-            Backstore::initialize(pool_uuid, devices, MDADataSize::default(), encryption_info)?;
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            devices,
+            MDADataSize::default(),
+            encryption_info,
+            journal_size,
+            tag_spec,
+        )?;
 
         let thinpool = ThinPool::<Backstore>::new(
             pool_uuid,
@@ -1257,7 +1265,7 @@ mod tests {
             tests::{loopbacked, real},
             thinpool::ThinPoolStatusDigest,
         },
-        types::{EngineAction, PoolIdentifier},
+        types::{EngineAction, IntegritySpec, PoolIdentifier},
         Engine, StratEngine,
     };
 
@@ -1300,7 +1308,8 @@ mod tests {
         stratis_devices.error_on_not_empty().unwrap();
 
         let name = "stratis-test-pool";
-        let (uuid, mut pool) = StratPool::initialize(name, unowned_devices2, None).unwrap();
+        let (uuid, mut pool) =
+            StratPool::initialize(name, unowned_devices2, None, None, None).unwrap();
         invariant(&pool, name);
 
         let metadata1 = pool.record(name);
@@ -1388,7 +1397,8 @@ mod tests {
         stratis_devices.error_on_not_empty().unwrap();
 
         let name = "stratis-test-pool";
-        let (uuid, mut pool) = StratPool::initialize(name, unowned_devices, None).unwrap();
+        let (uuid, mut pool) =
+            StratPool::initialize(name, unowned_devices, None, None, None).unwrap();
         invariant(&pool, name);
 
         pool.init_cache(uuid, name, cache_path, true).unwrap();
@@ -1428,7 +1438,8 @@ mod tests {
         stratis_devices.error_on_not_empty().unwrap();
 
         let name = "stratis-test-pool";
-        let (pool_uuid, mut pool) = StratPool::initialize(name, unowned_devices1, None).unwrap();
+        let (pool_uuid, mut pool) =
+            StratPool::initialize(name, unowned_devices1, None, None, None).unwrap();
         invariant(&pool, name);
 
         let fs_name = "stratis_test_filesystem";
@@ -1512,7 +1523,8 @@ mod tests {
         let (stratis_devices, unowned_devices) = devices.unpack();
         stratis_devices.error_on_not_empty().unwrap();
 
-        let (uuid, mut pool) = StratPool::initialize(name, unowned_devices, None).unwrap();
+        let (uuid, mut pool) =
+            StratPool::initialize(name, unowned_devices, None, None, None).unwrap();
         invariant(&pool, name);
 
         assert_eq!(pool.action_avail, ActionAvailability::Full);
@@ -1528,7 +1540,7 @@ mod tests {
         let (stratis_devices, unowned_devices) = devices.unpack();
         stratis_devices.error_on_not_empty().unwrap();
 
-        let (_, mut pool) = StratPool::initialize(name, unowned_devices, None).unwrap();
+        let (_, mut pool) = StratPool::initialize(name, unowned_devices, None, None, None).unwrap();
         invariant(&pool, name);
 
         assert_eq!(pool.action_avail, ActionAvailability::Full);
@@ -1568,7 +1580,7 @@ mod tests {
         stratis_devices.error_on_not_empty().unwrap();
 
         let (pool_uuid, mut pool) =
-            StratPool::initialize(pool_name, unowned_devices, None).unwrap();
+            StratPool::initialize(pool_name, unowned_devices, None, None, None).unwrap();
 
         let (_, fs_uuid, _) = pool
             .create_filesystems(
@@ -1678,10 +1690,11 @@ mod tests {
     fn test_grow_physical_pre_grow(paths: &[&Path]) {
         let pool_name = Name::new("pool".to_string());
         let engine = StratEngine::initialize().unwrap();
-        let pool_uuid = test_async!(engine.create_pool(&pool_name, paths, None))
-            .unwrap()
-            .changed()
-            .unwrap();
+        let pool_uuid =
+            test_async!(engine.create_pool(&pool_name, paths, None, IntegritySpec::default()))
+                .unwrap()
+                .changed()
+                .unwrap();
         let mut guard = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid))).unwrap();
         let (_, _, pool) = guard.as_mut_tuple();
 

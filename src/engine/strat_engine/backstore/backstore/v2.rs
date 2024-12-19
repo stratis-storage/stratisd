@@ -33,8 +33,8 @@ use crate::{
             writing::wipe_sectors,
         },
         types::{
-            ActionAvailability, BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, PoolUuid,
-            SizedKeyMemory, UnlockMethod,
+            ActionAvailability, BlockDevTier, DevUuid, EncryptionInfo, IntegrityTagSpec,
+            KeyDescription, PoolUuid, SizedKeyMemory, UnlockMethod,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -437,12 +437,14 @@ impl Backstore {
         devices: UnownedDevices,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
+        integrity_journal_size: Option<Sectors>,
+        integrity_tag_spec: Option<IntegrityTagSpec>,
     ) -> StratisResult<Backstore> {
-        let data_tier = DataTier::<StratBlockDev>::new(BlockDevMgr::<StratBlockDev>::initialize(
-            pool_uuid,
-            devices,
-            mda_data_size,
-        )?);
+        let data_tier = DataTier::<StratBlockDev>::new(
+            BlockDevMgr::<StratBlockDev>::initialize(pool_uuid, devices, mda_data_size)?,
+            integrity_journal_size,
+            integrity_tag_spec,
+        );
 
         let mut backstore = Backstore {
             data_tier,
@@ -1248,8 +1250,15 @@ mod tests {
         let initdatadevs = get_devices(initdatapaths).unwrap();
         let initcachedevs = get_devices(initcachepaths).unwrap();
 
-        let mut backstore =
-            Backstore::initialize(pool_uuid, initdatadevs, MDADataSize::default(), None).unwrap();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            initdatadevs,
+            MDADataSize::default(),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
 
         invariant(&backstore);
 
@@ -1340,8 +1349,15 @@ mod tests {
         let devices1 = get_devices(paths1).unwrap();
         let devices2 = get_devices(paths2).unwrap();
 
-        let mut backstore =
-            Backstore::initialize(pool_uuid, devices1, MDADataSize::default(), None).unwrap();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            devices1,
+            MDADataSize::default(),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
 
         for path in paths1 {
             assert_eq!(
@@ -1404,6 +1420,8 @@ mod tests {
                 "tang".to_string(),
                 json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
             ))),
+            None,
+            None,
         )
         .unwrap();
         backstore.alloc(pool_uuid, &[Sectors(512)]).unwrap();
@@ -1478,6 +1496,8 @@ mod tests {
                         json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
                     ),
                 )),
+                None,
+                None,
             ).unwrap();
             cmd::udev_settle().unwrap();
 

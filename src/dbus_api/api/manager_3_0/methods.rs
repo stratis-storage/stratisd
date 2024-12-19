@@ -13,6 +13,7 @@ use futures::executor::block_on;
 
 use crate::{
     dbus_api::{
+        api::shared::EncryptionParams,
         blockdev::create_dbus_blockdev,
         consts,
         filesystem::create_dbus_filesystem,
@@ -21,14 +22,12 @@ use crate::{
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
     engine::{
-        CreateAction, DeleteAction, EncryptionInfo, EngineAction, KeyDescription,
+        CreateAction, DeleteAction, EncryptionInfo, EngineAction, IntegritySpec, KeyDescription,
         MappingCreateAction, MappingDeleteAction, PoolIdentifier, PoolUuid, SetUnlockAction,
         UnlockMethod,
     },
     stratis::StratisError,
 };
-
-type EncryptionParams = (Option<(bool, String)>, Option<(bool, (String, String))>);
 
 pub fn destroy_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
@@ -329,6 +328,7 @@ pub fn create_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         name,
         &devs.map(Path::new).collect::<Vec<&Path>>(),
         EncryptionInfo::from_options((key_desc, clevis_info)).as_ref(),
+        IntegritySpec::default(),
     )));
     match create_result {
         Ok(pool_uuid_action) => match pool_uuid_action {

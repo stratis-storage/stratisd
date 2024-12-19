@@ -34,8 +34,8 @@ use crate::{
             types::BDAResult,
         },
         types::{
-            Compare, DevUuid, DevicePath, Diff, IntegrityTagSpec, PoolUuid, StateDiff,
-            StratBlockDevDiff, StratSigblockVersion,
+            Compare, DevUuid, DevicePath, Diff, PoolUuid, StateDiff, StratBlockDevDiff,
+            StratSigblockVersion, ValidatedIntegritySpec,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -49,14 +49,15 @@ use crate::{
 /// The result is divisible by 8 sectors.
 pub fn integrity_meta_space(
     total_space: Sectors,
-    journal_size: Sectors,
-    block_size: Bytes,
-    tag_spec: IntegrityTagSpec,
+    integrity_spec: ValidatedIntegritySpec,
 ) -> Sectors {
     Bytes(4096).sectors()
-        + journal_size
+        + integrity_spec.journal_size
         + Bytes::from(
-            (*((total_space.bytes() / block_size) * tag_spec.as_bytes_ceil()) + 4095) & !4095,
+            (*((total_space.bytes() / integrity_spec.block_size)
+                * integrity_spec.tag_spec.as_bytes_ceil())
+                + 4095)
+                & !4095,
         )
         .sectors()
 }
@@ -220,12 +221,7 @@ impl StratBlockDev {
     ///
     /// This will also extend integrity metadata reservations according to the new
     /// size of the device.
-    pub fn grow(
-        &mut self,
-        integrity_journal_size: Sectors,
-        integrity_block_size: Bytes,
-        integrity_tag_spec: IntegrityTagSpec,
-    ) -> StratisResult<bool> {
+    pub fn grow(&mut self, integrity_spec: ValidatedIntegritySpec) -> StratisResult<bool> {
         let size = BlockdevSize::new(Self::scan_blkdev_size(self.devnode())?);
         let metadata_size = self.bda.dev_size();
         match size.cmp(&metadata_size) {
@@ -252,16 +248,12 @@ impl StratBlockDev {
                 self.bda.header = h;
                 self.used.increase_size(size.sectors());
 
-                let integrity_grow = integrity_meta_space(
-                    size.sectors(),
-                    integrity_journal_size,
-                    integrity_block_size,
-                    integrity_tag_spec,
-                ) - self
-                    .integrity_meta_allocs
-                    .iter()
-                    .map(|(_, len)| *len)
-                    .sum::<Sectors>();
+                let integrity_grow = integrity_meta_space(size.sectors(), integrity_spec)
+                    - self
+                        .integrity_meta_allocs
+                        .iter()
+                        .map(|(_, len)| *len)
+                        .sum::<Sectors>();
                 self.alloc_int_meta_back(integrity_grow);
 
                 Ok(true)

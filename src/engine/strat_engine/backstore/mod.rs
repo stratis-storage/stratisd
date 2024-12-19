@@ -14,9 +14,6 @@ mod shared;
 
 pub use self::{
     blockdev::v2::integrity_meta_space,
-    data_tier::{
-        DEFAULT_INTEGRITY_BLOCK_SIZE, DEFAULT_INTEGRITY_JOURNAL_SIZE, DEFAULT_INTEGRITY_TAG_SPEC,
-    },
     devices::{find_stratis_devs_by_uuid, get_devno_from_path, ProcessedPathInfos, UnownedDevices},
 };
 

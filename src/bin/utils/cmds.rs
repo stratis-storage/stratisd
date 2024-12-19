@@ -18,7 +18,8 @@ use strum::VariantNames;
 use devicemapper::Bytes;
 
 use stratisd::engine::{
-    IntegrityTagSpec, DEFAULT_INTEGRITY_JOURNAL_SIZE, DEFAULT_INTEGRITY_TAG_SPEC,
+    IntegritySpec, IntegrityTagSpec, ValidatedIntegritySpec, DEFAULT_INTEGRITY_JOURNAL_SIZE,
+    DEFAULT_INTEGRITY_TAG_SPEC,
 };
 
 use crate::utils::predict_usage;
@@ -149,24 +150,23 @@ impl<'a> UtilCommand<'a> for StratisPredictUsage {
                 sub_m
                     .get_many::<u128>("filesystem-size")
                     .map(|szs| szs.map(|n| Bytes(*n)).collect::<Vec<_>>()),
-                sub_m
-                    .get_one::<u64>("integrity_journal_size")
-                    .map(|n| Bytes::from(*n))
-                    .map(|b| {
-                        if b % 4096u64 != Bytes(0) {
-                            Err(format!("Value {b} is not aligned to 4096"))
-                        } else {
-                            Ok(b.sectors())
-                        }
-                    })
-                    .transpose()?
-                    .expect("default specified by parser"),
-                sub_m
-                    .get_one::<String>("integrity_tag_spec")
-                    .map(|sz| {
-                        IntegrityTagSpec::try_from(sz.as_str()).expect("parser ensures valid value")
-                    })
-                    .expect("default specified by parser"),
+                ValidatedIntegritySpec::try_from(IntegritySpec {
+                    journal_size: Some(
+                        sub_m
+                            .get_one::<u64>("integrity_journal_size")
+                            .map(|n| Bytes::from(*n))
+                            .expect("default specified by parser"),
+                    ),
+                    tag_spec: Some(
+                        sub_m
+                            .get_one::<String>("integrity_tag_spec")
+                            .map(|sz| {
+                                IntegrityTagSpec::try_from(sz.as_str())
+                                    .expect("parser ensures valid value")
+                            })
+                            .expect("default specified by parser"),
+                    ),
+                })?,
                 LevelFilter::from_str(
                     matches
                         .get_one::<String>("log-level")

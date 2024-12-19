@@ -16,7 +16,6 @@ pub use self::{
         crypt_metadata_size, get_dm, get_dm_init, integrity_meta_space, register_clevis_token,
         set_up_crypt_logging, unshare_mount_namespace, StaticHeader, StaticHeaderResult,
         StratEngine, StratKeyActions, ThinPoolSizeParams, BDA, CLEVIS_TANG_TRUST_URL,
-        DEFAULT_INTEGRITY_BLOCK_SIZE, DEFAULT_INTEGRITY_JOURNAL_SIZE, DEFAULT_INTEGRITY_TAG_SPEC,
     },
     structures::{AllLockReadGuard, ExclusiveGuard, SharedGuard, Table},
     types::{
@@ -27,7 +26,8 @@ pub use self::{
         PoolUuid, PropChangeAction, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
         SetUnlockAction, StartAction, StopAction, StoppedPoolInfo, StoppedPoolsInfo,
         StratBlockDevDiff, StratFilesystemDiff, StratPoolDiff, StratSigblockVersion, StratisUuid,
-        ThinPoolDiff, ToDisplay, UdevEngineEvent, UnlockMethod,
+        ThinPoolDiff, ToDisplay, UdevEngineEvent, UnlockMethod, ValidatedIntegritySpec,
+        DEFAULT_INTEGRITY_JOURNAL_SIZE, DEFAULT_INTEGRITY_TAG_SPEC,
     },
 };
 

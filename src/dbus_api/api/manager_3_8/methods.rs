@@ -23,8 +23,8 @@ use crate::{
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
     engine::{
-        CreateAction, EncryptionInfo, IntegrityTagSpec, KeyDescription, Name, PoolIdentifier,
-        PoolUuid, StartAction, UnlockMethod,
+        CreateAction, EncryptionInfo, IntegritySpec, IntegrityTagSpec, KeyDescription, Name,
+        PoolIdentifier, PoolUuid, StartAction, UnlockMethod,
     },
     stratis::StratisError,
 };
@@ -206,8 +206,10 @@ pub fn create_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         name,
         &devs.map(Path::new).collect::<Vec<&Path>>(),
         EncryptionInfo::from_options((key_desc, clevis_info)).as_ref(),
-        journal_size,
-        tag_spec,
+        IntegritySpec {
+            journal_size,
+            tag_spec
+        },
     )));
     match create_result {
         Ok(pool_uuid_action) => match pool_uuid_action {

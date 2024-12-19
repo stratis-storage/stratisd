@@ -521,3 +521,9 @@ impl IntegrityTagSpec {
         }
     }
 }
+
+#[derive(Default)]
+pub struct IntegritySpec {
+    pub tag_spec: Option<IntegrityTagSpec>,
+    pub journal_size: Option<Bytes>,
+}

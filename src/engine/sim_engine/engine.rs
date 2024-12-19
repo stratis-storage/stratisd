@@ -14,8 +14,6 @@ use futures::executor::block_on;
 use serde_json::{json, Value};
 use tokio::sync::RwLock;
 
-use devicemapper::Bytes;
-
 use crate::{
     engine::{
         engine::{Engine, HandleEvents, KeyActions, Pool, Report},
@@ -27,9 +25,9 @@ use crate::{
         },
         types::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, Features, FilesystemUuid,
-            IntegrityTagSpec, LockedPoolsInfo, Name, PoolDevice, PoolDiff, PoolIdentifier,
-            PoolUuid, RenameAction, ReportType, SetUnlockAction, StartAction, StopAction,
-            StoppedPoolInfo, StoppedPoolsInfo, StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
+            IntegritySpec, LockedPoolsInfo, Name, PoolDevice, PoolDiff, PoolIdentifier, PoolUuid,
+            RenameAction, ReportType, SetUnlockAction, StartAction, StopAction, StoppedPoolInfo,
+            StoppedPoolsInfo, StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
         },
         StratSigblockVersion,
     },
@@ -131,8 +129,7 @@ impl Engine for SimEngine {
         name: &str,
         blockdev_paths: &[&Path],
         encryption_info: Option<&EncryptionInfo>,
-        _: Option<Bytes>,
-        _: Option<IntegrityTagSpec>,
+        _: IntegritySpec,
     ) -> StratisResult<CreateAction<PoolUuid>> {
         validate_name(name)?;
         let name = Name::new(name.to_owned());
@@ -444,8 +441,7 @@ mod tests {
             "name",
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
-            None
+            IntegritySpec::default(),
         ))
         .unwrap()
         .changed()
@@ -457,11 +453,15 @@ mod tests {
     /// Destroying a pool with devices should succeed
     fn destroy_pool_w_devices() {
         let engine = SimEngine::default();
-        let uuid =
-            test_async!(engine.create_pool("name", strs_to_paths!(["/s/d"]), None, None, None))
-                .unwrap()
-                .changed()
-                .unwrap();
+        let uuid = test_async!(engine.create_pool(
+            "name",
+            strs_to_paths!(["/s/d"]),
+            None,
+            IntegritySpec::default()
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
         assert!(test_async!(engine.destroy_pool(uuid)).is_ok());
     }
 
@@ -470,11 +470,15 @@ mod tests {
     fn destroy_pool_w_filesystem() {
         let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid =
-            test_async!(engine.create_pool(pool_name, strs_to_paths!(["/s/d"]), None, None, None))
-                .unwrap()
-                .changed()
-                .unwrap();
+        let uuid = test_async!(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/s/d"]),
+            None,
+            IntegritySpec::default()
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
         {
             let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
             pool.create_filesystems(pool_name, uuid, &[("test", None, None)])
@@ -490,9 +494,9 @@ mod tests {
         let name = "name";
         let engine = SimEngine::default();
         let devices = strs_to_paths!(["/s/d"]);
-        test_async!(engine.create_pool(name, devices, None, None, None)).unwrap();
+        test_async!(engine.create_pool(name, devices, None, IntegritySpec::default())).unwrap();
         assert_matches!(
-            test_async!(engine.create_pool(name, devices, None, None, None)),
+            test_async!(engine.create_pool(name, devices, None, IntegritySpec::default())),
             Ok(CreateAction::Identity)
         );
     }
@@ -502,13 +506,18 @@ mod tests {
     fn create_pool_name_collision_different_args() {
         let name = "name";
         let engine = SimEngine::default();
-        test_async!(engine.create_pool(name, strs_to_paths!(["/s/d"]), None, None, None)).unwrap();
+        test_async!(engine.create_pool(
+            name,
+            strs_to_paths!(["/s/d"]),
+            None,
+            IntegritySpec::default()
+        ))
+        .unwrap();
         assert!(test_async!(engine.create_pool(
             name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
-            None,
+            IntegritySpec::default(),
         ))
         .is_err());
     }
@@ -519,15 +528,20 @@ mod tests {
         let path = "/s/d";
         let engine = SimEngine::default();
         assert_matches!(
-            test_async!(engine.create_pool("name", strs_to_paths!([path, path]), None, None, None))
-                .unwrap()
-                .changed()
-                .map(
-                    |uuid| test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid)))
-                        .unwrap()
-                        .blockdevs()
-                        .len()
-                ),
+            test_async!(engine.create_pool(
+                "name",
+                strs_to_paths!([path, path]),
+                None,
+                IntegritySpec::default()
+            ))
+            .unwrap()
+            .changed()
+            .map(
+                |uuid| test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid)))
+                    .unwrap()
+                    .blockdevs()
+                    .len()
+            ),
             Some(1)
         );
     }
@@ -551,8 +565,7 @@ mod tests {
             name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
-            None,
+            IntegritySpec::default(),
         ))
         .unwrap()
         .changed()
@@ -571,8 +584,7 @@ mod tests {
             "old_name",
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
-            None,
+            IntegritySpec::default(),
         ))
         .unwrap()
         .changed()
@@ -592,8 +604,7 @@ mod tests {
             "old_name",
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
-            None,
+            IntegritySpec::default(),
         ))
         .unwrap()
         .changed()
@@ -602,8 +613,7 @@ mod tests {
             new_name,
             strs_to_paths!(["/dev/four", "/dev/five", "/dev/six"]),
             None,
-            None,
-            None,
+            IntegritySpec::default(),
         ))
         .unwrap();
         assert!(test_async!(engine.rename_pool(uuid, new_name)).is_err());
@@ -618,8 +628,7 @@ mod tests {
             new_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
-            None,
+            IntegritySpec::default(),
         ))
         .unwrap();
         assert_matches!(

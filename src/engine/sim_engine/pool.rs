@@ -882,7 +882,7 @@ mod tests {
 
     use crate::engine::{
         sim_engine::SimEngine,
-        types::{EngineAction, PoolIdentifier},
+        types::{EngineAction, IntegritySpec, PoolIdentifier},
         Engine,
     };
 
@@ -897,8 +897,7 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
-            None,
+            IntegritySpec::default(),
         ))
         .unwrap()
         .changed()
@@ -919,8 +918,7 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
-            None,
+            IntegritySpec::default(),
         ))
         .unwrap()
         .changed()
@@ -949,8 +947,7 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
-            None,
+            IntegritySpec::default(),
         ))
         .unwrap()
         .changed()
@@ -982,8 +979,7 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
-            None,
+            IntegritySpec::default(),
         ))
         .unwrap()
         .changed()
@@ -1004,8 +1000,7 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
-            None,
+            IntegritySpec::default(),
         ))
         .unwrap()
         .changed()
@@ -1026,8 +1021,7 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
-            None,
+            IntegritySpec::default(),
         ))
         .unwrap()
         .changed()
@@ -1048,8 +1042,7 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
-            None,
+            IntegritySpec::default(),
         ))
         .unwrap()
         .changed()
@@ -1078,8 +1071,7 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
-            None,
+            IntegritySpec::default(),
         ))
         .unwrap()
         .changed()
@@ -1098,8 +1090,7 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
-            None,
+            IntegritySpec::default(),
         ))
         .unwrap()
         .changed()
@@ -1125,8 +1116,7 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
-            None,
+            IntegritySpec::default(),
         ))
         .unwrap()
         .changed()
@@ -1150,8 +1140,7 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
-            None,
+            IntegritySpec::default(),
         ))
         .unwrap()
         .changed()
@@ -1179,8 +1168,7 @@ mod tests {
             "pool_name",
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
-            None,
+            IntegritySpec::default(),
         ))
         .unwrap()
         .changed()

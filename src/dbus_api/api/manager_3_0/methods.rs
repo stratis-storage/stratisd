@@ -22,7 +22,7 @@ use crate::{
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
     engine::{
-        CreateAction, DeleteAction, EncryptionInfo, EngineAction, KeyDescription,
+        CreateAction, DeleteAction, EncryptionInfo, EngineAction, IntegritySpec, KeyDescription,
         MappingCreateAction, MappingDeleteAction, PoolIdentifier, PoolUuid, SetUnlockAction,
         UnlockMethod,
     },
@@ -328,8 +328,7 @@ pub fn create_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         name,
         &devs.map(Path::new).collect::<Vec<&Path>>(),
         EncryptionInfo::from_options((key_desc, clevis_info)).as_ref(),
-        None,
-        None,
+        IntegritySpec::default(),
     )));
     match create_result {
         Ok(pool_uuid_action) => match pool_uuid_action {

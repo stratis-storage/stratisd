@@ -19,7 +19,7 @@ use serde_json::Value;
 use strum_macros::{self, AsRefStr, EnumString, FromRepr, VariantNames};
 use uuid::Uuid;
 
-use devicemapper::Bytes;
+use devicemapper::{Bytes, Sectors, IEC};
 
 pub use crate::engine::{
     engine::StateDiff,
@@ -38,6 +38,10 @@ pub use crate::engine::{
     },
 };
 use crate::stratis::{StratisError, StratisResult};
+
+pub const DEFAULT_INTEGRITY_JOURNAL_SIZE: Bytes = Bytes(128 * IEC::Mi as u128);
+pub const DEFAULT_INTEGRITY_BLOCK_SIZE: Bytes = Bytes(4 * IEC::Ki as u128);
+pub const DEFAULT_INTEGRITY_TAG_SPEC: IntegrityTagSpec = IntegrityTagSpec::B512;
 
 mod actions;
 mod diff;
@@ -526,4 +530,42 @@ impl IntegrityTagSpec {
 pub struct IntegritySpec {
     pub tag_spec: Option<IntegrityTagSpec>,
     pub journal_size: Option<Bytes>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ValidatedIntegritySpec {
+    pub tag_spec: IntegrityTagSpec,
+    pub journal_size: Sectors,
+    pub block_size: Bytes,
+}
+
+impl Default for ValidatedIntegritySpec {
+    fn default() -> Self {
+        ValidatedIntegritySpec::try_from(IntegritySpec::default()).expect("default is valid")
+    }
+}
+
+impl TryFrom<IntegritySpec> for ValidatedIntegritySpec {
+    type Error = StratisError;
+
+    fn try_from(spec: IntegritySpec) -> StratisResult<Self> {
+        let journal_size = match spec.journal_size {
+            Some(journal_size) => {
+                if journal_size % 4096u64 != Bytes(0) {
+                    return Err(StratisError::Msg(format!(
+                        "specified integrity journal size {journal_size} is not a multiple of 4096"
+                    )));
+                } else {
+                    journal_size.sectors()
+                }
+            }
+            None => DEFAULT_INTEGRITY_JOURNAL_SIZE.sectors(),
+        };
+
+        Ok(ValidatedIntegritySpec {
+            journal_size,
+            tag_spec: spec.tag_spec.unwrap_or(DEFAULT_INTEGRITY_TAG_SPEC),
+            block_size: DEFAULT_INTEGRITY_BLOCK_SIZE,
+        })
+    }
 }

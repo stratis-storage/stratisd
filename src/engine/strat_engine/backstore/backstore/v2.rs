@@ -33,8 +33,8 @@ use crate::{
             writing::wipe_sectors,
         },
         types::{
-            ActionAvailability, BlockDevTier, DevUuid, EncryptionInfo, IntegrityTagSpec,
-            KeyDescription, PoolUuid, SizedKeyMemory, UnlockMethod,
+            ActionAvailability, BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, PoolUuid,
+            SizedKeyMemory, UnlockMethod, ValidatedIntegritySpec,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -437,13 +437,11 @@ impl Backstore {
         devices: UnownedDevices,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
-        integrity_journal_size: Option<Sectors>,
-        integrity_tag_spec: Option<IntegrityTagSpec>,
+        integrity_spec: ValidatedIntegritySpec,
     ) -> StratisResult<Backstore> {
         let data_tier = DataTier::<StratBlockDev>::new(
             BlockDevMgr::<StratBlockDev>::initialize(pool_uuid, devices, mda_data_size)?,
-            integrity_journal_size,
-            integrity_tag_spec,
+            integrity_spec,
         );
 
         let mut backstore = Backstore {
@@ -1172,13 +1170,16 @@ mod tests {
 
     use devicemapper::{CacheDevStatus, DataBlocks, DmOptions, IEC};
 
-    use crate::engine::strat_engine::{
-        backstore::devices::{ProcessedPathInfos, UnownedDevices},
-        cmd,
-        crypt::crypt_metadata_size,
-        metadata::device_identifiers,
-        ns::{unshare_mount_namespace, MemoryFilesystem},
-        tests::{crypt, loopbacked, real},
+    use crate::engine::{
+        strat_engine::{
+            backstore::devices::{ProcessedPathInfos, UnownedDevices},
+            cmd,
+            crypt::crypt_metadata_size,
+            metadata::device_identifiers,
+            ns::{unshare_mount_namespace, MemoryFilesystem},
+            tests::{crypt, loopbacked, real},
+        },
+        types::ValidatedIntegritySpec,
     };
 
     use super::*;
@@ -1255,8 +1256,7 @@ mod tests {
             initdatadevs,
             MDADataSize::default(),
             None,
-            None,
-            None,
+            ValidatedIntegritySpec::default(),
         )
         .unwrap();
 
@@ -1354,8 +1354,7 @@ mod tests {
             devices1,
             MDADataSize::default(),
             None,
-            None,
-            None,
+            ValidatedIntegritySpec::default(),
         )
         .unwrap();
 
@@ -1420,8 +1419,7 @@ mod tests {
                 "tang".to_string(),
                 json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
             ))),
-            None,
-            None,
+            ValidatedIntegritySpec::default(),
         )
         .unwrap();
         backstore.alloc(pool_uuid, &[Sectors(512)]).unwrap();
@@ -1496,8 +1494,7 @@ mod tests {
                         json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
                     ),
                 )),
-                None,
-                None,
+                ValidatedIntegritySpec::default(),
             ).unwrap();
             cmd::udev_settle().unwrap();
 

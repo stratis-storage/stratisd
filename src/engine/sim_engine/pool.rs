@@ -26,7 +26,7 @@ use crate::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
             EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
             PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction, StratSigblockVersion,
+            SetDeleteAction, StratSigblockVersion, ValidatedIntegritySpec,
         },
         PropChangeAction,
     },
@@ -41,6 +41,7 @@ pub struct SimPool {
     fs_limit: u64,
     enable_overprov: bool,
     encryption_info: Option<EncryptionInfo>,
+    integrity_spec: ValidatedIntegritySpec,
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
@@ -48,10 +49,15 @@ pub struct PoolSave {
     name: String,
     fs_limit: Option<u64>,
     enable_overprov: Option<bool>,
+    integrity_spec: Option<ValidatedIntegritySpec>,
 }
 
 impl SimPool {
-    pub fn new(paths: &[&Path], enc_info: Option<&EncryptionInfo>) -> (PoolUuid, SimPool) {
+    pub fn new(
+        paths: &[&Path],
+        enc_info: Option<&EncryptionInfo>,
+        integrity_spec: ValidatedIntegritySpec,
+    ) -> (PoolUuid, SimPool) {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
         let device_pairs = devices.iter().map(|p| SimDev::new(p));
         (
@@ -63,6 +69,7 @@ impl SimPool {
                 fs_limit: 10,
                 enable_overprov: true,
                 encryption_info: enc_info.cloned(),
+                integrity_spec,
             },
         )
     }
@@ -130,6 +137,7 @@ impl SimPool {
             name: name.to_owned(),
             enable_overprov: Some(self.enable_overprov),
             fs_limit: Some(self.fs_limit),
+            integrity_spec: Some(self.integrity_spec),
         }
     }
 }

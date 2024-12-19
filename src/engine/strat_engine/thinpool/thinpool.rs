@@ -2112,6 +2112,7 @@ mod tests {
             tests::{loopbacked, real},
             writing::SyncAll,
         },
+        types::ValidatedIntegritySpec,
     };
 
     use super::*;
@@ -3157,8 +3158,7 @@ mod tests {
                 devices,
                 MDADataSize::default(),
                 None,
-                None,
-                None,
+                ValidatedIntegritySpec::default(),
             )
             .unwrap();
             let size = ThinPoolSizeParams::new(backstore.datatier_usable_size()).unwrap();
@@ -3261,8 +3261,7 @@ mod tests {
                 first_devices,
                 MDADataSize::default(),
                 None,
-                None,
-                None,
+                ValidatedIntegritySpec::default(),
             )
             .unwrap();
             let mut pool = ThinPool::<backstore::v2::Backstore>::new(
@@ -3398,8 +3397,7 @@ mod tests {
                 devices,
                 MDADataSize::default(),
                 None,
-                None,
-                None,
+                ValidatedIntegritySpec::default(),
             )
             .unwrap();
             warn!("Available: {}", backstore.available_in_backstore());
@@ -3525,8 +3523,7 @@ mod tests {
                 devices,
                 MDADataSize::default(),
                 None,
-                None,
-                None,
+                ValidatedIntegritySpec::default(),
             )
             .unwrap();
             let mut pool = ThinPool::<backstore::v2::Backstore>::new(
@@ -3596,8 +3593,7 @@ mod tests {
                 devices,
                 MDADataSize::default(),
                 None,
-                None,
-                None,
+                ValidatedIntegritySpec::default(),
             )
             .unwrap();
             let mut pool = ThinPool::<backstore::v2::Backstore>::new(
@@ -3677,8 +3673,7 @@ mod tests {
                 devices,
                 MDADataSize::default(),
                 None,
-                None,
-                None,
+                ValidatedIntegritySpec::default(),
             )
             .unwrap();
             let mut pool = ThinPool::<backstore::v2::Backstore>::new(
@@ -3745,8 +3740,7 @@ mod tests {
                 devices,
                 MDADataSize::default(),
                 None,
-                None,
-                None,
+                ValidatedIntegritySpec::default(),
             )
             .unwrap();
             let mut pool = ThinPool::<backstore::v2::Backstore>::new(
@@ -3808,8 +3802,7 @@ mod tests {
                 devices,
                 MDADataSize::default(),
                 None,
-                None,
-                None,
+                ValidatedIntegritySpec::default(),
             )
             .unwrap();
             let mut pool = ThinPool::<backstore::v2::Backstore>::new(
@@ -3916,8 +3909,7 @@ mod tests {
                 devices,
                 MDADataSize::default(),
                 None,
-                None,
-                None,
+                ValidatedIntegritySpec::default(),
             )
             .unwrap();
             let mut pool = ThinPool::<backstore::v2::Backstore>::new(
@@ -4056,8 +4048,7 @@ mod tests {
                 devices,
                 MDADataSize::default(),
                 None,
-                None,
-                None,
+                ValidatedIntegritySpec::default(),
             )
             .unwrap();
             let mut pool = ThinPool::<backstore::v2::Backstore>::new(

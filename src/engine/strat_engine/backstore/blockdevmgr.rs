@@ -29,7 +29,9 @@ use crate::{
             serde_structs::{BaseBlockDevSave, Recordable},
             shared::bds_to_bdas,
         },
-        types::{DevUuid, EncryptionInfo, IntegrityTagSpec, Name, PoolEncryptionInfo, PoolUuid},
+        types::{
+            DevUuid, EncryptionInfo, Name, PoolEncryptionInfo, PoolUuid, ValidatedIntegritySpec,
+        },
     },
     stratis::{StratisError, StratisResult},
 };
@@ -246,20 +248,14 @@ impl BlockDevMgr<v2::StratBlockDev> {
     pub fn grow(
         &mut self,
         dev: DevUuid,
-        integrity_journal_size: Sectors,
-        integrity_block_size: Bytes,
-        integrity_tag_spec: IntegrityTagSpec,
+        integrity_spec: ValidatedIntegritySpec,
     ) -> StratisResult<bool> {
         let bd = self
             .block_devs
             .iter_mut()
             .find(|bd| bd.uuid() == dev)
             .ok_or_else(|| StratisError::Msg(format!("Block device with UUID {dev} not found")))?;
-        bd.grow(
-            integrity_journal_size,
-            integrity_block_size,
-            integrity_tag_spec,
-        )
+        bd.grow(integrity_spec)
     }
 
     #[cfg(test)]

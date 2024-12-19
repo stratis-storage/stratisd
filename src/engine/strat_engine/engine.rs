@@ -17,7 +17,7 @@ use tokio::{
     task::{spawn_blocking, JoinHandle},
 };
 
-use devicemapper::{Bytes, DmNameBuf};
+use devicemapper::DmNameBuf;
 
 use crate::{
     engine::{
@@ -40,7 +40,7 @@ use crate::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, IntegritySpec,
             LockedPoolsInfo, PoolDiff, PoolIdentifier, RenameAction, ReportType, SetUnlockAction,
             StartAction, StopAction, StoppedPoolsInfo, StratFilesystemDiff, UdevEngineEvent,
-            UnlockMethod,
+            UnlockMethod, ValidatedIntegritySpec,
         },
         Engine, Name, Pool, PoolUuid, Report,
     },
@@ -499,15 +499,7 @@ impl Engine for StratEngine {
     ) -> StratisResult<CreateAction<PoolUuid>> {
         validate_name(name)?;
         let name = Name::new(name.to_owned());
-        let rounded_journal_size = match integrity_spec.journal_size {
-            Some(b) => {
-                if b % 4096u64 != Bytes(0) {
-                    return Err(StratisError::Msg(format!("{b} is not a multiple of 4096")));
-                }
-                Some(b.sectors())
-            }
-            None => None,
-        };
+        let integrity_spec = ValidatedIntegritySpec::try_from(integrity_spec)?;
 
         validate_paths(blockdev_paths)?;
 
@@ -569,8 +561,7 @@ impl Engine for StratEngine {
                         &cloned_name,
                         unowned_devices,
                         cloned_enc_info.as_ref(),
-                        rounded_journal_size,
-                        integrity_spec.tag_spec,
+                        integrity_spec,
                     )
                 })??;
                 pools.insert(Name::new(name.to_string()), pool_uuid, AnyPool::V2(pool));

@@ -1265,7 +1265,7 @@ mod tests {
             tests::{loopbacked, real},
             thinpool::ThinPoolStatusDigest,
         },
-        types::{EngineAction, PoolIdentifier},
+        types::{EngineAction, IntegritySpec, PoolIdentifier},
         Engine, StratEngine,
     };
 
@@ -1690,10 +1690,11 @@ mod tests {
     fn test_grow_physical_pre_grow(paths: &[&Path]) {
         let pool_name = Name::new("pool".to_string());
         let engine = StratEngine::initialize().unwrap();
-        let pool_uuid = test_async!(engine.create_pool(&pool_name, paths, None, None, None))
-            .unwrap()
-            .changed()
-            .unwrap();
+        let pool_uuid =
+            test_async!(engine.create_pool(&pool_name, paths, None, IntegritySpec::default()))
+                .unwrap()
+                .changed()
+                .unwrap();
         let mut guard = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid))).unwrap();
         let (_, _, pool) = guard.as_mut_tuple();
 

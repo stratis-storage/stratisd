@@ -19,7 +19,7 @@ use serde_json::Value;
 use strum_macros::{self, AsRefStr, EnumString, FromRepr, VariantNames};
 use uuid::Uuid;
 
-use devicemapper::Bytes;
+use devicemapper::{Bytes, Sectors};
 
 pub use crate::engine::{
     engine::StateDiff,
@@ -523,4 +523,36 @@ impl IntegrityTagSpec {
 pub struct IntegritySpec {
     pub tag_spec: Option<IntegrityTagSpec>,
     pub journal_size: Option<Bytes>,
+}
+
+/// A validated integrity spec.
+/// journal_size is rounded to 4KiB.
+pub struct ValidatedIntegritySpec {
+    pub tag_spec: Option<IntegrityTagSpec>,
+    pub journal_size: Option<Sectors>,
+}
+
+impl TryFrom<IntegritySpec> for ValidatedIntegritySpec {
+    type Error = StratisError;
+
+    fn try_from(spec: IntegritySpec) -> StratisResult<Self> {
+        match spec.journal_size {
+            Some(journal_size) => {
+                if journal_size % 4096u64 != Bytes(0) {
+                    Err(StratisError::Msg(format!(
+                        "specified integrity journal size {journal_size} is not a multiple of 4096"
+                    )))
+                } else {
+                    Ok(ValidatedIntegritySpec {
+                        tag_spec: spec.tag_spec,
+                        journal_size: Some(journal_size.sectors()),
+                    })
+                }
+            }
+            None => Ok(ValidatedIntegritySpec {
+                tag_spec: spec.tag_spec,
+                journal_size: None,
+            }),
+        }
+    }
 }

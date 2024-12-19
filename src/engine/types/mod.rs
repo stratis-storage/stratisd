@@ -16,8 +16,10 @@ use std::{
 use libudev::EventType;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use strum_macros::{self, EnumString, FromRepr, VariantNames};
+use strum_macros::{self, AsRefStr, EnumString, FromRepr, VariantNames};
 use uuid::Uuid;
+
+use devicemapper::{Bytes, Sectors};
 
 pub use crate::engine::{
     engine::StateDiff,
@@ -480,4 +482,88 @@ impl UuidOrConflict {
 pub enum StratSigblockVersion {
     V1 = 1,
     V2 = 2,
+}
+
+/// A way to specify an integrity tag size. It is possible for the specification
+/// to be non-numeric but translatable to some number of bits.
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    Serialize,
+    Deserialize,
+    VariantNames,
+    EnumString,
+    AsRefStr,
+)]
+pub enum IntegrityTagSpec {
+    #[strum(serialize = "0b")]
+    B0,
+    #[strum(serialize = "32b")]
+    B32,
+    #[strum(serialize = "512b")]
+    B512,
+}
+
+impl IntegrityTagSpec {
+    /// The smallest number of bytes containing the bits represented.
+    pub fn as_bytes_ceil(self) -> Bytes {
+        match self {
+            IntegrityTagSpec::B0 => Bytes(0),
+            IntegrityTagSpec::B32 => Bytes(4),
+            IntegrityTagSpec::B512 => Bytes(64),
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct IntegritySpec {
+    pub tag_spec: Option<IntegrityTagSpec>,
+    pub journal_size: Option<Bytes>,
+}
+
+/// A validated integrity spec.
+/// journal_size is rounded to 4KiB.
+#[derive(Default)]
+pub struct ValidatedIntegritySpec {
+    tag_spec: Option<IntegrityTagSpec>,
+    journal_size: Option<Sectors>,
+}
+
+impl ValidatedIntegritySpec {
+    pub fn journal_size(&self) -> Option<Sectors> {
+        self.journal_size
+    }
+
+    pub fn tag_spec(&self) -> Option<IntegrityTagSpec> {
+        self.tag_spec
+    }
+}
+
+impl TryFrom<IntegritySpec> for ValidatedIntegritySpec {
+    type Error = StratisError;
+
+    fn try_from(spec: IntegritySpec) -> StratisResult<Self> {
+        match spec.journal_size {
+            Some(journal_size) => {
+                if journal_size % 4096u64 != Bytes(0) {
+                    Err(StratisError::Msg(format!(
+                        "specified integrity journal size {journal_size} is not a multiple of 4096"
+                    )))
+                } else {
+                    Ok(ValidatedIntegritySpec {
+                        tag_spec: spec.tag_spec,
+                        journal_size: Some(journal_size.sectors()),
+                    })
+                }
+            }
+            None => Ok(ValidatedIntegritySpec {
+                tag_spec: spec.tag_spec,
+                journal_size: None,
+            }),
+        }
+    }
 }

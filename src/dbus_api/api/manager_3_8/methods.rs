@@ -158,7 +158,7 @@ pub fn create_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         Some(get_next_arg(&mut iter, 3)?),
     );
     let journal_size_tuple: (bool, u64) = get_next_arg(&mut iter, 4)?;
-    let tag_size_tuple: (bool, String) = get_next_arg(&mut iter, 5)?;
+    let tag_spec_tuple: (bool, String) = get_next_arg(&mut iter, 5)?;
 
     let return_message = message.method_return();
 
@@ -188,7 +188,7 @@ pub fn create_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     };
 
     let journal_size = tuple_to_option(journal_size_tuple).map(Bytes::from);
-    let tag_size = match tuple_to_option(tag_size_tuple)
+    let tag_spec = match tuple_to_option(tag_spec_tuple)
         .map(|s| IntegrityTagSpec::try_from(s.as_str()))
         .transpose()
     {
@@ -207,7 +207,7 @@ pub fn create_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         &devs.map(Path::new).collect::<Vec<&Path>>(),
         EncryptionInfo::from_options((key_desc, clevis_info)).as_ref(),
         journal_size,
-        tag_size,
+        tag_spec,
     )));
     match create_result {
         Ok(pool_uuid_action) => match pool_uuid_action {

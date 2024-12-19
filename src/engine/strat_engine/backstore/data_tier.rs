@@ -47,7 +47,7 @@ pub struct DataTier<B> {
     integrity_journal_size: Option<Sectors>,
     /// Integrity block size.
     integrity_block_size: Option<Bytes>,
-    /// Integrity tag size.
+    /// Integrity tag spec.
     integrity_tag_spec: Option<IntegrityTagSpec>,
 }
 

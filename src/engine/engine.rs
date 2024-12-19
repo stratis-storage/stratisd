@@ -383,7 +383,7 @@ pub trait Engine: Debug + Report + Send + Sync {
         blockdev_paths: &[&Path],
         encryption_info: Option<&EncryptionInfo>,
         journal_size: Option<Bytes>,
-        tag_size: Option<IntegrityTagSpec>,
+        tag_spec: Option<IntegrityTagSpec>,
     ) -> StratisResult<CreateAction<PoolUuid>>;
 
     /// Handle a libudev event.

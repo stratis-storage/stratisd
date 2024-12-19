@@ -51,12 +51,12 @@ pub fn integrity_meta_space(
     total_space: Sectors,
     journal_size: Sectors,
     block_size: Bytes,
-    tag_size: IntegrityTagSpec,
+    tag_spec: IntegrityTagSpec,
 ) -> Sectors {
     Bytes(4096).sectors()
         + journal_size
         + Bytes::from(
-            (*((total_space.bytes() / block_size) * tag_size.as_bytes_ceil()) + 4095) & !4095,
+            (*((total_space.bytes() / block_size) * tag_spec.as_bytes_ceil()) + 4095) & !4095,
         )
         .sectors()
 }

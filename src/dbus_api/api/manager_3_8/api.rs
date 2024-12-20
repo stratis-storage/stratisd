@@ -68,6 +68,13 @@ pub fn create_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TD
         //
         // Rust representation: (bool, String)
         .in_arg(("tag_spec", "(bs)"))
+        // Optionally specify whether to reserve space for integrity
+        // superblock.
+        // b: true if the second value is to be read, otherwise false.
+        // b: true if the superblock reservation is supposed to be done
+        //
+        // Rust representation: (bool, bool)
+        .in_arg(("allocate_superblock", "(bb)"))
         // In order from left to right:
         // b: true if a pool was created and object paths were returned
         // o: Object path for Pool

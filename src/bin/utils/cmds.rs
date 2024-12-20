@@ -110,6 +110,13 @@ pool is encrypted, setting this option has no effect on the prediction."),
                         .default_value(Box::leak((*DEFAULT_INTEGRITY_JOURNAL_SIZE).to_string().into_boxed_str()) as &'static str)
                         .help("Size of the integrity journal. Default is 128 MiB. Units are bytes.")
                         .next_line_help(true)
+                    )
+                    .arg(
+                        Arg::new("no_integrity_superblock")
+                        .action(ArgAction::SetTrue)
+                        .long("no-integrity-superblock")
+                        .help("Do not allocate space for integrity superblock")
+                        .next_line_help(true)
                     ),
                 Command::new("filesystem")
                     .about("Predicts the space usage when creating a Stratis filesystem.")
@@ -166,6 +173,7 @@ impl<'a> UtilCommand<'a> for StratisPredictUsage {
                             })
                             .expect("default specified by parser"),
                     ),
+                    allocate_superblock: Some(!sub_m.get_flag("no_integrity_superblock")),
                 })?,
                 LevelFilter::from_str(
                     matches

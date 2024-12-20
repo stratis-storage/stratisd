@@ -152,6 +152,7 @@ def create_pool(
                 ),
                 "journal_size": (False, 0),
                 "tag_spec": (False, ""),
+                "allocate_superblock": (False, False),
             },
         )
 

@@ -159,6 +159,7 @@ pub fn create_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     );
     let journal_size_tuple: (bool, u64) = get_next_arg(&mut iter, 4)?;
     let tag_spec_tuple: (bool, String) = get_next_arg(&mut iter, 5)?;
+    let allocate_superblock_tuple: (bool, bool) = get_next_arg(&mut iter, 6)?;
 
     let return_message = message.method_return();
 
@@ -201,6 +202,8 @@ pub fn create_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         }
     };
 
+    let allocate_superblock = tuple_to_option(allocate_superblock_tuple);
+
     let dbus_context = m.tree.get_data();
     let create_result = handle_action!(block_on(dbus_context.engine.create_pool(
         name,
@@ -208,7 +211,8 @@ pub fn create_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         EncryptionInfo::from_options((key_desc, clevis_info)).as_ref(),
         IntegritySpec {
             journal_size,
-            tag_spec
+            tag_spec,
+            allocate_superblock,
         },
     )));
     match create_result {

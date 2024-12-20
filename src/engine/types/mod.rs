@@ -530,6 +530,7 @@ impl IntegrityTagSpec {
 pub struct IntegritySpec {
     pub tag_spec: Option<IntegrityTagSpec>,
     pub journal_size: Option<Bytes>,
+    pub allocate_superblock: Option<bool>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -537,6 +538,7 @@ pub struct ValidatedIntegritySpec {
     pub tag_spec: IntegrityTagSpec,
     pub journal_size: Sectors,
     pub block_size: Bytes,
+    pub allocate_superblock: bool,
 }
 
 impl Default for ValidatedIntegritySpec {
@@ -566,6 +568,7 @@ impl TryFrom<IntegritySpec> for ValidatedIntegritySpec {
             journal_size,
             tag_spec: spec.tag_spec.unwrap_or(DEFAULT_INTEGRITY_TAG_SPEC),
             block_size: DEFAULT_INTEGRITY_BLOCK_SIZE,
+            allocate_superblock: spec.allocate_superblock.unwrap_or(true),
         })
     }
 }

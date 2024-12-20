@@ -51,7 +51,12 @@ pub fn integrity_meta_space(
     total_space: Sectors,
     integrity_spec: ValidatedIntegritySpec,
 ) -> Sectors {
-    Bytes(4096).sectors()
+    (if integrity_spec.allocate_superblock {
+        Bytes(4096)
+    } else {
+        Bytes(0)
+    })
+    .sectors()
         + integrity_spec.journal_size
         + Bytes::from(
             (*((total_space.bytes() / integrity_spec.block_size)

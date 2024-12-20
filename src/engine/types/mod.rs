@@ -505,10 +505,13 @@ pub enum StratSigblockVersion {
 )]
 pub enum IntegrityTagSpec {
     #[strum(serialize = "0b")]
+    #[serde(rename = "0b")]
     B0,
     #[strum(serialize = "32b")]
+    #[serde(rename = "32b")]
     B32,
     #[strum(serialize = "512b")]
+    #[serde(rename = "512b")]
     B512,
 }
 

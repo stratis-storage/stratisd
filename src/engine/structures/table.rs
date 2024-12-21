@@ -217,10 +217,7 @@ where
 
     /// Get mutable item by name.
     pub fn get_mut_by_name(&mut self, name: &str) -> Option<(U, &mut T)> {
-        let uuid = match self.name_to_uuid.get(name) {
-            Some(uuid) => uuid,
-            None => return None,
-        };
+        let uuid = self.name_to_uuid.get(name)?;
         self.items
             .get_mut(uuid)
             .map(|&mut (_, ref mut item)| (*uuid, item))

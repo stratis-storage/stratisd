@@ -161,6 +161,6 @@ where
     Ok(enumerator
         .scan_devices()?
         .filter(|dev| dev.is_initialized())
-        .find(|x| x.devnode().map_or(false, |d| **device_path == *d))
+        .find(|x| x.devnode().is_some_and(|d| **device_path == *d))
         .map(|ref d| f(&UdevEngineDevice::from(d))))
 }

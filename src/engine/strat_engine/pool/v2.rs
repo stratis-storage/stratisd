@@ -9,6 +9,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
+use either::Either;
 use serde_json::{Map, Value};
 
 use devicemapper::{Bytes, DmNameBuf, Sectors};
@@ -36,11 +37,12 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            Diff, EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
-            PoolEncryptionInfo, PoolUuid, PropChangeAction, RegenAction, RenameAction,
-            SetCreateAction, SetDeleteAction, SizedKeyMemory, StratFilesystemDiff, StratPoolDiff,
-            StratSigblockVersion, UnlockMethod,
+            Diff, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo, Key,
+            KeyDescription, Name, OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolUuid,
+            PropChangeAction, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
+            SizedKeyMemory, StratFilesystemDiff, StratPoolDiff, StratSigblockVersion,
         },
+        TokenUnlockMethod,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -152,7 +154,7 @@ impl StratPool {
     pub fn initialize(
         name: &str,
         devices: UnownedDevices,
-        encryption_info: Option<&EncryptionInfo>,
+        encryption_info: Option<&InputEncryptionInfo>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = PoolUuid::new_v4();
 
@@ -225,7 +227,7 @@ impl StratPool {
         cachedevs: Vec<StratBlockDev>,
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
-        unlock_method: Option<UnlockMethod>,
+        token_slot: TokenUnlockMethod,
         passphrase: Option<SizedKeyMemory>,
     ) -> BDARecordResult<(Name, StratPool)> {
         if let Err(e) = check_metadata(metadata) {
@@ -233,13 +235,7 @@ impl StratPool {
         }
 
         let backstore = Backstore::setup(
-            uuid,
-            metadata,
-            datadevs,
-            cachedevs,
-            timestamp,
-            unlock_method,
-            passphrase,
+            uuid, metadata, datadevs, cachedevs, timestamp, token_slot, passphrase,
         )?;
         let action_avail = backstore.action_availability();
 
@@ -644,43 +640,53 @@ impl Pool for StratPool {
     #[pool_mutating_action("NoRequests")]
     fn bind_clevis(
         &mut self,
+        token_slot: OptionalTokenSlotInput,
         pin: &str,
         clevis_info: &Value,
-    ) -> StratisResult<CreateAction<Clevis>> {
-        let changed = self.backstore.bind_clevis(pin, clevis_info)?;
-        if changed {
-            Ok(CreateAction::Created(Clevis))
-        } else {
-            Ok(CreateAction::Identity)
-        }
-    }
-
-    #[pool_mutating_action("NoRequests")]
-    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>> {
-        let changed = self.backstore.unbind_clevis()?;
-        if changed {
-            Ok(DeleteAction::Deleted(Clevis))
-        } else {
-            Ok(DeleteAction::Identity)
+    ) -> StratisResult<CreateAction<(Clevis, u32)>> {
+        let changed = self.backstore.bind_clevis(token_slot, pin, clevis_info)?;
+        match changed {
+            Some(t) => Ok(CreateAction::Created((Clevis, t))),
+            None => Ok(CreateAction::Identity),
         }
     }
 
     #[pool_mutating_action("NoRequests")]
     fn bind_keyring(
         &mut self,
+        token_slot: OptionalTokenSlotInput,
         key_description: &KeyDescription,
-    ) -> StratisResult<CreateAction<Key>> {
-        let changed = self.backstore.bind_keyring(key_description)?;
-        if changed {
-            Ok(CreateAction::Created(Key))
-        } else {
-            Ok(CreateAction::Identity)
+    ) -> StratisResult<CreateAction<(Key, u32)>> {
+        let changed = self.backstore.bind_keyring(token_slot, key_description)?;
+        match changed {
+            Some(t) => Ok(CreateAction::Created((Key, t))),
+            None => Ok(CreateAction::Identity),
         }
     }
 
     #[pool_mutating_action("NoRequests")]
-    fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>> {
-        let changed = self.backstore.unbind_keyring()?;
+    fn rebind_keyring(
+        &mut self,
+        token_slot: Option<u32>,
+        new_key_desc: &KeyDescription,
+    ) -> StratisResult<RenameAction<Key>> {
+        match self.backstore.rebind_keyring(token_slot, new_key_desc)? {
+            Some(true) => Ok(RenameAction::Renamed(Key)),
+            Some(false) => Ok(RenameAction::Identity),
+            None => Ok(RenameAction::NoSource),
+        }
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn rebind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<RegenAction> {
+        self.backstore
+            .rebind_clevis(token_slot)
+            .map(|_| RegenAction)
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn unbind_keyring(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Key>> {
+        let changed = self.backstore.unbind_keyring(token_slot)?;
         if changed {
             Ok(DeleteAction::Deleted(Key))
         } else {
@@ -689,20 +695,13 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action("NoRequests")]
-    fn rebind_keyring(
-        &mut self,
-        new_key_desc: &KeyDescription,
-    ) -> StratisResult<RenameAction<Key>> {
-        match self.backstore.rebind_keyring(new_key_desc)? {
-            Some(true) => Ok(RenameAction::Renamed(Key)),
-            Some(false) => Ok(RenameAction::Identity),
-            None => Ok(RenameAction::NoSource),
+    fn unbind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Clevis>> {
+        let changed = self.backstore.unbind_clevis(token_slot)?;
+        if changed {
+            Ok(DeleteAction::Deleted(Clevis))
+        } else {
+            Ok(DeleteAction::Identity)
         }
-    }
-
-    #[pool_mutating_action("NoRequests")]
-    fn rebind_clevis(&mut self) -> StratisResult<RegenAction> {
-        self.backstore.rebind_clevis().map(|_| RegenAction)
     }
 
     #[pool_mutating_action("NoRequests")]
@@ -1066,10 +1065,14 @@ impl Pool for StratPool {
         self.backstore.is_encrypted()
     }
 
-    fn encryption_info(&self) -> Option<PoolEncryptionInfo> {
+    fn encryption_info_legacy(&self) -> Option<PoolEncryptionInfo> {
         self.backstore
             .encryption_info()
             .map(PoolEncryptionInfo::from)
+    }
+
+    fn encryption_info(&self) -> Option<Either<EncryptionInfo, PoolEncryptionInfo>> {
+        self.backstore.encryption_info().cloned().map(Either::Left)
     }
 
     fn avail_actions(&self) -> ActionAvailability {
@@ -1266,20 +1269,6 @@ mod tests {
     fn invariant(pool: &StratPool, pool_name: &str) {
         check_metadata(&pool.record(&Name::new(pool_name.into()))).unwrap();
         assert!(!(pool.is_encrypted() && pool.backstore.has_cache()));
-        if pool.avail_actions() == ActionAvailability::NoRequests {
-            assert!(
-                pool.encryption_info().is_some()
-                    && pool
-                        .encryption_info()
-                        .map(|ei| { ei.is_inconsistent() })
-                        .unwrap_or(false)
-            );
-        } else if pool.avail_actions() == ActionAvailability::Full {
-            assert!(!pool
-                .encryption_info()
-                .map(|ei| ei.is_inconsistent())
-                .unwrap_or(false));
-        }
         assert!(pool
             .backstore
             .blockdevs()
@@ -1702,7 +1691,7 @@ mod tests {
             .tempdir()
             .unwrap();
         let new_file = tmp_dir.path().join("stratis_test.txt");
-        let write_block = &[0; 512_000];
+        let write_block = vec![0; 512_000];
 
         {
             let (_, fs) = pool.get_filesystem(fs_uuid).unwrap();
@@ -1723,7 +1712,7 @@ mod tests {
             .open(new_file)
             .unwrap();
         while !pool.out_of_alloc_space() {
-            f.write_all(write_block).unwrap();
+            f.write_all(&write_block).unwrap();
             f.sync_all().unwrap();
             match pool {
                 AnyPool::V1(p) => p.event_on(pool_uuid, &pool_name).unwrap(),

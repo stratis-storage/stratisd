@@ -33,18 +33,20 @@ use crate::{
         strat_engine::{
             cmd::clevis_decrypt,
             crypt::consts::{
-                CLEVIS_LUKS_TOKEN_ID, CLEVIS_RECURSION_LIMIT, CLEVIS_TANG_TRUST_URL,
-                CLEVIS_TOKEN_NAME, DEFAULT_CRYPT_KEYSLOTS_SIZE, DEFAULT_CRYPT_METADATA_SIZE,
-                LUKS2_SECTOR_SIZE, LUKS2_TOKEN_ID, LUKS2_TOKEN_TYPE, TOKEN_KEYSLOTS_KEY,
-                TOKEN_TYPE_KEY,
+                CLEVIS_RECURSION_LIMIT, CLEVIS_TANG_TRUST_URL, CLEVIS_TOKEN_NAME,
+                DEFAULT_CRYPT_KEYSLOTS_SIZE, DEFAULT_CRYPT_METADATA_SIZE, LUKS2_SECTOR_SIZE,
+                LUKS2_TOKEN_ID, LUKS2_TOKEN_TYPE, TOKEN_KEYSLOTS_KEY, TOKEN_TYPE_KEY,
             },
             dm::get_dm,
             keys,
         },
-        types::{KeyDescription, SizedKeyMemory, UnlockMethod},
+        types::{KeyDescription, SizedKeyMemory, UnlockMechanism},
+        EncryptionInfo,
     },
     stratis::{StratisError, StratisResult},
 };
+
+use super::consts::CLEVIS_TOKEN_TYPE;
 
 /// Set up crypt logging to log cryptsetup debug information at the trace level.
 pub fn set_up_crypt_logging() {
@@ -97,9 +99,10 @@ fn key_desc_to_passphrase(key_description: &KeyDescription) -> StratisResult<Siz
 // in memory (this is automatically done when formatting a LUKS2 device).
 pub fn add_keyring_keyslot(
     device: &mut CryptDevice,
+    token_slot: Option<u32>,
     key_description: &KeyDescription,
     pass: Option<Either<SizedKeyMemory, &KeyDescription>>,
-) -> StratisResult<()> {
+) -> StratisResult<u32> {
     let key = key_desc_to_passphrase(key_description)?;
     let keyslot = match pass {
         Some(Either::Left(ref pass)) => {
@@ -139,20 +142,20 @@ pub fn add_keyring_keyslot(
         }
     };
 
-    log_on_failure!(
+    let new_token_slot = log_on_failure!(
         device
             .token_handle()
-            .luks2_keyring_set(Some(LUKS2_TOKEN_ID), &key_description.to_system_string()),
+            .luks2_keyring_set(token_slot, &key_description.to_system_string()),
         "Failed to initialize the LUKS2 token for driving keyring activation operations"
     );
     log_on_failure!(
         device
             .token_handle()
-            .assign_keyslot(LUKS2_TOKEN_ID, Some(keyslot)),
+            .assign_keyslot(new_token_slot, Some(keyslot)),
         "Failed to assign the LUKS2 keyring token to the Stratis keyslot"
     );
 
-    Ok(())
+    Ok(new_token_slot)
 }
 
 /// Create a device handle and load the LUKS2 header into memory from
@@ -175,33 +178,35 @@ pub fn device_from_physical_path(physical_path: &Path) -> StratisResult<Option<C
     }
 }
 
-/// Get the Clevis binding information from the device metadata.
+/// Get the key description binding information from a JSON token value
 ///
 /// This method returns:
-/// * Ok(Some(_)) if a Clevis token was detected
-/// * Ok(None) if no token in the Clevis slot was detected or a token was detected
-///   but does not appear to be a Clevis token
-/// * Err(_) if the token appears to be a Clevis token but is malformed in some way
-pub fn clevis_info_from_metadata(
-    device: &mut CryptDevice,
-) -> StratisResult<Option<(String, Value)>> {
-    let json = match device.token_handle().json_get(CLEVIS_LUKS_TOKEN_ID).ok() {
-        Some(j) => j,
-        None => return Ok(None),
-    };
-    let json_b64 = match json
+/// * Ok(_) if a key description token was detected
+/// * Err(_) if an error occurred or the token was marked as a key description token but is malformed in some way
+fn key_description_from_json(json: &Value) -> StratisResult<Option<KeyDescription>> {
+    json.get("key_description")
+        .and_then(|val| val.as_str())
+        .ok_or_else(|| StratisError::Msg("Found malformed key description token".to_string()))
+        .and_then(|s| KeyDescription::from_system_key_desc(s).transpose())
+}
+
+/// Get the Clevis binding information from a JSON token value
+///
+/// This method returns:
+/// * Ok(_) if a Clevis token was detected
+/// * Err(_) if an error occurred or the token was marked as a Clevis token but is malformed in some way
+pub fn clevis_info_from_json(json: &Value) -> StratisResult<(String, Value)> {
+    let json_b64 = json
         .get("jwe")
         .and_then(|map| map.get("protected"))
         .and_then(|string| string.as_str())
-    {
-        Some(s) => s.to_owned(),
-        None => return Ok(None),
-    };
+        .map(|s| s.to_owned())
+        .ok_or_else(|| StratisError::Msg("Found malformed Clevis token".to_string()))?;
     let json_bytes = BASE64URL_NOPAD.decode(json_b64.as_bytes())?;
 
     let subjson: Value = serde_json::from_slice(json_bytes.as_slice())?;
 
-    pin_dispatch(&subjson, CLEVIS_RECURSION_LIMIT).map(Some)
+    pin_dispatch(&subjson, CLEVIS_RECURSION_LIMIT)
 }
 
 /// Returns true if the Tang config has a thumbprint or an advertisement
@@ -467,93 +472,6 @@ fn device_is_active(device: Option<&mut CryptDevice>, device_name: &DmName) -> S
     }
 }
 
-/// Activate encrypted Stratis device using the name stored in the
-/// Stratis token.
-pub fn activate(
-    device: &mut CryptDevice,
-    key_desc: Option<&KeyDescription>,
-    unlock_method: UnlockMethod,
-    passphrase: Option<&SizedKeyMemory>,
-    name: &DmName,
-) -> StratisResult<()> {
-    if let Some(p) = passphrase {
-        let key_slot =
-            if unlock_method == UnlockMethod::Keyring {
-                Some(get_keyslot_number(device, LUKS2_TOKEN_ID)?.ok_or_else(|| {
-                    StratisError::Msg("LUKS keyring keyslot not found".to_string())
-                })?)
-            } else if unlock_method == UnlockMethod::Clevis {
-                Some(
-                    get_keyslot_number(device, CLEVIS_LUKS_TOKEN_ID)?
-                        .ok_or_else(|| StratisError::Msg("Clevis keyslot not found".to_string()))?,
-                )
-            } else {
-                None
-            };
-        log_on_failure!(
-            device.activate_handle().activate_by_passphrase(
-                Some(&name.to_string()),
-                key_slot,
-                p.as_ref(),
-                CryptActivate::empty(),
-            ),
-            "Failed to activate device with name {}",
-            name
-        );
-    } else {
-        if let (Some(kd), UnlockMethod::Keyring | UnlockMethod::Any) = (key_desc, unlock_method) {
-            let key_description_missing = keys::search_key_persistent(kd)
-                .map_err(|_| {
-                    StratisError::Msg(format!(
-                        "Searching the persistent keyring for the key description {} failed.",
-                        kd.as_application_str(),
-                    ))
-                })?
-                .is_none();
-            if key_description_missing {
-                warn!(
-                    "Key description {} was not found in the keyring",
-                    kd.as_application_str()
-                );
-            }
-            if key_description_missing && unlock_method == UnlockMethod::Keyring {
-                return Err(StratisError::Msg(format!(
-                    "The key description \"{}\" is not currently set.",
-                    kd.as_application_str(),
-                )));
-            }
-        }
-        device
-            .token_handle()
-            .activate_by_token::<()>(
-                Some(&name.to_string()),
-                if unlock_method == UnlockMethod::Keyring {
-                    Some(LUKS2_TOKEN_ID)
-                } else if unlock_method == UnlockMethod::Clevis {
-                    Some(CLEVIS_LUKS_TOKEN_ID)
-                } else {
-                    None
-                },
-                None,
-                CryptActivate::empty(),
-            )
-            .map_err(|e| match e {
-                LibcryptErr::IOError(e) => match e.kind() {
-                    ErrorKind::NotFound => StratisError::Msg(format!(
-                        "Token slot for unlock method {unlock_method:?} was empty"
-                    )),
-                    _ => StratisError::from(e),
-                },
-                _ => StratisError::from(e),
-            })?;
-    }
-
-    // Check activation status.
-    device_is_active(Some(device), name)?;
-
-    Ok(())
-}
-
 /// Get a list of all keyslots associated with the LUKS2 token.
 /// This is necessary because attempting to destroy an uninitialized
 /// keyslot will result in an error.
@@ -777,10 +695,65 @@ pub fn read_key(key_description: &KeyDescription) -> StratisResult<Option<SizedK
     read_key_result.map(|opt| opt.map(|(_, mem)| mem))
 }
 
-/// Query the Stratis metadata for the key description used to unlock the
-/// physical device.
-pub fn key_desc_from_metadata(device: &mut CryptDevice) -> Option<String> {
-    device.token_handle().luks2_keyring_get(LUKS2_TOKEN_ID).ok()
+fn token_dispatch(json: &Value) -> StratisResult<Option<UnlockMechanism>> {
+    match json.get("type").and_then(|val| val.as_str()) {
+        Some(CLEVIS_TOKEN_TYPE) => Ok(Some(UnlockMechanism::ClevisInfo(clevis_info_from_json(
+            json,
+        )?))),
+        Some(LUKS2_TOKEN_TYPE) => {
+            Ok(key_description_from_json(json)?.map(UnlockMechanism::KeyDesc))
+        }
+        Some(ty) => {
+            info!("Token type {ty} found for the given token; ignoring",);
+            Ok(None)
+        }
+        None => {
+            warn!(
+                "No token type found for the given token: {}; this token may be malformed",
+                json.to_string()
+            );
+            Ok(None)
+        }
+    }
+}
+
+pub fn encryption_info_from_metadata(device: &mut CryptDevice) -> StratisResult<EncryptionInfo> {
+    let json = device.status_handle().dump_json()?;
+    let tokens = if let Value::Object(mut obj) = json {
+        obj.remove("tokens").ok_or_else(|| {
+            StratisError::Msg("Did not find a record of tokens in the LUKS2 metadata".to_string())
+        })?
+    } else {
+        return Err(StratisError::Msg(format!(
+            "Found malformed JSON record of metadata: {json}"
+        )));
+    };
+
+    if let Value::Object(obj) = tokens {
+        let encryption_info = obj.into_iter().try_fold(
+            EncryptionInfo::new(),
+            |mut enc_info, (token_slot, token)| {
+                let token_slot = token_slot
+                    .parse::<u32>()
+                    .map_err(|e| StratisError::Msg(e.to_string()))?;
+                if let Some(res) = token_dispatch(&token)? {
+                    enc_info.add_info(token_slot, res)?;
+                }
+                Result::<_, StratisError>::Ok(enc_info)
+            },
+        )?;
+        if encryption_info.is_empty() {
+            Err(StratisError::Msg(
+                "No valid unlock mechanism found for the encrypted device".to_string(),
+            ))
+        } else {
+            Ok(encryption_info)
+        }
+    } else {
+        Err(StratisError::Msg(format!(
+            "Found malformed JSON record of token metadata: {tokens}"
+        )))
+    }
 }
 
 // Bytes occupied by crypt metadata
@@ -867,6 +840,86 @@ pub fn register_clevis_token() -> StratisResult<()> {
         Some(validate),
         Some(dump),
     )?;
+    Ok(())
+}
+
+/// Activate encrypted Stratis device.
+pub fn activate(
+    device: &mut CryptDevice,
+    ei: &EncryptionInfo,
+    unlock_method: Option<u32>,
+    passphrase: Option<&SizedKeyMemory>,
+    name: &DmName,
+) -> StratisResult<()> {
+    if let Some(p) = passphrase {
+        let key_slot =
+            match unlock_method {
+                Some(t) => Some(get_keyslot_number(device, t)?.ok_or_else(|| {
+                    StratisError::Msg("Keyslot for token {t} not found".to_string())
+                })?),
+                None => None,
+            };
+        log_on_failure!(
+            device.activate_handle().activate_by_passphrase(
+                Some(&name.to_string()),
+                key_slot,
+                p.as_ref(),
+                CryptActivate::empty(),
+            ),
+            "Failed to activate device with name {}",
+            name
+        );
+    } else {
+        let slot = match unlock_method {
+            Some(t) => {
+                if let Some(kd) = ei
+                    .get_info(t)
+                    .ok_or_else(|| StratisError::Msg(format!("Token slot {t} empty")))?
+                    .key_desc()
+                {
+                    let key_description_missing = keys::search_key_persistent(kd)
+                        .map_err(|_| {
+                            StratisError::Msg(format!(
+                                "Searching the persistent keyring for the key description {} failed.",
+                                kd.as_application_str(),
+                            ))
+                        })?
+                        .is_none();
+                    if key_description_missing {
+                        warn!(
+                            "Key description {} was not found in the keyring",
+                            kd.as_application_str()
+                        );
+                        return Err(StratisError::Msg(format!(
+                            "The key description \"{}\" is not currently set.",
+                            kd.as_application_str(),
+                        )));
+                    }
+                }
+                Some(t)
+            }
+            None => {
+                keys::get_persistent_keyring()?;
+                None
+            }
+        };
+        device
+            .token_handle()
+            .activate_by_token::<()>(Some(&name.to_string()), slot, None, CryptActivate::empty())
+            .map_err(|e| match e {
+                LibcryptErr::IOError(e) => match e.kind() {
+                    ErrorKind::NotFound => StratisError::Msg(format!(
+                        "Token slot for unlock method {unlock_method:?} was empty"
+                    )),
+                    _ => StratisError::from(e),
+                },
+                _ => StratisError::from(e),
+            })?;
+    }
+
+    // Check activation status.
+    device_is_active(Some(device), name)?;
+
     Ok(())
 }
 

@@ -222,7 +222,7 @@ version = "0.26.0"
 optional = true
 
 [dependencies.tempfile]
-version = "3.4.0"
+version = "3.7.0"
 optional = true
 
 [dependencies.termios]

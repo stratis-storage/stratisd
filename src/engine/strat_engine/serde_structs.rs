@@ -16,7 +16,7 @@ use serde::{Serialize, Serializer};
 
 use devicemapper::{Sectors, ThinDevId};
 
-use crate::engine::types::{DevUuid, Features, FilesystemUuid};
+use crate::engine::types::{DevUuid, Features, FilesystemUuid, ValidatedIntegritySpec};
 
 const MAXIMUM_STRING_SIZE: usize = 255;
 
@@ -117,6 +117,8 @@ pub struct BackstoreSave {
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DataTierSave {
     pub blockdev: BlockDevSave,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub integrity_spec: Option<ValidatedIntegritySpec>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]

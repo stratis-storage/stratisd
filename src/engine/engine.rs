@@ -21,11 +21,12 @@ use crate::{
         structures::{AllLockReadGuard, AllLockWriteGuard, SomeLockReadGuard, SomeLockWriteGuard},
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, LockedPoolsInfo,
-            MappingCreateAction, MappingDeleteAction, Name, PoolDiff, PoolEncryptionInfo,
-            PoolIdentifier, PoolUuid, RegenAction, RenameAction, ReportType, SetCreateAction,
-            SetDeleteAction, SetUnlockAction, StartAction, StopAction, StoppedPoolsInfo,
-            StratFilesystemDiff, StratSigblockVersion, UdevEngineEvent, UnlockMethod,
+            EncryptionInfo, FilesystemUuid, GrowAction, IntegritySpec, Key, KeyDescription,
+            LockedPoolsInfo, MappingCreateAction, MappingDeleteAction, Name, PoolDiff,
+            PoolEncryptionInfo, PoolIdentifier, PoolUuid, RegenAction, RenameAction, ReportType,
+            SetCreateAction, SetDeleteAction, SetUnlockAction, StartAction, StopAction,
+            StoppedPoolsInfo, StratFilesystemDiff, StratSigblockVersion, UdevEngineEvent,
+            UnlockMethod,
         },
     },
     stratis::StratisResult,
@@ -381,6 +382,7 @@ pub trait Engine: Debug + Report + Send + Sync {
         name: &str,
         blockdev_paths: &[&Path],
         encryption_info: Option<&EncryptionInfo>,
+        integrity_spec: IntegritySpec,
     ) -> StratisResult<CreateAction<PoolUuid>>;
 
     /// Handle a libudev event.

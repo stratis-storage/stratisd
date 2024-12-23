@@ -240,7 +240,7 @@ optional = true
 features = ["serde", "v4"]
 
 [build-dependencies]
-pkg-config = "0.3.18"
+pkg-config = "0.3.31"
 
 [build-dependencies.bindgen]
 default-features = false

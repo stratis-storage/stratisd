@@ -137,7 +137,7 @@ impl Engine for SimEngine {
 
         validate_paths(blockdev_paths)?;
 
-        ValidatedIntegritySpec::try_from(integrity_spec)?;
+        let integrity_spec = ValidatedIntegritySpec::try_from(integrity_spec)?;
 
         if let Some(key_desc) = encryption_info.and_then(|ei| ei.key_description()) {
             if !self.key_handler.contains_key(key_desc) {
@@ -160,7 +160,7 @@ impl Engine for SimEngine {
                     let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
                     let devices = device_set.into_iter().cloned().collect::<Vec<_>>();
 
-                    let (pool_uuid, pool) = SimPool::new(&devices, encryption_info);
+                    let (pool_uuid, pool) = SimPool::new(&devices, encryption_info, integrity_spec);
 
                     self.pools.modify_all().await.insert(
                         Name::new(name.to_owned()),

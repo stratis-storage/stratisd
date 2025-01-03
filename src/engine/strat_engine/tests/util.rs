@@ -6,11 +6,10 @@ use std::{
     fs::File,
     io::Read,
     path::{Path, PathBuf},
-    thread::sleep,
-    time::Duration,
 };
 
 use nix::mount::{umount2, MntFlags};
+use retry::{delay::Fixed, retry};
 
 use devicemapper::{DevId, DmFlags, DmName, DmNameBuf, DmOptions, DM};
 
@@ -117,23 +116,17 @@ pub fn dm_stratis_devices_remove() -> Result<()> {
         // Retries if no progress has been made.
         if !remain.is_empty() && !progress_made {
             remain.retain(|name| {
-                for _ in 0..3 {
-                    match get_dm().device_remove(&DevId::Name(name), DmOptions::default()) {
-                        Ok(_) => {
-                            progress_made = true;
-                            return false;
-                        }
-                        Err(e) => {
-                            debug!(
-                                "Failed to remove device {} on retry: {}",
-                                name.to_string(),
-                                e
-                            );
-                            sleep(Duration::from_secs(1));
-                        }
-                    }
+                if let Err(retry::Error { error, .. }) =
+                    retry(Fixed::from_millis(1000).take(3), || {
+                        get_dm().device_remove(&DevId::Name(name), DmOptions::default())
+                    })
+                {
+                    debug!("Failed to remove device {}: {}", name.to_string(), error);
+                    true
+                } else {
+                    progress_made = true;
+                    false
                 }
-                true
             });
         }
 

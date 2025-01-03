@@ -83,8 +83,7 @@ use self::cleanup_errors::{Error, Result};
 /// FIXME: Current implementation complicated by https://bugzilla.redhat.com/show_bug.cgi?id=1506287
 pub fn dm_stratis_devices_remove() -> Result<()> {
     /// One iteration of removing devicemapper devices
-    fn one_iteration() -> Result<(bool, Vec<DmNameBuf>)> {
-        let mut progress_made = false;
+    fn one_iteration() -> Result<Vec<DmNameBuf>> {
         let remain = get_dm()
             .list_devices()
             .map_err(|e| {
@@ -109,23 +108,27 @@ pub fn dm_stratis_devices_remove() -> Result<()> {
                     debug!("Failed to remove device {}: {}", n.to_string(), error);
                     Some(n.to_owned())
                 } else {
-                    progress_made = true;
                     None
                 }
             })
             .collect::<Vec<_>>();
 
-        Ok((progress_made, remain))
+        Ok(remain)
     }
 
     /// Do one iteration of removals until progress stops. Return remaining
     /// dm devices.
     fn do_while_progress() -> Result<Vec<DmNameBuf>> {
-        let mut result = one_iteration()?;
-        while result.0 {
-            result = one_iteration()?;
+        let mut remaining = one_iteration()?;
+        while !remaining.is_empty() {
+            let temp = one_iteration()?;
+            if temp.len() < remaining.len() {
+                remaining = temp;
+            } else {
+                break;
+            }
         }
-        Ok(result.1)
+        Ok(remaining)
     }
 
     || -> Result<()> {

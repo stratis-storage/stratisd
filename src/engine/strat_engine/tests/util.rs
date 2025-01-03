@@ -84,36 +84,37 @@ use self::cleanup_errors::{Error, Result};
 pub fn dm_stratis_devices_remove() -> Result<()> {
     /// One iteration of removing devicemapper devices
     fn one_iteration() -> Result<Vec<DmNameBuf>> {
-        let remain = get_dm()
+        get_dm()
             .list_devices()
             .map_err(|e| {
                 Error::Chained(
                     "failed while listing DM devices, giving up".into(),
                     Box::new(e.into()),
                 )
-            })?
-            .iter()
-            .map(|d| &d.0)
-            .filter_map(|n| {
-                if !n.to_string().starts_with("stratis-1")
-                    && !n.to_string().starts_with("stratis_fail_device")
-                    && !n.to_string().starts_with("stratis_test_device")
-                {
-                    None
-                } else if let Err(retry::Error { error, .. }) =
-                    retry(Fixed::from_millis(1000).take(3), || {
-                        get_dm().device_remove(&DevId::Name(n), DmOptions::default())
-                    })
-                {
-                    debug!("Failed to remove device {}: {}", n.to_string(), error);
-                    Some(n.to_owned())
-                } else {
-                    None
-                }
             })
-            .collect::<Vec<_>>();
-
-        Ok(remain)
+            .map(|devices| {
+                devices
+                    .iter()
+                    .map(|d| &d.0)
+                    .filter_map(|n| {
+                        if !n.to_string().starts_with("stratis-1")
+                            && !n.to_string().starts_with("stratis_fail_device")
+                            && !n.to_string().starts_with("stratis_test_device")
+                        {
+                            None
+                        } else if let Err(retry::Error { error, .. }) =
+                            retry(Fixed::from_millis(1000).take(3), || {
+                                get_dm().device_remove(&DevId::Name(n), DmOptions::default())
+                            })
+                        {
+                            debug!("Failed to remove device {}: {}", n.to_string(), error);
+                            Some(n.to_owned())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })
     }
 
     /// Do one iteration of removals until progress stops. Return remaining

@@ -85,7 +85,7 @@ pub fn dm_stratis_devices_remove() -> Result<()> {
     /// One iteration of removing devicemapper devices
     fn one_iteration() -> Result<(bool, Vec<DmNameBuf>)> {
         let mut progress_made = false;
-        let mut remain = get_dm()
+        let remain = get_dm()
             .list_devices()
             .map_err(|e| {
                 Error::Chained(
@@ -101,34 +101,19 @@ pub fn dm_stratis_devices_remove() -> Result<()> {
                     && !n.to_string().starts_with("stratis_test_device")
                 {
                     None
+                } else if let Err(retry::Error { error, .. }) =
+                    retry(Fixed::from_millis(1000).take(3), || {
+                        get_dm().device_remove(&DevId::Name(n), DmOptions::default())
+                    })
+                {
+                    debug!("Failed to remove device {}: {}", n.to_string(), error);
+                    Some(n.to_owned())
                 } else {
-                    match get_dm().device_remove(&DevId::Name(n), DmOptions::default()) {
-                        Ok(_) => {
-                            progress_made = true;
-                            None
-                        }
-                        Err(_) => Some(n.to_owned()),
-                    }
+                    progress_made = true;
+                    None
                 }
             })
             .collect::<Vec<_>>();
-
-        // Retries if no progress has been made.
-        if !remain.is_empty() && !progress_made {
-            remain.retain(|name| {
-                if let Err(retry::Error { error, .. }) =
-                    retry(Fixed::from_millis(1000).take(3), || {
-                        get_dm().device_remove(&DevId::Name(name), DmOptions::default())
-                    })
-                {
-                    debug!("Failed to remove device {}: {}", name.to_string(), error);
-                    true
-                } else {
-                    progress_made = true;
-                    false
-                }
-            });
-        }
 
         Ok((progress_made, remain))
     }

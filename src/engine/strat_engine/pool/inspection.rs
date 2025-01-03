@@ -12,7 +12,7 @@ use devicemapper::Sectors;
 use crate::{
     engine::{
         strat_engine::serde_structs::PoolSave,
-        types::{DevUuid, ValidatedIntegritySpec},
+        types::{DevUuid, IntegrityTagSpec, ValidatedIntegritySpec},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -273,10 +273,31 @@ impl DataDevice {
         errors
     }
 
-    fn check(&self) -> Vec<String> {
+    fn _check_integrity(&self, integrity_spec: Option<ValidatedIntegritySpec>) -> Vec<String> {
+        if let Some(integrity_spec) = integrity_spec {
+            if !integrity_spec.allocate_superblock
+                && integrity_spec.journal_size == Sectors(0)
+                && integrity_spec.tag_spec == IntegrityTagSpec::B0
+                && self.sum(&[DataDeviceUse::IntegrityMetadata]) > Sectors(0)
+            {
+                vec![
+                    format!(
+                        "Integrity specification should resolve to 0 allocations for integrity, but data device has space allocated for integrity."
+                    )
+                ]
+            } else {
+                vec![]
+            }
+        } else {
+            vec![]
+        }
+    }
+
+    fn check(&self, integrity_spec: Option<ValidatedIntegritySpec>) -> Vec<String> {
         let mut errors = Vec::new();
         errors.extend(check_overlap(&self.extents, self.offset()));
         errors.extend(self._check_integrity_meta_round());
+        errors.extend(self._check_integrity(integrity_spec));
         errors
     }
 }
@@ -674,9 +695,14 @@ pub mod inspectors {
 
         let encrypted = metadata.features.contains(&PoolFeatures::Encryption);
 
-        let (data_devices, _) = data_devices(metadata)?;
-        for data_device in data_devices.values() {
-            errors.extend(data_device.check());
+        let (data_devices, integrity_spec) = data_devices(metadata)?;
+        for (uuid, data_device) in data_devices.iter() {
+            errors.extend(
+                data_device
+                    .check(integrity_spec)
+                    .iter()
+                    .map(|s| format!("Device {uuid}: {s}")),
+            );
         }
 
         let cache_devices = cache_devices(metadata)?;

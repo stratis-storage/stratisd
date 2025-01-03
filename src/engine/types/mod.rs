@@ -572,3 +572,12 @@ impl TryFrom<IntegritySpec> for ValidatedIntegritySpec {
         })
     }
 }
+
+impl Display for ValidatedIntegritySpec {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Allocate Superblock: {}", self.allocate_superblock)?;
+        writeln!(f, "Tag Specification: {}", self.tag_spec.as_ref())?;
+        writeln!(f, "Journal Size: {}", self.journal_size)?;
+        writeln!(f, "Block Size: {}", self.block_size)
+    }
+}

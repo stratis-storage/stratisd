@@ -20,13 +20,14 @@ pub use self::{
     structures::{AllLockReadGuard, ExclusiveGuard, SharedGuard, Table},
     types::{
         ActionAvailability, BlockDevTier, ClevisInfo, CreateAction, DeleteAction, DevUuid, Diff,
-        EncryptionInfo, EngineAction, FilesystemUuid, GrowAction, KeyDescription, Lockable,
-        LockedPoolInfo, LockedPoolsInfo, MappingCreateAction, MappingDeleteAction,
-        MaybeInconsistent, Name, PoolDiff, PoolEncryptionInfo, PoolIdentifier, PoolUuid,
-        PropChangeAction, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
+        EncryptionInfo, EngineAction, FilesystemUuid, GrowAction, IntegritySpec, IntegrityTagSpec,
+        KeyDescription, Lockable, LockedPoolInfo, LockedPoolsInfo, MappingCreateAction,
+        MappingDeleteAction, MaybeInconsistent, Name, PoolDiff, PoolEncryptionInfo, PoolIdentifier,
+        PoolUuid, PropChangeAction, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
         SetUnlockAction, StartAction, StopAction, StoppedPoolInfo, StoppedPoolsInfo,
         StratBlockDevDiff, StratFilesystemDiff, StratPoolDiff, StratSigblockVersion, StratisUuid,
-        ThinPoolDiff, ToDisplay, UdevEngineEvent, UnlockMethod,
+        ThinPoolDiff, ToDisplay, UdevEngineEvent, UnlockMethod, ValidatedIntegritySpec,
+        DEFAULT_INTEGRITY_JOURNAL_SIZE, DEFAULT_INTEGRITY_TAG_SPEC,
     },
 };
 

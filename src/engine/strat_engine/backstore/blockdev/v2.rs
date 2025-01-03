@@ -14,7 +14,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
-use devicemapper::{Bytes, Device, Sectors, IEC};
+use devicemapper::{Bytes, Device, Sectors};
 
 use crate::{
     engine::{
@@ -35,7 +35,7 @@ use crate::{
         },
         types::{
             Compare, DevUuid, DevicePath, Diff, PoolUuid, StateDiff, StratBlockDevDiff,
-            StratSigblockVersion,
+            StratSigblockVersion, ValidatedIntegritySpec,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -43,14 +43,28 @@ use crate::{
 
 /// Return the amount of space required for integrity for a device of the given size.
 ///
-/// This is a slight overestimation for the sake of simplicity. Because it uses the whole disk
+/// This default is a slight overestimation for the sake of simplicity. Because it uses the whole disk
 /// size, once the integrity metadata size is calculated, the remaining data size is now smaller
 /// than the metadata region could support for integrity.
 /// The result is divisible by 8 sectors.
-pub fn integrity_meta_space(total_space: Sectors) -> Sectors {
-    Bytes(4096).sectors()
-        + Bytes::from(64 * IEC::Mi).sectors()
-        + Bytes::from((*total_space * 32u64 + 4095) & !4095).sectors()
+pub fn integrity_meta_space(
+    total_space: Sectors,
+    integrity_spec: ValidatedIntegritySpec,
+) -> Sectors {
+    (if integrity_spec.allocate_superblock {
+        Bytes(4096)
+    } else {
+        Bytes(0)
+    })
+    .sectors()
+        + integrity_spec.journal_size
+        + Bytes::from(
+            (*((total_space.bytes() / integrity_spec.block_size)
+                * integrity_spec.tag_spec.as_bytes_ceil())
+                + 4095)
+                & !4095,
+        )
+        .sectors()
 }
 
 #[derive(Debug)]
@@ -206,6 +220,52 @@ impl StratBlockDev {
         }
     }
 
+    /// Grow the block device if the underlying physical device has grown in size.
+    /// Return an error and leave the size as is if the device has shrunk.
+    /// Do nothing if the device is the same size as recorded in the metadata.
+    ///
+    /// This will also extend integrity metadata reservations according to the new
+    /// size of the device.
+    pub fn grow(&mut self, integrity_spec: ValidatedIntegritySpec) -> StratisResult<bool> {
+        let size = BlockdevSize::new(Self::scan_blkdev_size(self.devnode())?);
+        let metadata_size = self.bda.dev_size();
+        match size.cmp(&metadata_size) {
+            Ordering::Less => Err(StratisError::Msg(
+                "The underlying device appears to have shrunk; you may experience data loss"
+                    .to_string(),
+            )),
+            Ordering::Equal => Ok(false),
+            Ordering::Greater => {
+                let mut f = OpenOptions::new()
+                    .write(true)
+                    .read(true)
+                    .open(self.devnode())?;
+                let mut h = static_header(&mut f)?.ok_or_else(|| {
+                    StratisError::Msg(format!(
+                        "No static header found on device {}",
+                        self.devnode().display()
+                    ))
+                })?;
+
+                h.blkdev_size = size;
+                let h = StaticHeader::write_header(&mut f, h, MetadataLocation::Both)?;
+
+                self.bda.header = h;
+                self.used.increase_size(size.sectors());
+
+                let integrity_grow = integrity_meta_space(size.sectors(), integrity_spec)
+                    - self
+                        .integrity_meta_allocs
+                        .iter()
+                        .map(|(_, len)| *len)
+                        .sum::<Sectors>();
+                self.alloc_int_meta_back(integrity_grow);
+
+                Ok(true)
+            }
+        }
+    }
+
     #[cfg(test)]
     pub fn invariant(&self) {
         assert!(self.total_size() == self.used.size());
@@ -266,46 +326,6 @@ impl InternalBlockDev for StratBlockDev {
             Ok(None)
         } else {
             Ok(Some(s))
-        }
-    }
-
-    fn grow(&mut self) -> StratisResult<bool> {
-        let size = BlockdevSize::new(Self::scan_blkdev_size(self.devnode())?);
-        let metadata_size = self.bda.dev_size();
-        match size.cmp(&metadata_size) {
-            Ordering::Less => Err(StratisError::Msg(
-                "The underlying device appears to have shrunk; you may experience data loss"
-                    .to_string(),
-            )),
-            Ordering::Equal => Ok(false),
-            Ordering::Greater => {
-                let mut f = OpenOptions::new()
-                    .write(true)
-                    .read(true)
-                    .open(self.devnode())?;
-                let mut h = static_header(&mut f)?.ok_or_else(|| {
-                    StratisError::Msg(format!(
-                        "No static header found on device {}",
-                        self.devnode().display()
-                    ))
-                })?;
-
-                h.blkdev_size = size;
-                let h = StaticHeader::write_header(&mut f, h, MetadataLocation::Both)?;
-
-                self.bda.header = h;
-                self.used.increase_size(size.sectors());
-
-                let integrity_grow = integrity_meta_space(size.sectors())
-                    - self
-                        .integrity_meta_allocs
-                        .iter()
-                        .map(|(_, len)| *len)
-                        .sum::<Sectors>();
-                self.alloc_int_meta_back(integrity_grow);
-
-                Ok(true)
-            }
         }
     }
 

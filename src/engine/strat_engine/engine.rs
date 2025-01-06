@@ -888,6 +888,8 @@ mod test {
         path::Path,
     };
 
+    use retry::{delay::Fixed, retry};
+
     use devicemapper::Sectors;
 
     use crate::engine::{
@@ -944,10 +946,28 @@ mod test {
 
         cmd::udev_settle().unwrap();
 
-        assert!(!Path::new(&format!("/dev/stratis/{name1}/{fs_name1}")).exists());
-        assert!(!Path::new(&format!("/dev/stratis/{name1}/{fs_name2}")).exists());
-        assert!(Path::new(&format!("/dev/stratis/{name2}/{fs_name1}")).exists());
-        assert!(Path::new(&format!("/dev/stratis/{name2}/{fs_name2}")).exists());
+        assert_matches!(
+            retry(Fixed::from_millis(1000).take(3), || {
+                for symlink in [
+                    format!("/dev/stratis/{name1}/{fs_name1}"),
+                    format!("/dev/stratis/{name1}/{fs_name2}"),
+                ] {
+                    if Path::new(&symlink).exists() {
+                        return Err(StratisError::Msg(format!("{} still exists", symlink)));
+                    }
+                }
+                for symlink in [
+                    format!("/dev/stratis/{name2}/{fs_name1}"),
+                    format!("/dev/stratis/{name2}/{fs_name2}"),
+                ] {
+                    if !Path::new(&symlink).exists() {
+                        return Err(StratisError::Msg(format!("{} does not exist", symlink)));
+                    }
+                }
+                Ok(())
+            }),
+            Ok(())
+        );
 
         {
             let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid1))).unwrap();

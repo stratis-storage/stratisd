@@ -13,7 +13,9 @@ use serde_json::{json, Value};
 
 use devicemapper::{Bytes, Sectors};
 
-use stratisd::engine::{crypt_metadata_size, integrity_meta_space, ThinPoolSizeParams, BDA};
+use stratisd::engine::{
+    crypt_metadata_size, integrity_meta_space, ThinPoolSizeParams, ValidatedIntegritySpec, BDA,
+};
 
 // 2^FS_SIZE_START_POWER is the logical size of the smallest Stratis
 // filesystem for which usage data exists in FSSizeLookup::internal, i.e.,
@@ -161,14 +163,17 @@ pub fn predict_filesystem_usage(
     Ok(())
 }
 
-fn predict_pool_metadata_usage(device_sizes: Vec<Sectors>) -> Result<Sectors, Box<dyn Error>> {
+fn predict_pool_metadata_usage(
+    device_sizes: Vec<Sectors>,
+    integrity_spec: ValidatedIntegritySpec,
+) -> Result<Sectors, Box<dyn Error>> {
     let stratis_metadata_alloc = BDA::default().extended_size().sectors();
     let stratis_avail_sizes = device_sizes
         .iter()
         .map(|&s| {
             info!("Total size of device: {:}", s);
 
-            let integrity_deduction = integrity_meta_space(s);
+            let integrity_deduction = integrity_meta_space(s, integrity_spec);
             info!(
                 "Deduction for stratis metadata: {:}",
                 stratis_metadata_alloc
@@ -205,6 +210,7 @@ pub fn predict_pool_usage(
     overprovisioned: bool,
     device_sizes: Vec<Bytes>,
     filesystem_sizes: Option<Vec<Bytes>>,
+    integrity_spec: ValidatedIntegritySpec,
     log_level: LevelFilter,
 ) -> Result<(), Box<dyn Error>> {
     Builder::new().filter(None, log_level).init();
@@ -216,7 +222,7 @@ pub fn predict_pool_usage(
     let device_sizes = device_sizes.iter().map(|s| s.sectors()).collect::<Vec<_>>();
     let total_size: Sectors = device_sizes.iter().cloned().sum();
 
-    let non_metadata_size = predict_pool_metadata_usage(device_sizes)?;
+    let non_metadata_size = predict_pool_metadata_usage(device_sizes, integrity_spec)?;
 
     let size_params = ThinPoolSizeParams::new(non_metadata_size)?;
     let total_non_data = 2usize * size_params.meta_size() + size_params.mdv_size();

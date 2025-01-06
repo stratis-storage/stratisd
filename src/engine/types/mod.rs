@@ -16,8 +16,10 @@ use std::{
 use libudev::EventType;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use strum_macros::{self, EnumString, FromRepr, VariantNames};
+use strum_macros::{self, AsRefStr, EnumString, FromRepr, VariantNames};
 use uuid::Uuid;
+
+use devicemapper::{Bytes, Sectors, IEC};
 
 pub use crate::engine::{
     engine::StateDiff,
@@ -36,6 +38,10 @@ pub use crate::engine::{
     },
 };
 use crate::stratis::{StratisError, StratisResult};
+
+pub const DEFAULT_INTEGRITY_JOURNAL_SIZE: Bytes = Bytes(128 * IEC::Mi as u128);
+pub const DEFAULT_INTEGRITY_BLOCK_SIZE: Bytes = Bytes(4 * IEC::Ki as u128);
+pub const DEFAULT_INTEGRITY_TAG_SPEC: IntegrityTagSpec = IntegrityTagSpec::B512;
 
 mod actions;
 mod diff;
@@ -480,4 +486,98 @@ impl UuidOrConflict {
 pub enum StratSigblockVersion {
     V1 = 1,
     V2 = 2,
+}
+
+/// A way to specify an integrity tag size. It is possible for the specification
+/// to be non-numeric but translatable to some number of bits.
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    Serialize,
+    Deserialize,
+    VariantNames,
+    EnumString,
+    AsRefStr,
+)]
+pub enum IntegrityTagSpec {
+    #[strum(serialize = "0b")]
+    #[serde(rename = "0b")]
+    B0,
+    #[strum(serialize = "32b")]
+    #[serde(rename = "32b")]
+    B32,
+    #[strum(serialize = "512b")]
+    #[serde(rename = "512b")]
+    B512,
+}
+
+impl IntegrityTagSpec {
+    /// The smallest number of bytes containing the bits represented.
+    pub fn as_bytes_ceil(self) -> Bytes {
+        match self {
+            IntegrityTagSpec::B0 => Bytes(0),
+            IntegrityTagSpec::B32 => Bytes(4),
+            IntegrityTagSpec::B512 => Bytes(64),
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct IntegritySpec {
+    pub tag_spec: Option<IntegrityTagSpec>,
+    pub journal_size: Option<Bytes>,
+    pub allocate_superblock: Option<bool>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ValidatedIntegritySpec {
+    pub tag_spec: IntegrityTagSpec,
+    pub journal_size: Sectors,
+    pub block_size: Bytes,
+    pub allocate_superblock: bool,
+}
+
+impl Default for ValidatedIntegritySpec {
+    fn default() -> Self {
+        ValidatedIntegritySpec::try_from(IntegritySpec::default()).expect("default is valid")
+    }
+}
+
+impl TryFrom<IntegritySpec> for ValidatedIntegritySpec {
+    type Error = StratisError;
+
+    fn try_from(spec: IntegritySpec) -> StratisResult<Self> {
+        let journal_size = match spec.journal_size {
+            Some(journal_size) => {
+                if journal_size % 4096u64 != Bytes(0) {
+                    return Err(StratisError::Msg(format!(
+                        "specified integrity journal size {journal_size} is not a multiple of 4096"
+                    )));
+                } else {
+                    journal_size.sectors()
+                }
+            }
+            None => DEFAULT_INTEGRITY_JOURNAL_SIZE.sectors(),
+        };
+
+        Ok(ValidatedIntegritySpec {
+            journal_size,
+            tag_spec: spec.tag_spec.unwrap_or(DEFAULT_INTEGRITY_TAG_SPEC),
+            block_size: DEFAULT_INTEGRITY_BLOCK_SIZE,
+            allocate_superblock: spec.allocate_superblock.unwrap_or(true),
+        })
+    }
+}
+
+impl Display for ValidatedIntegritySpec {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Allocate Superblock: {}", self.allocate_superblock)?;
+        writeln!(f, "Tag Specification: {}", self.tag_spec.as_ref())?;
+        writeln!(f, "Journal Size: {}", self.journal_size)?;
+        writeln!(f, "Block Size: {}", self.block_size)
+    }
 }

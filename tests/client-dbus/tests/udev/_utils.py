@@ -150,6 +150,9 @@ def create_pool(
                 "clevis_info": (
                     (False, ("", "")) if clevis_arg is None else (True, clevis_arg)
                 ),
+                "journal_size": (False, 0),
+                "tag_spec": (False, ""),
+                "allocate_superblock": (False, False),
             },
         )
 

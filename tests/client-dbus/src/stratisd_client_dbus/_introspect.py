@@ -13,6 +13,9 @@ SPECS = {
       <arg name="devices" type="as" direction="in" />
       <arg name="key_desc" type="(bs)" direction="in" />
       <arg name="clevis_info" type="(b(ss))" direction="in" />
+      <arg name="journal_size" type="(bt)" direction="in" />
+      <arg name="tag_spec" type="(bs)" direction="in" />
+      <arg name="allocate_superblock" type="(bb)" direction="in" />
       <arg name="result" type="(b(oao))" direction="out" />
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />

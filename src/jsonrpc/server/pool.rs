@@ -10,7 +10,7 @@ use tokio::task::block_in_place;
 use crate::{
     engine::{
         BlockDevTier, CreateAction, DeleteAction, EncryptionInfo, Engine, EngineAction,
-        KeyDescription, Name, PoolIdentifier, PoolUuid, RenameAction, UnlockMethod,
+        IntegritySpec, KeyDescription, Name, PoolIdentifier, PoolUuid, RenameAction, UnlockMethod,
     },
     jsonrpc::interface::PoolListType,
     stratis::{StratisError, StratisResult},
@@ -45,7 +45,10 @@ pub async fn pool_create<'a>(
     enc_info: Option<&'a EncryptionInfo>,
 ) -> StratisResult<bool> {
     Ok(
-        match engine.create_pool(name, blockdev_paths, enc_info).await? {
+        match engine
+            .create_pool(name, blockdev_paths, enc_info, IntegritySpec::default())
+            .await?
+        {
             CreateAction::Created(_) => true,
             CreateAction::Identity => false,
         },

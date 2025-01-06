@@ -77,7 +77,7 @@ fn main() {
         match c.run(stripped_args) {
             Ok(()) => {}
             Err(e) => {
-                eprintln!("Error encountered: {e}");
+                eprintln!("{e}");
                 process::exit(1);
             }
         }

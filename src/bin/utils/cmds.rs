@@ -8,13 +8,19 @@ use std::{
     str::FromStr,
 };
 
-use clap::{Arg, ArgAction, Command};
+use clap::{builder::PossibleValuesParser, Arg, ArgAction, Command};
 
 #[cfg(feature = "systemd_compat")]
 use clap::builder::Str;
 use log::LevelFilter;
+use strum::VariantNames;
 
 use devicemapper::Bytes;
+
+use stratisd::engine::{
+    IntegritySpec, IntegrityTagSpec, ValidatedIntegritySpec, DEFAULT_INTEGRITY_JOURNAL_SIZE,
+    DEFAULT_INTEGRITY_TAG_SPEC,
+};
 
 use crate::utils::predict_usage;
 
@@ -86,6 +92,31 @@ pool is encrypted, setting this option has no effect on the prediction."),
                         .value_parser(clap::value_parser!(u128))
                         .help("Size of filesystem to be made for this pool. May be specified multiple times, one for each filesystem. Units are bytes. Must be at least 512 MiB and less than 4 PiB.")
                         .next_line_help(true)
+                    )
+                    .arg(
+                        Arg::new("integrity_tag_spec")
+                        .long("integrity-tag-spec")
+                        .num_args(1)
+                        .value_parser(PossibleValuesParser::new(IntegrityTagSpec::VARIANTS))
+                        .default_value(DEFAULT_INTEGRITY_TAG_SPEC.as_ref())
+                        .help("Integrity tag specification defining the size of the tag to store a checksum or other value for each block on a device.")
+                        .next_line_help(true)
+                    )
+                    .arg(
+                        Arg::new("integrity_journal_size")
+                        .long("integrity-journal-size")
+                        .num_args(1)
+                        .value_parser(clap::value_parser!(u64))
+                        .default_value(Box::leak((*DEFAULT_INTEGRITY_JOURNAL_SIZE).to_string().into_boxed_str()) as &'static str)
+                        .help("Size of the integrity journal. Default is 128 MiB. Units are bytes.")
+                        .next_line_help(true)
+                    )
+                    .arg(
+                        Arg::new("no_integrity_superblock")
+                        .action(ArgAction::SetTrue)
+                        .long("no-integrity-superblock")
+                        .help("Do not allocate space for integrity superblock")
+                        .next_line_help(true)
                     ),
                 Command::new("filesystem")
                     .about("Predicts the space usage when creating a Stratis filesystem.")
@@ -126,6 +157,24 @@ impl<'a> UtilCommand<'a> for StratisPredictUsage {
                 sub_m
                     .get_many::<u128>("filesystem-size")
                     .map(|szs| szs.map(|n| Bytes(*n)).collect::<Vec<_>>()),
+                ValidatedIntegritySpec::try_from(IntegritySpec {
+                    journal_size: Some(
+                        sub_m
+                            .get_one::<u64>("integrity_journal_size")
+                            .map(|n| Bytes::from(*n))
+                            .expect("default specified by parser"),
+                    ),
+                    tag_spec: Some(
+                        sub_m
+                            .get_one::<String>("integrity_tag_spec")
+                            .map(|sz| {
+                                IntegrityTagSpec::try_from(sz.as_str())
+                                    .expect("parser ensures valid value")
+                            })
+                            .expect("default specified by parser"),
+                    ),
+                    allocate_superblock: Some(!sub_m.get_flag("no_integrity_superblock")),
+                })?,
                 LevelFilter::from_str(
                     matches
                         .get_one::<String>("log-level")

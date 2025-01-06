@@ -37,9 +37,10 @@ use crate::{
             SomeLockWriteGuard, Table,
         },
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockedPoolsInfo,
-            PoolDiff, PoolIdentifier, RenameAction, ReportType, SetUnlockAction, StartAction,
-            StopAction, StoppedPoolsInfo, StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
+            CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, IntegritySpec,
+            LockedPoolsInfo, PoolDiff, PoolIdentifier, RenameAction, ReportType, SetUnlockAction,
+            StartAction, StopAction, StoppedPoolsInfo, StratFilesystemDiff, UdevEngineEvent,
+            UnlockMethod, ValidatedIntegritySpec,
         },
         Engine, Name, Pool, PoolUuid, Report,
     },
@@ -494,9 +495,11 @@ impl Engine for StratEngine {
         name: &str,
         blockdev_paths: &[&Path],
         encryption_info: Option<&EncryptionInfo>,
+        integrity_spec: IntegritySpec,
     ) -> StratisResult<CreateAction<PoolUuid>> {
         validate_name(name)?;
         let name = Name::new(name.to_owned());
+        let integrity_spec = ValidatedIntegritySpec::try_from(integrity_spec)?;
 
         validate_paths(blockdev_paths)?;
 
@@ -558,6 +561,7 @@ impl Engine for StratEngine {
                         &cloned_name,
                         unowned_devices,
                         cloned_enc_info.as_ref(),
+                        integrity_spec,
                     )
                 })??;
                 pools.insert(Name::new(name.to_string()), pool_uuid, AnyPool::V2(pool));
@@ -911,7 +915,7 @@ mod test {
         let engine = StratEngine::initialize().unwrap();
 
         let name1 = "name1";
-        let uuid1 = test_async!(engine.create_pool(name1, paths, None))
+        let uuid1 = test_async!(engine.create_pool(name1, paths, None, IntegritySpec::default()))
             .unwrap()
             .changed()
             .unwrap();
@@ -1034,13 +1038,13 @@ mod test {
         let engine = StratEngine::initialize().unwrap();
 
         let name1 = "name1";
-        let uuid1 = test_async!(engine.create_pool(name1, paths1, None))
+        let uuid1 = test_async!(engine.create_pool(name1, paths1, None, IntegritySpec::default()))
             .unwrap()
             .changed()
             .unwrap();
 
         let name2 = "name2";
-        let uuid2 = test_async!(engine.create_pool(name2, paths2, None))
+        let uuid2 = test_async!(engine.create_pool(name2, paths2, None, IntegritySpec::default()))
             .unwrap()
             .changed()
             .unwrap();
@@ -1500,7 +1504,7 @@ mod test {
     fn test_start_stop(paths: &[&Path]) {
         let engine = StratEngine::initialize().unwrap();
         let name = "pool_name";
-        let uuid = test_async!(engine.create_pool(name, paths, None))
+        let uuid = test_async!(engine.create_pool(name, paths, None, IntegritySpec::default()))
             .unwrap()
             .changed()
             .unwrap();

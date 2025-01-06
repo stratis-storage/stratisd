@@ -34,7 +34,7 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, PoolUuid,
-            SizedKeyMemory, UnlockMethod,
+            SizedKeyMemory, UnlockMethod, ValidatedIntegritySpec,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -437,12 +437,12 @@ impl Backstore {
         devices: UnownedDevices,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
+        integrity_spec: ValidatedIntegritySpec,
     ) -> StratisResult<Backstore> {
-        let data_tier = DataTier::<StratBlockDev>::new(BlockDevMgr::<StratBlockDev>::initialize(
-            pool_uuid,
-            devices,
-            mda_data_size,
-        )?);
+        let data_tier = DataTier::<StratBlockDev>::new(
+            BlockDevMgr::<StratBlockDev>::initialize(pool_uuid, devices, mda_data_size)?,
+            integrity_spec,
+        );
 
         let mut backstore = Backstore {
             data_tier,
@@ -1170,13 +1170,16 @@ mod tests {
 
     use devicemapper::{CacheDevStatus, DataBlocks, DmOptions, IEC};
 
-    use crate::engine::strat_engine::{
-        backstore::devices::{ProcessedPathInfos, UnownedDevices},
-        cmd,
-        crypt::crypt_metadata_size,
-        metadata::device_identifiers,
-        ns::{unshare_mount_namespace, MemoryFilesystem},
-        tests::{crypt, loopbacked, real},
+    use crate::engine::{
+        strat_engine::{
+            backstore::devices::{ProcessedPathInfos, UnownedDevices},
+            cmd,
+            crypt::crypt_metadata_size,
+            metadata::device_identifiers,
+            ns::{unshare_mount_namespace, MemoryFilesystem},
+            tests::{crypt, loopbacked, real},
+        },
+        types::ValidatedIntegritySpec,
     };
 
     use super::*;
@@ -1248,8 +1251,14 @@ mod tests {
         let initdatadevs = get_devices(initdatapaths).unwrap();
         let initcachedevs = get_devices(initcachepaths).unwrap();
 
-        let mut backstore =
-            Backstore::initialize(pool_uuid, initdatadevs, MDADataSize::default(), None).unwrap();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            initdatadevs,
+            MDADataSize::default(),
+            None,
+            ValidatedIntegritySpec::default(),
+        )
+        .unwrap();
 
         invariant(&backstore);
 
@@ -1340,8 +1349,14 @@ mod tests {
         let devices1 = get_devices(paths1).unwrap();
         let devices2 = get_devices(paths2).unwrap();
 
-        let mut backstore =
-            Backstore::initialize(pool_uuid, devices1, MDADataSize::default(), None).unwrap();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            devices1,
+            MDADataSize::default(),
+            None,
+            ValidatedIntegritySpec::default(),
+        )
+        .unwrap();
 
         for path in paths1 {
             assert_eq!(
@@ -1404,6 +1419,7 @@ mod tests {
                 "tang".to_string(),
                 json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
             ))),
+            ValidatedIntegritySpec::default(),
         )
         .unwrap();
         backstore.alloc(pool_uuid, &[Sectors(512)]).unwrap();
@@ -1478,6 +1494,7 @@ mod tests {
                         json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
                     ),
                 )),
+                ValidatedIntegritySpec::default(),
             ).unwrap();
             cmd::udev_settle().unwrap();
 

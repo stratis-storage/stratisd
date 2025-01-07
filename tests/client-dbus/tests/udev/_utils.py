@@ -31,7 +31,15 @@ from tempfile import NamedTemporaryFile
 import dbus
 import psutil
 import pyudev
-from tenacity import Retrying, retry_if_exception_type, stop_after_delay, wait_fixed
+from tenacity import (
+    RetryError,
+    Retrying,
+    retry_if_exception_type,
+    retry_if_not_result,
+    stop_after_attempt,
+    stop_after_delay,
+    wait_fixed,
+)
 
 # isort: LOCAL
 from stratisd_client_dbus import (
@@ -251,29 +259,31 @@ def wait_for_udev_count(expected_num):
     :return: None
     :raises RuntimeError: if unexpected number of device nodes is found
     """
-    found_num = None
-
     context = pyudev.Context()
-    end_time = time.time() + 10.0
 
-    while time.time() < end_time and not expected_num == found_num:
-        found_num = len(
-            frozenset(
-                [
-                    x.device_node
-                    for x in context.list_devices(
-                        subsystem="block", ID_FS_TYPE=STRATIS_FS_TYPE
+    try:
+        for attempt in Retrying(
+            retry=retry_if_not_result(lambda found_num: found_num == expected_num),
+            stop=stop_after_delay(10),
+            wait=wait_fixed(1),
+        ):
+            with attempt:
+                found_num = len(
+                    frozenset(
+                        [
+                            x.device_node
+                            for x in context.list_devices(
+                                subsystem="block", ID_FS_TYPE=STRATIS_FS_TYPE
+                            )
+                        ]
                     )
-                ]
-            )
-        )
-        time.sleep(1)
-
-    if expected_num != found_num:
+                )
+            attempt.retry_state.set_result(found_num)
+    except RetryError as err:
         raise RuntimeError(
-            f"Found unexpected number of devnodes: "
-            f"expected number: {expected_num} != found number: {found_num}"
-        )
+            "Found unexpected number of devnodes: expected number: "
+            f"{expected_num} != found number: {err.last_attempt.result()}"
+        ) from err
 
 
 def wait_for_udev(fs_type, expected_paths):
@@ -288,25 +298,32 @@ def wait_for_udev(fs_type, expected_paths):
     :raises RuntimeError: if unexpected device nodes are found
     """
     expected_devnodes = frozenset((os.path.realpath(x) for x in expected_paths))
-    found_devnodes = None
-
     context = pyudev.Context()
-    end_time = time.time() + 10.0
 
-    while time.time() < end_time and not expected_devnodes == found_devnodes:
-        found_devnodes = frozenset(
-            [
-                x.device_node
-                for x in context.list_devices(subsystem="block", ID_FS_TYPE=fs_type)
-            ]
-        )
-        time.sleep(1)
+    try:
+        for attempt in Retrying(
+            retry=retry_if_not_result(
+                lambda found_devnodes: found_devnodes == expected_devnodes
+            ),
+            stop=stop_after_delay(10),
+            wait=wait_fixed(1),
+        ):
+            with attempt:
+                found_devnodes = frozenset(
+                    [
+                        x.device_node
+                        for x in context.list_devices(
+                            subsystem="block", ID_FS_TYPE=fs_type
+                        )
+                    ]
+                )
+            attempt.retry_state.set_result(found_devnodes)
 
-    if expected_devnodes != found_devnodes:
+    except RetryError as err:
         raise RuntimeError(
             f'Found unexpected devnodes: expected devnodes: {", ".join(expected_devnodes)} '
-            f'!= found_devnodes: {", ".join(found_devnodes)}'
-        )
+            f'!= found_devnodes: {", ".join(err.last_attempt.result())}'
+        ) from err
 
 
 def processes(name):
@@ -538,32 +555,36 @@ class UdevTest(unittest.TestCase):
         :return: list of pool information found
         :rtype: list of (str * MOPool)
         """
-        (count, limit, dbus_err, found_num, known_pools, start_time) = (
-            0,
-            expected_num + 1,
-            None,
-            None,
-            None,
-            time.time(),
-        )
-        while count < limit and not expected_num == found_num:
-            try:
-                known_pools = get_pools(name=name)
-            except dbus.exceptions.DBusException as err:
-                dbus_err = err
-
-            if known_pools is not None:
-                found_num = len(known_pools)
-
-            time.sleep(3)
-            count += 1
-
-        if found_num is None and dbus_err is not None:
+        try:
+            for attempt in Retrying(
+                retry=(
+                    retry_if_exception_type(dbus.exceptions.DBusException)
+                    | retry_if_not_result(
+                        lambda known_pools: len(known_pools) == expected_num
+                    )
+                ),
+                wait=wait_fixed(3),
+                stop=stop_after_attempt(expected_num + 1),
+                reraise=True,
+            ):
+                with attempt:
+                    known_pools = get_pools(name=name)
+                attempt.retry_state.set_result(known_pools)
+        except dbus.exceptions.DBusException as err:
             raise RuntimeError(
-                f"After {time.time() - start_time:.2f} seconds, the only "
-                "response is a D-Bus exception"
-            ) from dbus_err
+                "Failed to obtain any information about pools from the D-Bus"
+            ) from err
+        except RetryError:
+            pass
 
-        self.assertEqual(found_num, expected_num)
+        # At this point, it is not known whether the number of pools is more,
+        # fewer, or equal to the number of pools expected. It is only known
+        # that the D-Bus is returning a result. If the number of pools is
+        # equal to the number of pools expected, that may be due to timing,
+        # and be about to change. So, regardless, try to get the pools one
+        # more time and verify the correct count.
+        time.sleep(3)
+        known_pools = get_pools(name=name)
+        self.assertEqual(len(known_pools), expected_num)
 
         return known_pools

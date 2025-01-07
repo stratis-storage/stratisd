@@ -346,14 +346,26 @@ impl Engine for SimEngine {
                     .map(|(n, p)| (n, u, p))?,
             };
             if pool.is_encrypted() && unlock_method.is_none() {
+                self.stopped_pools
+                    .write()
+                    .await
+                    .insert(name, pool_uuid, pool);
                 return Err(StratisError::Msg(format!(
                     "Pool with UUID {pool_uuid} is encrypted but no unlock method was provided"
                 )));
             } else if !pool.is_encrypted() && unlock_method.is_some() {
+                self.stopped_pools
+                    .write()
+                    .await
+                    .insert(name, pool_uuid, pool);
                 return Err(StratisError::Msg(format!(
                     "Pool with UUID {pool_uuid} is not encrypted but an unlock method was provided"
                 )));
             } else if !pool.is_encrypted() && passphrase_fd.is_some() {
+                self.stopped_pools
+                    .write()
+                    .await
+                    .insert(name, pool_uuid, pool);
                 return Err(StratisError::Msg(format!(
                     "Pool with UUID {pool_uuid} is not encrypted but a passphrase was provided"
                 )));

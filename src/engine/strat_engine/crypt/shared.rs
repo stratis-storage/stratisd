@@ -4,10 +4,11 @@
 
 use std::{
     fs::OpenOptions,
-    io::{ErrorKind, Write},
+    io::Write,
     mem::forget,
     path::{Path, PathBuf},
     slice::from_raw_parts_mut,
+    sync::{Mutex, OnceLock},
 };
 
 use data_encoding::BASE64URL_NOPAD;
@@ -25,7 +26,7 @@ use libcryptsetup_rs::{
             CryptDebugLevel, CryptLogLevel, CryptStatusInfo, CryptWipePattern, EncryptionFormat,
         },
     },
-    register, set_debug_level, set_log_callback, CryptDevice, CryptInit, LibcryptErr,
+    register, set_debug_level, set_log_callback, CryptDevice, CryptInit,
 };
 
 use crate::{
@@ -45,6 +46,8 @@ use crate::{
     },
     stratis::{StratisError, StratisResult},
 };
+
+static CLEVIS_ERROR: OnceLock<Mutex<Option<StratisError>>> = OnceLock::new();
 
 /// Set up crypt logging to log cryptsetup debug information at the trace level.
 pub fn set_up_crypt_logging() {
@@ -523,29 +526,18 @@ pub fn activate(
                 )));
             }
         }
-        device
-            .token_handle()
-            .activate_by_token::<()>(
-                Some(&name.to_string()),
-                if unlock_method == UnlockMethod::Keyring {
-                    Some(LUKS2_TOKEN_ID)
-                } else if unlock_method == UnlockMethod::Clevis {
-                    Some(CLEVIS_LUKS_TOKEN_ID)
-                } else {
-                    None
-                },
-                None,
-                CryptActivate::empty(),
-            )
-            .map_err(|e| match e {
-                LibcryptErr::IOError(e) => match e.kind() {
-                    ErrorKind::NotFound => StratisError::Msg(format!(
-                        "Token slot for unlock method {unlock_method:?} was empty"
-                    )),
-                    _ => StratisError::from(e),
-                },
-                _ => StratisError::from(e),
-            })?;
+        activate_by_token(
+            device,
+            Some(&name.to_string()),
+            if unlock_method == UnlockMethod::Keyring {
+                Some(LUKS2_TOKEN_ID)
+            } else if unlock_method == UnlockMethod::Clevis {
+                Some(CLEVIS_LUKS_TOKEN_ID)
+            } else {
+                None
+            },
+            CryptActivate::empty(),
+        )?;
     }
 
     // Check activation status.
@@ -733,12 +725,7 @@ pub fn ensure_wiped(
 /// No activation will actually occur, only validation.
 pub fn check_luks2_token(device: &mut CryptDevice) -> StratisResult<()> {
     log_on_failure!(
-        device.token_handle().activate_by_token::<()>(
-            None,
-            Some(LUKS2_TOKEN_ID),
-            None,
-            CryptActivate::empty(),
-        ),
+        activate_by_token(device, None, Some(LUKS2_TOKEN_ID), CryptActivate::empty()),
         "libcryptsetup reported that the LUKS2 token is unable to \
         open the encrypted device; this could be due to a malformed \
         LUKS2 keyring token on the device or a missing or inaccessible \
@@ -844,6 +831,13 @@ unsafe extern "C" fn open(
         }
         Err(e) => {
             error!("{}", e.to_string());
+            let guard = CLEVIS_ERROR
+                .get()
+                .expect("Must have been initialized")
+                .lock();
+            if let Ok(mut g) = guard {
+                *g = Some(e);
+            }
             -1
         }
     }
@@ -867,7 +861,37 @@ pub fn register_clevis_token() -> StratisResult<()> {
         Some(validate),
         Some(dump),
     )?;
+    CLEVIS_ERROR
+        .set(Mutex::new(None))
+        .expect("Only initialized here");
     Ok(())
+}
+
+pub fn activate_by_token(
+    device: &mut CryptDevice,
+    device_name: Option<&str>,
+    token_slot: Option<u32>,
+    activate_flags: CryptActivate,
+) -> StratisResult<()> {
+    let res = device.token_handle().activate_by_token::<()>(
+        device_name,
+        token_slot,
+        None,
+        activate_flags,
+    );
+    let error = CLEVIS_ERROR
+        .get()
+        .expect("Must be initialized")
+        .lock()
+        .map(|mut guard| guard.take());
+    match (error, res) {
+        (Ok(Some(e)), Err(_)) => Err(StratisError::Chained(
+            "Failed to unlock using token".to_string(),
+            Box::new(e),
+        )),
+        (_, Err(e)) => Err(StratisError::from(e)),
+        (_, Ok(_)) => Ok(()),
+    }
 }
 
 #[cfg(test)]

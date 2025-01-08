@@ -37,10 +37,10 @@ use crate::{
                     LUKS2_TOKEN_ID, STRATIS_MEK_SIZE,
                 },
                 shared::{
-                    acquire_crypt_device, activate, add_keyring_keyslot, clevis_info_from_metadata,
-                    device_from_physical_path, ensure_wiped, get_keyslot_number,
-                    interpret_clevis_config, key_desc_from_metadata, luks2_token_type_is_valid,
-                    wipe_fallback,
+                    acquire_crypt_device, activate, activate_by_token, add_keyring_keyslot,
+                    clevis_info_from_metadata, device_from_physical_path, ensure_wiped,
+                    get_keyslot_number, interpret_clevis_config, key_desc_from_metadata,
+                    luks2_token_type_is_valid, wipe_fallback,
                 },
             },
             device::blkdev_size,
@@ -757,12 +757,7 @@ impl CryptHandle {
             None => 0,
         };
         let mut crypt = self.acquire_crypt_device()?;
-        crypt.token_handle().activate_by_token::<()>(
-            None,
-            None,
-            None,
-            CryptActivate::KEYRING_KEY,
-        )?;
+        activate_by_token(&mut crypt, None, None, CryptActivate::KEYRING_KEY)?;
         crypt
             .context_handle()
             .resize(&self.activation_name().to_string(), processed_size)

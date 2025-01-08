@@ -461,6 +461,7 @@ pub fn clevis_decrypt(jwe: &Value) -> StratisResult<SizedKeyMemory> {
         .arg("decrypt")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .spawn()?;
     let mut clevis_stdin = clevis_child.stdin.take().ok_or_else(|| {
         StratisError::Msg(
@@ -472,7 +473,24 @@ pub fn clevis_decrypt(jwe: &Value) -> StratisResult<SizedKeyMemory> {
     clevis_stdin.write_all(jose_output.as_bytes())?;
     drop(clevis_stdin);
 
-    clevis_child.wait()?;
+    let result = clevis_child.wait()?;
+    if result.code() != Some(0) {
+        match clevis_child.stderr {
+            Some(mut stderr) => {
+                let mut msg = String::new();
+                stderr.read_to_string(&mut msg)?;
+                return Err(StratisError::Chained(
+                    "Failed to retrieve Clevis passphrase".to_string(),
+                    Box::new(StratisError::Msg(msg.trim().to_string())),
+                ));
+            }
+            None => {
+                return Err(StratisError::Msg(
+                    "Failed to retrieve Clevis passphrase".to_string(),
+                ));
+            }
+        }
+    }
 
     let mut mem = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
     let bytes_read = clevis_child

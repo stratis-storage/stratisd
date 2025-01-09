@@ -1017,10 +1017,7 @@ impl LiminalDevices {
         event: &UdevEngineEvent,
     ) -> Option<(Name, PoolUuid, AnyPool)> {
         let event_type = event.event_type();
-        let device_path = match event.device().devnode() {
-            Some(d) => d,
-            None => return None,
-        };
+        let device_path = event.device().devnode()?;
         let device_info = match event_type {
             libudev::EventType::Add | libudev::EventType::Change => {
                 if device_path.exists() {

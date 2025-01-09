@@ -41,9 +41,9 @@ use crate::{
                     TOKEN_TYPE_KEY,
                 },
                 shared::{
-                    acquire_crypt_device, activate, add_keyring_keyslot, check_luks2_token,
-                    clevis_info_from_metadata, device_from_physical_path, ensure_inactive,
-                    ensure_wiped, get_keyslot_number, interpret_clevis_config,
+                    acquire_crypt_device, activate, activate_by_token, add_keyring_keyslot,
+                    check_luks2_token, clevis_info_from_metadata, device_from_physical_path,
+                    ensure_inactive, ensure_wiped, get_keyslot_number, interpret_clevis_config,
                     key_desc_from_metadata, luks2_token_type_is_valid, read_key, wipe_fallback,
                 },
             },
@@ -520,11 +520,11 @@ impl CryptHandle {
             }
             if try_unlock_clevis {
                 log_on_failure!(
-                    device.token_handle().activate_by_token::<()>(
+                    activate_by_token(
+                        &mut device,
                         None,
                         Some(CLEVIS_LUKS_TOKEN_ID),
-                        None,
-                        CryptActivate::empty(),
+                        CryptActivate::empty()
                     ),
                     "libcryptsetup reported that the decrypted Clevis passphrase \
                     is unable to open the encrypted device"

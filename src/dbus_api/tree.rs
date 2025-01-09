@@ -298,7 +298,7 @@ impl DbusTreeHandler {
             opath
                 .get_data()
                 .as_ref()
-                .map_or(false, |op_cxt| op_cxt.parent == item)
+                .is_some_and(|op_cxt| op_cxt.parent == item)
         }) {
             if let StratisUuid::Fs(_) = opath
                 .get_data()

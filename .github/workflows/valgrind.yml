@@ -29,7 +29,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-22.04
     container:
-      image: fedora:40  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev
     steps:
       - uses: actions/checkout@v4
@@ -64,7 +64,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-22.04
     container:
-      image: fedora:40  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev --ipc=host
     steps:
       - uses: actions/checkout@v4
@@ -164,7 +164,7 @@ jobs:
   python-based-checks_with_tang:
     runs-on: ubuntu-22.04
     container:
-      image: fedora:40  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev --userns=host --ipc=host -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1 -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev
     services:
       tang:

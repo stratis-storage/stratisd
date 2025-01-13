@@ -1,9 +1,17 @@
 UNITTEST_OPTS = --verbose
 
+# Ignore bandit B404 errors. Any import of the subprocess module causes this
+# error. We know what we are doing when we import that module and do not
+# need to be warned.
+BANDIT_SKIP = --skip B404,B603,B311
+
 .PHONY: lint
 lint:
 	pylint src/stratisd_client_dbus --ignore=_introspect.py
 	pylint tests --disable=R0801
+	bandit --recursive ./src ${BANDIT_SKIP}
+	bandit --recursive ./tests ${BANDIT_SKIP},B101
+	pyright
 
 .PHONY: startup-tests
 startup-tests:

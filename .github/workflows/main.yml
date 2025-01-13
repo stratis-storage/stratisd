@@ -192,11 +192,17 @@ jobs:
       - name: Install dependencies
         run: >
           dnf install -y
+          bandit
           make
+          pip
           pylint
           python3-dbus
-      - name: Run pylint
-        run: make -f Makefile pylint
+      - name: Install pyright
+        run: pip install --user pyright
+      - name: Run lint
+        run: >
+          PATH=${PATH}:/github/home/.local/bin
+          make -f Makefile lint
 
   python-based-tests:
     runs-on: ubuntu-22.04

@@ -105,6 +105,8 @@ class LoopBackDevices:
         :return: list of keys for the devices
         :rtype: list of uuid.UUID
         """
+        assert self.dir is not None
+
         tokens = []
 
         first_creation = self.count == 0
@@ -220,6 +222,8 @@ class LoopBackDevices:
         Detach all the devices and delete the file(s) and directory!
         :return: None
         """
+        assert self.dir is not None
+
         self.destroy_devices()
         os.rmdir(self.dir)
         self.dir = None

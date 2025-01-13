@@ -398,7 +398,9 @@ pub fn clevis_luks_bind(
             execute_cmd(&mut cmd)
         }
         Either::Right(ref key) => {
-            cmd.stdin(Stdio::piped());
+            cmd.stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped());
             let mut child = cmd.spawn()?;
             let stdin = child.stdin.as_mut().ok_or_else(|| {
                 StratisError::Msg(

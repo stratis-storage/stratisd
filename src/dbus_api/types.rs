@@ -18,6 +18,7 @@ use dbus::{
     Path,
 };
 use dbus_tree::{DataType, MTSync, ObjectPath, Tree};
+use either::Either;
 use tokio::sync::{
     mpsc::UnboundedSender as TokioSender, OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock,
 };
@@ -27,12 +28,18 @@ use devicemapper::{Bytes, Sectors};
 use crate::{
     dbus_api::{connection::DbusConnectionHandler, tree::DbusTreeHandler, udev::DbusUdevHandler},
     engine::{
-        total_allocated, total_used, ActionAvailability, DevUuid, Diff, Engine, ExclusiveGuard,
-        FilesystemUuid, Lockable, LockedPoolsInfo, PoolDiff, PoolEncryptionInfo, PoolUuid,
-        SharedGuard, StoppedPoolsInfo, StratBlockDevDiff, StratFilesystemDiff, StratPoolDiff,
-        StratisUuid, ThinPoolDiff,
+        total_allocated, total_used, ActionAvailability, DevUuid, Diff, EncryptionInfo, Engine,
+        ExclusiveGuard, FilesystemUuid, Lockable, LockedPoolsInfo, PoolDiff, PoolEncryptionInfo,
+        PoolUuid, SharedGuard, StoppedPoolsInfo, StratBlockDevDiff, StratFilesystemDiff,
+        StratPoolDiff, StratisUuid, ThinPoolDiff,
     },
 };
+
+/// Type for encryption input for multiple token slots.
+pub type EncryptionInfos<'a> = (
+    Vec<((bool, u32), &'a str)>,
+    Vec<((bool, u32), &'a str, &'a str)>,
+);
 
 /// Type for lockable D-Bus tree object.
 pub type LockableTree = Lockable<Arc<RwLock<Tree<MTSync<TData>, TData>>>>;
@@ -97,8 +104,14 @@ pub enum DbusAction {
     FsNameChange(Path<'static>, String),
     PoolNameChange(Path<'static>, String),
     PoolAvailActions(Path<'static>, ActionAvailability),
-    PoolKeyDescChange(Path<'static>, Option<PoolEncryptionInfo>),
-    PoolClevisInfoChange(Path<'static>, Option<PoolEncryptionInfo>),
+    PoolKeyDescChange(
+        Path<'static>,
+        Option<Either<(bool, EncryptionInfo), PoolEncryptionInfo>>,
+    ),
+    PoolClevisInfoChange(
+        Path<'static>,
+        Option<Either<(bool, EncryptionInfo), PoolEncryptionInfo>>,
+    ),
     PoolCacheChange(Path<'static>, bool),
     PoolFsLimitChange(Path<'static>, u64),
     PoolOverprovModeChange(Path<'static>, bool),
@@ -109,6 +122,7 @@ pub enum DbusAction {
     FsOriginChange(Path<'static>, Option<FilesystemUuid>),
     FsSizeLimitChange(Path<'static>, Option<Sectors>),
     FsMergeScheduledChange(Path<'static>, bool),
+    PoolEncryptionChange(Path<'static>, bool),
     FsBackgroundChange(
         FilesystemUuid,
         SignalChange<Option<Bytes>>,
@@ -297,7 +311,11 @@ impl DbusContext {
     }
 
     /// Send changed signal for KeyDesc property.
-    pub fn push_pool_key_desc_change(&self, item: &Path<'static>, ei: Option<PoolEncryptionInfo>) {
+    pub fn push_pool_key_desc_change(
+        &self,
+        item: &Path<'static>,
+        ei: Option<Either<(bool, EncryptionInfo), PoolEncryptionInfo>>,
+    ) {
         if let Err(e) = self
             .sender
             .send(DbusAction::PoolKeyDescChange(item.clone(), ei))
@@ -313,7 +331,7 @@ impl DbusContext {
     pub fn push_pool_clevis_info_change(
         &self,
         item: &Path<'static>,
-        ei: Option<PoolEncryptionInfo>,
+        ei: Option<Either<(bool, EncryptionInfo), PoolEncryptionInfo>>,
     ) {
         if let Err(e) = self
             .sender
@@ -461,6 +479,19 @@ impl DbusContext {
         {
             warn!(
                 "Block device total physical size change event could not be sent to the processing thread; no signal will be sent out for the block device total physical size state change: {}",
+                e,
+            )
+        }
+    }
+
+    /// Send changed signal for changed encryption status of pool.
+    pub fn push_pool_encryption_status_change(&self, path: &Path<'static>, encrypted: bool) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::PoolEncryptionChange(path.clone(), encrypted))
+        {
+            warn!(
+                "Encryption status change event could not be sent to the processing thread; no signal will be sent out for the encryption status state change: {}",
                 e,
             )
         }

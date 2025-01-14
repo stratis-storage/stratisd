@@ -21,23 +21,30 @@ use uuid::Uuid;
 
 use devicemapper::{Bytes, Sectors, IEC};
 
-pub use crate::engine::{
-    engine::StateDiff,
-    structures::Lockable,
-    types::{
-        actions::{
-            Clevis, CreateAction, DeleteAction, EngineAction, GrowAction, Key, MappingCreateAction,
-            MappingDeleteAction, PropChangeAction, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction, SetUnlockAction, StartAction, StopAction, ToDisplay,
+pub use crate::{
+    engine::{
+        engine::StateDiff,
+        structures::Lockable,
+        types::{
+            actions::{
+                Clevis, CreateAction, DeleteAction, EncryptedDevice, EngineAction, GrowAction, Key,
+                MappingCreateAction, MappingDeleteAction, PropChangeAction, Reencrypt, RegenAction,
+                RenameAction, SetCreateAction, SetDeleteAction, SetUnlockAction, StartAction,
+                StopAction, ToDisplay,
+            },
+            diff::{
+                Compare, Diff, PoolDiff, StratBlockDevDiff, StratFilesystemDiff, StratPoolDiff,
+                ThinPoolDiff,
+            },
+            keys::{
+                EncryptionInfo, InputEncryptionInfo, KeyDescription, OptionalTokenSlotInput,
+                PoolEncryptionInfo, SizedKeyMemory, TokenUnlockMethod, UnlockMechanism,
+                UnlockMethod,
+            },
         },
-        diff::{
-            Compare, Diff, PoolDiff, StratBlockDevDiff, StratFilesystemDiff, StratPoolDiff,
-            ThinPoolDiff,
-        },
-        keys::{EncryptionInfo, KeyDescription, PoolEncryptionInfo, SizedKeyMemory},
     },
+    stratis::{StratisError, StratisResult},
 };
-use crate::stratis::{StratisError, StratisResult};
 
 pub const DEFAULT_INTEGRITY_JOURNAL_SIZE: Bytes = Bytes(128 * IEC::Mi as u128);
 pub const DEFAULT_INTEGRITY_BLOCK_SIZE: Bytes = Bytes(4 * IEC::Ki as u128);
@@ -134,15 +141,6 @@ impl Display for StratisUuid {
             StratisUuid::Pool(p) => Display::fmt(p, f),
         }
     }
-}
-
-/// Use Clevis or keyring to unlock LUKS volume.
-#[derive(Serialize, Deserialize, Clone, Copy, Eq, PartialEq, Debug, EnumString, VariantNames)]
-#[strum(serialize_all = "snake_case")]
-pub enum UnlockMethod {
-    Clevis,
-    Keyring,
-    Any,
 }
 
 /// Blockdev tier. Used to distinguish between blockdevs used for
@@ -486,6 +484,35 @@ impl UuidOrConflict {
 pub enum StratSigblockVersion {
     V1 = 1,
     V2 = 2,
+}
+
+impl TryFrom<u8> for StratSigblockVersion {
+    type Error = StratisError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            1u8 => Ok(StratSigblockVersion::V1),
+            2u8 => Ok(StratSigblockVersion::V2),
+            _ => Err(StratisError::Msg(format!(
+                "Unknown sigblock version: {value}"
+            ))),
+        }
+    }
+}
+
+impl From<StratSigblockVersion> for u8 {
+    fn from(version: StratSigblockVersion) -> Self {
+        match version {
+            StratSigblockVersion::V1 => 1u8,
+            StratSigblockVersion::V2 => 2u8,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum OffsetDirection {
+    Backwards,
+    Forwards,
 }
 
 /// A way to specify an integrity tag size. It is possible for the specification

@@ -23,6 +23,9 @@ pub struct Key;
 /// Return value indicating clevis operation
 pub struct Clevis;
 
+/// Return value indicating an encrypt operation on the pool
+pub struct EncryptedDevice;
+
 /// A trait for a generic kind of action. Defines the type of the thing to
 /// be changed, and also a method to indicate what changed.
 pub trait EngineAction {
@@ -75,13 +78,13 @@ impl Display for CreateAction<PoolUuid> {
     }
 }
 
-impl Display for CreateAction<Clevis> {
+impl Display for CreateAction<(Clevis, u32)> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CreateAction::Created(Clevis) => {
+            CreateAction::Created((_, t)) => {
                 write!(
                     f,
-                    "Pool successfully bound to an unlocking mechanism using clevis"
+                    "Pool successfully bound an unlocking mechanism to token slot {t} using clevis"
                 )
             }
             CreateAction::Identity => {
@@ -94,13 +97,13 @@ impl Display for CreateAction<Clevis> {
     }
 }
 
-impl Display for CreateAction<Key> {
+impl Display for CreateAction<(Key, u32)> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CreateAction::Created(Key) => {
+            CreateAction::Created((_, t)) => {
                 write!(
                     f,
-                    "Pool successfully bound to a passphrase in the kernel keyring"
+                    "Pool successfully bound to a passphrase to token slot {t} in the kernel keyring"
                 )
             }
             CreateAction::Identity => {
@@ -132,6 +135,19 @@ where
                     f,
                     "The snapshot requested for creation is already present; no action taken"
                 )
+            }
+        }
+    }
+}
+
+impl Display for CreateAction<EncryptedDevice> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CreateAction::Created(_) => {
+                write!(f, "Unencrypted pool successfully encrypted")
+            }
+            CreateAction::Identity => {
+                write!(f, "The requested pool was already encrypted")
             }
         }
     }
@@ -833,5 +849,14 @@ impl<T> EngineAction for PropChangeAction<T> {
             PropChangeAction::NewValue(t) => Some(t),
             PropChangeAction::Identity => None,
         }
+    }
+}
+
+/// Return value indicating a successful reencrypt operation on the pool
+pub struct Reencrypt;
+
+impl Display for Reencrypt {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Reencryption operation was completed successfully")
     }
 }

@@ -10,19 +10,17 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
+use either::Either;
 use serde_json::{Map, Value};
 
 use devicemapper::{Bytes, DmNameBuf, Sectors};
 use stratisd_proc_macros::strat_pool_impl_gen;
 
 #[cfg(any(test, feature = "test_extras"))]
-use crate::engine::{
-    strat_engine::{
-        backstore::UnownedDevices,
-        metadata::MDADataSize,
-        thinpool::{ThinPoolSizeParams, DATA_BLOCK_SIZE},
-    },
-    types::EncryptionInfo,
+use crate::engine::strat_engine::{
+    backstore::UnownedDevices,
+    metadata::MDADataSize,
+    thinpool::{ThinPoolSizeParams, DATA_BLOCK_SIZE},
 };
 use crate::{
     engine::{
@@ -37,6 +35,7 @@ use crate::{
                 blockdev::{v1::StratBlockDev, InternalBlockDev},
                 ProcessedPathInfos,
             },
+            crypt::{CLEVIS_LUKS_TOKEN_ID, LUKS2_TOKEN_ID},
             liminal::DeviceSet,
             metadata::BDA,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
@@ -46,11 +45,12 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            Diff, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
-            PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction, StratFilesystemDiff, StratPoolDiff, StratSigblockVersion,
+            Diff, EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo,
+            Key, KeyDescription, Name, OffsetDirection, OptionalTokenSlotInput, PoolDiff,
+            PoolEncryptionInfo, PoolUuid, PropChangeAction, Reencrypt, RegenAction, RenameAction,
+            SetCreateAction, SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
+            StratSigblockVersion,
         },
-        PropChangeAction,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -187,7 +187,7 @@ impl StratPool {
     pub fn initialize(
         name: &str,
         devices: UnownedDevices,
-        encryption_info: Option<&EncryptionInfo>,
+        encryption_info: Option<&InputEncryptionInfo>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = PoolUuid::new_v4();
 
@@ -664,10 +664,14 @@ impl Pool for StratPool {
                 )
                 .and_then(|bdi| {
                     self.thin_pool
-                        .set_device(self.backstore.device().expect(
-                            "Since thin pool exists, space must have been allocated \
+                        .set_device(
+                            self.backstore.device().expect(
+                                "Since thin pool exists, space must have been allocated \
                              from the backstore, so backstore must have a cap device",
-                        ))
+                            ),
+                            Sectors(0),
+                            OffsetDirection::Forwards,
+                        )
                         .and(Ok(bdi))
                 });
             self.thin_pool.resume()?;
@@ -704,25 +708,19 @@ impl Pool for StratPool {
     #[pool_rollback]
     fn bind_clevis(
         &mut self,
+        token_slot: OptionalTokenSlotInput,
         pin: &str,
         clevis_info: &Value,
-    ) -> StratisResult<CreateAction<Clevis>> {
+    ) -> StratisResult<CreateAction<(Clevis, u32)>> {
+        if token_slot != OptionalTokenSlotInput::Legacy {
+            return Err(StratisError::Msg("Specifying the token slot for binding is not supported in V1 pools; please migrate to V2 pools to use this feature".to_string()));
+        }
+
         let changed = self.backstore.bind_clevis(pin, clevis_info)?;
         if changed {
-            Ok(CreateAction::Created(Clevis))
+            Ok(CreateAction::Created((Clevis, CLEVIS_LUKS_TOKEN_ID)))
         } else {
             Ok(CreateAction::Identity)
-        }
-    }
-
-    #[pool_mutating_action("NoRequests")]
-    #[pool_rollback]
-    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>> {
-        let changed = self.backstore.unbind_clevis()?;
-        if changed {
-            Ok(DeleteAction::Deleted(Clevis))
-        } else {
-            Ok(DeleteAction::Identity)
         }
     }
 
@@ -730,11 +728,16 @@ impl Pool for StratPool {
     #[pool_rollback]
     fn bind_keyring(
         &mut self,
+        token_slot: OptionalTokenSlotInput,
         key_description: &KeyDescription,
-    ) -> StratisResult<CreateAction<Key>> {
+    ) -> StratisResult<CreateAction<(Key, u32)>> {
+        if token_slot != OptionalTokenSlotInput::Legacy {
+            return Err(StratisError::Msg("Specifying the token slot for binding is not supported in V1 pools; please migrate to V2 pools to use this feature".to_string()));
+        }
+
         let changed = self.backstore.bind_keyring(key_description)?;
         if changed {
-            Ok(CreateAction::Created(Key))
+            Ok(CreateAction::Created((Key, LUKS2_TOKEN_ID)))
         } else {
             Ok(CreateAction::Identity)
         }
@@ -742,7 +745,41 @@ impl Pool for StratPool {
 
     #[pool_mutating_action("NoRequests")]
     #[pool_rollback]
-    fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>> {
+    fn rebind_keyring(
+        &mut self,
+        token_slot: Option<u32>,
+        new_key_desc: &KeyDescription,
+    ) -> StratisResult<RenameAction<Key>> {
+        if token_slot.is_some() {
+            return Err(StratisError::Msg("Specifying the token slot for rebinding is not supported in V1 pools; please migrate to V2 pools to use this feature".to_string()));
+        }
+
+        match self.backstore.rebind_keyring(new_key_desc)? {
+            Some(true) => Ok(RenameAction::Renamed(Key)),
+            Some(false) => Ok(RenameAction::Identity),
+            None => Ok(RenameAction::NoSource),
+        }
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    #[pool_rollback]
+    fn rebind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<RegenAction> {
+        if token_slot.is_some() {
+            return Err(StratisError::Msg("Specifying the token slot for rebinding is not supported in V1 pools; please migrate to V2 pools to use this feature".to_string()));
+        }
+
+        self.backstore.rebind_clevis().map(|_| RegenAction)
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    #[pool_rollback]
+    fn unbind_keyring(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Key>> {
+        if token_slot.is_some() {
+            return Err(StratisError::Msg(
+                "Token slot can only be provided for V2 pools".to_string(),
+            ));
+        }
+
         let changed = self.backstore.unbind_keyring()?;
         if changed {
             Ok(DeleteAction::Deleted(Key))
@@ -753,21 +790,19 @@ impl Pool for StratPool {
 
     #[pool_mutating_action("NoRequests")]
     #[pool_rollback]
-    fn rebind_keyring(
-        &mut self,
-        new_key_desc: &KeyDescription,
-    ) -> StratisResult<RenameAction<Key>> {
-        match self.backstore.rebind_keyring(new_key_desc)? {
-            Some(true) => Ok(RenameAction::Renamed(Key)),
-            Some(false) => Ok(RenameAction::Identity),
-            None => Ok(RenameAction::NoSource),
+    fn unbind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Clevis>> {
+        if token_slot.is_some() {
+            return Err(StratisError::Msg(
+                "Token slot can only be provided for V2 pools".to_string(),
+            ));
         }
-    }
 
-    #[pool_mutating_action("NoRequests")]
-    #[pool_rollback]
-    fn rebind_clevis(&mut self) -> StratisResult<RegenAction> {
-        self.backstore.rebind_clevis().map(|_| RegenAction)
+        let changed = self.backstore.unbind_clevis()?;
+        if changed {
+            Ok(DeleteAction::Deleted(Clevis))
+        } else {
+            Ok(DeleteAction::Identity)
+        }
     }
 
     #[pool_mutating_action("NoRequests")]
@@ -1168,8 +1203,12 @@ impl Pool for StratPool {
         self.backstore.is_encrypted()
     }
 
-    fn encryption_info(&self) -> Option<PoolEncryptionInfo> {
+    fn encryption_info_legacy(&self) -> Option<PoolEncryptionInfo> {
         self.backstore.encryption_info()
+    }
+
+    fn encryption_info(&self) -> Option<Either<EncryptionInfo, PoolEncryptionInfo>> {
+        self.backstore.encryption_info().map(Either::Right)
     }
 
     fn avail_actions(&self) -> ActionAvailability {
@@ -1254,6 +1293,22 @@ impl Pool for StratPool {
         } else {
             Ok(PropChangeAction::Identity)
         }
+    }
+
+    fn encrypt_pool(
+        &mut self,
+        _: &Name,
+        _: PoolUuid,
+        _: &InputEncryptionInfo,
+    ) -> StratisResult<CreateAction<EncryptedDevice>> {
+        Err(StratisError::Msg(
+            "Encrypting an unencrypted device is only supported in V2 of the metadata".to_string(),
+        ))
+    }
+
+    fn reencrypt_pool(&mut self) -> StratisResult<Reencrypt> {
+        self.backstore.reencrypt()?;
+        Ok(Reencrypt)
     }
 
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {
@@ -1370,13 +1425,13 @@ mod tests {
             assert!(
                 pool.encryption_info().is_some()
                     && pool
-                        .encryption_info()
+                        .encryption_info_legacy()
                         .map(|ei| { ei.is_inconsistent() })
                         .unwrap_or(false)
             );
         } else if pool.avail_actions() == ActionAvailability::Full {
             assert!(!pool
-                .encryption_info()
+                .encryption_info_legacy()
                 .map(|ei| ei.is_inconsistent())
                 .unwrap_or(false));
         }

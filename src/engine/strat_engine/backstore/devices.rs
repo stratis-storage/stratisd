@@ -38,7 +38,7 @@ use crate::{
                 STRATIS_FS_TYPE,
             },
         },
-        types::{DevUuid, DevicePath, EncryptionInfo, Name, PoolUuid, StratSigblockVersion},
+        types::{DevUuid, DevicePath, InputEncryptionInfo, Name, PoolUuid, StratSigblockVersion},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -506,7 +506,7 @@ pub fn initialize_devices_legacy(
     pool_name: Name,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
-    encryption_info: Option<&EncryptionInfo>,
+    encryption_info: Option<&InputEncryptionInfo>,
     sector_size: Option<u32>,
 ) -> StratisResult<Vec<v1::StratBlockDev>> {
     /// Initialize an encrypted device on the given physical device
@@ -521,7 +521,7 @@ pub fn initialize_devices_legacy(
         pool_name: Name,
         pool_uuid: PoolUuid,
         dev_uuid: DevUuid,
-        encryption_info: &EncryptionInfo,
+        encryption_info: &InputEncryptionInfo,
         sector_size: Option<u32>,
     ) -> StratisResult<(CryptHandle, Device, Sectors)> {
         let handle = CryptHandle::initialize(
@@ -653,7 +653,7 @@ pub fn initialize_devices_legacy(
         pool_name: Name,
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
-        encryption_info: Option<&EncryptionInfo>,
+        encryption_info: Option<&InputEncryptionInfo>,
         sector_size: Option<u32>,
     ) -> StratisResult<v1::StratBlockDev> {
         let dev_uuid = DevUuid::new_v4();
@@ -729,7 +729,7 @@ pub fn initialize_devices_legacy(
         pool_name: Name,
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
-        encryption_info: Option<&EncryptionInfo>,
+        encryption_info: Option<&InputEncryptionInfo>,
         sector_size: Option<u32>,
     ) -> StratisResult<Vec<v1::StratBlockDev>> {
         let mut initialized_blockdevs: Vec<v1::StratBlockDev> = Vec::new();
@@ -1077,7 +1077,7 @@ mod tests {
                 pool_uuid,
                 MDADataSize::default(),
                 key_description
-                    .map(|kd| EncryptionInfo::KeyDesc(kd.clone()))
+                    .and_then(|kd| InputEncryptionInfo::new_legacy(Some(kd.clone()), None))
                     .as_ref(),
                 None,
             )
@@ -1292,7 +1292,7 @@ mod tests {
                 pool_uuid,
                 MDADataSize::default(),
                 key_desc
-                    .map(|kd| EncryptionInfo::KeyDesc(kd.clone()))
+                    .and_then(|kd| InputEncryptionInfo::new_legacy(Some(kd.clone()), None))
                     .as_ref(),
                 None,
             )

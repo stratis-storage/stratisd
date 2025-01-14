@@ -35,8 +35,8 @@ use crate::{
             writing::wipe_sectors,
         },
         types::{
-            ActionAvailability, BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, Name,
-            PoolEncryptionInfo, PoolUuid,
+            ActionAvailability, BlockDevTier, DevUuid, EncryptionInfo, InputEncryptionInfo,
+            KeyDescription, Name, PoolEncryptionInfo, PoolUuid,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -287,7 +287,7 @@ impl Backstore {
         pool_uuid: PoolUuid,
         devices: UnownedDevices,
         mda_data_size: MDADataSize,
-        encryption_info: Option<&EncryptionInfo>,
+        encryption_info: Option<&InputEncryptionInfo>,
     ) -> StratisResult<Backstore> {
         let data_tier = DataTier::<StratBlockDev>::new(BlockDevMgr::<StratBlockDev>::initialize(
             pool_name,
@@ -338,6 +338,7 @@ impl Backstore {
                     self.encryption_info()
                         .map(EncryptionInfo::try_from)
                         .transpose()?
+                        .map(InputEncryptionInfo::from)
                         .as_ref(),
                     sector_size,
                 )?;
@@ -686,7 +687,9 @@ impl Backstore {
             }
         };
 
-        if let Some((ref existing_pin, ref existing_info)) = encryption_info.clevis_info() {
+        if let Some((_, (ref existing_pin, ref existing_info))) =
+            encryption_info.single_clevis_info()
+        {
             if existing_pin.as_str() == pin
                 && CryptHandle::can_unlock(
                     self.blockdevs()
@@ -731,7 +734,7 @@ impl Backstore {
             }
         };
 
-        if encryption_info.clevis_info().is_some() {
+        if encryption_info.single_clevis_info().is_some() {
             operation_loop(
                 self.blockdevs_mut().into_iter().map(|(_, _, bd)| bd),
                 |blockdev| blockdev.unbind_clevis(),
@@ -760,7 +763,7 @@ impl Backstore {
             }
         };
 
-        if let Some(kd) = encryption_info.key_description() {
+        if let Some((_, kd)) = encryption_info.single_key_description() {
             if kd == key_desc {
                 if CryptHandle::can_unlock(
                     self.blockdevs()
@@ -815,7 +818,7 @@ impl Backstore {
             }
         };
 
-        if encryption_info.key_description().is_some() {
+        if encryption_info.single_key_description().is_some() {
             operation_loop(
                 self.blockdevs_mut().into_iter().map(|(_, _, bd)| bd),
                 |blockdev| blockdev.unbind_keyring(),
@@ -845,9 +848,9 @@ impl Backstore {
             }
         };
 
-        if encryption_info.key_description() == Some(key_desc) {
+        if encryption_info.single_key_description().map(|(_, kd)| kd) == Some(key_desc) {
             Ok(Some(false))
-        } else if encryption_info.key_description().is_some() {
+        } else if encryption_info.single_key_description().is_some() {
             // Keys are not the same but key description is present
             operation_loop(
                 self.blockdevs_mut().into_iter().map(|(_, _, bd)| bd),
@@ -879,7 +882,7 @@ impl Backstore {
             }
         };
 
-        if encryption_info.clevis_info().is_none() {
+        if encryption_info.single_clevis_info().is_none() {
             Err(StratisError::Msg(
                 "Requested pool is not already bound to Clevis".to_string(),
             ))
@@ -1310,10 +1313,10 @@ mod tests {
             pool_uuid,
             get_devices(paths).unwrap(),
             MDADataSize::default(),
-            Some(&EncryptionInfo::ClevisInfo((
+            InputEncryptionInfo::new_legacy(None, Some((
                 "tang".to_string(),
                 json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
-            ))),
+            ))).as_ref()
         )
         .unwrap();
         cmd::udev_settle().unwrap();
@@ -1383,13 +1386,13 @@ mod tests {
                 pool_uuid,
                 get_devices(paths).unwrap(),
                 MDADataSize::default(),
-                Some(&EncryptionInfo::Both(
-                    key_desc.clone(),
-                    (
+                InputEncryptionInfo::new_legacy(
+                    Some(key_desc.clone()),
+                    Some((
                         "tang".to_string(),
                         json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
-                    ),
-                )),
+                    )),
+                ).as_ref(),
             ).unwrap();
             cmd::udev_settle().unwrap();
 

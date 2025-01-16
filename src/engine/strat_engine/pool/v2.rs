@@ -1251,6 +1251,7 @@ impl DumpState<'_> for StratPool {
 #[cfg(test)]
 mod tests {
     use std::{
+        env,
         fs::OpenOptions,
         io::{BufWriter, Read, Write},
     };
@@ -1263,11 +1264,11 @@ mod tests {
         strat_engine::{
             cmd::udev_settle,
             pool::AnyPool,
-            tests::{loopbacked, real},
+            tests::{crypt, loopbacked, real},
             thinpool::ThinPoolStatusDigest,
         },
         types::{EngineAction, IntegritySpec, PoolIdentifier},
-        Engine, StratEngine,
+        unshare_mount_namespace, Engine, StratEngine,
     };
 
     use super::*;
@@ -1799,6 +1800,167 @@ mod tests {
             &loopbacked::DeviceLimits::Exactly(2, Some(Sectors(10 * IEC::Mi))),
             test_grow_physical_pre_grow,
             test_grow_physical_post_grow,
+        );
+    }
+
+    /// Tests:
+    /// 1. Clevis only pool creation (regression test)
+    /// 2. Unbinding last token slot (should fail)
+    /// 3. Binding additional clevis token
+    /// 4. Binding additional keyring token
+    /// 5. Keyring only pool creation
+    /// 6. Unbinding last token slot (should fail)
+    /// 7. Binding additional clevis token
+    /// 8. Binding additional keyring token (idempotence test)
+    /// 9. Pool creation with both types
+    /// 10. Test that unbinding Clevis with keyring unbind and vice versa fails
+    /// 11. Clevis and keyring idempotence test with specific keyslot
+    /// 12. Create new Clevis binding with specific token slot
+    fn clevis_test_multiple_token_slots(paths: &[&Path]) {
+        fn test_multiple_token_slots_with_key(paths: &[&Path], key_desc: &KeyDescription) {
+            unshare_mount_namespace().unwrap();
+
+            let engine = StratEngine::initialize().unwrap();
+
+            let first = paths[0];
+            let pool_uuid_clevis_only = test_async!(engine.create_pool(
+                "clevis_only",
+                &[first],
+                InputEncryptionInfo::new(
+                    vec![],
+                    vec![(Some(0), (
+                        "tang".to_string(),
+                        json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
+                    ))],
+                ).unwrap().as_ref(),
+                IntegritySpec::default(),
+            )).unwrap().changed().unwrap();
+
+            {
+                let mut handle_clevis_only =
+                    test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid_clevis_only)))
+                        .unwrap();
+
+                assert!(handle_clevis_only.unbind_clevis(Some(0)).is_err());
+                handle_clevis_only
+                    .bind_clevis(
+                        OptionalTokenSlotInput::None,
+                        "tang",
+                        &json!({
+                            "url": env::var("TANG_URL").expect("TANG_URL env var required"),
+                            "stratis:tang:trust_url": true,
+                        }),
+                    )
+                    .unwrap();
+                handle_clevis_only
+                    .bind_keyring(OptionalTokenSlotInput::None, key_desc)
+                    .unwrap();
+            }
+
+            test_async!(engine.destroy_pool(pool_uuid_clevis_only)).unwrap();
+
+            let second = paths[1];
+            let pool_uuid_keyring_only = test_async!(engine.create_pool(
+                "keyring_only",
+                &[second],
+                InputEncryptionInfo::new(vec![(Some(0), key_desc.to_owned())], vec![])
+                    .unwrap()
+                    .as_ref(),
+                IntegritySpec::default(),
+            ))
+            .unwrap()
+            .changed()
+            .unwrap();
+
+            {
+                let mut handle_keyring_only =
+                    test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid_keyring_only)))
+                        .unwrap();
+
+                assert!(handle_keyring_only.unbind_keyring(Some(0)).is_err());
+                handle_keyring_only
+                    .bind_clevis(
+                        OptionalTokenSlotInput::None,
+                        "tang",
+                        &json!({
+                            "url": env::var("TANG_URL").expect("TANG_URL env var required"),
+                            "stratis:tang:trust_url": true,
+                        }),
+                    )
+                    .unwrap();
+                matches!(
+                    handle_keyring_only.bind_keyring(OptionalTokenSlotInput::None, key_desc),
+                    Ok(CreateAction::Identity)
+                );
+            }
+
+            test_async!(engine.destroy_pool(pool_uuid_keyring_only)).unwrap();
+
+            let third = paths[2];
+            let pool_uuid_both = test_async!(engine.create_pool(
+                "both",
+                &[third],
+                InputEncryptionInfo::new(
+                    vec![(Some(0), key_desc.to_owned())],
+                    vec![(Some(1), (
+                        "tang".to_string(),
+                        json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
+                    ))],
+                )
+                .unwrap()
+                .as_ref(),
+                IntegritySpec::default(),
+            ))
+            .unwrap()
+            .changed()
+            .unwrap();
+
+            {
+                let mut handle_both =
+                    test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid_both))).unwrap();
+
+                assert!(handle_both.unbind_keyring(Some(1)).is_err());
+                assert!(handle_both.unbind_clevis(Some(0)).is_err());
+                matches!(
+                    handle_both.bind_clevis(
+                        OptionalTokenSlotInput::Some(1),
+                        "tang",
+                        &json!({
+                            "url": env::var("TANG_URL").expect("TANG_URL env var required"),
+                            "stratis:tang:trust_url": true,
+                        }),
+                    ),
+                    Ok(CreateAction::Identity)
+                );
+                matches!(
+                    handle_both.bind_keyring(OptionalTokenSlotInput::Some(0), key_desc),
+                    Ok(CreateAction::Identity)
+                );
+                matches!(
+                    handle_both.bind_keyring(OptionalTokenSlotInput::Some(2), key_desc,),
+                    Ok(CreateAction::Created(_))
+                );
+            }
+
+            test_async!(engine.destroy_pool(pool_uuid_both)).unwrap();
+        }
+
+        crypt::insert_and_cleanup_key(paths, test_multiple_token_slots_with_key);
+    }
+
+    #[test]
+    fn clevis_loop_test_multiple_token_slots() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(3, None),
+            clevis_test_multiple_token_slots,
+        );
+    }
+
+    #[test]
+    fn clevis_real_test_multiple_token_slots() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(3, None, None),
+            clevis_test_multiple_token_slots,
         );
     }
 }

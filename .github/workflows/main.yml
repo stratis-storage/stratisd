@@ -299,8 +299,8 @@ jobs:
         working-directory: ./testing
       - name: Switch
         run: |
-          git checkout -b mulkieran-additional-create-args master
-          git pull https://github.com/mulkieran/testing.git additional-create-args
+          git checkout -b mulkieran-multiple-token-slots master
+          git pull https://github.com/mulkieran/testing.git multiple-token-slots
         working-directory: ./testing
       - name: Run stratisd_cert.py
         run: >

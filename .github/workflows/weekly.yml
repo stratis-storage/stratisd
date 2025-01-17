@@ -106,7 +106,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.83.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.84.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-audit

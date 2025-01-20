@@ -585,7 +585,7 @@ impl CryptHandle {
             yes,
         )?;
 
-        let encryption_info =
+        let mut encryption_info =
             encryption_info_from_metadata(&mut acquire_crypt_device(self.luks2_device_path())?)?;
 
         let new_slot = encryption_info
@@ -594,7 +594,9 @@ impl CryptHandle {
 
         self.metadata.encryption_info.add_info(
             new_slot,
-            UnlockMechanism::ClevisInfo((pin.to_owned(), json.to_owned())),
+            encryption_info
+                .remove(new_slot)
+                .expect("Checked slot above"),
         )?;
 
         Ok(new_slot)

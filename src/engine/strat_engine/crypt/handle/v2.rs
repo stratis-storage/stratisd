@@ -180,23 +180,12 @@ fn setup_crypt_handle(
 fn get_passphrase(
     device: &mut CryptDevice,
     encryption_info: &EncryptionInfo,
-) -> StratisResult<(c_uint, SizedKeyMemory)> {
+) -> StratisResult<Either<(u32, SizedKeyMemory), SizedKeyMemory>> {
     for (ts, mech) in encryption_info.all_infos() {
         match mech {
             UnlockMechanism::KeyDesc(kd) => match read_key(kd) {
-                Ok(Some(pass)) => {
-                    let keyslot = match get_keyslot_number(device, *ts) {
-                        Ok(Some(ks)) => ks,
-                        Ok(None) => {
-                            warn!("Failed to find keyslot associated with the given token");
-                            continue;
-                        }
-                        Err(e) => {
-                            warn!("Failure while finding keyslot associated with the given token: {e}");
-                            continue;
-                        }
-                    };
-                    return Ok((keyslot, pass));
+                Ok(Some(key)) => {
+                    return Ok(Either::Left((*ts, key)));
                 }
                 Ok(None) => {
                     info!("Key description was not in keyring; trying next unlock mechanism")
@@ -205,18 +194,7 @@ fn get_passphrase(
             },
             UnlockMechanism::ClevisInfo(_) => match clevis_decrypt(device, *ts) {
                 Ok(Some(pass)) => {
-                    let keyslot = match get_keyslot_number(device, *ts) {
-                        Ok(Some(ks)) => ks,
-                        Ok(None) => {
-                            warn!("Failed to find keyslot associated with the given token");
-                            continue;
-                        }
-                        Err(e) => {
-                            warn!("Failure while finding keyslot associated with the given token: {e}");
-                            continue;
-                        }
-                    };
-                    return Ok((keyslot, pass));
+                    return Ok(Either::Right(pass));
                 }
                 Ok(None) => {
                     info!("Failed to find the given token; trying next unlock method");
@@ -560,14 +538,14 @@ impl CryptHandle {
 
         let old_encryption_info = self.encryption_info().clone();
 
-        let (_, key) = get_passphrase(
+        let either = get_passphrase(
             &mut acquire_crypt_device(self.luks2_device_path())?,
             self.encryption_info(),
         )?;
 
         clevis_luks_bind(
             self.luks2_device_path(),
-            &Either::Right(key),
+            &either.map_left(|(ts, _)| ts),
             token_slot,
             pin,
             &json_owned,
@@ -649,7 +627,8 @@ impl CryptHandle {
         key_desc: &KeyDescription,
     ) -> StratisResult<u32> {
         let mut device = self.acquire_crypt_device()?;
-        let (_, key) = get_passphrase(&mut device, self.encryption_info())?;
+        let key =
+            get_passphrase(&mut device, self.encryption_info())?.either(|(_, key)| key, |key| key);
 
         let t = match token_slot {
             Some(t) => t,

@@ -464,7 +464,7 @@ impl Pool for SimPool {
                         "Cannot unbind token slot {t} from keyring; bound to Clevis",
                     )));
                 };
-                encryption_info.remove(t)
+                encryption_info.remove(t).is_some()
             }
             None => false,
         };
@@ -502,7 +502,7 @@ impl Pool for SimPool {
                         "Cannot unbind token slot {t} from Clevis; bound to keyring",
                     )));
                 };
-                encryption_info.remove(t)
+                encryption_info.remove(t).is_some()
             }
             None => false,
         };

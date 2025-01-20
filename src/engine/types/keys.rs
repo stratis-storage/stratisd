@@ -383,8 +383,8 @@ impl EncryptionInfo {
         Ok(())
     }
 
-    pub fn remove(&mut self, token_slot: u32) -> bool {
-        self.encryption_infos.remove(&token_slot).is_some()
+    pub fn remove(&mut self, token_slot: u32) -> Option<UnlockMechanism> {
+        self.encryption_infos.remove(&token_slot)
     }
 
     pub fn is_empty(&self) -> bool {

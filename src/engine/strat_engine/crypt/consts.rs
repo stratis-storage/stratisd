@@ -4,7 +4,7 @@
 
 use libc::c_uint;
 
-use devicemapper::{Bytes, IEC};
+use devicemapper::{Bytes, Sectors, IEC};
 
 // Stratis token JSON keys
 pub const TOKEN_TYPE_KEY: &str = "type";
@@ -32,8 +32,10 @@ pub const LUKS2_SECTOR_SIZE: Bytes = Bytes(4096);
 /// tang server does not need to be verified.
 pub const CLEVIS_TANG_TRUST_URL: &str = "stratis:tang:trust_url";
 
-pub const DEFAULT_CRYPT_METADATA_SIZE: Bytes = Bytes(16 * IEC::Ki as u128);
+pub const DEFAULT_CRYPT_METADATA_SIZE_V1: Bytes = Bytes(16 * IEC::Ki as u128);
+pub const DEFAULT_CRYPT_METADATA_SIZE_V2: Bytes = Bytes(64 * IEC::Ki as u128);
 pub const DEFAULT_CRYPT_KEYSLOTS_SIZE: Bytes = Bytes(16352 * IEC::Ki as u128);
+pub const DEFAULT_CRYPT_DATA_OFFSET_V2: Sectors = Sectors(34816);
 
 pub const CLEVIS_TOKEN_NAME: &str = "clevis\0";
 

@@ -14,7 +14,8 @@ use serde_json::{json, Value};
 use devicemapper::{Bytes, Sectors};
 
 use stratisd::engine::{
-    crypt_metadata_size, integrity_meta_space, ThinPoolSizeParams, ValidatedIntegritySpec, BDA,
+    integrity_meta_space, ThinPoolSizeParams, ValidatedIntegritySpec, BDA,
+    DEFAULT_CRYPT_DATA_OFFSET_V2,
 };
 
 // 2^FS_SIZE_START_POWER is the logical size of the smallest Stratis
@@ -195,12 +196,8 @@ fn predict_pool_metadata_usage(
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let crypt_metadata_size = crypt_metadata_size();
-    let crypt_metadata_size_sectors = crypt_metadata_size.sectors();
-    // verify that crypt metadata size is divisible by sector size
-    assert_eq!(crypt_metadata_size_sectors.bytes(), crypt_metadata_size);
-
-    Ok(stratis_avail_sizes.iter().cloned().sum::<Sectors>() - crypt_metadata_size_sectors)
+    let crypt_metadata_size = DEFAULT_CRYPT_DATA_OFFSET_V2;
+    Ok(stratis_avail_sizes.iter().cloned().sum::<Sectors>() - crypt_metadata_size)
 }
 
 // Predict usage for a newly created pool given information about whether

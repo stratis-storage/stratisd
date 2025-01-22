@@ -837,6 +837,48 @@ impl CryptHandle {
         )
     }
 
+    /// Encrypt an unencrypted pool.
+    pub fn decrypt(self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        let activation_name = format_crypt_backstore_name(&pool_uuid);
+        let sector_size = {
+            let mut probe = BlkidProbe::new_from_filename(self.luks2_device_path())?;
+            let top = probe.get_topology()?;
+            convert_int!(top.get_logical_sector_size(), u64, u32)?
+        };
+        let mut device = acquire_crypt_device(self.luks2_device_path())?;
+        let (keyslot, key) = get_passphrase(&mut device, self.encryption_info())?
+            .either(|(keyslot, _, key)| (keyslot, key), |tup| tup);
+        device.reencrypt_handle().reencrypt_init_by_passphrase(
+            Some(&activation_name.to_string()),
+            key.as_ref(),
+            Some(keyslot),
+            None,
+            None,
+            CryptParamsReencrypt {
+                mode: CryptReencryptModeInfo::Decrypt,
+                direction: CryptReencryptDirectionInfo::Forward,
+                resilience: "checksum".to_string(),
+                hash: "sha256".to_string(),
+                data_shift: 0,
+                max_hotzone_size: 0,
+                device_size: 0,
+                luks2: CryptParamsLuks2 {
+                    data_alignment: 0,
+                    data_device: None,
+                    integrity: None,
+                    integrity_params: None,
+                    pbkdf: None,
+                    label: None,
+                    sector_size,
+                    subsystem: None,
+                },
+                flags: CryptReencrypt::empty(),
+            },
+        )?;
+        device.reencrypt_handle().reencrypt2::<()>(None, None)?;
+        Ok(())
+    }
+
     /// Deactivate the device referenced by the current device handle.
     #[cfg(test)]
     pub fn deactivate(&self) -> StratisResult<()> {

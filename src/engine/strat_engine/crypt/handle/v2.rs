@@ -864,6 +864,36 @@ impl CryptHandle {
         )
     }
 
+    /// Decrypt the crypt device for an encrypted pool.
+    #[allow(dead_code)]
+    pub fn decrypt(self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        let activation_name = format_crypt_backstore_name(&pool_uuid);
+        let mut device = acquire_crypt_device(self.luks2_device_path())?;
+        let (keyslot, key) = get_passphrase(&mut device, self.encryption_info())?
+            .either(|(keyslot, _, key)| (keyslot, key), |tup| tup);
+        device.reencrypt_handle().reencrypt_init_by_passphrase(
+            Some(&activation_name.to_string()),
+            key.as_ref(),
+            Some(keyslot),
+            None,
+            None,
+            CryptParamsReencrypt {
+                mode: CryptReencryptModeInfo::Decrypt,
+                direction: CryptReencryptDirectionInfo::Forward,
+                resilience: "checksum".to_string(),
+                hash: "sha256".to_string(),
+                data_shift: 0,
+                max_hotzone_size: 0,
+                device_size: 0,
+                luks2: None,
+                flags: CryptReencrypt::empty(),
+            },
+        )?;
+        info!("Starting decryption operation on pool with UUID {pool_uuid}; may take a while");
+        device.reencrypt_handle().reencrypt2::<()>(None, None)?;
+        Ok(())
+    }
+
     /// Deactivate the device referenced by the current device handle.
     #[cfg(test)]
     pub fn deactivate(&self) -> StratisResult<()> {

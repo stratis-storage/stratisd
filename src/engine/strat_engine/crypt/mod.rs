@@ -10,9 +10,11 @@ pub mod handle;
 mod shared;
 
 pub use self::{
-    consts::CLEVIS_TANG_TRUST_URL,
+    consts::{
+        CLEVIS_LUKS_TOKEN_ID, CLEVIS_TANG_TRUST_URL, DEFAULT_CRYPT_DATA_OFFSET_V2, LUKS2_TOKEN_ID,
+    },
+    handle::v1::crypt_metadata_size,
     shared::{
-        back_up_luks_header, crypt_metadata_size, register_clevis_token, restore_luks_header,
-        set_up_crypt_logging,
+        back_up_luks_header, register_clevis_token, restore_luks_header, set_up_crypt_logging,
     },
 };

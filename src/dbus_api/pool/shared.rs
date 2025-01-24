@@ -5,7 +5,7 @@
 use std::{fmt::Display, path::Path};
 
 use dbus::{
-    arg::{Array, IterAppend},
+    arg::{Array, IterAppend, RefArg, Variant},
     Message,
 };
 use dbus_tree::{MTSync, MethodErr, MethodInfo, MethodResult, PropInfo, Tree};
@@ -286,9 +286,19 @@ pub fn pool_key_desc_prop(pool: &dyn Pool) -> (bool, (bool, String)) {
     prop_conv::key_desc_to_prop(pool.encryption_info())
 }
 
+/// Generate D-Bus representation of a pool key descriptions property.
+pub fn pool_key_descs_prop(pool: &dyn Pool) -> Variant<Box<dyn RefArg>> {
+    prop_conv::key_descs_to_prop(pool.encryption_info())
+}
+
 /// Generate D-Bus representation of a pool Clevis info property.
 pub fn pool_clevis_info_prop(pool: &dyn Pool) -> (bool, (bool, (String, String))) {
     prop_conv::clevis_info_to_prop(pool.encryption_info())
+}
+
+/// Generate D-Bus representation of a pool Clevis infos property.
+pub fn pool_clevis_infos_prop(pool: &dyn Pool) -> Variant<Box<dyn RefArg>> {
+    prop_conv::clevis_infos_to_prop(pool.encryption_info())
 }
 
 /// Generate D-Bus representation of a boolean indicating whether the pool

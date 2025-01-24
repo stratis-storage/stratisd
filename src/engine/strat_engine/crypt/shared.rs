@@ -17,7 +17,7 @@ use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 
-use devicemapper::{Bytes, DevId, DmName, DmOptions};
+use devicemapper::{Bytes, DevId, DmName, DmOptions, Sectors};
 use libcryptsetup_rs::{
     c_uint,
     consts::{
@@ -35,9 +35,8 @@ use crate::{
             cmd::clevis_decrypt,
             crypt::consts::{
                 CLEVIS_LUKS_TOKEN_ID, CLEVIS_RECURSION_LIMIT, CLEVIS_TANG_TRUST_URL,
-                CLEVIS_TOKEN_NAME, DEFAULT_CRYPT_KEYSLOTS_SIZE, DEFAULT_CRYPT_METADATA_SIZE,
-                LUKS2_SECTOR_SIZE, LUKS2_TOKEN_ID, LUKS2_TOKEN_TYPE, TOKEN_KEYSLOTS_KEY,
-                TOKEN_TYPE_KEY,
+                CLEVIS_TOKEN_NAME, LUKS2_SECTOR_SIZE, LUKS2_TOKEN_ID, LUKS2_TOKEN_TYPE,
+                TOKEN_KEYSLOTS_KEY, TOKEN_TYPE_KEY,
             },
             dm::get_dm,
             keys,
@@ -614,16 +613,13 @@ pub fn ensure_inactive(device: &mut CryptDevice, name: &DmName) -> StratisResult
     Ok(())
 }
 
-/// Align the number of bytes to the nearest multiple of `LUKS2_SECTOR_SIZE`
-/// above the current value.
-fn ceiling_sector_size_alignment(bytes: Bytes) -> Bytes {
-    let round = *LUKS2_SECTOR_SIZE - 1;
-    Bytes::from((*bytes + round) & !round)
-}
-
 /// Fallback method for wiping a crypt device where a handle to the encrypted device
 /// cannot be acquired.
-pub fn wipe_fallback(path: &Path, causal_error: StratisError) -> StratisError {
+pub fn wipe_fallback(
+    path: &Path,
+    metadata_size: Bytes,
+    causal_error: StratisError,
+) -> StratisError {
     let mut file = match OpenOptions::new().write(true).open(path) {
         Ok(f) => f,
         Err(e) => {
@@ -633,7 +629,7 @@ pub fn wipe_fallback(path: &Path, causal_error: StratisError) -> StratisError {
             }
         }
     };
-    let size = match convert_int!(*crypt_metadata_size(), u128, usize) {
+    let size = match convert_int!(*metadata_size, u128, usize) {
         Ok(s) => s,
         Err(e) => {
             return StratisError::NoActionRollbackError {
@@ -663,6 +659,7 @@ pub fn ensure_wiped(
     name: &DmName,
 ) -> StratisResult<()> {
     ensure_inactive(device, name)?;
+
     let keyslot_number = get_keyslot_number(device, LUKS2_TOKEN_ID);
     match keyslot_number {
         Ok(Some(keyslot)) => {
@@ -688,35 +685,19 @@ pub fn ensure_wiped(
         }
     }
 
-    let (md_size, ks_size) = log_on_failure!(
-        device.settings_handle().get_metadata_size(),
-        "Failed to acquire LUKS2 metadata size"
-    );
-    debug!("Metadata size of LUKS2 device: {}", *md_size);
-    debug!("Keyslot area size of LUKS2 device: {}", *ks_size);
-    assert!(*md_size % 4096 == 0);
-    let total_luks2_metadata_size = *md_size * 2
-        + convert_int!(
-            *ceiling_sector_size_alignment(Bytes::from(*ks_size)),
-            u128,
-            u64
-        )?;
-    debug!("Aligned total size: {}", total_luks2_metadata_size);
+    let data_offset = Sectors(device.status_handle().get_data_offset());
+    debug!("Crypt device data offset: {data_offset}");
 
-    log_on_failure!(
-        device.wipe_handle().wipe::<()>(
-            physical_path,
-            CryptWipePattern::Zero,
-            0,
-            total_luks2_metadata_size,
-            convert_const!(*LUKS2_SECTOR_SIZE, u128, usize),
-            CryptWipe::empty(),
-            None,
-            None,
-        ),
-        "Failed to wipe device with name {}",
-        name
-    );
+    device.wipe_handle().wipe::<()>(
+        physical_path,
+        CryptWipePattern::Zero,
+        0,
+        convert_int!(*data_offset.bytes(), u128, u64)?,
+        convert_const!(*LUKS2_SECTOR_SIZE, u128, usize),
+        CryptWipe::empty(),
+        None,
+        None,
+    )?;
     Ok(())
 }
 
@@ -768,11 +749,6 @@ pub fn read_key(key_description: &KeyDescription) -> StratisResult<Option<SizedK
 /// physical device.
 pub fn key_desc_from_metadata(device: &mut CryptDevice) -> Option<String> {
     device.token_handle().luks2_keyring_get(LUKS2_TOKEN_ID).ok()
-}
-
-// Bytes occupied by crypt metadata
-pub fn crypt_metadata_size() -> Bytes {
-    2u64 * DEFAULT_CRYPT_METADATA_SIZE + ceiling_sector_size_alignment(DEFAULT_CRYPT_KEYSLOTS_SIZE)
 }
 
 /// Back up the LUKS2 header to a temporary file.

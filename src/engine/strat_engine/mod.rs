@@ -31,7 +31,8 @@ pub use self::pool::inspection as pool_inspection;
 pub use self::{
     backstore::integrity_meta_space,
     crypt::{
-        crypt_metadata_size, register_clevis_token, set_up_crypt_logging, CLEVIS_TANG_TRUST_URL,
+        register_clevis_token, set_up_crypt_logging, CLEVIS_TANG_TRUST_URL,
+        DEFAULT_CRYPT_DATA_OFFSET_V2,
     },
     dm::{get_dm, get_dm_init},
     engine::StratEngine,

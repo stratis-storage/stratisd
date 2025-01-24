@@ -23,7 +23,7 @@ use crate::{
                 blockdevmgr::BlockDevMgr, cache_tier::CacheTier, data_tier::DataTier,
                 devices::UnownedDevices, shared::BlockSizeSummary,
             },
-            crypt::{crypt_metadata_size, handle::v2::CryptHandle},
+            crypt::{handle::v2::CryptHandle, DEFAULT_CRYPT_DATA_OFFSET_V2},
             dm::{get_dm, list_of_backstore_devices, remove_optional_devices, DEVICEMAPPER_PATH},
             metadata::{MDADataSize, BDA},
             names::{format_backstore_ids, CacheRole},
@@ -455,7 +455,7 @@ impl Backstore {
             crypt_meta_allocs: Vec::new(),
         };
 
-        let size = crypt_metadata_size().sectors();
+        let size = DEFAULT_CRYPT_DATA_OFFSET_V2;
         if !backstore.meta_alloc_cache(&[size])? {
             return Err(StratisError::Msg(format!(
                 "Failed to satisfy request in backstore for {size}"
@@ -1174,7 +1174,6 @@ mod tests {
         strat_engine::{
             backstore::devices::{ProcessedPathInfos, UnownedDevices},
             cmd,
-            crypt::crypt_metadata_size,
             metadata::device_identifiers,
             ns::{unshare_mount_namespace, MemoryFilesystem},
             tests::{crypt, loopbacked, real},
@@ -1202,7 +1201,7 @@ mod tests {
         assert_eq!(
             backstore.data_tier.allocated(),
             match (&backstore.origin, &backstore.cache) {
-                (None, None) => crypt_metadata_size().sectors(),
+                (None, None) => DEFAULT_CRYPT_DATA_OFFSET_V2,
                 (&None, Some(cache)) => cache.size(),
                 (Some(linear), &None) => linear.size(),
                 _ => panic!("impossible; see first assertion"),
@@ -1500,7 +1499,7 @@ mod tests {
 
             // Allocate space from the backstore so that the cap device is made.
             backstore
-                .alloc(pool_uuid, &[2u64 * crypt_metadata_size().sectors()])
+                .alloc(pool_uuid, &[2u64 * DEFAULT_CRYPT_DATA_OFFSET_V2])
                 .unwrap()
                 .unwrap();
 

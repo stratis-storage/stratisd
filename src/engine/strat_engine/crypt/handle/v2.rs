@@ -33,8 +33,9 @@ use crate::{
             cmd::{clevis_decrypt, clevis_luks_bind, clevis_luks_regen, clevis_luks_unbind},
             crypt::{
                 consts::{
-                    CLEVIS_LUKS_TOKEN_ID, DEFAULT_CRYPT_KEYSLOTS_SIZE, DEFAULT_CRYPT_METADATA_SIZE,
-                    LUKS2_TOKEN_ID, STRATIS_MEK_SIZE,
+                    CLEVIS_LUKS_TOKEN_ID, DEFAULT_CRYPT_DATA_OFFSET_V2,
+                    DEFAULT_CRYPT_KEYSLOTS_SIZE, DEFAULT_CRYPT_METADATA_SIZE_V2, LUKS2_TOKEN_ID,
+                    STRATIS_MEK_SIZE,
                 },
                 shared::{
                     acquire_crypt_device, activate, activate_by_token, add_keyring_keyslot,
@@ -275,10 +276,6 @@ impl CryptHandle {
             nothing to clean up",
             physical_path.display()
         );
-        device.settings_handle().set_metadata_size(
-            MetadataSize::try_from(convert_int!(*DEFAULT_CRYPT_METADATA_SIZE, u128, u64)?)?,
-            KeyslotsSize::try_from(convert_int!(*DEFAULT_CRYPT_KEYSLOTS_SIZE, u128, u64)?)?,
-        )?;
         Self::initialize_with_err(&mut device, physical_path, pool_uuid, encryption_info, luks2_params.as_ref())
             .and_then(|path| clevis_info_from_metadata(&mut device).map(|ci| (path, ci)))
             .and_then(|(_, clevis_info)| {
@@ -366,7 +363,11 @@ impl CryptHandle {
             .context_handle()
             .load::<()>(Some(EncryptionFormat::Luks2), None)
         {
-            return Err(wipe_fallback(physical_path, StratisError::from(e)));
+            return Err(wipe_fallback(
+                physical_path,
+                DEFAULT_CRYPT_DATA_OFFSET_V2.bytes(),
+                StratisError::from(e),
+            ));
         }
 
         device.keyslot_handle().destroy(keyslot)?;
@@ -398,7 +399,11 @@ impl CryptHandle {
             .context_handle()
             .load::<()>(Some(EncryptionFormat::Luks2), None)
         {
-            return Err(wipe_fallback(physical_path, StratisError::from(e)));
+            return Err(wipe_fallback(
+                physical_path,
+                DEFAULT_CRYPT_DATA_OFFSET_V2.bytes(),
+                StratisError::from(e),
+            ));
         }
 
         Ok(())
@@ -414,6 +419,12 @@ impl CryptHandle {
         let mut luks2_params_ref: Option<CryptParamsLuks2Ref<'_>> =
             luks2_params.map(|lp| lp.try_into()).transpose()?;
 
+        device.settings_handle().set_metadata_size(
+            MetadataSize::try_from(convert_int!(*DEFAULT_CRYPT_METADATA_SIZE_V2, u128, u64)?)?,
+            KeyslotsSize::try_from(convert_int!(*DEFAULT_CRYPT_KEYSLOTS_SIZE, u128, u64)?)?,
+        )?;
+        device.set_data_offset(*DEFAULT_CRYPT_DATA_OFFSET_V2)?;
+
         log_on_failure!(
             device.context_handle().format::<CryptParamsLuks2Ref<'_>>(
                 EncryptionFormat::Luks2,
@@ -424,6 +435,11 @@ impl CryptHandle {
             ),
             "Failed to format device {} with LUKS2 header",
             physical_path.display()
+        );
+
+        assert_eq!(
+            *DEFAULT_CRYPT_DATA_OFFSET_V2,
+            device.status_handle().get_data_offset()
         );
 
         match encryption_info {
@@ -780,17 +796,14 @@ mod tests {
     };
 
     use devicemapper::{Bytes, Sectors, IEC};
-    use libcryptsetup_rs::{
-        consts::vals::{CryptStatusInfo, EncryptionFormat},
-        CryptInit, Either,
-    };
+    use libcryptsetup_rs::consts::vals::CryptStatusInfo;
 
     use crate::engine::{
         strat_engine::{
             crypt::{
                 consts::{
-                    CLEVIS_LUKS_TOKEN_ID, DEFAULT_CRYPT_KEYSLOTS_SIZE, DEFAULT_CRYPT_METADATA_SIZE,
-                    LUKS2_TOKEN_ID, STRATIS_MEK_SIZE,
+                    CLEVIS_LUKS_TOKEN_ID, DEFAULT_CRYPT_KEYSLOTS_SIZE,
+                    DEFAULT_CRYPT_METADATA_SIZE_V2, LUKS2_TOKEN_ID,
                 },
                 shared::acquire_crypt_device,
             },
@@ -978,28 +991,6 @@ mod tests {
     }
 
     #[test]
-    fn loop_test_crypt_metadata_defaults() {
-        fn test_defaults(paths: &[&Path]) {
-            let mut context = CryptInit::init(paths[0]).unwrap();
-            context
-                .context_handle()
-                .format::<()>(
-                    EncryptionFormat::Luks2,
-                    ("aes", "xts-plain64"),
-                    None,
-                    Either::Right(STRATIS_MEK_SIZE),
-                    None,
-                )
-                .unwrap();
-            let (metadata, keyslot) = context.settings_handle().get_metadata_size().unwrap();
-            assert_eq!(DEFAULT_CRYPT_METADATA_SIZE, Bytes::from(*metadata));
-            assert_eq!(DEFAULT_CRYPT_KEYSLOTS_SIZE, Bytes::from(*keyslot));
-        }
-
-        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Exactly(1, None), test_defaults);
-    }
-
-    #[test]
     // Test passing an unusual, larger sector size for cryptsetup. 4096 should
     // be no smaller than the physical sector size of the loop device, and
     // should be allowed by cryptsetup.
@@ -1114,6 +1105,10 @@ mod tests {
         .unwrap();
 
         let mut device = acquire_crypt_device(handle.luks2_device_path()).unwrap();
+        let (metadata, keyslot) = device.settings_handle().get_metadata_size().unwrap();
+        assert_eq!(DEFAULT_CRYPT_METADATA_SIZE_V2, Bytes::from(*metadata));
+        assert_eq!(DEFAULT_CRYPT_KEYSLOTS_SIZE, Bytes::from(*keyslot));
+
         assert!(device.token_handle().json_get(CLEVIS_LUKS_TOKEN_ID).is_ok());
         assert!(device.token_handle().json_get(LUKS2_TOKEN_ID).is_err());
     }

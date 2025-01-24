@@ -16,7 +16,7 @@ use serde::{
 };
 use serde_json::{from_value, to_value, Value};
 
-use devicemapper::{Device, DmName, DmNameBuf, Sectors};
+use devicemapper::{Bytes, Device, DmName, DmNameBuf, Sectors};
 use libcryptsetup_rs::{
     c_uint,
     consts::{
@@ -34,11 +34,11 @@ use crate::{
             cmd::{clevis_decrypt, clevis_luks_bind, clevis_luks_regen, clevis_luks_unbind},
             crypt::{
                 consts::{
-                    CLEVIS_LUKS_TOKEN_ID, DEFAULT_CRYPT_KEYSLOTS_SIZE, DEFAULT_CRYPT_METADATA_SIZE,
-                    LUKS2_TOKEN_ID, STRATIS_MEK_SIZE, STRATIS_TOKEN_DEVNAME_KEY,
-                    STRATIS_TOKEN_DEV_UUID_KEY, STRATIS_TOKEN_ID, STRATIS_TOKEN_POOLNAME_KEY,
-                    STRATIS_TOKEN_POOL_UUID_KEY, STRATIS_TOKEN_TYPE, TOKEN_KEYSLOTS_KEY,
-                    TOKEN_TYPE_KEY,
+                    CLEVIS_LUKS_TOKEN_ID, DEFAULT_CRYPT_KEYSLOTS_SIZE,
+                    DEFAULT_CRYPT_METADATA_SIZE_V1, LUKS2_SECTOR_SIZE, LUKS2_TOKEN_ID,
+                    STRATIS_MEK_SIZE, STRATIS_TOKEN_DEVNAME_KEY, STRATIS_TOKEN_DEV_UUID_KEY,
+                    STRATIS_TOKEN_ID, STRATIS_TOKEN_POOLNAME_KEY, STRATIS_TOKEN_POOL_UUID_KEY,
+                    STRATIS_TOKEN_TYPE, TOKEN_KEYSLOTS_KEY, TOKEN_TYPE_KEY,
                 },
                 shared::{
                     acquire_crypt_device, activate, activate_by_token, add_keyring_keyslot,
@@ -59,6 +59,19 @@ use crate::{
     },
     stratis::{StratisError, StratisResult},
 };
+
+/// Align the number of bytes to the nearest multiple of `LUKS2_SECTOR_SIZE`
+/// above the current value.
+fn ceiling_sector_size_alignment(bytes: Bytes) -> Bytes {
+    let round = *LUKS2_SECTOR_SIZE - 1;
+    Bytes::from((*bytes + round) & !round)
+}
+
+// Bytes occupied by crypt metadata
+pub fn crypt_metadata_size() -> Bytes {
+    2u64 * DEFAULT_CRYPT_METADATA_SIZE_V1
+        + ceiling_sector_size_alignment(DEFAULT_CRYPT_KEYSLOTS_SIZE)
+}
 
 pub struct StratisLuks2Token {
     pub devname: DmNameBuf,
@@ -573,7 +586,7 @@ impl CryptHandle {
             physical_path.display()
         );
         device.settings_handle().set_metadata_size(
-            MetadataSize::try_from(convert_int!(*DEFAULT_CRYPT_METADATA_SIZE, u128, u64)?)?,
+            MetadataSize::try_from(convert_int!(*DEFAULT_CRYPT_METADATA_SIZE_V1, u128, u64)?)?,
             KeyslotsSize::try_from(convert_int!(*DEFAULT_CRYPT_KEYSLOTS_SIZE, u128, u64)?)?,
         )?;
         Self::initialize_with_err(&mut device, physical_path, pool_uuid, dev_uuid, &pool_name, encryption_info, luks2_params.as_ref())
@@ -663,7 +676,11 @@ impl CryptHandle {
             .context_handle()
             .load::<()>(Some(EncryptionFormat::Luks2), None)
         {
-            return Err(wipe_fallback(physical_path, StratisError::from(e)));
+            return Err(wipe_fallback(
+                physical_path,
+                crypt_metadata_size(),
+                StratisError::from(e),
+            ));
         }
 
         device.keyslot_handle().destroy(keyslot)?;
@@ -695,7 +712,11 @@ impl CryptHandle {
             .context_handle()
             .load::<()>(Some(EncryptionFormat::Luks2), None)
         {
-            return Err(wipe_fallback(physical_path, StratisError::from(e)));
+            return Err(wipe_fallback(
+                physical_path,
+                crypt_metadata_size(),
+                StratisError::from(e),
+            ));
         }
 
         Ok(())
@@ -723,6 +744,11 @@ impl CryptHandle {
             ),
             "Failed to format device {} with LUKS2 header",
             physical_path.display()
+        );
+
+        assert_eq!(
+            *crypt_metadata_size().sectors(),
+            device.status_handle().get_data_offset()
         );
 
         match encryption_info {
@@ -1143,8 +1169,8 @@ mod tests {
         strat_engine::{
             crypt::{
                 consts::{
-                    CLEVIS_LUKS_TOKEN_ID, DEFAULT_CRYPT_KEYSLOTS_SIZE, DEFAULT_CRYPT_METADATA_SIZE,
-                    LUKS2_TOKEN_ID, STRATIS_MEK_SIZE,
+                    CLEVIS_LUKS_TOKEN_ID, DEFAULT_CRYPT_KEYSLOTS_SIZE,
+                    DEFAULT_CRYPT_METADATA_SIZE_V1, LUKS2_TOKEN_ID, STRATIS_MEK_SIZE,
                 },
                 shared::acquire_crypt_device,
             },
@@ -1421,7 +1447,7 @@ mod tests {
                 )
                 .unwrap();
             let (metadata, keyslot) = context.settings_handle().get_metadata_size().unwrap();
-            assert_eq!(DEFAULT_CRYPT_METADATA_SIZE, Bytes::from(*metadata));
+            assert_eq!(DEFAULT_CRYPT_METADATA_SIZE_V1, Bytes::from(*metadata));
             assert_eq!(DEFAULT_CRYPT_KEYSLOTS_SIZE, Bytes::from(*keyslot));
         }
 

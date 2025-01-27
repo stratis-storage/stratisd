@@ -544,6 +544,12 @@ impl CryptHandle {
         pin: &str,
         json: &Value,
     ) -> StratisResult<u32> {
+        if self.metadata.encryption_info.all_token_slots().count() >= 15 {
+            return Err(StratisError::Msg(
+                "Reached limit of 15 token and keyslots for pool".to_string(),
+            ));
+        }
+
         let mut json_owned = json.clone();
         let yes = interpret_clevis_config(pin, &mut json_owned)?;
 
@@ -644,6 +650,12 @@ impl CryptHandle {
         token_slot: Option<u32>,
         key_desc: &KeyDescription,
     ) -> StratisResult<u32> {
+        if self.metadata.encryption_info.all_token_slots().count() >= 15 {
+            return Err(StratisError::Msg(
+                "Reached limit of 15 token and keyslots for pool".to_string(),
+            ));
+        }
+
         let mut device = self.acquire_crypt_device()?;
         let key =
             get_passphrase(&mut device, self.encryption_info())?.either(|(_, key)| key, |key| key);

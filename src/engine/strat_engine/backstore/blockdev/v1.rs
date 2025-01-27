@@ -18,7 +18,6 @@ use devicemapper::{Device, Sectors};
 
 use crate::{
     engine::{
-        crypt_metadata_size,
         engine::{BlockDev, DumpState},
         strat_engine::{
             backstore::{
@@ -26,7 +25,7 @@ use crate::{
                 devices::BlockSizes,
                 range_alloc::{PerDevSegments, RangeAllocator},
             },
-            crypt::handle::v1::CryptHandle,
+            crypt::{crypt_metadata_size, handle::v1::CryptHandle},
             device::blkdev_size,
             metadata::{
                 disown_device, static_header, BlockdevSize, MDADataSize, MetadataLocation,

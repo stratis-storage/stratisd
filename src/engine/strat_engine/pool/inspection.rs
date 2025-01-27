@@ -11,13 +11,12 @@ use devicemapper::Sectors;
 
 use crate::{
     engine::{
-        strat_engine::serde_structs::PoolSave,
+        strat_engine::{crypt::DEFAULT_CRYPT_DATA_OFFSET_V2, serde_structs::PoolSave},
         types::{DevUuid, IntegrityTagSpec, ValidatedIntegritySpec},
     },
     stratis::{StratisError, StratisResult},
 };
 
-const SIZE_OF_CRYPT_METADATA_SECTORS: Sectors = Sectors(32768);
 const SIZE_OF_STRATIS_METADATA_SECTORS: Sectors = Sectors(8192);
 
 // Encodes the use for each extent.
@@ -191,7 +190,7 @@ impl Allocator<CapDeviceUse> for CapDevice {
         if self.encrypted {
             Sectors(0)
         } else {
-            SIZE_OF_CRYPT_METADATA_SECTORS
+            DEFAULT_CRYPT_DATA_OFFSET_V2
         }
     }
 
@@ -446,7 +445,7 @@ impl CryptAllocs {
             errors.push(format!("Crypt meta allocs offset, {start} is not 0"));
         }
 
-        if length != SIZE_OF_CRYPT_METADATA_SECTORS {
+        if length != DEFAULT_CRYPT_DATA_OFFSET_V2 {
             errors.push(format!(
                 "Crypt meta allocs entry has unexpected length {length}"
             ));
@@ -539,7 +538,7 @@ impl Allocator<FlexDeviceUse> for FlexDevice {
         if self.encrypted {
             Sectors(0)
         } else {
-            SIZE_OF_CRYPT_METADATA_SECTORS
+            DEFAULT_CRYPT_DATA_OFFSET_V2
         }
     }
 

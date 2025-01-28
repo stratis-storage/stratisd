@@ -57,13 +57,17 @@ class TestBindingAndAddingTrustedUrl(UdevTest):
         with OptionalKeyServiceContextManager(key_spec=[(key_description, key)]):
             pool_name = random_string(5)
             (_, (pool_object_path, _)) = create_pool(
-                pool_name, initial_devnodes, key_description=key_description
+                pool_name, initial_devnodes, key_description=[(key_description, None)]
             )
             self.wait_for_pools(1)
 
             (_, exit_code, message) = Pool.Methods.BindClevis(
                 get_object(pool_object_path),
-                {"pin": "tang", "json": self._CLEVIS_CONFIG_STR},
+                {
+                    "pin": "tang",
+                    "json": self._CLEVIS_CONFIG_STR,
+                    "token_slot": (False, 0),
+                },
             )
 
             self.assertEqual(exit_code, StratisdErrors.OK, message)
@@ -88,19 +92,23 @@ class TestBindingAndAddingTrustedUrl(UdevTest):
         with OptionalKeyServiceContextManager(key_spec=[(key_description, key)]):
             pool_name = random_string(5)
             (_, (pool_object_path, _)) = create_pool(
-                pool_name, initial_devnodes, key_description=key_description
+                pool_name, initial_devnodes, key_description=[(key_description, None)]
             )
             self.wait_for_pools(1)
 
             (_, exit_code, message) = Pool.Methods.BindClevis(
                 get_object(pool_object_path),
-                {"pin": "tang", "json": self._CLEVIS_CONFIG_STR},
+                {
+                    "pin": "tang",
+                    "json": self._CLEVIS_CONFIG_STR,
+                    "token_slot": (False, 0),
+                },
             )
 
             self.assertEqual(exit_code, StratisdErrors.OK, message)
 
             (_, exit_code, message) = Pool.Methods.UnbindClevis(
-                get_object(pool_object_path), {}
+                get_object(pool_object_path), {"token_slot": (False, 0)}
             )
 
             self.assertEqual(exit_code, StratisdErrors.OK, message)
@@ -126,19 +134,23 @@ class TestBindingAndAddingTrustedUrl(UdevTest):
         with OptionalKeyServiceContextManager(key_spec=[(key_description, key)]):
             pool_name = random_string(5)
             (_, (pool_object_path, _)) = create_pool(
-                pool_name, initial_devnodes, key_description=key_description
+                pool_name, initial_devnodes, key_description=[(key_description, None)]
             )
             self.wait_for_pools(1)
 
             (_, exit_code, message) = Pool.Methods.BindClevis(
                 get_object(pool_object_path),
-                {"pin": "tang", "json": self._CLEVIS_CONFIG_STR},
+                {
+                    "pin": "tang",
+                    "json": self._CLEVIS_CONFIG_STR,
+                    "token_slot": (False, 0),
+                },
             )
 
             self.assertEqual(exit_code, StratisdErrors.OK, message)
 
             (_, exit_code, message) = Pool.Methods.UnbindKeyring(
-                get_object(pool_object_path), {}
+                get_object(pool_object_path), {"token_slot": (False, 0)}
             )
 
             self.assertEqual(exit_code, StratisdErrors.OK, message)
@@ -164,18 +176,21 @@ class TestBindingAndAddingTrustedUrl(UdevTest):
         with OptionalKeyServiceContextManager(key_spec=[(key_description, key)]):
             pool_name = random_string(5)
             (_, (pool_object_path, _)) = create_pool(
-                pool_name, initial_devnodes, clevis_info=("tang", (_TANG_URL, None))
+                pool_name,
+                initial_devnodes,
+                clevis_info=[("tang", (_TANG_URL, None), None)],
             )
             self.wait_for_pools(1)
 
             (_, exit_code, message) = Pool.Methods.BindKeyring(
-                get_object(pool_object_path), {"key_desc": key_description}
+                get_object(pool_object_path),
+                {"key_desc": key_description, "token_slot": (False, 0)},
             )
 
             self.assertEqual(exit_code, StratisdErrors.OK, message)
 
             (_, exit_code, message) = Pool.Methods.UnbindClevis(
-                get_object(pool_object_path), {}
+                get_object(pool_object_path), {"token_slot": (False, 0)}
             )
 
             self.assertEqual(exit_code, StratisdErrors.OK, message)
@@ -201,12 +216,14 @@ class TestBindingAndAddingTrustedUrl(UdevTest):
             pool_name = random_string(5)
 
             (_, (pool_object_path, _)) = create_pool(
-                pool_name, initial_devnodes, clevis_info=("tang", (_TANG_URL, None))
+                pool_name,
+                initial_devnodes,
+                clevis_info=[("tang", (_TANG_URL, None), None)],
             )
             self.wait_for_pools(1)
 
             (_, exit_code, message) = Pool.Methods.RebindClevis(
-                get_object(pool_object_path), {}
+                get_object(pool_object_path), {"token_slot": (False, 0)}
             )
 
             self.assertEqual(exit_code, StratisdErrors.OK, message)
@@ -239,12 +256,13 @@ class TestBindingAndRebindingKernelKeyring(UdevTest):
         with OptionalKeyServiceContextManager(key_spec=keys):
             pool_name = random_string(5)
             (_, (pool_object_path, _)) = create_pool(
-                pool_name, initial_devnodes, key_description=keys[0][0]
+                pool_name, initial_devnodes, key_description=[(keys[0][0], None)]
             )
             self.wait_for_pools(1)
 
             (_, exit_code, message) = Pool.Methods.RebindKeyring(
-                get_object(pool_object_path), {"key_desc": keys[1][0]}
+                get_object(pool_object_path),
+                {"key_desc": keys[1][0], "token_slot": (False, 0)},
             )
 
             self.assertEqual(exit_code, StratisdErrors.OK, message)

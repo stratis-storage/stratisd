@@ -158,7 +158,7 @@ class TestRevert(UdevTest):
                 {
                     "id": pool_name,
                     "id_type": "name",
-                    "unlock_method": (False, ""),
+                    "unlock_method": (False, (False, 0)),
                     "key_fd": (False, 0),
                 },
             )
@@ -276,7 +276,7 @@ class TestRevert(UdevTest):
                 {
                     "id": pool_name,
                     "id_type": "name",
-                    "unlock_method": (False, ""),
+                    "unlock_method": (False, (False, 0)),
                     "key_fd": (False, 0),
                 },
             )

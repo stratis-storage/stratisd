@@ -1336,6 +1336,23 @@ impl Backstore {
         }
     }
 
+    pub fn decrypt(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        let handle = self
+            .cap_device
+            .enc
+            .take()
+            .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?
+            .right()
+            .ok_or_else(|| {
+                StratisError::Msg("No space has been allocated from the backstore".to_string())
+            })?;
+        let luks2_path = handle.luks2_device_path().to_owned();
+
+        handle.decrypt(pool_uuid)?;
+        manual_wipe(&luks2_path, Sectors(0), DEFAULT_CRYPT_DATA_OFFSET_V2)?;
+        Ok(())
+    }
+
     /// A summary of block sizes
     pub fn block_size_summary(&self, tier: BlockDevTier) -> Option<BlockSizeSummary> {
         match tier {

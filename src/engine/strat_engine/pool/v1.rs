@@ -1352,6 +1352,16 @@ impl Pool for StratPool {
         self.backstore.reencrypt().map(|_| ReencryptedDevice)
     }
 
+    fn decrypt_pool(
+        &mut self,
+        _: &Name,
+        _: PoolUuid,
+    ) -> StratisResult<DeleteAction<EncryptedDevice>> {
+        Err(StratisError::Msg(
+            "Decrypting an encrypted device is only supported in V2 of the metadata".to_string(),
+        ))
+    }
+
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {
         serde_json::to_string(&self.record(pool_name)).map_err(|e| e.into())
     }

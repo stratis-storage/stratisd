@@ -863,7 +863,6 @@ impl CryptHandle {
     }
 
     /// Encrypt an unencrypted pool.
-    #[allow(dead_code)]
     pub fn decrypt(self, pool_uuid: PoolUuid) -> StratisResult<()> {
         let activation_name = format_crypt_backstore_name(&pool_uuid);
         let sector_size = convert_int!(

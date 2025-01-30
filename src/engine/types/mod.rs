@@ -511,7 +511,9 @@ impl From<StratSigblockVersion> for u8 {
 
 #[derive(Clone, Copy)]
 pub enum OffsetDirection {
+    /// Subtract the offset from the current offset.
     Backwards,
+    /// Add the offset to the current offset.
     Forwards,
 }
 

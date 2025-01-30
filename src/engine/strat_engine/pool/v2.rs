@@ -1238,6 +1238,37 @@ impl Pool for StratPool {
             .map(|_| ReencryptedDevice(pool_uuid))
     }
 
+    #[pool_mutating_action("NoRequests")]
+    fn decrypt_pool(
+        &mut self,
+        name: &Name,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<DeleteAction<EncryptedDevice>> {
+        let offset = DEFAULT_CRYPT_DATA_OFFSET_V2;
+        let direction = OffsetDirection::Forwards;
+        match self.backstore.encryption_info() {
+            None => Ok(DeleteAction::Identity),
+            Some(_) => {
+                self.backstore.decrypt(pool_uuid)?;
+                self.thin_pool.suspend()?;
+                let set_device_res = self.thin_pool.set_device(
+                    self.backstore.device().expect(
+                        "Since thin pool exists, space must have been allocated \
+                         from the backstore, so backstore must have a cap device",
+                    ),
+                    offset,
+                    direction,
+                );
+                self.thin_pool.resume()?;
+                self.backstore.shift_alloc_offset(offset, direction);
+                let metadata_res = self.write_metadata(name);
+                let _ = set_device_res?;
+                metadata_res?;
+                Ok(DeleteAction::Deleted(EncryptedDevice(pool_uuid)))
+            }
+        }
+    }
+
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {
         serde_json::to_string(&self.record(pool_name)).map_err(|e| e.into())
     }

@@ -865,7 +865,6 @@ impl CryptHandle {
     }
 
     /// Decrypt the crypt device for an encrypted pool.
-    #[allow(dead_code)]
     pub fn decrypt(self, pool_uuid: PoolUuid) -> StratisResult<()> {
         let activation_name = format_crypt_backstore_name(&pool_uuid);
         let mut device = acquire_crypt_device(self.luks2_device_path())?;

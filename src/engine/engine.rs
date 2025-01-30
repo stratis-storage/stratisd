@@ -399,6 +399,13 @@ pub trait Pool: Debug + Send + Sync {
     /// Reencrypt an encrypted pool.
     fn reencrypt_pool(&mut self) -> StratisResult<ReencryptedDevice>;
 
+    /// Decrypt an encrypted pool.
+    fn decrypt_pool(
+        &mut self,
+        name: &Name,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<DeleteAction<EncryptedDevice>>;
+
     /// Return the metadata that would be written if metadata were written.
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String>;
 

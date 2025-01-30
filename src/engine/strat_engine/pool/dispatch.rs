@@ -360,6 +360,17 @@ impl Pool for AnyPool {
         }
     }
 
+    fn decrypt_pool(
+        &mut self,
+        name: &Name,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<DeleteAction<EncryptedDevice>> {
+        match self {
+            AnyPool::V1(p) => p.decrypt_pool(name, pool_uuid),
+            AnyPool::V2(p) => p.decrypt_pool(name, pool_uuid),
+        }
+    }
+
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {
         match self {
             AnyPool::V1(p) => p.current_metadata(pool_name),

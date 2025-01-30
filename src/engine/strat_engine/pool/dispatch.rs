@@ -4,6 +4,7 @@
 
 use std::{collections::HashSet, path::Path};
 
+use either::Either;
 use serde_json::Value;
 
 use devicemapper::{Bytes, Sectors};
@@ -14,8 +15,9 @@ use crate::{
         strat_engine::pool::{v1, v2},
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff, PoolEncryptionInfo,
-            PoolUuid, PropChangeAction, RegenAction, RenameAction, SetCreateAction,
+            EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo, Key,
+            KeyDescription, Name, OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolUuid,
+            PropChangeAction, ReencryptedDevice, RegenAction, RenameAction, SetCreateAction,
             SetDeleteAction, StratSigblockVersion,
         },
     },
@@ -44,53 +46,56 @@ impl Pool for AnyPool {
 
     fn bind_clevis(
         &mut self,
+        token_slot: OptionalTokenSlotInput,
         pin: &str,
         clevis_info: &Value,
-    ) -> StratisResult<CreateAction<Clevis>> {
+    ) -> StratisResult<CreateAction<(Clevis, u32)>> {
         match self {
-            AnyPool::V1(p) => p.bind_clevis(pin, clevis_info),
-            AnyPool::V2(p) => p.bind_clevis(pin, clevis_info),
-        }
-    }
-
-    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>> {
-        match self {
-            AnyPool::V1(p) => p.unbind_clevis(),
-            AnyPool::V2(p) => p.unbind_clevis(),
+            AnyPool::V1(p) => p.bind_clevis(token_slot, pin, clevis_info),
+            AnyPool::V2(p) => p.bind_clevis(token_slot, pin, clevis_info),
         }
     }
 
     fn bind_keyring(
         &mut self,
+        token_slot: OptionalTokenSlotInput,
         key_description: &KeyDescription,
-    ) -> StratisResult<CreateAction<Key>> {
+    ) -> StratisResult<CreateAction<(Key, u32)>> {
         match self {
-            AnyPool::V1(p) => p.bind_keyring(key_description),
-            AnyPool::V2(p) => p.bind_keyring(key_description),
-        }
-    }
-
-    fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>> {
-        match self {
-            AnyPool::V1(p) => p.unbind_keyring(),
-            AnyPool::V2(p) => p.unbind_keyring(),
+            AnyPool::V1(p) => p.bind_keyring(token_slot, key_description),
+            AnyPool::V2(p) => p.bind_keyring(token_slot, key_description),
         }
     }
 
     fn rebind_keyring(
         &mut self,
+        token_slot: Option<u32>,
         new_key_desc: &KeyDescription,
     ) -> StratisResult<RenameAction<Key>> {
         match self {
-            AnyPool::V1(p) => p.rebind_keyring(new_key_desc),
-            AnyPool::V2(p) => p.rebind_keyring(new_key_desc),
+            AnyPool::V1(p) => p.rebind_keyring(token_slot, new_key_desc),
+            AnyPool::V2(p) => p.rebind_keyring(token_slot, new_key_desc),
         }
     }
 
-    fn rebind_clevis(&mut self) -> StratisResult<RegenAction> {
+    fn rebind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<RegenAction> {
         match self {
-            AnyPool::V1(p) => p.rebind_clevis(),
-            AnyPool::V2(p) => p.rebind_clevis(),
+            AnyPool::V1(p) => p.rebind_clevis(token_slot),
+            AnyPool::V2(p) => p.rebind_clevis(token_slot),
+        }
+    }
+
+    fn unbind_keyring(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Key>> {
+        match self {
+            AnyPool::V1(p) => p.unbind_keyring(token_slot),
+            AnyPool::V2(p) => p.unbind_keyring(token_slot),
+        }
+    }
+
+    fn unbind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Clevis>> {
+        match self {
+            AnyPool::V1(p) => p.unbind_clevis(token_slot),
+            AnyPool::V2(p) => p.unbind_clevis(token_slot),
         }
     }
 
@@ -252,7 +257,14 @@ impl Pool for AnyPool {
         }
     }
 
-    fn encryption_info(&self) -> Option<PoolEncryptionInfo> {
+    fn encryption_info_legacy(&self) -> Option<PoolEncryptionInfo> {
+        match self {
+            AnyPool::V1(p) => p.encryption_info_legacy(),
+            AnyPool::V2(p) => p.encryption_info_legacy(),
+        }
+    }
+
+    fn encryption_info(&self) -> Option<Either<EncryptionInfo, PoolEncryptionInfo>> {
         match self {
             AnyPool::V1(p) => p.encryption_info(),
             AnyPool::V2(p) => p.encryption_info(),
@@ -326,6 +338,36 @@ impl Pool for AnyPool {
         match self {
             AnyPool::V1(p) => p.set_fs_size_limit(fs, limit),
             AnyPool::V2(p) => p.set_fs_size_limit(fs, limit),
+        }
+    }
+
+    fn encrypt_pool(
+        &mut self,
+        name: &Name,
+        pool_uuid: PoolUuid,
+        encryption_info: &InputEncryptionInfo,
+    ) -> StratisResult<CreateAction<EncryptedDevice>> {
+        match self {
+            AnyPool::V1(p) => p.encrypt_pool(name, pool_uuid, encryption_info),
+            AnyPool::V2(p) => p.encrypt_pool(name, pool_uuid, encryption_info),
+        }
+    }
+
+    fn reencrypt_pool(&mut self) -> StratisResult<ReencryptedDevice> {
+        match self {
+            AnyPool::V1(p) => p.reencrypt_pool(),
+            AnyPool::V2(p) => p.reencrypt_pool(),
+        }
+    }
+
+    fn decrypt_pool(
+        &mut self,
+        name: &Name,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<DeleteAction<EncryptedDevice>> {
+        match self {
+            AnyPool::V1(p) => p.decrypt_pool(name, pool_uuid),
+            AnyPool::V2(p) => p.decrypt_pool(name, pool_uuid),
         }
     }
 

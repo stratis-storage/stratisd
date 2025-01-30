@@ -4,13 +4,15 @@
 
 use std::{os::unix::io::RawFd, path::Path, sync::Arc};
 
+use either::Either;
 use serde_json::Value;
 use tokio::task::block_in_place;
 
 use crate::{
     engine::{
-        BlockDevTier, CreateAction, DeleteAction, EncryptionInfo, Engine, EngineAction,
-        IntegritySpec, KeyDescription, Name, PoolIdentifier, PoolUuid, RenameAction, UnlockMethod,
+        BlockDevTier, CreateAction, DeleteAction, Engine, EngineAction, InputEncryptionInfo,
+        IntegritySpec, KeyDescription, Name, OptionalTokenSlotInput, PoolIdentifier, PoolUuid,
+        RenameAction, TokenUnlockMethod,
     },
     jsonrpc::interface::PoolListType,
     stratis::{StratisError, StratisResult},
@@ -20,7 +22,7 @@ use crate::{
 pub async fn pool_start(
     engine: Arc<dyn Engine>,
     id: PoolIdentifier<PoolUuid>,
-    unlock_method: Option<UnlockMethod>,
+    unlock_method: TokenUnlockMethod,
     prompt: Option<RawFd>,
 ) -> StratisResult<bool> {
     Ok(engine
@@ -42,7 +44,7 @@ pub async fn pool_create<'a>(
     engine: Arc<dyn Engine>,
     name: &'a str,
     blockdev_paths: &'a [&'a Path],
-    enc_info: Option<&'a EncryptionInfo>,
+    enc_info: Option<&'a InputEncryptionInfo>,
 ) -> StratisResult<bool> {
     Ok(
         match engine
@@ -166,6 +168,7 @@ pub async fn pool_list(engine: Arc<dyn Engine>) -> PoolListType {
 pub async fn pool_bind_keyring(
     engine: Arc<dyn Engine>,
     id: PoolIdentifier<PoolUuid>,
+    token_slot: OptionalTokenSlotInput,
     key_desc: &KeyDescription,
 ) -> StratisResult<bool> {
     let mut guard = engine
@@ -174,7 +177,7 @@ pub async fn pool_bind_keyring(
         .ok_or_else(|| StratisError::Msg(format!("Pool with {id} not found")))?;
 
     let (_, _, pool) = guard.as_mut_tuple();
-    match pool.bind_keyring(key_desc)? {
+    match pool.bind_keyring(token_slot, key_desc)? {
         CreateAction::Created(_key) => Ok(true),
         CreateAction::Identity => Ok(false),
     }
@@ -184,6 +187,7 @@ pub async fn pool_bind_keyring(
 pub async fn pool_bind_clevis<'a>(
     engine: Arc<dyn Engine>,
     id: PoolIdentifier<PoolUuid>,
+    token_slot: OptionalTokenSlotInput,
     pin: &'a str,
     clevis_info: &'a Value,
 ) -> StratisResult<bool> {
@@ -193,7 +197,7 @@ pub async fn pool_bind_clevis<'a>(
         .ok_or_else(|| StratisError::Msg(format!("Pool with {id} not found")))?;
 
     let (_, _, pool) = guard.as_mut_tuple();
-    match pool.bind_clevis(pin, clevis_info)? {
+    match pool.bind_clevis(token_slot, pin, clevis_info)? {
         CreateAction::Created(_clevis) => Ok(true),
         CreateAction::Identity => Ok(false),
     }
@@ -203,6 +207,7 @@ pub async fn pool_bind_clevis<'a>(
 pub async fn pool_unbind_keyring(
     engine: Arc<dyn Engine>,
     id: PoolIdentifier<PoolUuid>,
+    token_slot: Option<u32>,
 ) -> StratisResult<bool> {
     let mut guard = engine
         .get_mut_pool(id.clone())
@@ -210,7 +215,7 @@ pub async fn pool_unbind_keyring(
         .ok_or_else(|| StratisError::Msg(format!("Pool with {id} not found")))?;
 
     let (_, _, pool) = guard.as_mut_tuple();
-    match pool.unbind_keyring()? {
+    match pool.unbind_keyring(token_slot)? {
         DeleteAction::Deleted(_key_desc) => Ok(true),
         DeleteAction::Identity => Ok(false),
     }
@@ -220,6 +225,7 @@ pub async fn pool_unbind_keyring(
 pub async fn pool_unbind_clevis(
     engine: Arc<dyn Engine>,
     id: PoolIdentifier<PoolUuid>,
+    token_slot: Option<u32>,
 ) -> StratisResult<bool> {
     let mut guard = engine
         .get_mut_pool(id.clone())
@@ -227,7 +233,7 @@ pub async fn pool_unbind_clevis(
         .ok_or_else(|| StratisError::Msg(format!("Pool with {id} not found")))?;
 
     let (_, _, pool) = guard.as_mut_tuple();
-    match pool.unbind_clevis()? {
+    match pool.unbind_clevis(token_slot)? {
         DeleteAction::Deleted(_clevis) => Ok(true),
         DeleteAction::Identity => Ok(false),
     }
@@ -237,6 +243,7 @@ pub async fn pool_unbind_clevis(
 pub async fn pool_rebind_keyring(
     engine: Arc<dyn Engine>,
     id: PoolIdentifier<PoolUuid>,
+    token_slot: Option<u32>,
     key_desc: KeyDescription,
 ) -> StratisResult<bool> {
     let mut guard = engine
@@ -245,7 +252,7 @@ pub async fn pool_rebind_keyring(
         .ok_or_else(|| StratisError::Msg(format!("Pool with {id} not found")))?;
 
     let (_, _, pool) = guard.as_mut_tuple();
-    match pool.rebind_keyring(&key_desc)? {
+    match pool.rebind_keyring(token_slot, &key_desc)? {
         RenameAction::Renamed(_key) => Ok(true),
         RenameAction::Identity => Ok(false),
         RenameAction::NoSource => Ok(false),
@@ -256,6 +263,7 @@ pub async fn pool_rebind_keyring(
 pub async fn pool_rebind_clevis(
     engine: Arc<dyn Engine>,
     id: PoolIdentifier<PoolUuid>,
+    token_slot: Option<u32>,
 ) -> StratisResult<bool> {
     let mut guard = engine
         .get_mut_pool(id.clone())
@@ -263,7 +271,7 @@ pub async fn pool_rebind_clevis(
         .ok_or_else(|| StratisError::Msg(format!("Pool with {id} not found")))?;
 
     let (_, _, pool) = guard.as_mut_tuple();
-    pool.rebind_clevis()?;
+    pool.rebind_clevis(token_slot)?;
     Ok(true)
 }
 
@@ -326,7 +334,8 @@ pub async fn pool_is_bound(
     let guard = engine.get_pool(id.clone()).await;
     if let Some((_, _, pool)) = guard.as_ref().map(|guard| guard.as_tuple()) {
         Ok(match pool.encryption_info() {
-            Some(ei) => ei.clevis_info()?.is_some(),
+            Some(Either::Left(ei)) => ei.all_clevis_infos().count() > 0,
+            Some(Either::Right(ei)) => ei.clevis_info()?.is_some(),
             None => false,
         })
     } else if let Some(info) = locked.locked.get(match id {
@@ -351,7 +360,8 @@ pub async fn pool_has_passphrase(
     let guard = engine.get_pool(id.clone()).await;
     if let Some((_, _, pool)) = guard.as_ref().map(|guard| guard.as_tuple()) {
         Ok(match pool.encryption_info() {
-            Some(ei) => ei.key_description()?.is_some(),
+            Some(Either::Left(ei)) => ei.all_key_descriptions().count() > 0,
+            Some(Either::Right(ei)) => ei.key_description()?.is_some(),
             None => false,
         })
     } else if let Some(info) = locked.locked.get(match id {
@@ -362,32 +372,6 @@ pub async fn pool_has_passphrase(
             .ok_or_else(|| StratisError::Msg(format!("Could not find pool with name {n}")))?,
     }) {
         Ok(info.info.key_description()?.is_some())
-    } else {
-        Err(StratisError::Msg(format!("Pool with {id} not found")))
-    }
-}
-
-// stratis-min pool clevis-pin
-pub async fn pool_clevis_pin(
-    engine: Arc<dyn Engine>,
-    id: PoolIdentifier<PoolUuid>,
-) -> StratisResult<Option<String>> {
-    let locked = engine.locked_pools().await;
-    let guard = engine.get_pool(id.clone()).await;
-    if let Some((_, _, pool)) = guard.as_ref().map(|guard| guard.as_tuple()) {
-        let encryption_info = match pool.encryption_info() {
-            Some(ei) => EncryptionInfo::try_from(ei)?,
-            None => return Ok(None),
-        };
-        Ok(encryption_info.clevis_info().map(|(pin, _)| pin.clone()))
-    } else if let Some(info) = locked.locked.get(match id {
-        PoolIdentifier::Uuid(ref u) => u,
-        PoolIdentifier::Name(ref n) => locked
-            .name_to_uuid
-            .get(n)
-            .ok_or_else(|| StratisError::Msg(format!("Could not find pool with name {n}")))?,
-    }) {
-        Ok(info.info.clevis_info()?.map(|(pin, _)| pin.clone()))
     } else {
         Err(StratisError::Msg(format!("Pool with {id} not found")))
     }

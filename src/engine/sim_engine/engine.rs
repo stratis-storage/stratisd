@@ -24,16 +24,18 @@ use crate::{
             SomeLockWriteGuard, Table,
         },
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, Features, FilesystemUuid,
+            CreateAction, DeleteAction, DevUuid, Features, FilesystemUuid, InputEncryptionInfo,
             IntegritySpec, LockedPoolsInfo, Name, PoolDevice, PoolDiff, PoolIdentifier, PoolUuid,
             RenameAction, ReportType, SetUnlockAction, StartAction, StopAction, StoppedPoolInfo,
-            StoppedPoolsInfo, StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
-            ValidatedIntegritySpec,
+            StoppedPoolsInfo, StratFilesystemDiff, TokenUnlockMethod, UdevEngineEvent,
+            UnlockMethod, ValidatedIntegritySpec,
         },
         StratSigblockVersion,
     },
     stratis::{StratisError, StratisResult},
 };
+
+use super::shared::convert_encryption_info;
 
 #[derive(Debug)]
 pub struct SimEngine {
@@ -129,7 +131,7 @@ impl Engine for SimEngine {
         &self,
         name: &str,
         blockdev_paths: &[&Path],
-        encryption_info: Option<&EncryptionInfo>,
+        encryption_info: Option<&InputEncryptionInfo>,
         integrity_spec: IntegritySpec,
     ) -> StratisResult<CreateAction<PoolUuid>> {
         validate_name(name)?;
@@ -139,14 +141,7 @@ impl Engine for SimEngine {
 
         let integrity_spec = ValidatedIntegritySpec::try_from(integrity_spec)?;
 
-        if let Some(key_desc) = encryption_info.and_then(|ei| ei.key_description()) {
-            if !self.key_handler.contains_key(key_desc) {
-                return Err(StratisError::Msg(format!(
-                    "Key {} was not found in the keyring",
-                    key_desc.as_application_str()
-                )));
-            }
-        }
+        let converted_ei = convert_encryption_info(encryption_info, Some(&self.key_handler))?;
 
         let guard = self.pools.read(PoolIdentifier::Name(name.clone())).await;
         match guard.as_ref().map(|g| g.as_tuple()) {
@@ -160,7 +155,8 @@ impl Engine for SimEngine {
                     let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
                     let devices = device_set.into_iter().cloned().collect::<Vec<_>>();
 
-                    let (pool_uuid, pool) = SimPool::new(&devices, encryption_info, integrity_spec);
+                    let (pool_uuid, pool) =
+                        SimPool::new(&devices, converted_ei.as_ref(), integrity_spec);
 
                     self.pools.modify_all().await.insert(
                         Name::new(name.to_owned()),
@@ -250,7 +246,7 @@ impl Engine for SimEngine {
                 st.stopped.insert(
                     *uuid,
                     StoppedPoolInfo {
-                        info: pool.encryption_info(),
+                        info: pool.encryption_info_legacy(),
                         devices: pool
                             .blockdevs()
                             .into_iter()
@@ -300,16 +296,12 @@ impl Engine for SimEngine {
     async fn start_pool(
         &self,
         id: PoolIdentifier<PoolUuid>,
-        unlock_method: Option<UnlockMethod>,
+        token_slot: TokenUnlockMethod,
         passphrase_fd: Option<RawFd>,
     ) -> StratisResult<StartAction<PoolUuid>> {
         if let Some(guard) = self.pools.read(id.clone()).await {
             let (_, pool_uuid, pool) = guard.as_tuple();
-            if pool.is_encrypted() && unlock_method.is_none() {
-                return Err(StratisError::Msg(format!(
-                    "Pool with UUID {pool_uuid} is encrypted but no unlock method was provided"
-                )));
-            } else if !pool.is_encrypted() && unlock_method.is_some() {
+            if !pool.is_encrypted() && token_slot.is_some() {
                 return Err(StratisError::Msg(format!(
                     "Pool with UUID {pool_uuid} is not encrypted but an unlock method was provided"
                 )));
@@ -345,7 +337,7 @@ impl Engine for SimEngine {
                     })
                     .map(|(n, p)| (n, u, p))?,
             };
-            if pool.is_encrypted() && unlock_method.is_none() {
+            if pool.is_encrypted() && token_slot.is_none() {
                 self.stopped_pools
                     .write()
                     .await
@@ -353,7 +345,7 @@ impl Engine for SimEngine {
                 return Err(StratisError::Msg(format!(
                     "Pool with UUID {pool_uuid} is encrypted but no unlock method was provided"
                 )));
-            } else if !pool.is_encrypted() && unlock_method.is_some() {
+            } else if !pool.is_encrypted() && token_slot.is_some() {
                 self.stopped_pools
                     .write()
                     .await

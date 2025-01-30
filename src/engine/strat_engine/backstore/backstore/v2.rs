@@ -1272,6 +1272,20 @@ impl Backstore {
         }
     }
 
+    pub fn decrypt(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        let handle = self
+            .enc
+            .take()
+            .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?
+            .right()
+            .ok_or_else(|| {
+                StratisError::Msg("No space has been allocated from the backstore".to_string())
+            })?;
+
+        handle.decrypt(pool_uuid)?;
+        Ok(())
+    }
+
     /// A summary of block sizes
     pub fn block_size_summary(&self, tier: BlockDevTier) -> Option<BlockSizeSummary> {
         match tier {

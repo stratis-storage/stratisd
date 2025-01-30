@@ -885,6 +885,15 @@ impl Pool for SimPool {
         Ok(ReencryptedDevice)
     }
 
+    fn decrypt_pool(
+        &mut self,
+        _: &Name,
+        _: PoolUuid,
+    ) -> StratisResult<DeleteAction<EncryptedDevice>> {
+        self.encryption_info = None;
+        Ok(DeleteAction::Deleted(EncryptedDevice))
+    }
+
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {
         serde_json::to_string(&self.record(pool_name)).map_err(|e| e.into())
     }

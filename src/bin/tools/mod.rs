@@ -5,5 +5,6 @@
 mod check_metadata;
 mod cmds;
 mod dump_metadata;
+mod legacy_pool;
 
 pub use cmds::cmds;

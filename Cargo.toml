@@ -71,10 +71,6 @@ required-features = ["udev_scripts"]
 name = "stratis-utils"
 required-features = ["engine"]
 
-[[bin]]
-name = "stratis-legacy-pool"
-required-features = ["test_extras"]
-
 [dependencies.async-trait]
 version = "0.1.51"
 optional = true
@@ -295,11 +291,11 @@ engine = [
 ]
 default = ["dbus_enabled", "engine"]
 dbus_enabled = ["dep:dbus", "dep:dbus-tree"]
-extras = ["dep:pretty-hex"]
+extras = ["dep:pretty-hex", "test_extras"]
 min = ["dep:termios"]
 systemd_compat = ["dep:bindgen"]
 udev_scripts = ["dep:data-encoding"]
-test_extras = ["engine"]
+test_extras = []
 
 [lints.rust]
 warnings = { level = "deny" }

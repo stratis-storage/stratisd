@@ -13,6 +13,7 @@ use stratisd::stratis::VERSION;
 pub trait ToolCommand<'a> {
     fn name(&self) -> &'a str;
     fn run(&self, command_line_args: Vec<String>) -> Result<(), String>;
+    fn show_in_after_help(&self) -> bool;
 }
 
 struct StratisDumpMetadata;
@@ -68,6 +69,10 @@ impl<'a> ToolCommand<'a> for StratisDumpMetadata {
                 .unwrap_or(false),
         )
     }
+
+    fn show_in_after_help(&self) -> bool {
+        true
+    }
 }
 
 struct StratisCheckMetadata;
@@ -100,6 +105,10 @@ impl<'a> ToolCommand<'a> for StratisCheckMetadata {
 
         check_metadata::run(infile, false)
     }
+
+    fn show_in_after_help(&self) -> bool {
+        false
+    }
 }
 
 struct StratisPrintMetadata;
@@ -131,6 +140,10 @@ impl<'a> ToolCommand<'a> for StratisPrintMetadata {
             .expect("'file' is a mandatory argument");
 
         check_metadata::run(infile, true)
+    }
+
+    fn show_in_after_help(&self) -> bool {
+        false
     }
 }
 

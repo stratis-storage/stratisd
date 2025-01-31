@@ -50,9 +50,22 @@ fn main() {
                 Arg::new("executable")
                     .required(true)
                     .value_name("EXECUTABLE")
-                    .value_parser(cmds().iter().map(|x| x.name()).collect::<Vec<_>>()),
+                    .value_parser(cmds().iter().map(|x| x.name()).collect::<Vec<_>>())
+                    .hide_possible_values(true),
             )
-            .arg_required_else_help(true);
+            .arg_required_else_help(true)
+            .after_help(format!(
+                "Executables:\n{}",
+                cmds()
+                    .iter()
+                    .filter_map(|x| if x.show_in_after_help() {
+                        Some(format!("* {}", x.name()))
+                    } else {
+                        None
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            ));
 
         let truncated_args = if args.len() > 1 {
             vec![argv1, &args[1]]

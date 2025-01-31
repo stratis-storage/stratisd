@@ -4,9 +4,9 @@
 
 use std::path::PathBuf;
 
-use clap::{Arg, ArgAction, Command};
+use clap::{Arg, ArgAction, ArgGroup, Command};
 
-use crate::tools::{check_metadata, dump_metadata};
+use crate::tools::{check_metadata, dump_metadata, legacy_pool};
 
 use stratisd::stratis::VERSION;
 
@@ -147,10 +147,72 @@ impl<'a> ToolCommand<'a> for StratisPrintMetadata {
     }
 }
 
+struct StratisLegacyPool;
+
+impl StratisLegacyPool {
+    fn cmd() -> Command {
+        Command::new("stratis-legacy-pool")
+            .version(VERSION)
+            .about("A script for facilitating testing; not to be used in production")
+            .arg(Arg::new("pool_name").num_args(1).required(true))
+            .arg(
+                Arg::new("blockdevs")
+                    .action(ArgAction::Append)
+                    .value_parser(clap::value_parser!(PathBuf))
+                    .required(true),
+            )
+            .arg(
+                Arg::new("key_desc")
+                    .long("key-desc")
+                    .num_args(1)
+                    .required(false),
+            )
+            .arg(
+                Arg::new("clevis")
+                    .long("clevis")
+                    .num_args(1)
+                    .required(false)
+                    .value_parser(["nbde", "tang", "tpm2"])
+                    .requires_if("nbde", "tang_args")
+                    .requires_if("tang", "tang_args"),
+            )
+            .arg(
+                Arg::new("tang_url")
+                    .long("tang-url")
+                    .num_args(1)
+                    .required_if_eq("clevis", "nbde")
+                    .required_if_eq("clevis", "tang"),
+            )
+            .arg(Arg::new("thumbprint").long("thumbprint").num_args(1))
+            .arg(Arg::new("trust_url").long("trust-url").num_args(0))
+            .group(
+                ArgGroup::new("tang_args")
+                    .arg("thumbprint")
+                    .arg("trust_url"),
+            )
+    }
+}
+
+impl<'a> ToolCommand<'a> for StratisLegacyPool {
+    fn name(&self) -> &'a str {
+        "stratis-legacy-pool"
+    }
+
+    fn run(&self, command_line_args: Vec<String>) -> Result<(), String> {
+        let matches = StratisLegacyPool::cmd().get_matches_from(command_line_args);
+        legacy_pool::run(&matches).map_err(|err| format!("{err}"))
+    }
+
+    fn show_in_after_help(&self) -> bool {
+        false
+    }
+}
+
 pub fn cmds<'a>() -> Vec<Box<dyn ToolCommand<'a>>> {
     vec![
         Box::new(StratisCheckMetadata),
         Box::new(StratisDumpMetadata),
+        Box::new(StratisLegacyPool),
         Box::new(StratisPrintMetadata),
     ]
 }

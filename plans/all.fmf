@@ -50,11 +50,10 @@ execute:
 
 /python:
   prepare+:
-    - name: Build and install legacy pool script
+    - name: Make link for legacy pool utility
       how: shell
       script:
-        - PROFILEDIR=debug make build-test-extras
-        - mv target/debug/stratis-legacy-pool /usr/local/bin
+        - ln -s /usr/bin/stratisd-tools /usr/local/bin/stratis-legacy-pool
   discover+:
     filter: "tag:python"
 

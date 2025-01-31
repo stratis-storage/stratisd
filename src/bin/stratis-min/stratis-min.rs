@@ -4,17 +4,15 @@
 
 use std::{error::Error, path::PathBuf};
 
-use clap::{builder::PossibleValuesParser, Arg, ArgAction, ArgGroup, Command};
+use clap::{Arg, ArgAction, ArgGroup, Command};
 use serde_json::{json, Map, Value};
-use strum::VariantNames;
 
 use stratisd::{
     engine::{
-        EncryptionInfo, KeyDescription, Name, PoolIdentifier, PoolUuid, UnlockMethod,
-        CLEVIS_TANG_TRUST_URL,
+        EncryptionInfo, KeyDescription, Name, PoolIdentifier, PoolUuid, CLEVIS_TANG_TRUST_URL,
     },
     jsonrpc::client::{filesystem, key, pool, report},
-    stratis::VERSION,
+    stratis::{UnlockMethod, VERSION},
 };
 
 fn parse_args() -> Command {
@@ -46,7 +44,7 @@ fn parse_args() -> Command {
                         Arg::new("unlock_method")
                             .long("unlock-method")
                             .num_args(1)
-                            .value_parser(PossibleValuesParser::new(UnlockMethod::VARIANTS)),
+                            .value_parser(clap::value_parser!(UnlockMethod)),
                     )
                     .arg(
                         Arg::new("prompt")
@@ -241,9 +239,7 @@ fn main() -> Result<(), String> {
                             .expect("required"),
                     )?)
                 };
-                let unlock_method = args.get_one::<String>("unlock_method").map(|s| {
-                    UnlockMethod::try_from(s.as_str()).expect("parser ensures valid string value")
-                });
+                let unlock_method = args.get_one::<UnlockMethod>("unlock_method").copied();
                 let prompt = args.get_flag("prompt");
                 pool::pool_start(id, unlock_method, prompt)?;
                 Ok(())

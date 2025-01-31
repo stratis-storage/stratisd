@@ -16,7 +16,9 @@ use std::{
 use libudev::EventType;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use strum_macros::{self, AsRefStr, EnumString, FromRepr, VariantNames};
+use strum_macros::{
+    self, AsRefStr, EnumString, FromRepr, IntoStaticStr, VariantArray, VariantNames,
+};
 use uuid::Uuid;
 
 use devicemapper::{Bytes, Sectors, IEC};
@@ -137,7 +139,18 @@ impl Display for StratisUuid {
 }
 
 /// Use Clevis or keyring to unlock LUKS volume.
-#[derive(Serialize, Deserialize, Clone, Copy, Eq, PartialEq, Debug, EnumString, VariantNames)]
+#[derive(
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Eq,
+    PartialEq,
+    Debug,
+    EnumString,
+    VariantArray,
+    IntoStaticStr,
+)]
 #[strum(serialize_all = "snake_case")]
 pub enum UnlockMethod {
     Clevis,

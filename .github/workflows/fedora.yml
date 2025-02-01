@@ -45,9 +45,6 @@ jobs:
           - task: PROFILEDIR=debug make -f Makefile build
             toolchain: 1.84.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-          - task: PROFILEDIR=debug make -f Makefile build-test-extras
-            toolchain: 1.84.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
           - task: PROFILEDIR=debug make -f Makefile build-min
             toolchain: 1.84.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
@@ -70,9 +67,6 @@ jobs:
             toolchain: 1.84.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile build
-            toolchain: 1.84.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
-          - task: make -f Makefile build-test-extras
             toolchain: 1.84.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile build-min

@@ -49,9 +49,7 @@ fn main() {
             .arg(
                 Arg::new("executable")
                     .required(true)
-                    .value_name("EXECUTABLE")
-                    .value_parser(cmds().iter().map(|x| x.name()).collect::<Vec<_>>())
-                    .hide_possible_values(true),
+                    .value_name("EXECUTABLE"),
             )
             .arg_required_else_help(true)
             .after_help(format!(

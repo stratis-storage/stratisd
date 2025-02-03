@@ -702,7 +702,7 @@ impl<B> ThinPool<B> {
 
 impl ThinPool<v1::Backstore> {
     /// Make a new thin pool.
-    #[cfg(any(test, feature = "test_extras"))]
+    #[cfg(any(test, feature = "extras"))]
     pub fn new(
         pool_uuid: PoolUuid,
         thin_pool_size: &ThinPoolSizeParams,

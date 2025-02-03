@@ -49,7 +49,7 @@ impl DataTier<v1::StratBlockDev> {
     /// Initially 0 segments are allocated.
     ///
     /// WARNING: metadata changing event
-    #[cfg(any(test, feature = "test_extras"))]
+    #[cfg(any(test, feature = "extras"))]
     pub fn new(block_mgr: BlockDevMgr<v1::StratBlockDev>) -> DataTier<v1::StratBlockDev> {
         DataTier {
             block_mgr,

@@ -2,11 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#[cfg(feature = "test_extras")]
-pub use self::strat_engine::{ProcessedPathInfos, StratPool};
-
 #[cfg(feature = "extras")]
-pub use self::strat_engine::pool_inspection;
+pub use self::strat_engine::{pool_inspection, ProcessedPathInfos, StratPool};
 
 pub use self::{
     engine::{BlockDev, Engine, Filesystem, KeyActions, Pool, Report},

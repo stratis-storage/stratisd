@@ -291,11 +291,10 @@ engine = [
 ]
 default = ["dbus_enabled", "engine"]
 dbus_enabled = ["dep:dbus", "dep:dbus-tree"]
-extras = ["dep:pretty-hex", "test_extras"]
+extras = ["dep:pretty-hex"]
 min = ["dep:termios"]
 systemd_compat = ["dep:bindgen"]
 udev_scripts = ["dep:data-encoding"]
-test_extras = []
 
 [lints.rust]
 warnings = { level = "deny" }

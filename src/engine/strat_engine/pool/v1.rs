@@ -15,7 +15,7 @@ use serde_json::{Map, Value};
 use devicemapper::{Bytes, DmNameBuf, Sectors};
 use stratisd_proc_macros::strat_pool_impl_gen;
 
-#[cfg(any(test, feature = "test_extras"))]
+#[cfg(any(test, feature = "extras"))]
 use crate::engine::{
     strat_engine::{
         backstore::UnownedDevices,
@@ -183,7 +183,7 @@ impl StratPool {
     /// 1. Initialize the block devices specified by paths.
     /// 2. Set up thinpool device to back filesystems.
     /// Precondition: p.is_absolute() is true for all p in paths
-    #[cfg(any(test, feature = "test_extras"))]
+    #[cfg(any(test, feature = "extras"))]
     pub fn initialize(
         name: &str,
         devices: UnownedDevices,

@@ -10,8 +10,8 @@ use crate::dbus_api::{
         consts,
         pool_3_8::{
             methods::{
-                bind_clevis, bind_keyring, encrypt_pool, rebind_clevis, rebind_keyring,
-                reencrypt_pool, unbind_clevis, unbind_keyring,
+                bind_clevis, bind_keyring, decrypt_pool, encrypt_pool, rebind_clevis,
+                rebind_keyring, reencrypt_pool, unbind_clevis, unbind_keyring,
             },
             props::{get_pool_clevis_infos, get_pool_key_descs},
         },
@@ -132,6 +132,16 @@ pub fn encrypt_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<T
 
 pub fn reencrypt_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("ReencryptPool", (), reencrypt_pool)
+        // b: true if successful
+        //
+        // Rust representation: bool
+        .out_arg(("results", "b"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"))
+}
+
+pub fn decrypt_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+    f.method("DecryptPool", (), decrypt_pool)
         // b: true if successful
         //
         // Rust representation: bool

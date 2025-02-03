@@ -153,7 +153,7 @@ impl StratisLegacyPool {
     fn cmd() -> Command {
         Command::new("stratis-legacy-pool")
             .version(VERSION)
-            .about("A script for facilitating testing; not to be used in production")
+            .about("A program for facilitating testing; not to be used in production. Creates a v1 pool equivalent to a pool that would be created by stratisd 3.7.3.")
             .arg(Arg::new("pool_name").num_args(1).required(true))
             .arg(
                 Arg::new("blockdevs")

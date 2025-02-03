@@ -5,4 +5,4 @@
 mod api;
 mod methods;
 
-pub use api::{encrypt_pool_method, reencrypt_pool_method};
+pub use api::{decrypt_pool_method, encrypt_pool_method, reencrypt_pool_method};

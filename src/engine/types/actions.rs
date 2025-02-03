@@ -590,6 +590,19 @@ impl Display for DeleteAction<Key> {
     }
 }
 
+impl Display for DeleteAction<EncryptedDevice> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DeleteAction::Deleted(_) => {
+                write!(f, "Encrypted pool successfully decrypted")
+            }
+            DeleteAction::Identity => {
+                write!(f, "The requested pool was already decrypted")
+            }
+        }
+    }
+}
+
 /// An action which may delete multiple things.
 /// This action may also cause other values to require updating.
 #[derive(Debug, PartialEq, Eq)]

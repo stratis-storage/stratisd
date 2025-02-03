@@ -296,6 +296,7 @@ pub fn create_dbus_pool<'a>(
                 .add_m(pool_3_7::get_fs_metadata_method(&f))
                 .add_m(pool_3_8::encrypt_pool_method(&f))
                 .add_m(pool_3_8::reencrypt_pool_method(&f))
+                .add_m(pool_3_8::decrypt_pool_method(&f))
                 .add_p(pool_3_0::name_property(&f))
                 .add_p(pool_3_0::uuid_property(&f))
                 .add_p(pool_3_0::encrypted_property(&f))

@@ -112,11 +112,16 @@ def create_pool(
             with subprocess.Popen(
                 cmdline,
                 text=True,
-            ) as output:
-                output.wait()
-                if output.returncode != 0:
+                stdin=subprocess.PIPE,
+            ) as process:
+                process.stdin.write(  # pyright: ignore [reportOptionalMemberAccess]
+                    f"Yes{os.linesep}"
+                )
+                process.stdin.flush()  # pyright: ignore [reportOptionalMemberAccess]
+                process.wait()
+                if process.returncode != 0:
                     raise RuntimeError(
-                        f"Unable to create a pool {name} with devices {devices}: {output.stderr}"
+                        f"Unable to create a pool {name} with devices {devices}: {process.stderr}"
                     )
 
             newly_created = True

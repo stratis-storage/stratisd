@@ -2,7 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::path::PathBuf;
+use std::{
+    io::{stdin, stdout, Write},
+    path::PathBuf,
+};
 
 use clap::ArgMatches;
 use serde_json::{json, Map, Value};
@@ -66,6 +69,19 @@ fn parse_args(matches: &ArgMatches) -> ParseReturn {
 
 pub fn run(matches: &ArgMatches) -> StratisResult<()> {
     let (name, devices, key_desc, clevis_info) = parse_args(matches)?;
+
+    println!("This program's purpose is to create v1 pools that can be used for testing. Under no circumstances should such pools be used in production.");
+    print!("Do you want to continue? [Y/n] ");
+    stdout().flush()?;
+
+    let mut answer = String::new();
+    stdin().read_line(&mut answer)?;
+    let answer = answer.trim_end();
+
+    if answer != "y" && answer != "Y" && answer != "yes" && answer != "Yes" {
+        return Ok(());
+    }
+
     let unowned = ProcessedPathInfos::try_from(
         devices
             .iter()

@@ -50,7 +50,7 @@ endif
 MIN_FEATURES = --no-default-features --features engine,min
 NO_IPC_FEATURES = --no-default-features --features engine
 SYSTEMD_FEATURES = --no-default-features --features engine,min,systemd_compat
-EXTRAS_FEATURES =  --no-default-features --features engine,extras,min
+EXTRAS_FEATURES =  --no-default-features --features engine,extras
 UDEV_FEATURES = --no-default-features --features udev_scripts
 UTILS_FEATURES = --no-default-features --features engine,systemd_compat
 

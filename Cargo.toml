@@ -45,7 +45,7 @@ required-features = ["engine"]
 
 [[bin]]
 name = "stratisd-tools"
-required-features = ["engine", "extras", "min"]
+required-features = ["engine", "extras"]
 
 [[bin]]
 name = "stratis-min"

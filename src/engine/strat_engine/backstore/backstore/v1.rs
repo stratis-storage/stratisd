@@ -281,7 +281,7 @@ impl Backstore {
     /// be encrypted only with a kernel keyring and without Clevis information.
     ///
     /// WARNING: metadata changing event
-    #[cfg(any(test, feature = "test_extras"))]
+    #[cfg(any(test, feature = "extras"))]
     pub fn initialize(
         pool_name: Name,
         pool_uuid: PoolUuid,

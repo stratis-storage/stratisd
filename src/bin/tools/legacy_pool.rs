@@ -2,9 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{env, path::PathBuf};
+use std::{
+    io::{stdin, stdout, Write},
+    path::PathBuf,
+};
 
-use clap::{Arg, ArgAction, ArgGroup, Command};
+use clap::ArgMatches;
 use serde_json::{json, Map, Value};
 
 use stratisd::{
@@ -15,45 +18,6 @@ use stratisd::{
     stratis::StratisResult,
 };
 
-fn stratis_legacy_pool_args() -> Command {
-    Command::new("stratis-legacy-pool")
-        .arg(Arg::new("pool_name").num_args(1).required(true))
-        .arg(
-            Arg::new("blockdevs")
-                .action(ArgAction::Append)
-                .required(true),
-        )
-        .arg(
-            Arg::new("key_desc")
-                .long("key-desc")
-                .num_args(1)
-                .required(false),
-        )
-        .arg(
-            Arg::new("clevis")
-                .long("clevis")
-                .num_args(1)
-                .required(false)
-                .value_parser(["nbde", "tang", "tpm2"])
-                .requires_if("nbde", "tang_args")
-                .requires_if("tang", "tang_args"),
-        )
-        .arg(
-            Arg::new("tang_url")
-                .long("tang-url")
-                .num_args(1)
-                .required_if_eq("clevis", "nbde")
-                .required_if_eq("clevis", "tang"),
-        )
-        .arg(Arg::new("thumbprint").long("thumbprint").num_args(1))
-        .arg(Arg::new("trust_url").long("trust-url").num_args(0))
-        .group(
-            ArgGroup::new("tang_args")
-                .arg("thumbprint")
-                .arg("trust_url"),
-        )
-}
-
 type ParseReturn = StratisResult<(
     String,
     Vec<PathBuf>,
@@ -61,19 +25,15 @@ type ParseReturn = StratisResult<(
     Option<(String, Value)>,
 )>;
 
-fn parse_args() -> ParseReturn {
-    let args = env::args().collect::<Vec<_>>();
-    let parser = stratis_legacy_pool_args();
-    let matches = parser.get_matches_from(args);
-
+fn parse_args(matches: &ArgMatches) -> ParseReturn {
     let pool_name = matches
         .get_one::<String>("pool_name")
         .expect("required")
         .clone();
     let blockdevs = matches
-        .get_many::<String>("blockdevs")
+        .get_many::<PathBuf>("blockdevs")
         .expect("required")
-        .map(PathBuf::from)
+        .cloned()
         .collect::<Vec<_>>();
     let key_desc = match matches.get_one::<String>("key_desc") {
         Some(kd) => Some(KeyDescription::try_from(kd)?),
@@ -107,10 +67,21 @@ fn parse_args() -> ParseReturn {
     Ok((pool_name, blockdevs, key_desc, clevis_info))
 }
 
-fn main() -> StratisResult<()> {
-    env_logger::init();
+pub fn run(matches: &ArgMatches) -> StratisResult<()> {
+    let (name, devices, key_desc, clevis_info) = parse_args(matches)?;
 
-    let (name, devices, key_desc, clevis_info) = parse_args()?;
+    println!("This program's purpose is to create v1 pools that can be used for testing. Under no circumstances should such pools be used in production.");
+    print!("Do you want to continue? [Y/n] ");
+    stdout().flush()?;
+
+    let mut answer = String::new();
+    stdin().read_line(&mut answer)?;
+    let answer = answer.trim_end();
+
+    if answer != "y" && answer != "Y" && answer != "yes" && answer != "Yes" {
+        return Ok(());
+    }
+
     let unowned = ProcessedPathInfos::try_from(
         devices
             .iter()

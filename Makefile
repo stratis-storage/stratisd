@@ -386,6 +386,10 @@ test-stratisd-min:
 test-stratis-min:
 	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test --no-default-features --features "engine,min" test_stratis_min
 
+## Test stratisd-tools CLI
+test-stratisd-tools:
+	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test --no-default-features --features "engine,extras" test_stratisd_tools
+
 ## Run yamllint on workflow files
 yamllint:
 	yamllint --strict .github/workflows/*.yml .packit.yaml

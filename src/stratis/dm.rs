@@ -45,7 +45,7 @@ pub async fn dm_event_thread(
 
         // NOTE: May need to change order of pool_evented() and fs_evented()
 
-        #[cfg(any(feature = "min", not(any(feature = "min", feature = "dbus_enabled"))))]
+        #[cfg(any(feature = "min", not(feature = "dbus_enabled")))]
         {
             let _ = engine.pool_evented(Some(&evented)).await;
             let _ = engine.fs_evented(Some(&evented)).await;

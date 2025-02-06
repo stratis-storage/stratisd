@@ -23,7 +23,7 @@ use crate::{
                 blockdevmgr::BlockDevMgr, cache_tier::CacheTier, data_tier::DataTier,
                 devices::UnownedDevices, shared::BlockSizeSummary,
             },
-            crypt::{handle::v2::CryptHandle, DEFAULT_CRYPT_DATA_OFFSET_V2},
+            crypt::{handle::v2::CryptHandle, manual_wipe, DEFAULT_CRYPT_DATA_OFFSET_V2},
             dm::{get_dm, list_of_backstore_devices, remove_optional_devices, DEVICEMAPPER_PATH},
             metadata::{MDADataSize, BDA},
             names::{format_backstore_ids, CacheRole},
@@ -689,7 +689,10 @@ impl Backstore {
                     None,
                 )?),
                 Some(Either::Right(_)) => unreachable!("Checked above"),
-                None => None,
+                None => {
+                    manual_wipe(&placeholder.devnode(), DEFAULT_CRYPT_DATA_OFFSET_V2.bytes())?;
+                    None
+                }
             };
             self.origin = Some(origin);
             self.placeholder = Some(placeholder);

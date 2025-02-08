@@ -13,6 +13,7 @@ pub use self::{
     consts::{CLEVIS_TANG_TRUST_URL, DEFAULT_CRYPT_DATA_OFFSET_V2},
     handle::v1::crypt_metadata_size,
     shared::{
-        back_up_luks_header, register_clevis_token, restore_luks_header, set_up_crypt_logging,
+        back_up_luks_header, manual_wipe, register_clevis_token, restore_luks_header,
+        set_up_crypt_logging,
     },
 };

@@ -613,6 +613,13 @@ pub fn ensure_inactive(device: &mut CryptDevice, name: &DmName) -> StratisResult
     Ok(())
 }
 
+pub fn manual_wipe(path: &Path, metadata_size: Bytes) -> StratisResult<()> {
+    let mut file = OpenOptions::new().write(true).open(path)?;
+    let size = convert_int!(*metadata_size, u128, usize)?;
+    file.write_all(vec![0; size].as_slice())?;
+    Ok(())
+}
+
 /// Fallback method for wiping a crypt device where a handle to the encrypted device
 /// cannot be acquired.
 pub fn wipe_fallback(
@@ -620,29 +627,11 @@ pub fn wipe_fallback(
     metadata_size: Bytes,
     causal_error: StratisError,
 ) -> StratisError {
-    let mut file = match OpenOptions::new().write(true).open(path) {
-        Ok(f) => f,
-        Err(e) => {
-            return StratisError::NoActionRollbackError {
-                causal_error: Box::new(causal_error),
-                rollback_error: Box::new(StratisError::from(e)),
-            }
-        }
-    };
-    let size = match convert_int!(*metadata_size, u128, usize) {
-        Ok(s) => s,
-        Err(e) => {
-            return StratisError::NoActionRollbackError {
-                causal_error: Box::new(causal_error),
-                rollback_error: Box::new(e),
-            }
-        }
-    };
-    match file.write_all(vec![0; size].as_slice()) {
+    match manual_wipe(path, metadata_size) {
         Ok(()) => causal_error,
         Err(e) => StratisError::NoActionRollbackError {
             causal_error: Box::new(causal_error),
-            rollback_error: Box::new(StratisError::from(e)),
+            rollback_error: Box::new(e),
         },
     }
 }

@@ -168,12 +168,12 @@ impl CapDevice {
         }
     }
 
-    fn add(mut self, allocs: Option<&[(Sectors, Sectors)]>) -> StratisResult<Self> {
+    fn add(&mut self, allocs: Option<&[(Sectors, Sectors)]>) -> StratisResult<()> {
         if let Some(allocs) = allocs {
             add(&mut self.extents, allocs, CapDeviceUse::Allocated)?;
         }
 
-        Ok(self)
+        Ok(())
     }
 
     fn check(&self) -> Vec<String> {
@@ -413,12 +413,12 @@ impl CryptAllocs {
         }
     }
 
-    fn add(mut self, allocs: Option<&Vec<(Sectors, Sectors)>>) -> StratisResult<Self> {
+    fn add(&mut self, allocs: Option<&Vec<(Sectors, Sectors)>>) -> StratisResult<()> {
         if let Some(allocs) = allocs {
             add(&mut self.extents, allocs, CryptAllocsUse::Metadata)?;
         }
 
-        Ok(self)
+        Ok(())
     }
 
     fn check(&self) -> Vec<String> {
@@ -486,12 +486,12 @@ impl FlexDevice {
     }
 
     fn add(
-        mut self,
+        &mut self,
         thin_meta_dev: Option<&Vec<(Sectors, Sectors)>>,
         thin_meta_dev_spare: Option<&Vec<(Sectors, Sectors)>>,
         meta_dev: Option<&Vec<(Sectors, Sectors)>>,
         thin_data_dev: Option<&Vec<(Sectors, Sectors)>>,
-    ) -> StratisResult<Self> {
+    ) -> StratisResult<()> {
         if let Some(allocs) = thin_meta_dev {
             add(&mut self.extents, allocs, FlexDeviceUse::ThinMetaDev)?;
         }
@@ -508,7 +508,7 @@ impl FlexDevice {
             add(&mut self.extents, allocs, FlexDeviceUse::ThinDataDev)?;
         }
 
-        Ok(self)
+        Ok(())
     }
 
     // Verify that both thin meta devices, the one currently in use and the
@@ -653,25 +653,31 @@ fn cache_devices(metadata: &PoolSave) -> StratisResult<IndexMap<DevUuid, CacheDe
 fn crypt_allocs(metadata: &PoolSave) -> StratisResult<CryptAllocs> {
     let crypt_metadata = &metadata.backstore.cap.crypt_meta_allocs;
 
-    CryptAllocs::new().add(Some(crypt_metadata))
+    let mut crypt_allocs = CryptAllocs::new();
+    crypt_allocs.add(Some(crypt_metadata))?;
+    Ok(crypt_allocs)
 }
 
 // Calculate the flex device from the metadata.
 fn flex_device(metadata: &PoolSave, encrypted: bool) -> StratisResult<FlexDevice> {
     let flex_device_metadata = &metadata.flex_devs;
 
-    FlexDevice::new(encrypted).add(
+    let mut flex_device = FlexDevice::new(encrypted);
+    flex_device.add(
         Some(&flex_device_metadata.thin_meta_dev),
         Some(&flex_device_metadata.thin_meta_dev_spare),
         Some(&flex_device_metadata.meta_dev),
         Some(&flex_device_metadata.thin_data_dev),
-    )
+    )?;
+    Ok(flex_device)
 }
 
 fn cap_device(metadata: &PoolSave, encrypted: bool) -> StratisResult<CapDevice> {
     let cap_device_metadata = &metadata.backstore.cap;
 
-    CapDevice::new(encrypted).add(Some(&cap_device_metadata.allocs))
+    let mut cap_device = CapDevice::new(encrypted);
+    cap_device.add(Some(&cap_device_metadata.allocs))?;
+    Ok(cap_device)
 }
 
 /// Some ways of inspecting the pool-level metadata.

@@ -2,10 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    fmt,
-};
+use indexmap::map::{Entry, IndexMap};
+use std::fmt;
 
 use devicemapper::Sectors;
 
@@ -30,10 +28,10 @@ trait Allocator<U: Use> {
     fn offset(&self) -> Sectors;
 
     // The recorded extents of the offset
-    fn extents(&self) -> &HashMap<Sectors, (U, Sectors)>;
+    fn extents(&self) -> &IndexMap<Sectors, (U, Sectors)>;
 
     // A table using the unused marker for unused extents
-    fn filled(&self) -> HashMap<Sectors, (U, Sectors)> {
+    fn filled(&self) -> IndexMap<Sectors, (U, Sectors)> {
         filled(self.extents(), Self::unused_marker(), self.offset())
     }
 
@@ -47,7 +45,7 @@ trait Allocator<U: Use> {
 // Return the sum of the length of all the extents in extents that fall into
 // any of the list of uses. An empty list of uses will always result in a sum
 // of 0 sectors.
-fn sum<U>(extents: &HashMap<Sectors, (U, Sectors)>, uses: &[U]) -> Sectors
+fn sum<U>(extents: &IndexMap<Sectors, (U, Sectors)>, uses: &[U]) -> Sectors
 where
     U: Use,
 {
@@ -62,14 +60,14 @@ where
 // Marks unused parts with the specified filler use.
 // Begins at start_offset which must be at least 0, but may be more.
 fn filled<U>(
-    extents: &HashMap<Sectors, (U, Sectors)>,
+    extents: &IndexMap<Sectors, (U, Sectors)>,
     filler: U,
     start_offset: Sectors,
-) -> HashMap<Sectors, (U, Sectors)>
+) -> IndexMap<Sectors, (U, Sectors)>
 where
     U: Use,
 {
-    let mut result = HashMap::new();
+    let mut result = IndexMap::new();
     let mut current_offset = start_offset;
     let mut starts: Vec<&Sectors> = extents.keys().collect();
     starts.sort();
@@ -88,7 +86,7 @@ where
 
 // Add an optional vector of extents to the current data structure.
 fn add<U>(
-    current: &mut HashMap<Sectors, (U, Sectors)>,
+    current: &mut IndexMap<Sectors, (U, Sectors)>,
     to_add: &[(Sectors, Sectors)],
     used: U,
 ) -> StratisResult<()>
@@ -108,7 +106,7 @@ where
 }
 
 // Print a representation of extents for display.
-fn display<U>(f: &mut fmt::Formatter<'_>, extents: &HashMap<Sectors, (U, Sectors)>) -> fmt::Result
+fn display<U>(f: &mut fmt::Formatter<'_>, extents: &IndexMap<Sectors, (U, Sectors)>) -> fmt::Result
 where
     U: Use,
 {
@@ -127,7 +125,7 @@ where
 }
 
 // Check whether any extent overlaps with another.
-fn check_overlap<U>(extents: &HashMap<Sectors, (U, Sectors)>, start_offset: Sectors) -> Vec<String>
+fn check_overlap<U>(extents: &IndexMap<Sectors, (U, Sectors)>, start_offset: Sectors) -> Vec<String>
 where
     U: Use,
 {
@@ -158,14 +156,14 @@ enum CapDeviceUse {
 impl Use for CapDeviceUse {}
 
 struct CapDevice {
-    extents: HashMap<Sectors, (CapDeviceUse, Sectors)>,
+    extents: IndexMap<Sectors, (CapDeviceUse, Sectors)>,
     encrypted: bool,
 }
 
 impl CapDevice {
     fn new(encrypted: bool) -> CapDevice {
         CapDevice {
-            extents: HashMap::new(),
+            extents: IndexMap::new(),
             encrypted,
         }
     }
@@ -198,7 +196,7 @@ impl Allocator<CapDeviceUse> for CapDevice {
         CapDeviceUse::Unused
     }
 
-    fn extents(&self) -> &HashMap<Sectors, (CapDeviceUse, Sectors)> {
+    fn extents(&self) -> &IndexMap<Sectors, (CapDeviceUse, Sectors)> {
         &self.extents
     }
 }
@@ -222,12 +220,12 @@ enum DataDeviceUse {
 impl Use for DataDeviceUse {}
 
 struct DataDevice {
-    extents: HashMap<Sectors, (DataDeviceUse, Sectors)>,
+    extents: IndexMap<Sectors, (DataDeviceUse, Sectors)>,
 }
 
 impl DataDevice {
     fn new() -> DataDevice {
-        let mut extents = HashMap::new();
+        let mut extents = IndexMap::new();
         extents.insert(
             Sectors(0),
             (
@@ -239,10 +237,10 @@ impl DataDevice {
     }
 
     fn add(
-        mut self,
+        &mut self,
         integrity_meta_allocs: Option<&Vec<(Sectors, Sectors)>>,
         allocs: Option<&[(Sectors, Sectors)]>,
-    ) -> StratisResult<Self> {
+    ) -> StratisResult<()> {
         if let Some(allocs) = integrity_meta_allocs {
             add(&mut self.extents, allocs, DataDeviceUse::IntegrityMetadata)?;
         }
@@ -251,7 +249,7 @@ impl DataDevice {
             add(&mut self.extents, allocs, DataDeviceUse::Allocated)?;
         }
 
-        Ok(self)
+        Ok(())
     }
 
     fn _check_integrity_meta_round(&self) -> Vec<String> {
@@ -311,7 +309,7 @@ impl Allocator<DataDeviceUse> for DataDevice {
         DataDeviceUse::Unused
     }
 
-    fn extents(&self) -> &HashMap<Sectors, (DataDeviceUse, Sectors)> {
+    fn extents(&self) -> &IndexMap<Sectors, (DataDeviceUse, Sectors)> {
         &self.extents
     }
 }
@@ -335,12 +333,12 @@ enum CacheDeviceUse {
 impl Use for CacheDeviceUse {}
 
 struct CacheDevice {
-    extents: HashMap<Sectors, (CacheDeviceUse, Sectors)>,
+    extents: IndexMap<Sectors, (CacheDeviceUse, Sectors)>,
 }
 
 impl CacheDevice {
     fn new() -> CacheDevice {
-        let mut extents = HashMap::new();
+        let mut extents = IndexMap::new();
         extents.insert(
             Sectors(0),
             (
@@ -352,10 +350,10 @@ impl CacheDevice {
     }
 
     fn add(
-        mut self,
+        &mut self,
         metadata_allocs: Option<&[(Sectors, Sectors)]>,
         data_allocs: Option<&[(Sectors, Sectors)]>,
-    ) -> StratisResult<Self> {
+    ) -> StratisResult<()> {
         if let Some(allocs) = metadata_allocs {
             add(&mut self.extents, allocs, CacheDeviceUse::CacheMetadata)?;
         }
@@ -364,7 +362,7 @@ impl CacheDevice {
             add(&mut self.extents, allocs, CacheDeviceUse::CacheData)?;
         }
 
-        Ok(self)
+        Ok(())
     }
 
     fn check(&self) -> Vec<String> {
@@ -384,7 +382,7 @@ impl Allocator<CacheDeviceUse> for CacheDevice {
         CacheDeviceUse::Unused
     }
 
-    fn extents(&self) -> &HashMap<Sectors, (CacheDeviceUse, Sectors)> {
+    fn extents(&self) -> &IndexMap<Sectors, (CacheDeviceUse, Sectors)> {
         &self.extents
     }
 }
@@ -405,13 +403,13 @@ enum CryptAllocsUse {
 impl Use for CryptAllocsUse {}
 
 struct CryptAllocs {
-    extents: HashMap<Sectors, (CryptAllocsUse, Sectors)>,
+    extents: IndexMap<Sectors, (CryptAllocsUse, Sectors)>,
 }
 
 impl CryptAllocs {
     fn new() -> CryptAllocs {
         CryptAllocs {
-            extents: HashMap::new(),
+            extents: IndexMap::new(),
         }
     }
 
@@ -475,14 +473,14 @@ enum FlexDeviceUse {
 impl Use for FlexDeviceUse {}
 
 struct FlexDevice {
-    extents: HashMap<Sectors, (FlexDeviceUse, Sectors)>,
+    extents: IndexMap<Sectors, (FlexDeviceUse, Sectors)>,
     encrypted: bool,
 }
 
 impl FlexDevice {
     fn new(encrypted: bool) -> FlexDevice {
         FlexDevice {
-            extents: HashMap::new(),
+            extents: IndexMap::new(),
             encrypted,
         }
     }
@@ -546,7 +544,7 @@ impl Allocator<FlexDeviceUse> for FlexDevice {
         FlexDeviceUse::Unused
     }
 
-    fn extents(&self) -> &HashMap<Sectors, (FlexDeviceUse, Sectors)> {
+    fn extents(&self) -> &IndexMap<Sectors, (FlexDeviceUse, Sectors)> {
         &self.extents
     }
 }
@@ -560,16 +558,21 @@ impl fmt::Display for FlexDevice {
 // Calculate map of device UUIDs to data device representation from metadata.
 fn data_devices(
     metadata: &PoolSave,
-) -> StratisResult<(HashMap<DevUuid, DataDevice>, Option<ValidatedIntegritySpec>)> {
+) -> StratisResult<(
+    IndexMap<DevUuid, DataDevice>,
+    Option<ValidatedIntegritySpec>,
+)> {
     let data_tier_metadata = &metadata.backstore.data_tier;
 
     let data_tier_devs = &data_tier_metadata.blockdev.devs;
 
     let mut bds = data_tier_devs
         .iter()
-        .try_fold(HashMap::new(), |mut acc, dev| {
+        .try_fold(IndexMap::new(), |mut acc, dev| {
             if let Entry::Vacant(e) = acc.entry(dev.uuid) {
-                e.insert(DataDevice::new().add(Some(&dev.integrity_meta_allocs), None)?);
+                let mut data_device = DataDevice::new();
+                data_device.add(Some(&dev.integrity_meta_allocs), None)?;
+                e.insert(data_device);
                 Ok(acc)
             } else {
                 Err(StratisError::Msg(format!(
@@ -582,11 +585,8 @@ fn data_devices(
     let data_tier_allocs = &data_tier_metadata.blockdev.allocs[0];
 
     for item in data_tier_allocs {
-        if let Some(dd) = bds.remove(&item.parent) {
-            bds.insert(
-                item.parent,
-                dd.add(None, Some(&[(item.start, item.length)]))?,
-            );
+        if let Entry::Occupied(mut e) = bds.entry(item.parent) {
+            e.get_mut().add(None, Some(&[(item.start, item.length)]))?;
         } else {
             return Err(StratisError::Msg(format!(
                 "No device in devs for uuid {} in blockdevs",
@@ -599,16 +599,16 @@ fn data_devices(
 }
 
 // Calculate map of device UUIDs to cache device representation from metadata.
-fn cache_devices(metadata: &PoolSave) -> StratisResult<HashMap<DevUuid, CacheDevice>> {
+fn cache_devices(metadata: &PoolSave) -> StratisResult<IndexMap<DevUuid, CacheDevice>> {
     let cache_tier_metadata = &metadata.backstore.cache_tier;
 
     cache_tier_metadata.as_ref().map_or_else(
-        || Ok(HashMap::new()),
+        || Ok(IndexMap::new()),
         |cache_tier_metadata| {
             let cache_tier_devs = &cache_tier_metadata.blockdev.devs;
             let mut bds = cache_tier_devs
                 .iter()
-                .try_fold(HashMap::new(), |mut acc, dev| {
+                .try_fold(IndexMap::new(), |mut acc, dev| {
                     if let Entry::Vacant(e) = acc.entry(dev.uuid) {
                         e.insert(CacheDevice::new());
                         Ok(acc)
@@ -623,11 +623,8 @@ fn cache_devices(metadata: &PoolSave) -> StratisResult<HashMap<DevUuid, CacheDev
             let cache_tier_allocs = &cache_tier_metadata.blockdev.allocs;
 
             for item in &cache_tier_allocs[0] {
-                if let Some(dd) = bds.remove(&item.parent) {
-                    bds.insert(
-                        item.parent,
-                        dd.add(Some(&[(item.start, item.length)]), None)?,
-                    );
+                if let Entry::Occupied(mut e) = bds.entry(item.parent) {
+                    e.get_mut().add(Some(&[(item.start, item.length)]), None)?;
                 } else {
                     return Err(StratisError::Msg(format!(
                         "No device in devs for uuid {} in blockdevs",
@@ -637,11 +634,8 @@ fn cache_devices(metadata: &PoolSave) -> StratisResult<HashMap<DevUuid, CacheDev
             }
 
             for item in &cache_tier_allocs[1] {
-                if let Some(dd) = bds.remove(&item.parent) {
-                    bds.insert(
-                        item.parent,
-                        dd.add(None, Some(&[(item.start, item.length)]))?,
-                    );
+                if let Entry::Occupied(mut e) = bds.entry(item.parent) {
+                    e.get_mut().add(None, Some(&[(item.start, item.length)]))?;
                 } else {
                     return Err(StratisError::Msg(format!(
                         "No device in devs for uuid {} in blockdevs",

@@ -121,6 +121,10 @@ optional = true
 version = "0.3.31"
 optional = true
 
+[dependencies.indexmap]
+version = "2.7.0"
+optional = true
+
 [dependencies.iocuddle]
 version = "0.1.0"
 optional = true
@@ -263,6 +267,7 @@ engine = [
     "dep:either",
     "dep:env_logger",
     "dep:futures",
+    "dep:indexmap",
     "dep:iocuddle",
     "dep:itertools",
     "dep:libblkid-rs",

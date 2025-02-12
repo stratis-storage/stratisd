@@ -1,5 +1,5 @@
 path: /
-duration: 20m
+duration: 30m
 tag: rust
 
 require:

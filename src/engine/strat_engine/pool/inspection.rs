@@ -735,6 +735,29 @@ pub mod inspectors {
         let cache_devices = cache_devices(metadata)?;
         let cap_device = cap_device(metadata, encrypted)?;
 
+        let thinpool_dev = &metadata.thinpool_dev;
+        println!("Thinpool specification:");
+        println!("    Data block size: {}", thinpool_dev.data_block_size);
+        println!("    Feature Args:");
+        for arg in thinpool_dev.feature_args.iter().flatten() {
+            println!("        {}", arg);
+        }
+        println!(
+            "    Filesystem limit: {}",
+            thinpool_dev
+                .fs_limit
+                .map(|l| l.to_string())
+                .unwrap_or("none".into())
+        );
+        println!(
+            "    Overprovisioning enabled: {}",
+            thinpool_dev
+                .enable_overprov
+                .map(|e| e.to_string())
+                .unwrap_or("N/A".into())
+        );
+        println!();
+
         println!("Integrity specification for data devices:");
         println!(
             "{}",

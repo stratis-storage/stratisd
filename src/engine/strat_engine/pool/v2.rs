@@ -2179,4 +2179,74 @@ mod tests {
             clevis_test_online_reencrypt,
         );
     }
+
+    /// Tests online encryption functionality by performing online encryption and then stopping and
+    /// starting the pool.
+    fn clevis_test_online_decrypt(paths: &[&Path]) {
+        fn test_online_encrypt_with_key(paths: &[&Path], key_desc: &KeyDescription) {
+            unshare_mount_namespace().unwrap();
+
+            let engine = StratEngine::initialize().unwrap();
+
+            let pool_uuid = test_async!(engine.create_pool(
+                "encrypt_with_both",
+                paths,
+                InputEncryptionInfo::new(
+                    vec![(None, key_desc.to_owned())],
+                    vec![(
+                        None,
+                        (
+                            "tang".to_string(),
+                            json!({
+                                "url": env::var("TANG_URL").expect("TANG_URL env var required"),
+                                "stratis:tang:trust_url": true,
+                            }),
+                        ),
+                    )],
+                )
+                .unwrap()
+                .as_ref(),
+                IntegritySpec::default(),
+            ))
+            .unwrap()
+            .changed()
+            .unwrap();
+
+            {
+                let mut handle =
+                    test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid))).unwrap();
+                let (name, _, pool) = handle.as_mut_tuple();
+                assert!(pool.is_encrypted());
+                pool.decrypt_pool(&name, pool_uuid).unwrap();
+                assert!(!pool.is_encrypted());
+            }
+
+            test_async!(engine.stop_pool(PoolIdentifier::Uuid(pool_uuid), true)).unwrap();
+            test_async!(engine.start_pool(
+                PoolIdentifier::Uuid(pool_uuid),
+                TokenUnlockMethod::None,
+                None
+            ))
+            .unwrap();
+            test_async!(engine.destroy_pool(pool_uuid)).unwrap();
+        }
+
+        crypt::insert_and_cleanup_key(paths, test_online_encrypt_with_key);
+    }
+
+    #[test]
+    fn clevis_loop_test_online_decrypt() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(2, None),
+            clevis_test_online_decrypt,
+        );
+    }
+
+    #[test]
+    fn clevis_real_test_online_decrypt() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(2, None, None),
+            clevis_test_online_decrypt,
+        );
+    }
 }

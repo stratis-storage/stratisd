@@ -690,7 +690,11 @@ impl Backstore {
                 )?),
                 Some(Either::Right(_)) => unreachable!("Checked above"),
                 None => {
-                    manual_wipe(&placeholder.devnode(), DEFAULT_CRYPT_DATA_OFFSET_V2.bytes())?;
+                    manual_wipe(
+                        &placeholder.devnode(),
+                        Sectors(0),
+                        DEFAULT_CRYPT_DATA_OFFSET_V2,
+                    )?;
                     None
                 }
             };

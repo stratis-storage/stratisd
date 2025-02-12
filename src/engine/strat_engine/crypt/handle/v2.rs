@@ -365,7 +365,8 @@ impl CryptHandle {
         {
             return Err(wipe_fallback(
                 physical_path,
-                DEFAULT_CRYPT_DATA_OFFSET_V2.bytes(),
+                Sectors(0),
+                DEFAULT_CRYPT_DATA_OFFSET_V2,
                 StratisError::from(e),
             ));
         }
@@ -401,7 +402,8 @@ impl CryptHandle {
         {
             return Err(wipe_fallback(
                 physical_path,
-                DEFAULT_CRYPT_DATA_OFFSET_V2.bytes(),
+                Sectors(0),
+                DEFAULT_CRYPT_DATA_OFFSET_V2,
                 StratisError::from(e),
             ));
         }

@@ -678,7 +678,8 @@ impl CryptHandle {
         {
             return Err(wipe_fallback(
                 physical_path,
-                crypt_metadata_size(),
+                Sectors(0),
+                crypt_metadata_size().sectors(),
                 StratisError::from(e),
             ));
         }
@@ -714,7 +715,8 @@ impl CryptHandle {
         {
             return Err(wipe_fallback(
                 physical_path,
-                crypt_metadata_size(),
+                Sectors(0),
+                crypt_metadata_size().sectors(),
                 StratisError::from(e),
             ));
         }

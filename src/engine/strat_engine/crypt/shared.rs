@@ -4,7 +4,7 @@
 
 use std::{
     fs::OpenOptions,
-    io::Write,
+    io::{Seek, SeekFrom, Write},
     mem::forget,
     path::{Path, PathBuf},
     slice::from_raw_parts_mut,
@@ -17,7 +17,7 @@ use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 
-use devicemapper::{Bytes, DevId, DmName, DmOptions, Sectors};
+use devicemapper::{DevId, DmName, DmOptions, Sectors, SECTOR_SIZE};
 use libcryptsetup_rs::{
     c_uint,
     consts::{
@@ -613,10 +613,13 @@ pub fn ensure_inactive(device: &mut CryptDevice, name: &DmName) -> StratisResult
     Ok(())
 }
 
-pub fn manual_wipe(path: &Path, metadata_size: Bytes) -> StratisResult<()> {
+pub fn manual_wipe(path: &Path, offset: Sectors, length: Sectors) -> StratisResult<()> {
     let mut file = OpenOptions::new().write(true).open(path)?;
-    let size = convert_int!(*metadata_size, u128, usize)?;
-    file.write_all(vec![0; size].as_slice())?;
+    file.seek(SeekFrom::Start(convert_int!(*offset.bytes(), u128, u64)?))?;
+    for _ in 0..*length {
+        file.write_all(vec![0; SECTOR_SIZE].as_slice())?;
+    }
+    file.sync_all()?;
     Ok(())
 }
 
@@ -624,10 +627,11 @@ pub fn manual_wipe(path: &Path, metadata_size: Bytes) -> StratisResult<()> {
 /// cannot be acquired.
 pub fn wipe_fallback(
     path: &Path,
-    metadata_size: Bytes,
+    offset: Sectors,
+    metadata_size: Sectors,
     causal_error: StratisError,
 ) -> StratisError {
-    match manual_wipe(path, metadata_size) {
+    match manual_wipe(path, offset, metadata_size) {
         Ok(()) => causal_error,
         Err(e) => StratisError::NoActionRollbackError {
             causal_error: Box::new(causal_error),

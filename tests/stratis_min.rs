@@ -742,7 +742,7 @@ fn test_stratis_min_list_defaults() {
 
 fn stratis_min_key_set() {
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();
-    cmd.write_stdin("thisisatestpassphrase\n")
+    cmd.write_stdin("thisisatestpassphrase\nthisisatestpassphrase\n")
         .arg("key")
         .arg("set")
         .arg("--capture-key")
@@ -751,6 +751,16 @@ fn stratis_min_key_set() {
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();
     cmd.arg("key").arg("unset").arg("testkey");
     cmd.assert().success();
+
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.write_stdin("thisisatestpassphrase\ndoesnotmatch\n")
+        .arg("key")
+        .arg("set")
+        .arg("--capture-key")
+        .arg("testkey1");
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("Passphrases did not match"));
 }
 
 #[test]

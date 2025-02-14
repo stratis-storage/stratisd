@@ -1,5 +1,5 @@
-stratisd 3.8.0 (UNRELEASED)
-===========================
+stratisd 3.8.0
+==============
 Recommended Rust toolchain version: 1.82.0
 Recommended development platform for Python development: Fedora 40
 

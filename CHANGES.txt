@@ -117,6 +117,12 @@ Recommended development platform for Python development: Fedora 40
 - Cargo.toml: Set up workspace table:
   https://github.com/stratis-storage/stratisd/pull/3564
 
+* Put manipulation of struct representing DM table status in separate module:
+  https://github.com/stratis-storage/stratisd/pull/3718
+
+* Use strum to eliminate boilerplate from a bunch of enums:
+  https://github.com/stratis-storage/stratisd/pull/3583
+
 - Use once_cell crate instead of lazy_static crate:
   https://github.com/stratis-storage/stratisd/pull/3600
   https://github.com/stratis-storage/stratisd/pull/3577

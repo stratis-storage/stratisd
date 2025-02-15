@@ -10,6 +10,8 @@ Recommended development platform for Python development: Fedora 40
   https://github.com/stratis-storage/stratisd/pull/3652
 
 * Introduce metadata version v2:
+  https://github.com/stratis-storage/stratisd/pull/3745
+  https://github.com/stratis-storage/stratisd/pull/3733
   https://github.com/stratis-storage/stratisd/pull/3706
   https://github.com/stratis-storage/stratisd/pull/3705
   https://github.com/stratis-storage/stratisd/pull/3679
@@ -54,6 +56,16 @@ Recommended development platform for Python development: Fedora 40
   https://github.com/stratis-storage/stratisd/pull/3543
   https://github.com/stratis-storage/stratisd/pull/3544
 
+* Capture stderr on clevis bind failure:
+  https://github.com/stratis-storage/stratisd/pull/3743
+
+* Give better error message on Clevis unlock failure:
+  https://github.com/stratis-storage/stratisd/pull/3741
+
+* Wipe space for crypt header on unencrypted pool creation:
+  https://github.com/stratis-storage/stratisd/pull/3763
+  https://github.com/stratis-storage/stratisd/pull/3756
+
 - Reject UserInfo argument values that do not satisfy validate_name:
   https://github.com/stratis-storage/stratisd/pull/3570
 
@@ -94,6 +106,21 @@ Recommended development platform for Python development: Fedora 40
 - Fix log message in SetCreateAction:
   https://github.com/stratis-storage/stratisd/pull/3548
 
+* Return parser error on invalid command-line arguments more:
+  https://github.com/stratis-storage/stratisd/pull/3734
+  https://github.com/stratis-storage/stratisd/pull/3719
+
+* Improvements and enhancements to stratisd-tools:
+  https://github.com/stratis-storage/stratisd/pull/3764
+  https://github.com/stratis-storage/stratisd/pull/3758
+  https://github.com/stratis-storage/stratisd/pull/3755
+  https://github.com/stratis-storage/stratisd/pull/3752
+  https://github.com/stratis-storage/stratisd/pull/3751
+  https://github.com/stratis-storage/stratisd/pull/3732
+  https://github.com/stratis-storage/stratisd/pull/3730
+  https://github.com/stratis-storage/stratisd/pull/3728
+  https://github.com/stratis-storage/stratisd/pull/3727
+
 - Add a debug-level log entry when writing metadata to a pool:
   https://github.com/stratis-storage/stratisd/pull/3584
 
@@ -114,6 +141,9 @@ Recommended development platform for Python development: Fedora 40
   https://github.com/stratis-storage/stratisd/pull/3541
   https://github.com/stratis-storage/stratisd/pull/3552
 
+* Fix bug that dropped stopped pools in sim engine:
+  https://github.com/stratis-storage/stratisd/pull/3740
+
 - Cargo.toml: Set up workspace table:
   https://github.com/stratis-storage/stratisd/pull/3564
 
@@ -129,6 +159,20 @@ Recommended development platform for Python development: Fedora 40
 
 - Use loopdev-3 instead of loopdev crate:
   https://github.com/stratis-storage/stratisd/pull/3498
+
+* Increase devicemapper-sys dependency lower bound to 0.3.1;
+  increase pkg-config dependency lower bound to 0.3.31:
+  https://github.com/stratis-storage/stratisd/pull/3735
+
+* Increase tempfile dependency lower bound to 3.7.0:
+  https://github.com/stratis-storage/stratisd/pull/3737
+
+* Increase clap dependency lower bound to 4.5.0:
+  https://github.com/stratis-storage/stratisd/pull/3736
+
+* Increase libcryptsetup dependency lower bound to 0.12.0:
+  https://github.com/stratis-storage/stratisd/pull/3747
+  https://github.com/stratis-storage/stratisd/pull/3739
 
 - Increase libcryptsetup dependency lower bound to 0.11.0,
   increase libc dependency lower bound to 0.2.155,
@@ -163,6 +207,9 @@ Recommended development platform for Python development: Fedora 40
 
 - Increase pretty-hex dependency lower bound to 0.4.1:
   https://github.com/stratis-storage/stratisd/pull/3536
+
+* Increase itertools dependency lower bound to 0.14.0:
+  https://github.com/stratis-storage/stratisd/pull/3746
 
 - Increase itertools dependency lower bound to 0.13.0:
   https://github.com/stratis-storage/stratisd/pull/3627
@@ -208,11 +255,25 @@ Recommended development platform for Python development: Fedora 40
   https://github.com/stratis-storage/stratisd/pull/3602
 
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3761
+  https://github.com/stratis-storage/stratisd/pull/3760
+  https://github.com/stratis-storage/stratisd/pull/3755
+  https://github.com/stratis-storage/stratisd/pull/3748
+  https://github.com/stratis-storage/stratisd/pull/3744
+  https://github.com/stratis-storage/stratisd/pull/3742
+  https://github.com/stratis-storage/stratisd/pull/3738
+  https://github.com/stratis-storage/stratisd/pull/3729
+  https://github.com/stratis-storage/stratisd/pull/3726
+  https://github.com/stratis-storage/stratisd/pull/3725
+  https://github.com/stratis-storage/stratisd/pull/3724
+  https://github.com/stratis-storage/stratisd/pull/3723
+  https://github.com/stratis-storage/stratisd/pull/3722
   https://github.com/stratis-storage/stratisd/pull/3715
   https://github.com/stratis-storage/stratisd/pull/3711
   https://github.com/stratis-storage/stratisd/pull/3709
   https://github.com/stratis-storage/stratisd/pull/3707
   https://github.com/stratis-storage/stratisd/pull/3704
+  https://github.com/stratis-storage/stratisd/pull/3689
   https://github.com/stratis-storage/stratisd/pull/3688
   https://github.com/stratis-storage/stratisd/pull/3687
   https://github.com/stratis-storage/stratisd/pull/3685
@@ -223,6 +284,7 @@ Recommended development platform for Python development: Fedora 40
   https://github.com/stratis-storage/stratisd/pull/3670
   https://github.com/stratis-storage/stratisd/pull/3668
   https://github.com/stratis-storage/stratisd/pull/3667
+  https://github.com/stratis-storage/stratisd/pull/3666
   https://github.com/stratis-storage/stratisd/pull/3664
   https://github.com/stratis-storage/stratisd/pull/3662
   https://github.com/stratis-storage/stratisd/pull/3661

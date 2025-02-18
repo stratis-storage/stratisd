@@ -2,19 +2,18 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{error::Error, path::PathBuf};
+use std::{collections::HashMap, error::Error, path::PathBuf};
 
-use clap::{builder::PossibleValuesParser, Arg, ArgAction, ArgGroup, Command};
+use clap::{Arg, ArgAction, ArgGroup, Command};
 use serde_json::{json, Map, Value};
-use strum::VariantNames;
 
 use stratisd::{
     engine::{
-        EncryptionInfo, KeyDescription, Name, PoolIdentifier, PoolUuid, UnlockMethod,
-        CLEVIS_TANG_TRUST_URL,
+        InputEncryptionInfo, KeyDescription, Name, OptionalTokenSlotInput, PoolIdentifier,
+        PoolUuid, TokenUnlockMethod, CLEVIS_TANG_TRUST_URL,
     },
     jsonrpc::client::{filesystem, key, pool, report},
-    stratis::VERSION,
+    stratis::{StratisError, VERSION},
 };
 
 fn parse_args() -> Command {
@@ -42,18 +41,8 @@ fn parse_args() -> Command {
                 Command::new("start")
                     .arg(Arg::new("id").required(true))
                     .arg(Arg::new("name").long("name").num_args(0))
-                    .arg(
-                        Arg::new("unlock_method")
-                            .long("unlock-method")
-                            .num_args(1)
-                            .value_parser(PossibleValuesParser::new(UnlockMethod::VARIANTS)),
-                    )
-                    .arg(
-                        Arg::new("prompt")
-                            .long("prompt")
-                            .num_args(0)
-                            .requires("unlock_method"),
-                    ),
+                    .arg(Arg::new("token_slot").long("token_slot").num_args(1))
+                    .arg(Arg::new("prompt").long("prompt").num_args(0)),
                 Command::new("stop")
                     .arg(Arg::new("id").required(true))
                     .arg(Arg::new("name").long("name").num_args(0)),
@@ -65,28 +54,17 @@ fn parse_args() -> Command {
                             .value_parser(clap::value_parser!(PathBuf))
                             .required(true),
                     )
-                    .arg(Arg::new("key_desc").long("key-desc").num_args(1))
                     .arg(
-                        Arg::new("clevis")
-                            .long("clevis")
+                        Arg::new("key_descs")
+                            .long("key-descs")
                             .num_args(1)
-                            .value_parser(["nbde", "tang", "tpm2"])
-                            .requires_if("nbde", "tang_args")
-                            .requires_if("tang", "tang_args"),
+                            .action(ArgAction::Append),
                     )
                     .arg(
-                        Arg::new("tang_url")
-                            .long("tang-url")
+                        Arg::new("clevis_infos")
+                            .long("clevis-infos")
                             .num_args(1)
-                            .required_if_eq("clevis", "nbde")
-                            .required_if_eq("clevis", "tang"),
-                    )
-                    .arg(Arg::new("thumbprint").long("thumbprint").num_args(1))
-                    .arg(Arg::new("trust_url").long("trust-url").num_args(0))
-                    .group(
-                        ArgGroup::new("tang_args")
-                            .arg("thumbprint")
-                            .arg("trust_url"),
+                            .action(ArgAction::Append),
                     ),
                 Command::new("init-cache")
                     .arg(Arg::new("name").required(true))
@@ -128,9 +106,6 @@ fn parse_args() -> Command {
                 Command::new("has-passphrase")
                     .arg(Arg::new("name").long("name").num_args(0))
                     .arg(Arg::new("id").required(true)),
-                Command::new("clevis-pin")
-                    .arg(Arg::new("name").long("name").num_args(0))
-                    .arg(Arg::new("id").required(true)),
                 Command::new("bind")
                     .subcommand_required(true)
                     .subcommands(vec![
@@ -142,12 +117,14 @@ fn parse_args() -> Command {
                                     .long("key-desc")
                                     .num_args(1)
                                     .required(true),
-                            ),
+                            )
+                            .arg(Arg::new("token_slot").long("token-slot").num_args(1)),
                         Command::new("nbde")
                             .alias("tang")
                             .arg(Arg::new("name").long("name").num_args(0))
                             .arg(Arg::new("id").required(true))
                             .arg(Arg::new("tang_url").required(true))
+                            .arg(Arg::new("token_slot").long("token-slot").num_args(1))
                             .arg(Arg::new("thumbprint").long("thumbprint").num_args(1))
                             .arg(Arg::new("trust_url").long("trust-url").num_args(0))
                             .group(
@@ -157,17 +134,30 @@ fn parse_args() -> Command {
                             ),
                         Command::new("tpm2")
                             .arg(Arg::new("name").long("name").num_args(0))
-                            .arg(Arg::new("id").required(true)),
+                            .arg(Arg::new("id").required(true))
+                            .arg(Arg::new("token_slot").long("token-slot").num_args(1)),
                     ]),
                 Command::new("unbind")
                     .subcommand_required(true)
                     .subcommands(vec![
                         Command::new("keyring")
                             .arg(Arg::new("name").long("name").num_args(0))
-                            .arg(Arg::new("id").required(true)),
+                            .arg(Arg::new("id").required(true))
+                            .arg(
+                                Arg::new("token_slot")
+                                    .long("token-slot")
+                                    .num_args(1)
+                                    .value_parser(clap::value_parser!(u32)),
+                            ),
                         Command::new("clevis")
                             .arg(Arg::new("name").long("name").num_args(0))
-                            .arg(Arg::new("id").required(true)),
+                            .arg(Arg::new("id").required(true))
+                            .arg(
+                                Arg::new("token_slot")
+                                    .long("token-slot")
+                                    .num_args(1)
+                                    .value_parser(clap::value_parser!(u32)),
+                            ),
                     ]),
                 Command::new("rebind")
                     .subcommand_required(true)
@@ -180,10 +170,22 @@ fn parse_args() -> Command {
                                     .long("key-desc")
                                     .num_args(1)
                                     .required(true),
+                            )
+                            .arg(
+                                Arg::new("token_slot")
+                                    .long("token-slot")
+                                    .num_args(1)
+                                    .value_parser(clap::value_parser!(u32)),
                             ),
                         Command::new("clevis")
                             .arg(Arg::new("name").long("name").num_args(0))
-                            .arg(Arg::new("id").required(true)),
+                            .arg(Arg::new("id").required(true))
+                            .arg(
+                                Arg::new("token_slot")
+                                    .long("token-slot")
+                                    .num_args(1)
+                                    .value_parser(clap::value_parser!(u32)),
+                            ),
                     ]),
             ]),
             Command::new("filesystem").subcommands(vec![
@@ -241,11 +243,13 @@ fn main() -> Result<(), String> {
                             .expect("required"),
                     )?)
                 };
-                let unlock_method = args.get_one::<String>("unlock_method").map(|s| {
-                    UnlockMethod::try_from(s.as_str()).expect("parser ensures valid string value")
-                });
+                let token_slot = match args.get_one::<String>("token_slot").map(|s| s.as_str()) {
+                    Some("any") => TokenUnlockMethod::Any,
+                    Some(s) => TokenUnlockMethod::Token(s.parse::<u32>()?),
+                    None => TokenUnlockMethod::None,
+                };
                 let prompt = args.get_flag("prompt");
-                pool::pool_start(id, unlock_method, prompt)?;
+                pool::pool_start(id, token_slot, prompt)?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("stop") {
                 let id = if args.get_flag("name") {
@@ -262,43 +266,134 @@ fn main() -> Result<(), String> {
                 pool::pool_stop(id)?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("create") {
-                let key_description = match args.get_one::<String>("key_desc").map(|s| s.to_owned())
-                {
-                    Some(string) => Some(KeyDescription::try_from(string)?),
-                    None => None,
-                };
-                let pin = args.get_one::<String>("clevis").map(|s| s.as_str());
-                let clevis_info = match pin {
-                    Some("nbde" | "tang") => {
-                        let mut json = Map::new();
-                        json.insert(
-                            "url".to_string(),
-                            Value::from(
-                                args.get_one::<String>("tang_url")
-                                    .map(|s| s.as_str())
-                                    .expect("Required"),
-                            ),
-                        );
-                        if args.get_flag("trust_url") {
-                            json.insert(CLEVIS_TANG_TRUST_URL.to_string(), Value::from(true));
-                        } else if let Some(thp) =
-                            args.get_one::<String>("thumbprint").map(|s| s.as_str())
-                        {
-                            json.insert("thp".to_string(), Value::from(thp));
-                        }
-                        pin.map(|p| (p.to_string(), Value::from(json)))
+                let kds = match args.get_many::<String>("key_descs") {
+                    Some(key_descs) => {
+                        key_descs.into_iter().try_fold(Vec::new(), |mut vec, s| {
+                            let mut split = s.split(":");
+                            let kd = split.next().ok_or_else(|| {
+                                StratisError::Msg("Key description required".to_string())
+                            })?;
+                            let token_slot = split
+                                .next()
+                                .map(|i| {
+                                    i.parse::<u32>()
+                                        .map_err(|e| StratisError::Msg(e.to_string()))
+                                })
+                                .transpose()?;
+                            vec.push((token_slot, KeyDescription::try_from(kd.to_string())?));
+                            Result::<_, StratisError>::Ok(vec)
+                        })?
                     }
-                    Some("tpm2") => Some(("tpm2".to_string(), json!({}))),
-                    Some(_) => unreachable!("Validated by parser"),
-                    None => None,
+                    None => vec![],
                 };
+                let cis = match args.get_many::<String>("clevis_infos") {
+                    Some(clevis_infos) => {
+                        clevis_infos
+                            .into_iter()
+                            .try_fold(Vec::new(), |mut vec, s| {
+                                let pairs = s.split_whitespace().try_fold(
+                                    HashMap::<&str, Option<&str>>::default(),
+                                    |mut hm, pair| {
+                                        let mut key_value = pair.split("=");
+                                        match (key_value.next(), key_value.next()) {
+                                            (None, _) => {
+                                                return Err(StratisError::Msg(format!(
+                                                    "Malformed value pair: {pair}"
+                                                )));
+                                            }
+                                            (Some(k), None) => hm.insert(k, None),
+                                            (Some(k), Some(v)) => hm.insert(k, Some(v)),
+                                        };
+                                        Ok(hm)
+                                    },
+                                )?;
+                                let token_slot = if let Some(Some(t)) = pairs.get("token_slot") {
+                                    Some(
+                                        t.parse::<u32>()
+                                            .map_err(|e| StratisError::Msg(e.to_string()))?,
+                                    )
+                                } else if let Some(None) = pairs.get("token_slot") {
+                                    return Err(StratisError::Msg(
+                                        "token_slot requires argument".to_string(),
+                                    ));
+                                } else {
+                                    None
+                                };
+                                match pairs.get("pin") {
+                                    Some(Some("tang")) => {
+                                        let tang_url = if let Some(t) = pairs
+                                            .get("tang_url")
+                                            .and_then(|t| t.as_ref().map(|s| *s))
+                                        {
+                                            t
+                                        } else {
+                                            return Err(StratisError::Msg(
+                                                "tang_url is required".to_string(),
+                                            ));
+                                        };
+                                        let (thumbprint, trust_url) =
+                                            match (pairs.get("thumbprint"), pairs.get("trust_url"))
+                                            {
+                                                (Some(Some(t)), None) => (Some(*t), false),
+                                                (None, Some(None)) => (None, true),
+                                                (None, Some(Some(_))) => {
+                                                    return Err(StratisError::Msg(
+                                                        "trust_url takes no argument".to_string(),
+                                                    ));
+                                                }
+                                                (None, None) => {
+                                                    return Err(StratisError::Msg(
+                                                        "Missing required argument trust_url or thumbprint="
+                                                            .to_string(),
+                                                    ));
+                                                }
+                                                (_, _) => {
+                                                    return Err(StratisError::Msg(
+                                                        "thumbprint= cannot be used with trust_url"
+                                                            .to_string(),
+                                                    ));
+                                                }
+                                            };
+                                        let mut json = Map::new();
+                                        json.insert("url".to_string(), Value::from(tang_url));
+                                        if trust_url {
+                                            json.insert(
+                                                CLEVIS_TANG_TRUST_URL.to_string(),
+                                                Value::from(true),
+                                            );
+                                        } else if let Some(thp) = thumbprint {
+                                            json.insert("thp".to_string(), Value::from(thp));
+                                        }
+                                        vec.push((
+                                            token_slot,
+                                            ("tang".to_string(), Value::from(json)),
+                                        ));
+                                        Ok(vec)
+                                    }
+                                    Some(Some("tpm2")) => {
+                                        vec.push((token_slot, ("tpm2".to_string(), json!({}))));
+                                        Ok(vec)
+                                    }
+                                    Some(Some(s)) => {
+                                        Err(StratisError::Msg(format!("Invalid pin {s}")))
+                                    }
+                                    Some(None) => Err(StratisError::Msg(
+                                        "Value required for key pin".to_string(),
+                                    )),
+                                    None => Err(StratisError::Msg("pin is required".to_string())),
+                                }
+                            })?
+                    }
+                    None => vec![],
+                };
+                let ei = InputEncryptionInfo::new(kds, cis)?;
                 pool::pool_create(
                     args.get_one::<String>("name").expect("required").to_owned(),
                     args.get_many::<PathBuf>("blockdevs")
                         .expect("required")
                         .cloned()
                         .collect::<Vec<_>>(),
-                    EncryptionInfo::from_options((key_description, clevis_info)),
+                    ei,
                 )?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("destroy") {
@@ -397,20 +492,6 @@ fn main() -> Result<(), String> {
                 };
                 println!("{}", pool::pool_has_passphrase(id)?);
                 Ok(())
-            } else if let Some(args) = subcommand.subcommand_matches("clevis-pin") {
-                let id = if args.get_flag("name") {
-                    PoolIdentifier::Name(Name::new(
-                        args.get_one::<String>("id").expect("required").to_owned(),
-                    ))
-                } else {
-                    PoolIdentifier::Uuid(PoolUuid::parse_str(
-                        args.get_one::<String>("id")
-                            .map(|s| s.as_str())
-                            .expect("required"),
-                    )?)
-                };
-                println!("{}", pool::pool_clevis_pin(id)?);
-                Ok(())
             } else if let Some(subcommand) = subcommand.subcommand_matches("bind") {
                 if let Some(args) = subcommand.subcommand_matches("keyring") {
                     let id = if args.get_flag("name") {
@@ -427,7 +508,13 @@ fn main() -> Result<(), String> {
                     let key_desc = KeyDescription::try_from(
                         args.get_one::<String>("key_desc").expect("required"),
                     )?;
-                    pool::pool_bind_keyring(id, key_desc)?;
+                    let token_slot = match args.get_one::<String>("token_slot").map(|s| s.as_str())
+                    {
+                        Some("legacy") => OptionalTokenSlotInput::Legacy,
+                        Some(s) => OptionalTokenSlotInput::Some(s.parse::<u32>()?),
+                        None => OptionalTokenSlotInput::None,
+                    };
+                    pool::pool_bind_keyring(id, token_slot, key_desc)?;
                     Ok(())
                 } else if let Some(args) = subcommand.subcommand_matches("nbde") {
                     let id = if args.get_flag("name") {
@@ -460,7 +547,13 @@ fn main() -> Result<(), String> {
                         }
                         Value::from(json)
                     };
-                    pool::pool_bind_clevis(id, "tang".to_string(), clevis_info)?;
+                    let token_slot = match args.get_one::<String>("token_slot").map(|s| s.as_str())
+                    {
+                        Some("legacy") => OptionalTokenSlotInput::Legacy,
+                        Some(s) => OptionalTokenSlotInput::Some(s.parse::<u32>()?),
+                        None => OptionalTokenSlotInput::None,
+                    };
+                    pool::pool_bind_clevis(id, token_slot, "tang".to_string(), clevis_info)?;
                     Ok(())
                 } else if let Some(args) = subcommand.subcommand_matches("tpm2") {
                     let id = if args.get_flag("name") {
@@ -479,7 +572,13 @@ fn main() -> Result<(), String> {
                         let json = Map::new();
                         Value::from(json)
                     };
-                    pool::pool_bind_clevis(id, pin.to_string(), clevis_info)?;
+                    let token_slot = match args.get_one::<String>("token_slot").map(|s| s.as_str())
+                    {
+                        Some("legacy") => OptionalTokenSlotInput::Legacy,
+                        Some(s) => OptionalTokenSlotInput::Some(s.parse::<u32>()?),
+                        None => OptionalTokenSlotInput::None,
+                    };
+                    pool::pool_bind_clevis(id, token_slot, pin.to_string(), clevis_info)?;
                     Ok(())
                 } else {
                     unreachable!("Parser requires a subcommand")
@@ -497,7 +596,8 @@ fn main() -> Result<(), String> {
                                 .expect("required"),
                         )?)
                     };
-                    pool::pool_unbind_keyring(id)?;
+                    let token_slot = args.get_one::<u32>("token_slot").cloned();
+                    pool::pool_unbind_keyring(id, token_slot)?;
                     Ok(())
                 } else if let Some(args) = subcommand.subcommand_matches("clevis") {
                     let id = if args.get_flag("name") {
@@ -511,7 +611,8 @@ fn main() -> Result<(), String> {
                                 .expect("required"),
                         )?)
                     };
-                    pool::pool_unbind_clevis(id)?;
+                    let token_slot = args.get_one::<u32>("token_slot").cloned();
+                    pool::pool_unbind_clevis(id, token_slot)?;
                     Ok(())
                 } else {
                     unreachable!("Parser requires a subcommand")
@@ -532,7 +633,8 @@ fn main() -> Result<(), String> {
                     let key_desc = KeyDescription::try_from(
                         args.get_one::<String>("key_desc").expect("required"),
                     )?;
-                    pool::pool_rebind_keyring(id, key_desc)?;
+                    let token_slot = args.get_one::<u32>("token_slot").cloned();
+                    pool::pool_rebind_keyring(id, token_slot, key_desc)?;
                     Ok(())
                 } else if let Some(args) = subcommand.subcommand_matches("clevis") {
                     let id = if args.get_flag("name") {
@@ -546,7 +648,8 @@ fn main() -> Result<(), String> {
                                 .expect("required"),
                         )?)
                     };
-                    pool::pool_rebind_clevis(id)?;
+                    let token_slot = args.get_one::<u32>("token_slot").cloned();
+                    pool::pool_rebind_clevis(id, token_slot)?;
                     Ok(())
                 } else {
                     unreachable!("Parser requires a subcommand")

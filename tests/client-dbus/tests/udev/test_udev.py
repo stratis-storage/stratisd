@@ -22,7 +22,6 @@ import random
 # isort: LOCAL
 from stratisd_client_dbus import Manager, Pool, StratisdErrors, get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
-from stratisd_client_dbus._stratisd_constants import EncryptionMethod
 
 from ._dm import remove_stratis_setup
 from ._loopback import UDEV_ADD_EVENT, UDEV_REMOVE_EVENT
@@ -252,7 +251,11 @@ class UdevTest3(UdevTest):
 
             self.wait_for_pools(0)
             (_, (pool_object_path, device_object_paths)) = create_pool(
-                random_string(5), devnodes, key_description=key_description
+                random_string(5),
+                devnodes,
+                key_description=(
+                    [(key_description, None)] if key_description is not None else None
+                ),
             )
             wait_for_udev(STRATIS_FS_TYPE, get_devnodes(device_object_paths))
             self.wait_for_pools(1)
@@ -262,15 +265,27 @@ class UdevTest3(UdevTest):
             remove_stratis_setup()
 
         with OptionalKeyServiceContextManager(key_spec=key_spec):
-            ((changed, _), exit_code, _) = Manager.Methods.StartPool(
-                get_object(TOP_OBJECT),
-                {
-                    "id": pool_uuid,
-                    "unlock_method": (True, str(EncryptionMethod.KEYRING)),
-                    "id_type": "uuid",
-                    "key_fd": (False, 0),
-                },
-            )
+            if _LEGACY_POOL is not None:
+                ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+                    get_object(TOP_OBJECT),
+                    {
+                        "id": pool_uuid,
+                        "unlock_method": (True, (True, 1)),
+                        "id_type": "uuid",
+                        "key_fd": (False, 0),
+                    },
+                )
+            else:
+                ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+                    get_object(TOP_OBJECT),
+                    {
+                        "id": pool_uuid,
+                        "unlock_method": (True, (False, 0)),
+                        "id_type": "uuid",
+                        "key_fd": (False, 0),
+                    },
+                )
+
             if key_spec is None:
                 self.assertNotEqual(exit_code, StratisdErrors.OK)
                 self.assertEqual(changed, False)
@@ -314,6 +329,8 @@ class UdevTest4(UdevTest):
     in, and it is verified that the daemon has recreated the pool.
     """
 
+    # pylint: disable=too-many-statements
+    # pylint: disable=too-many-locals
     def _simple_event_test(self, *, key_spec=None):  # pylint: disable=too-many-locals
         """
         A simple test of event-based discovery.
@@ -344,7 +361,11 @@ class UdevTest4(UdevTest):
 
             self.wait_for_pools(0)
             (_, (pool_object_path, _)) = create_pool(
-                random_string(5), devnodes, key_description=key_description
+                random_string(5),
+                devnodes,
+                key_description=(
+                    [(key_description, None)] if key_description is not None else None
+                ),
             )
             self.wait_for_pools(1)
             pool_uuid = Pool.Properties.Uuid.Get(get_object(pool_object_path))
@@ -367,15 +388,27 @@ class UdevTest4(UdevTest):
                 wait_for_udev(udev_wait_type, self._lb_mgr.device_files(tokens_up))
                 self.wait_for_pools(0)
 
-            ((changed, _), exit_code, _) = Manager.Methods.StartPool(
-                get_object(TOP_OBJECT),
-                {
-                    "id": pool_uuid,
-                    "unlock_method": (True, str(EncryptionMethod.KEYRING)),
-                    "id_type": "uuid",
-                    "key_fd": (False, 0),
-                },
-            )
+            if _LEGACY_POOL is not None:
+                ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+                    get_object(TOP_OBJECT),
+                    {
+                        "id": pool_uuid,
+                        "unlock_method": (True, (True, 1)),
+                        "id_type": "uuid",
+                        "key_fd": (False, 0),
+                    },
+                )
+            else:
+                ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+                    get_object(TOP_OBJECT),
+                    {
+                        "id": pool_uuid,
+                        "unlock_method": (True, (False, 0)),
+                        "id_type": "uuid",
+                        "key_fd": (False, 0),
+                    },
+                )
+
             # This should always fail because a pool cannot be successfully
             # started without all devices present.
             self.assertNotEqual(exit_code, StratisdErrors.OK)
@@ -388,17 +421,28 @@ class UdevTest4(UdevTest):
 
             wait_for_udev(udev_wait_type, self._lb_mgr.device_files(tokens_up))
 
-            ((changed, _), exit_code, _) = Manager.Methods.StartPool(
-                get_object(TOP_OBJECT),
-                {
-                    "id": pool_uuid,
-                    "unlock_method": (True, str(EncryptionMethod.KEYRING)),
-                    "id_type": "uuid",
-                    "key_fd": (False, 0),
-                },
-            )
+            if _LEGACY_POOL is not None:
+                ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+                    get_object(TOP_OBJECT),
+                    {
+                        "id": pool_uuid,
+                        "unlock_method": (True, (True, 1)),
+                        "id_type": "uuid",
+                        "key_fd": (False, 0),
+                    },
+                )
+            else:
+                ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+                    get_object(TOP_OBJECT),
+                    {
+                        "id": pool_uuid,
+                        "unlock_method": (True, (False, 0)),
+                        "id_type": "uuid",
+                        "key_fd": (False, 0),
+                    },
+                )
 
-            if key_spec is None or _LEGACY_POOL is None:
+            if key_spec is None:
                 self.assertNotEqual(exit_code, StratisdErrors.OK)
                 self.assertEqual(changed, False)
             else:
@@ -440,6 +484,8 @@ class UdevTest5(UdevTest):
     so forth. Eventually, all pools should have been set up.
     """
 
+    # pylint: disable=too-many-locals
+    # pylint: disable=too-many-branches
     def test_duplicate_pool_name(
         self,
     ):  # pylint: disable=too-many-locals, too-many-statements
@@ -469,7 +515,15 @@ class UdevTest5(UdevTest):
                     if random.choice([True, False])
                     else None
                 )
-                create_pool(pool_name, devnodes, key_description=key_description)
+                create_pool(
+                    pool_name,
+                    devnodes,
+                    key_description=(
+                        [(key_description, None)]
+                        if key_description is not None
+                        else None
+                    ),
+                )
                 if key_description is None:
                     unencrypted_indices.append(i)
                 else:
@@ -523,15 +577,26 @@ class UdevTest5(UdevTest):
             )
 
             for pool_uuid in variant_pool_uuids:
-                Manager.Methods.StartPool(
-                    get_object(TOP_OBJECT),
-                    {
-                        "id": pool_uuid,
-                        "unlock_method": (True, str(EncryptionMethod.KEYRING)),
-                        "id_type": "uuid",
-                        "key_fd": (False, 0),
-                    },
-                )
+                if _LEGACY_POOL is not None:
+                    Manager.Methods.StartPool(
+                        get_object(TOP_OBJECT),
+                        {
+                            "id": pool_uuid,
+                            "unlock_method": (True, (True, 1)),
+                            "id_type": "uuid",
+                            "key_fd": (False, 0),
+                        },
+                    )
+                else:
+                    Manager.Methods.StartPool(
+                        get_object(TOP_OBJECT),
+                        {
+                            "id": pool_uuid,
+                            "unlock_method": (True, (False, 0)),
+                            "id_type": "uuid",
+                            "key_fd": (False, 0),
+                        },
+                    )
 
             wait_for_udev_count(len(non_luks_tokens) + len(luks_tokens))
 
@@ -564,10 +629,7 @@ class UdevTest5(UdevTest):
                                 get_object(TOP_OBJECT),
                                 {
                                     "id": pool_uuid,
-                                    "unlock_method": (
-                                        True,
-                                        str(EncryptionMethod.KEYRING),
-                                    ),
+                                    "unlock_method": (True, (True, 1)),
                                     "id_type": "uuid",
                                     "key_fd": (False, 0),
                                 },
@@ -576,6 +638,25 @@ class UdevTest5(UdevTest):
                     self._lb_mgr.generate_synthetic_udev_events(
                         non_luks_tokens + luks_tokens, UDEV_ADD_EVENT
                     )
+                    for pool_uuid, props in variant_pool_uuids.items():
+                        encrypted = False
+                        if "features" in props:
+                            boolean, features = props["features"]
+                            if (
+                                bool(boolean) is True
+                                and "encryption" in features
+                                and bool(features["encryption"]) is True
+                            ):
+                                encrypted = True
+                        Manager.Methods.StartPool(
+                            get_object(TOP_OBJECT),
+                            {
+                                "id": pool_uuid,
+                                "unlock_method": (encrypted, (False, 0)),
+                                "id_type": "uuid",
+                                "key_fd": (False, 0),
+                            },
+                        )
 
                 settle()
 
@@ -703,7 +784,13 @@ class UdevTest7(UdevTest):
         ) as key_desc:
             self.wait_for_pools(0)
 
-            create_pool("encrypted", devnodes[:2], key_description=key_desc[0])
+            create_pool(
+                "encrypted",
+                devnodes[:2],
+                key_description=(
+                    [(key_desc[0], None)] if key_desc[0] is not None else None
+                ),
+            )
             create_pool("unencrypted", devnodes[2:])
 
             self.wait_for_pools(2)
@@ -733,15 +820,26 @@ class UdevTest7(UdevTest):
             )
             settle()
 
-            ((changed, _), exit_code, _) = Manager.Methods.StartPool(
-                get_object(TOP_OBJECT),
-                {
-                    "id": "encrypted",
-                    "unlock_method": (True, str(EncryptionMethod.KEYRING)),
-                    "id_type": "name",
-                    "key_fd": (False, 0),
-                },
-            )
+            if _LEGACY_POOL is not None:
+                ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+                    get_object(TOP_OBJECT),
+                    {
+                        "id": "encrypted",
+                        "unlock_method": (True, (True, 1)),
+                        "id_type": "name",
+                        "key_fd": (False, 0),
+                    },
+                )
+            else:
+                ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+                    get_object(TOP_OBJECT),
+                    {
+                        "id": "encrypted",
+                        "unlock_method": (True, (False, 0)),
+                        "id_type": "name",
+                        "key_fd": (False, 0),
+                    },
+                )
             self.assertFalse(changed)
             self.assertEqual(exit_code, 1)
             self.assertEqual(
@@ -753,7 +851,7 @@ class UdevTest7(UdevTest):
                 get_object(TOP_OBJECT),
                 {
                     "id": "unencrypted",
-                    "unlock_method": (False, ""),
+                    "unlock_method": (False, (False, 0)),
                     "id_type": "name",
                     "key_fd": (False, 0),
                 },
@@ -770,15 +868,26 @@ class UdevTest7(UdevTest):
             )
             settle()
 
-            ((changed, _), exit_code, _) = Manager.Methods.StartPool(
-                get_object(TOP_OBJECT),
-                {
-                    "id": "encrypted",
-                    "unlock_method": (True, str(EncryptionMethod.KEYRING)),
-                    "id_type": "name",
-                    "key_fd": (False, 0),
-                },
-            )
+            if _LEGACY_POOL is not None:
+                ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+                    get_object(TOP_OBJECT),
+                    {
+                        "id": "encrypted",
+                        "unlock_method": (True, (True, 1)),
+                        "id_type": "name",
+                        "key_fd": (False, 0),
+                    },
+                )
+            else:
+                ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+                    get_object(TOP_OBJECT),
+                    {
+                        "id": "encrypted",
+                        "unlock_method": (True, (False, 0)),
+                        "id_type": "name",
+                        "key_fd": (False, 0),
+                    },
+                )
             self.assertTrue(changed)
             self.assertEqual(exit_code, 0)
             self.assertEqual(
@@ -789,7 +898,7 @@ class UdevTest7(UdevTest):
                 get_object(TOP_OBJECT),
                 {
                     "id": "unencrypted",
-                    "unlock_method": (False, ""),
+                    "unlock_method": (False, (False, 0)),
                     "id_type": "name",
                     "key_fd": (False, 0),
                 },

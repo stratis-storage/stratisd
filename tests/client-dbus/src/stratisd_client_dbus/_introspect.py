@@ -11,8 +11,8 @@ SPECS = {
     <method name="CreatePool">
       <arg name="name" type="s" direction="in" />
       <arg name="devices" type="as" direction="in" />
-      <arg name="key_desc" type="(bs)" direction="in" />
-      <arg name="clevis_info" type="(b(ss))" direction="in" />
+      <arg name="key_desc" type="a((bu)s)" direction="in" />
+      <arg name="clevis_info" type="a((bu)ss)" direction="in" />
       <arg name="journal_size" type="(bt)" direction="in" />
       <arg name="tag_spec" type="(bs)" direction="in" />
       <arg name="allocate_superblock" type="(bb)" direction="in" />
@@ -50,7 +50,7 @@ SPECS = {
     <method name="StartPool">
       <arg name="id" type="s" direction="in" />
       <arg name="id_type" type="s" direction="in" />
-      <arg name="unlock_method" type="(bs)" direction="in" />
+      <arg name="unlock_method" type="(b(bu))" direction="in" />
       <arg name="key_fd" type="(bh)" direction="in" />
       <arg name="result" type="(b(oaoao))" direction="out" />
       <arg name="return_code" type="q" direction="out" />
@@ -158,12 +158,14 @@ SPECS = {
     <method name="BindClevis">
       <arg name="pin" type="s" direction="in" />
       <arg name="json" type="s" direction="in" />
+      <arg name="token_slot" type="(bu)" direction="in" />
       <arg name="results" type="b" direction="out" />
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
     <method name="BindKeyring">
       <arg name="key_desc" type="s" direction="in" />
+      <arg name="token_slot" type="(bu)" direction="in" />
       <arg name="results" type="b" direction="out" />
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
@@ -206,12 +208,14 @@ SPECS = {
       <arg name="return_string" type="s" direction="out" />
     </method>
     <method name="RebindClevis">
+      <arg name="token_slot" type="(bu)" direction="in" />
       <arg name="results" type="b" direction="out" />
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
     <method name="RebindKeyring">
       <arg name="key_desc" type="s" direction="in" />
+      <arg name="token_slot" type="(bu)" direction="in" />
       <arg name="results" type="b" direction="out" />
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
@@ -230,24 +234,26 @@ SPECS = {
       <arg name="return_string" type="s" direction="out" />
     </method>
     <method name="UnbindClevis">
+      <arg name="token_slot" type="(bu)" direction="in" />
       <arg name="results" type="b" direction="out" />
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
     <method name="UnbindKeyring">
+      <arg name="token_slot" type="(bu)" direction="in" />
       <arg name="results" type="b" direction="out" />
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
     <property name="AllocatedSize" type="s" access="read" />
     <property name="AvailableActions" type="s" access="read" />
-    <property name="ClevisInfo" type="(b(b(ss)))" access="read" />
+    <property name="ClevisInfos" type="v" access="read" />
     <property name="Encrypted" type="b" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>
     <property name="FsLimit" type="t" access="readwrite" />
     <property name="HasCache" type="b" access="read" />
-    <property name="KeyDescription" type="(b(bs))" access="read" />
+    <property name="KeyDescriptions" type="v" access="read" />
     <property name="MetadataVersion" type="t" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>

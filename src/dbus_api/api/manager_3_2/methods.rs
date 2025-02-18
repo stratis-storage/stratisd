@@ -15,7 +15,7 @@ use crate::{
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
-    engine::{PoolIdentifier, PoolUuid, StartAction, StopAction, UnlockMethod},
+    engine::{PoolIdentifier, PoolUuid, StartAction, StopAction, TokenUnlockMethod, UnlockMethod},
     stratis::StratisError,
 };
 
@@ -63,7 +63,7 @@ pub fn start_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
 
     let ret = match handle_action!(block_on(dbus_context.engine.start_pool(
         PoolIdentifier::Uuid(pool_uuid),
-        unlock_method,
+        TokenUnlockMethod::from(unlock_method),
         None
     ))) {
         Ok(StartAction::Started(_)) => {

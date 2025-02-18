@@ -20,7 +20,7 @@ pub fn start_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TDa
     f.method("StartPool", (), start_pool)
         .in_arg(("id", "s"))
         .in_arg(("id_type", "s"))
-        .in_arg(("unlock_method", "(bs)"))
+        .in_arg(("unlock_method", "(b(bu))"))
         .in_arg(("key_fd", "(bh)"))
         // In order from left to right:
         // b: true if the pool was newly started
@@ -38,21 +38,23 @@ pub fn create_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TD
     f.method("CreatePool", (), create_pool)
         .in_arg(("name", "s"))
         .in_arg(("devices", "as"))
-        // Optional key description of key in the kernel keyring
-        // b: true if the pool should be encrypted and able to be
-        // unlocked with a passphrase associated with this key description.
+        // Optional key descriptions of key in the kernel keyring
+        // a: array of zero or more elements
+        // b: true if a token slot is specified
+        // i: token slot
         // s: key description
         //
-        // Rust representation: (bool, String)
-        .in_arg(("key_desc", "(bs)"))
-        // Optional Clevis information for binding on initialization.
-        // b: true if the pool should be encrypted and able to be unlocked
-        // using Clevis.
+        // Rust representation: Vec<((bool, u32), String)>
+        .in_arg(("key_desc", "a((bu)s)"))
+        // Optional Clevis infos for binding on initialization.
+        // a: array of zero or more elements
+        // b: true if a token slot is specified
+        // i: token slot
         // s: pin name
         // s: JSON config for Clevis use
         //
-        // Rust representation: (bool, (String, String))
-        .in_arg(("clevis_info", "(b(ss))"))
+        // Rust representation: Vec<((bool, u32), String, String)>
+        .in_arg(("clevis_info", "a((bu)ss)"))
         // Optional journal size for integrity metadata reservation.
         // b: true if the size should be specified.
         //    false if the default should be used.

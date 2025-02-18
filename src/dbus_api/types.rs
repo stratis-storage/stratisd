@@ -18,6 +18,7 @@ use dbus::{
     Path,
 };
 use dbus_tree::{DataType, MTSync, ObjectPath, Tree};
+use either::Either;
 use tokio::sync::{
     mpsc::UnboundedSender as TokioSender, OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock,
 };
@@ -27,10 +28,10 @@ use devicemapper::{Bytes, Sectors};
 use crate::{
     dbus_api::{connection::DbusConnectionHandler, tree::DbusTreeHandler, udev::DbusUdevHandler},
     engine::{
-        total_allocated, total_used, ActionAvailability, DevUuid, Diff, Engine, ExclusiveGuard,
-        FilesystemUuid, Lockable, LockedPoolsInfo, PoolDiff, PoolEncryptionInfo, PoolUuid,
-        SharedGuard, StoppedPoolsInfo, StratBlockDevDiff, StratFilesystemDiff, StratPoolDiff,
-        StratisUuid, ThinPoolDiff,
+        total_allocated, total_used, ActionAvailability, DevUuid, Diff, EncryptionInfo, Engine,
+        ExclusiveGuard, FilesystemUuid, Lockable, LockedPoolsInfo, PoolDiff, PoolEncryptionInfo,
+        PoolUuid, SharedGuard, StoppedPoolsInfo, StratBlockDevDiff, StratFilesystemDiff,
+        StratPoolDiff, StratisUuid, ThinPoolDiff,
     },
 };
 
@@ -97,8 +98,14 @@ pub enum DbusAction {
     FsNameChange(Path<'static>, String),
     PoolNameChange(Path<'static>, String),
     PoolAvailActions(Path<'static>, ActionAvailability),
-    PoolKeyDescChange(Path<'static>, Option<PoolEncryptionInfo>),
-    PoolClevisInfoChange(Path<'static>, Option<PoolEncryptionInfo>),
+    PoolKeyDescChange(
+        Path<'static>,
+        Option<Either<(bool, EncryptionInfo), PoolEncryptionInfo>>,
+    ),
+    PoolClevisInfoChange(
+        Path<'static>,
+        Option<Either<(bool, EncryptionInfo), PoolEncryptionInfo>>,
+    ),
     PoolCacheChange(Path<'static>, bool),
     PoolFsLimitChange(Path<'static>, u64),
     PoolOverprovModeChange(Path<'static>, bool),
@@ -297,7 +304,11 @@ impl DbusContext {
     }
 
     /// Send changed signal for KeyDesc property.
-    pub fn push_pool_key_desc_change(&self, item: &Path<'static>, ei: Option<PoolEncryptionInfo>) {
+    pub fn push_pool_key_desc_change(
+        &self,
+        item: &Path<'static>,
+        ei: Option<Either<(bool, EncryptionInfo), PoolEncryptionInfo>>,
+    ) {
         if let Err(e) = self
             .sender
             .send(DbusAction::PoolKeyDescChange(item.clone(), ei))
@@ -313,7 +324,7 @@ impl DbusContext {
     pub fn push_pool_clevis_info_change(
         &self,
         item: &Path<'static>,
-        ei: Option<PoolEncryptionInfo>,
+        ei: Option<Either<(bool, EncryptionInfo), PoolEncryptionInfo>>,
     ) {
         if let Err(e) = self
             .sender

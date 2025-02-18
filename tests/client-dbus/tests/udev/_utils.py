@@ -76,6 +76,7 @@ def random_string(length):
     return f'stratis_{"".join(random.choice(string.ascii_uppercase) for _ in range(length))}'
 
 
+# pylint: disable=too-many-statements
 def create_pool(
     name, devices, *, key_description=None, clevis_info=None, overprovision=True
 ):
@@ -83,10 +84,10 @@ def create_pool(
     Creates a stratis pool.
     :param name:    Name of pool
     :param devices:  Devices to use for pool
-    :param key_description: optional key description
-    :type key_description: str or NoneType
+    :param key_description: optional key descriptions and token slots
+    :type key_description: list of tuples
     :param clevis_info: clevis information, pin and config
-    :type clevis_info: pair of str * (bool, str)
+    :type clevis_info: list of tuples
     :return: result of pool create if operation succeeds
     :rtype: bool * str * list of str
     :raises RuntimeError: if pool is not created
@@ -98,9 +99,18 @@ def create_pool(
         if len(get_pools(name)) == 0:
             cmdline = [_LEGACY_POOL, name] + devices
             if key_description is not None:
-                cmdline.extend(["--key-desc", key_description])
+                if len(key_description) > 1:
+                    raise RuntimeError(
+                        "Can only provide one key description to legacy pools"
+                    )
+                (kd, _) = key_description[0]
+                cmdline.extend(["--key-desc", kd])
             if clevis_info is not None:
-                (pin, (tang_url, thp)) = clevis_info
+                if len(clevis_info) > 1:
+                    raise RuntimeError(
+                        "Can only provide one Clevis info to legacy pools"
+                    )
+                (pin, (tang_url, thp), _) = clevis_info[0]
                 cmdline.extend(["--clevis", pin])
                 if pin == "tang":
                     cmdline.extend(["--tang-url", tang_url])
@@ -136,12 +146,26 @@ def create_pool(
         return (newly_created, (pool_object_path, bd_object_paths))
 
     def create_v2_pool():
-        if clevis_info is None:
-            clevis_arg = None
-        else:
-            (pin, (tang_url, thp)) = clevis_info
+        dbus_key_descriptions = []
+        for kd, slot in key_description if key_description is not None else []:
+            if slot is None:
+                dbus_slot = (False, 0)
+            else:
+                dbus_slot = (True, slot)
+
+            dbus_key_descriptions.append((dbus_slot, kd))
+
+        dbus_clevis_infos = []
+        for pin, (tang_url, thp), slot in (
+            clevis_info if clevis_info is not None else []
+        ):
+            if slot is None:
+                dbus_slot = (False, 0)
+            else:
+                dbus_slot = (True, slot)
+
             if pin == "tang":
-                clevis_arg = (
+                (pin, config) = (
                     "tang",
                     json.dumps(
                         {"url": tang_url, "stratis:tang:trust_url": True}
@@ -150,19 +174,19 @@ def create_pool(
                     ),
                 )
             else:
-                clevis_arg = None
+                raise RuntimeError(
+                    "Currently only Tang is supported for Clevis in the test infrastructure"
+                )
+
+            dbus_clevis_infos.append((dbus_slot, pin, config))
 
         (result, exit_code, error_str) = Manager.Methods.CreatePool(
             get_object(TOP_OBJECT),
             {
                 "name": name,
                 "devices": devices,
-                "key_desc": (
-                    (False, "") if key_description is None else (True, key_description)
-                ),
-                "clevis_info": (
-                    (False, ("", "")) if clevis_arg is None else (True, clevis_arg)
-                ),
+                "key_desc": dbus_key_descriptions,
+                "clevis_info": dbus_clevis_infos,
                 "journal_size": (False, 0),
                 "tag_spec": (False, ""),
                 "allocate_superblock": (False, False),

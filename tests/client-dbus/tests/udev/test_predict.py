@@ -302,7 +302,7 @@ class TestSpaceUsagePrediction(UdevTest):
         (key_description, key) = ("key_spec", "data")
         with OptionalKeyServiceContextManager(key_spec=[(key_description, key)]):
             pool_name = random_string(5)
-            create_pool(pool_name, devnodes, key_description=key_description)
+            create_pool(pool_name, devnodes, key_description=[(key_description, None)])
             self.wait_for_pools(1)
             self._test_prediction(pool_name)
 

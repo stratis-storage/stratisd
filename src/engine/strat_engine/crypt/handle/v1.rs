@@ -8,7 +8,7 @@ use std::{
 };
 
 use either::Either;
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use rand::{distr::Alphanumeric, rng, Rng};
 use serde::{
     de::{Error, MapAccess, Visitor},
     ser::SerializeMap,
@@ -603,7 +603,7 @@ impl CryptHandle {
         physical_path: &Path,
         (pin, json, yes): (&str, &Value, bool),
     ) -> StratisResult<()> {
-        let (_, key_data) = thread_rng()
+        let (_, key_data) = rng()
             .sample_iter(Alphanumeric)
             .take(MAX_STRATIS_PASS_SIZE)
             .fold(

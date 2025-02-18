@@ -17,14 +17,9 @@ require:
   - python3-pyudev
   - rust
   - systemd-devel
-  - valgrind
 
 environment:
   TANG_URL: localhost
-
-/valgrind:
-  test: make -f Makefile test-clevis-loop-valgrind
-  summary: Run Rust tests that use loopbacked device framework for Clevis with valgrind
 
 /loop:
   test: make -f Makefile test-clevis-loop

@@ -10,7 +10,7 @@ use std::{
 };
 
 use either::Either;
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use rand::{distr::Alphanumeric, rng, Rng};
 use serde_json::Value;
 
 use devicemapper::{Device, DmName, DmNameBuf, Sectors};
@@ -344,7 +344,7 @@ impl CryptHandle {
         let (to_delete, clevis_bind_input) = match key_descs_with_token_id.keys().next() {
             Some(t) => (None, Either::Left(*t)),
             _ => {
-                let (_, key_data) = thread_rng()
+                let (_, key_data) = rng()
                     .sample_iter(Alphanumeric)
                     .take(MAX_STRATIS_PASS_SIZE)
                     .fold(

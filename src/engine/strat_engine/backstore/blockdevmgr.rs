@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use chrono::{DateTime, Duration, Utc};
-use rand::{seq::IteratorRandom, thread_rng};
+use rand::{rng, seq::IteratorRandom};
 
 use devicemapper::{Bytes, Device, Sectors};
 
@@ -430,7 +430,7 @@ where
         // TODO: consider making selection not entirely random, i.e, ensuring
         // distribution of metadata over different paths.
         let saved = candidates
-            .choose_multiple(&mut thread_rng(), MAX_NUM_TO_WRITE)
+            .choose_multiple(&mut rng(), MAX_NUM_TO_WRITE)
             .iter_mut()
             .fold(false, |acc, b| {
                 acc | b.save_state(&stamp_time, metadata).is_ok()

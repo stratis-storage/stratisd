@@ -140,9 +140,9 @@ pub enum CacheRole {
 /// The various roles taken on by DM devices in the integrity tier.
 #[derive(Clone, Copy, strum_macros::Display)]
 #[strum(serialize_all = "lowercase")]
-#[allow(dead_code)]
 pub enum IntegrityRole {
     /// The DM integrity device, contains the other two devices.
+    #[allow(dead_code)]
     Integrity,
     /// The meta sub-device of the DM integrity device.
     MetaSub,
@@ -261,7 +261,6 @@ pub fn format_backstore_ids(pool_uuid: PoolUuid, role: CacheRole) -> (DmNameBuf,
 ///             < 128 (129 for UUID)
 ///
 /// which is equivalent to len(format!("{}", FORMAT_VERSION) < 60 (61 for UUID)
-#[allow(dead_code)]
 pub fn format_integrity_ids(pool_uuid: PoolUuid, role: IntegrityRole) -> (DmNameBuf, DmUuidBuf) {
     let value = format!(
         "stratis-{}-private-{}-integrity-{}",

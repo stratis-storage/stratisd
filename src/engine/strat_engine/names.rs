@@ -137,6 +137,19 @@ pub enum CacheRole {
     OriginSub,
 }
 
+/// The various roles taken on by DM devices in the integrity tier.
+#[derive(Clone, Copy, strum_macros::Display)]
+#[strum(serialize_all = "lowercase")]
+#[allow(dead_code)]
+pub enum IntegrityRole {
+    /// The DM integrity device, contains the other two devices.
+    Integrity,
+    /// The meta sub-device of the DM integrity device.
+    MetaSub,
+    /// The origin sub-device of the DM integrity device, holds the actual data.
+    OriginSub,
+}
+
 /// Format a name & uuid for the flex layer.
 ///
 /// Prerequisite: len(format!("{}", FORMAT_VERSION)
@@ -226,6 +239,32 @@ pub fn format_thinpool_ids(pool_uuid: PoolUuid, role: ThinPoolRole) -> (DmNameBu
 pub fn format_backstore_ids(pool_uuid: PoolUuid, role: CacheRole) -> (DmNameBuf, DmUuidBuf) {
     let value = format!(
         "stratis-{}-private-{}-physical-{}",
+        FORMAT_VERSION,
+        uuid_to_string!(pool_uuid),
+        role
+    );
+    (
+        DmNameBuf::new(value.clone()).expect("FORMAT_VERSION display_length < 60"),
+        DmUuidBuf::new(value).expect("FORMAT_VERSION display_length < 61"),
+    )
+}
+
+/// Format a name & uuid for dm devices in the backstore.
+///
+/// Prerequisite: len(format!("{}", FORMAT_VERSION)
+///             + len("stratis")                         7
+///             + len("private")                         7
+///             + len("integrity")                       9
+///             + num_dashes                             5
+///             + len(pool uuid)                         32
+///             + max(len(IntegrityRole))                9
+///             < 128 (129 for UUID)
+///
+/// which is equivalent to len(format!("{}", FORMAT_VERSION) < 60 (61 for UUID)
+#[allow(dead_code)]
+pub fn format_integrity_ids(pool_uuid: PoolUuid, role: IntegrityRole) -> (DmNameBuf, DmUuidBuf) {
+    let value = format!(
+        "stratis-{}-private-{}-integrity-{}",
         FORMAT_VERSION,
         uuid_to_string!(pool_uuid),
         role

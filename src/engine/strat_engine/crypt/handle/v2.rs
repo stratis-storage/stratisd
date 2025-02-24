@@ -46,7 +46,8 @@ use crate::{
                     acquire_crypt_device, activate, activate_by_token, add_keyring_keyslot,
                     clevis_info_from_json, device_from_physical_path,
                     encryption_info_from_metadata, ensure_wiped, get_keyslot_number,
-                    get_passphrase, interpret_clevis_config, reencrypt_shared, wipe_fallback,
+                    get_passphrase, handle_do_reencrypt, handle_setup_reencrypt,
+                    interpret_clevis_config, wipe_fallback,
                 },
             },
             device::blkdev_size,
@@ -828,12 +829,23 @@ impl CryptHandle {
             .map(|h| h.expect("should have crypt device after online encrypt"))
     }
 
-    /// Encrypt an unencrypted pool.
-    pub fn reencrypt(&self) -> StratisResult<()> {
-        reencrypt_shared(
+    /// Prepare the crypt header for reencryption.
+    ///
+    /// Can be rolled back.
+    pub fn setup_reencrypt(&self) -> StratisResult<(u32, SizedKeyMemory, u32)> {
+        handle_setup_reencrypt(self.luks2_device_path(), self.encryption_info())
+    }
+
+    /// Perform the reencryption.
+    ///
+    /// Cannot be rolled back.
+    pub fn do_reencrypt(&self, slot: u32, key: SizedKeyMemory, new_slot: u32) -> StratisResult<()> {
+        handle_do_reencrypt(
             &format_crypt_backstore_name(&self.metadata.pool_uuid).to_string(),
             self.luks2_device_path(),
-            self.encryption_info(),
+            slot,
+            key,
+            new_slot,
         )
     }
 

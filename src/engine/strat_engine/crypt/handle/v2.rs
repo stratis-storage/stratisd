@@ -44,8 +44,9 @@ use crate::{
                 shared::{
                     acquire_crypt_device, activate, add_keyring_keyslot, clevis_info_from_json,
                     device_from_physical_path, encryption_info_from_metadata, ensure_wiped,
-                    get_keyslot_number, get_passphrase, interpret_clevis_config,
-                    load_vk_to_keyring, reencrypt_shared, wipe_fallback,
+                    get_keyslot_number, get_passphrase, handle_do_reencrypt,
+                    handle_setup_reencrypt, interpret_clevis_config, load_vk_to_keyring,
+                    wipe_fallback,
                 },
             },
             device::blkdev_size,
@@ -854,13 +855,31 @@ impl CryptHandle {
             .map(|h| h.expect("should have crypt device after online encrypt"))
     }
 
-    /// Reencrypt an encrypted pool with a new volume key.
-    pub fn reencrypt(&self, pool_uuid: PoolUuid) -> StratisResult<()> {
-        reencrypt_shared(
+    /// Set up a reencryption operation on the given crypt device.
+    ///
+    /// Can be rolled back.
+    pub fn setup_reencrypt(&self) -> StratisResult<(u32, SizedKeyMemory, u32)> {
+        handle_setup_reencrypt(self.luks2_device_path(), self.encryption_info())
+    }
+
+    /// Perform the reencryption operation on the encrypted pool to convert to switch to another
+    /// volume key.
+    ///
+    /// Cannot be rolled back.
+    pub fn do_reencrypt(
+        &self,
+        pool_uuid: PoolUuid,
+        slot: u32,
+        key: SizedKeyMemory,
+        new_slot: u32,
+    ) -> StratisResult<()> {
+        handle_do_reencrypt(
             self.metadata.activation_name.to_string().as_str(),
-            self.luks2_device_path(),
-            self.encryption_info(),
             pool_uuid,
+            self.luks2_device_path(),
+            slot,
+            key,
+            new_slot,
         )
     }
 

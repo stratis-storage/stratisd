@@ -229,14 +229,14 @@ fn test_stratis_min_pool_start_invalid_uuid() {
 
 #[test]
 // Test starting a pool using an invalid unlock method.
-fn test_stratis_min_pool_start_invalid_unlock_method() {
+fn test_stratis_min_pool_start_invalid_token_slot_value() {
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();
     cmd.arg("pool")
         .arg("start")
         .arg("--name")
         .arg("pn")
-        .arg("--unlock-method=bogus");
-    cmd.assert().failure().code(2);
+        .arg("--token-slot=bogus");
+    cmd.assert().failure().code(1);
 }
 
 #[test]

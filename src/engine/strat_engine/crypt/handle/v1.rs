@@ -44,8 +44,8 @@ use crate::{
                     acquire_crypt_device, activate, activate_by_token, add_keyring_keyslot,
                     check_luks2_token, clevis_decrypt, device_from_physical_path,
                     encryption_info_from_metadata, ensure_inactive, ensure_wiped,
-                    get_keyslot_number, interpret_clevis_config, luks2_token_type_is_valid,
-                    read_key, reencrypt_shared, wipe_fallback,
+                    get_keyslot_number, handle_do_reencrypt, handle_setup_reencrypt,
+                    interpret_clevis_config, luks2_token_type_is_valid, read_key, wipe_fallback,
                 },
             },
             dm::DEVICEMAPPER_PATH,
@@ -1003,12 +1003,29 @@ impl CryptHandle {
         Ok(())
     }
 
-    /// Reencrypt an encrypted pool with a new volume key.
-    pub fn reencrypt(&self) -> StratisResult<()> {
-        reencrypt_shared(
+    /// Set up a reencryption operation on the given crypt device.
+    ///
+    /// This operation can be rolled back.
+    pub fn setup_reencrypt(&self) -> StratisResult<(u32, SizedKeyMemory, u32)> {
+        handle_setup_reencrypt(self.luks2_device_path(), self.encryption_info())
+    }
+
+    /// Perform the reencryption operation on the encrypted pool to convert to switch to another
+    /// volume key.
+    ///
+    /// This operation cannot be rolled back.
+    pub fn do_reencrypt(
+        &self,
+        single_keyslot: u32,
+        single_key: SizedKeyMemory,
+        single_new_keyslot: u32,
+    ) -> StratisResult<()> {
+        handle_do_reencrypt(
             self.metadata.activation_name.to_string().as_str(),
             self.luks2_device_path(),
-            self.encryption_info(),
+            single_keyslot,
+            single_key,
+            single_new_keyslot,
         )
     }
 

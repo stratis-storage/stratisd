@@ -1,0 +1,118 @@
+# Copyright 2021 Red Hat, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Test starting additional stratisd processes.
+"""
+
+# isort: STDLIB
+import os
+
+# isort: LOCAL
+from stratisd_client_dbus import Manager, Pool, get_object
+from stratisd_client_dbus._constants import TOP_OBJECT
+
+from ._utils import OptionalKeyServiceContextManager, UdevTest, create_pool
+
+
+class TestFailedStart(UdevTest):
+    """
+    Test creating an encrypted pool and stopping it, removing the key from the keyring,
+    and then start it.
+
+    This is a regression test for a bug.
+    """
+
+    def test_failed_start_regression(self):
+        """
+        * Create encryption pool
+        * Add cache
+        * Stop pool
+        * Unset key
+        * Start pool (should fail)
+        * Set key again
+        * Start pool (should succeed)
+        """
+
+        device_tokens = self._lb_mgr.create_devices(3)
+        devnodes = self._lb_mgr.device_files(device_tokens)
+
+        with OptionalKeyServiceContextManager(
+            key_spec=[("testkey", "testkey")]
+        ) as key_descriptions:
+            key_description = key_descriptions[0]
+
+            self.wait_for_pools(0)
+            (_, (pool_object_path, _)) = create_pool(
+                "testpool",
+                devnodes[:2],
+                key_description=([(key_description, None)]),
+            )
+            self.wait_for_pools(1)
+
+            (_, rc, _) = Pool.Methods.InitCache(
+                get_object(pool_object_path), {"devices": [devnodes[2]]}
+            )
+            self.assertEqual(rc, 0)
+
+            ((b, _), rc, _) = Manager.Methods.StopPool(
+                get_object(TOP_OBJECT),
+                {
+                    "id": "testpool",
+                    "id_type": "name",
+                },
+            )
+            self.assertEqual(b, True)
+            self.assertEqual(rc, 0)
+
+            (_, rc, _) = Manager.Methods.UnsetKey(
+                get_object(TOP_OBJECT),
+                {
+                    "key_desc": "testkey",
+                },
+            )
+            self.assertEqual(rc, 0)
+
+            (_, rc, _) = Manager.Methods.StartPool(
+                get_object(TOP_OBJECT),
+                {
+                    "id": "testpool",
+                    "id_type": "name",
+                    "unlock_method": (True, (False, 0)),
+                    "key_fd": (False, 0),
+                },
+            )
+            self.assertNotEqual(rc, 0)
+
+            (out_side, in_side) = os.pipe()
+            os.write(in_side, b"testkey")
+            (_, rc, _) = Manager.Methods.SetKey(
+                get_object(TOP_OBJECT),
+                {
+                    "key_desc": "testkey",
+                    "key_fd": out_side,
+                },
+            )
+            self.assertEqual(rc, 0)
+
+            (_, rc, _) = Manager.Methods.StartPool(
+                get_object(TOP_OBJECT),
+                {
+                    "id": "testpool",
+                    "id_type": "name",
+                    "unlock_method": (True, (False, 0)),
+                    "key_fd": (False, 0),
+                },
+            )
+            self.assertEqual(rc, 0)

@@ -1033,11 +1033,10 @@ pub fn get_all_passphrases(
     Ok(passphrases)
 }
 
-pub fn reencrypt_shared(
-    device_name: &str,
+pub fn handle_setup_reencrypt(
     luks2_path: &Path,
     encryption_info: &EncryptionInfo,
-) -> StratisResult<()> {
+) -> StratisResult<(u32, SizedKeyMemory, u32)> {
     let mut device = acquire_crypt_device(luks2_path)?;
 
     let mut keys = get_all_passphrases(&mut device, encryption_info)?;
@@ -1091,6 +1090,18 @@ pub fn reencrypt_shared(
             .token_handle()
             .json_set(TokenInput::ReplaceToken(ts, &token_contents))?;
     }
+
+    Ok((single_keyslot, single_key, single_new_keyslot))
+}
+
+pub fn handle_do_reencrypt(
+    device_name: &str,
+    luks2_path: &Path,
+    single_keyslot: u32,
+    single_key: SizedKeyMemory,
+    single_new_keyslot: u32,
+) -> StratisResult<()> {
+    let mut device = acquire_crypt_device(luks2_path)?;
 
     let cipher = device.status_handle().get_cipher()?;
     let cipher_mode = device.status_handle().get_cipher_mode()?;

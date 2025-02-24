@@ -13,6 +13,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use either::Either;
 use serde_json::Value;
+use tempfile::TempDir;
 
 use devicemapper::{
     CacheDev, CacheDevTargetTable, CacheTargetParams, DevId, Device, DmDevice, DmFlags, DmOptions,
@@ -31,7 +32,10 @@ use crate::{
                 devices::{get_devno_from_path, UnownedDevices},
                 shared::BlockSizeSummary,
             },
-            crypt::{handle::v2::CryptHandle, manual_wipe, DEFAULT_CRYPT_DATA_OFFSET_V2},
+            crypt::{
+                back_up_luks_header, handle::v2::CryptHandle, manual_wipe, restore_luks_header,
+                DEFAULT_CRYPT_DATA_OFFSET_V2,
+            },
             dm::{get_dm, list_of_backstore_devices, remove_optional_devices, DEVICEMAPPER_PATH},
             keys::{search_key_process, unset_key_process},
             metadata::MDADataSize,
@@ -1330,7 +1334,24 @@ impl Backstore {
                 Err(StratisError::Msg("Encrypted pool where the encrypted device has not yet been created cannot be reencrypted".to_string()))
             }
             Some(Either::Right(ref handle)) => {
-                handle.reencrypt()
+                let tmp_dir = TempDir::new()?;
+                let h = back_up_luks_header(handle.luks2_device_path(), &tmp_dir)?;
+                let (slot, key, new_slot) = match handle.setup_reencrypt() {
+                    Ok(tup) => tup,
+                    Err(causal_e) => {
+                        if let Err(rollback_e) = restore_luks_header(handle.luks2_device_path(), &h) {
+                            return Err(StratisError::RollbackError {
+                                causal_error: Box::new(causal_e),
+                                rollback_error: Box::new(rollback_e),
+                                level: ActionAvailability::Full,
+                            });
+                        } else {
+                            return Err(causal_e)
+                        }
+                    }
+                };
+                handle.do_reencrypt(slot, key, new_slot)?;
+                Ok(())
             }
             None => {
                 Err(StratisError::Msg("Unencrypted device cannot be reencrypted".to_string()))

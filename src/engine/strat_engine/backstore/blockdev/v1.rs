@@ -36,7 +36,7 @@ use crate::{
         },
         types::{
             Compare, DevUuid, DevicePath, Diff, EncryptionInfo, KeyDescription, Name, PoolUuid,
-            StateDiff, StratBlockDevDiff, StratSigblockVersion,
+            SizedKeyMemory, StateDiff, StratBlockDevDiff, StratSigblockVersion,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -416,13 +416,31 @@ impl StratBlockDev {
         }
     }
 
-    /// Reencrypt an individual block device in a pool.
-    pub fn reencrypt(&self) -> StratisResult<()> {
+    /// Prepare the crypt header for reencryption.
+    ///
+    /// Can be rolled back.
+    pub fn setup_reencrypt(&self) -> StratisResult<(u32, SizedKeyMemory, u32)> {
         let crypt_handle = self
             .underlying_device
             .crypt_handle()
             .expect("Checked that pool is encrypted");
-        crypt_handle.reencrypt()
+        crypt_handle.setup_reencrypt()
+    }
+
+    /// Perform the reencryption.
+    ///
+    /// Cannot be rolled back.
+    pub fn do_reencrypt(
+        &self,
+        keyslot: u32,
+        key: SizedKeyMemory,
+        new_keyslot: u32,
+    ) -> StratisResult<()> {
+        let crypt_handle = self
+            .underlying_device
+            .crypt_handle()
+            .expect("Checked that pool is encrypted");
+        crypt_handle.do_reencrypt(keyslot, key, new_keyslot)
     }
 
     #[cfg(test)]

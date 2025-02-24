@@ -614,6 +614,44 @@ fn test_stratis_min_pool_is_encrypted() {
     test_with_stratisd_min_sim(stratis_min_pool_is_encrypted);
 }
 
+fn stratis_min_encrypted_pool_start() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.write_stdin("thisisatestpassphrase\n")
+        .arg("key")
+        .arg("set")
+        .arg("--capture-key")
+        .arg("testkey");
+    cmd.assert().success();
+
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool")
+        .arg("create")
+        .arg("--key-descs")
+        .arg("testkey:0")
+        .arg("pn")
+        .arg("/dev/n");
+    cmd.assert().success();
+
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("stop").arg("--name").arg("pn");
+    cmd.assert().success();
+
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool")
+        .arg("start")
+        .arg("--name")
+        .arg("pn")
+        .arg("--token-slot")
+        .arg("0");
+    cmd.assert().success();
+}
+
+#[test]
+// Verify that an encrypted pool can be started
+fn test_stratis_min_encrypted_pool_start() {
+    test_with_stratisd_min_sim(stratis_min_encrypted_pool_start)
+}
+
 fn stratis_min_pool_is_stopped() {
     stratis_min_create_pool_and_fs();
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();

@@ -803,6 +803,9 @@ impl Backstore {
     /// Returns:
     /// * Ok(()) if successful
     /// * Err(_) if an operation fails while reencrypting the devices.
+    ///
+    /// Precondition: blockdevs_mut() must always return the block devices in the
+    /// same order.
     pub fn reencrypt(&mut self) -> StratisResult<()> {
         if self.encryption_info().is_none() {
             return Err(StratisError::Msg(
@@ -810,11 +813,18 @@ impl Backstore {
             ));
         };
 
-        // Keys are not the same but key description is present
-        operation_loop(
+        let key_info = operation_loop(
             self.blockdevs_mut().into_iter().map(|(_, _, bd)| bd),
-            |blockdev| blockdev.reencrypt(),
+            |blockdev| blockdev.setup_reencrypt(),
         )?;
+        for (bd, (slot, key, new_slot)) in self
+            .blockdevs_mut()
+            .into_iter()
+            .map(|(_, _, bd)| bd)
+            .zip(key_info)
+        {
+            bd.do_reencrypt(slot, key, new_slot)?;
+        }
         Ok(())
     }
 
@@ -935,10 +945,10 @@ impl Recordable<BackstoreSave> for Backstore {
     }
 }
 
-fn operation_loop<'a, I, A>(blockdevs: I, action: A) -> StratisResult<()>
+fn operation_loop<'a, I, A, R>(blockdevs: I, action: A) -> StratisResult<Vec<R>>
 where
     I: IntoIterator<Item = &'a mut StratBlockDev>,
-    A: Fn(&mut StratBlockDev) -> StratisResult<()>,
+    A: Fn(&mut StratBlockDev) -> StratisResult<R>,
 {
     fn rollback_loop(
         rollback_record: Vec<&mut StratBlockDev>,
@@ -979,13 +989,18 @@ where
         causal_error
     }
 
-    fn perform_operation<'a, I, A>(tmp_dir: &TempDir, blockdevs: I, action: A) -> StratisResult<()>
+    fn perform_operation<'a, I, A, R>(
+        tmp_dir: &TempDir,
+        blockdevs: I,
+        action: A,
+    ) -> StratisResult<Vec<R>>
     where
         I: IntoIterator<Item = &'a mut StratBlockDev>,
-        A: Fn(&mut StratBlockDev) -> StratisResult<()>,
+        A: Fn(&mut StratBlockDev) -> StratisResult<R>,
     {
         let mut original_headers = Vec::new();
         let mut rollback_record = Vec::new();
+        let mut results = Vec::new();
         for blockdev in blockdevs {
             match back_up_luks_header(blockdev.physical_path(), tmp_dir) {
                 Ok(h) => original_headers.push(h),
@@ -993,12 +1008,15 @@ where
             };
             let res = action(blockdev);
             rollback_record.push(blockdev);
-            if let Err(error) = res {
-                return Err(rollback_loop(rollback_record, original_headers, error));
+            match res {
+                Ok(r) => results.push(r),
+                Err(e) => {
+                    return Err(rollback_loop(rollback_record, original_headers, e));
+                }
             }
         }
 
-        Ok(())
+        Ok(results)
     }
 
     let tmp_dir = TempDir::new()?;

@@ -41,7 +41,7 @@ fn parse_args() -> Command {
                 Command::new("start")
                     .arg(Arg::new("id").required(true))
                     .arg(Arg::new("name").long("name").num_args(0))
-                    .arg(Arg::new("token_slot").long("token_slot").num_args(1))
+                    .arg(Arg::new("token_slot").long("token-slot").num_args(1))
                     .arg(Arg::new("prompt").long("prompt").num_args(0)),
                 Command::new("stop")
                     .arg(Arg::new("id").required(true))

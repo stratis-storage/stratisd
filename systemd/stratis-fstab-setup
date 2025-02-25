@@ -19,7 +19,7 @@ done
 
 if $(stratis-min pool is-stopped "$POOL_UUID"); then
 	if $(stratis-min pool is-bound "$POOL_UUID"); then
-		if stratis-min pool start --unlock-method=clevis "$POOL_UUID"; then
+		if stratis-min pool start --token-slot=any "$POOL_UUID"; then
 			exit 0
 		else
 			echo Failed to start pool with UUID $POOL_UUID using Clevis. >&2
@@ -28,7 +28,7 @@ if $(stratis-min pool is-stopped "$POOL_UUID"); then
 	if $(stratis-min pool has-passphrase "$POOL_UUID"); then
 		if systemd-ask-password \
 			"Enter password for pool with UUID $POOL_UUID" |
-			stratis-min pool start --unlock-method=keyring --prompt "$POOL_UUID"; then
+			stratis-min pool start --token-slot=any --prompt "$POOL_UUID"; then
 			exit 0
 		else
 			echo Failed to start pool with UUID $POOL_UUID using passphrase. >&2

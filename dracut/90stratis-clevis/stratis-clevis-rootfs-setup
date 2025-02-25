@@ -17,7 +17,7 @@ done
 
 if $(stratis-min pool is-stopped "$STRATIS_ROOTFS_UUID"); then
 	if $(stratis-min pool is-bound "$STRATIS_ROOTFS_UUID"); then
-		if ! stratis-min pool start --unlock-method=clevis "$STRATIS_ROOTFS_UUID"; then
+		if ! stratis-min pool start --token-slot=any "$STRATIS_ROOTFS_UUID"; then
 			echo Failed to start pool with UUID $STRATIS_ROOTFS_UUID using Clevis >&2
 			exit 1
 		fi

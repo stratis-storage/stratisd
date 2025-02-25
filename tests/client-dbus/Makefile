@@ -17,6 +17,10 @@ lint:
 startup-tests:
 	python3 -m unittest ${UNITTEST_OPTS} tests.udev.test_startup
 
+.PHONY: start-tests
+start-tests:
+	python3 -m unittest ${UNITTEST_OPTS} tests.udev.test_start
+
 .PHONY: fmt
 fmt:
 	isort src tests

@@ -303,7 +303,17 @@ impl Backstore {
         passphrase: Option<SizedKeyMemory>,
     ) -> BDARecordResult<Backstore> {
         let block_mgr = BlockDevMgr::new(datadevs, Some(last_update_time));
-        let data_tier = DataTier::setup(block_mgr, &pool_save.backstore.data_tier)?;
+        let data_tier = match DataTier::setup(block_mgr, &pool_save.backstore.data_tier) {
+            Ok(dt) => dt,
+            Err((e, data)) => {
+                return Err((
+                    e,
+                    data.into_iter()
+                        .chain(bds_to_bdas(cachedevs))
+                        .collect::<HashMap<_, _>>(),
+                ));
+            }
+        };
         let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
         let origin = match LinearDev::setup(
             get_dm(),
@@ -386,7 +396,21 @@ impl Backstore {
             .collect::<PathBuf>();
         let has_header = match CryptHandle::load_metadata(crypt_physical_path, pool_uuid) {
             Ok(opt) => opt.is_some(),
-            Err(e) => return Err((e, data_tier.block_mgr.into_bdas())),
+            Err(e) => {
+                return Err((
+                    e,
+                    data_tier
+                        .block_mgr
+                        .into_bdas()
+                        .into_iter()
+                        .chain(
+                            cache_tier
+                                .map(|ct| ct.block_mgr.into_bdas())
+                                .unwrap_or_default(),
+                        )
+                        .collect::<HashMap<_, _>>(),
+                ));
+            }
         };
         let enc = match (metadata_enc_enabled, has_header, passphrase.as_ref()) {
             (true, true, pass) => {
@@ -395,10 +419,40 @@ impl Backstore {
                         if let Some(h) = opt {
                             Some(Either::Right(h))
                         } else {
-                            return Err((StratisError::Msg("Metadata reported that encryption is enabled but no crypt header was found".to_string()), data_tier.block_mgr.into_bdas()));
+                            return Err(
+                                (
+                                    StratisError::Msg(
+                                        "Metadata reported that encryption is enabled but no crypt header was found".to_string()
+                                    ),
+                                    data_tier
+                                        .block_mgr
+                                        .into_bdas()
+                                        .into_iter()
+                                        .chain(
+                                            cache_tier
+                                                .map(|ct| ct.block_mgr.into_bdas())
+                                                .unwrap_or_default(),
+                                        )
+                                        .collect::<HashMap<_, _>>(),
+                                )
+                            );
                         }
                     }
-                    Err(e) => return Err((e, data_tier.block_mgr.into_bdas())),
+                    Err(e) => {
+                        return Err((
+                            e,
+                            data_tier
+                                .block_mgr
+                                .into_bdas()
+                                .into_iter()
+                                .chain(
+                                    cache_tier
+                                        .map(|ct| ct.block_mgr.into_bdas())
+                                        .unwrap_or_default(),
+                                )
+                                .collect::<HashMap<_, _>>(),
+                        ))
+                    }
                 }
             }
             (true, _, _) => {
@@ -407,7 +461,16 @@ impl Backstore {
                         "Metadata reported that encryption is enabled but no header was found"
                             .to_string(),
                     ),
-                    data_tier.block_mgr.into_bdas(),
+                    data_tier
+                        .block_mgr
+                        .into_bdas()
+                        .into_iter()
+                        .chain(
+                            cache_tier
+                                .map(|ct| ct.block_mgr.into_bdas())
+                                .unwrap_or_default(),
+                        )
+                        .collect::<HashMap<_, _>>(),
                 ));
             }
             (false, true, _) => {
@@ -416,7 +479,16 @@ impl Backstore {
                         "Metadata reported that encryption is disabled but header was found"
                             .to_string(),
                     ),
-                    data_tier.block_mgr.into_bdas(),
+                    data_tier
+                        .block_mgr
+                        .into_bdas()
+                        .into_iter()
+                        .chain(
+                            cache_tier
+                                .map(|ct| ct.block_mgr.into_bdas())
+                                .unwrap_or_default(),
+                        )
+                        .collect::<HashMap<_, _>>(),
                 ));
             }
             (false, _, _) => None,

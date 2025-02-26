@@ -6,10 +6,22 @@ endif
 ifeq ($(origin AUDITABLE), undefined)
   BUILD = build
   RUSTC = rustc
+  TEST = test
 else
   BUILD = auditable build
   RUSTC = auditable rustc
+  TEST = test
 endif
+
+ifeq ($(origin MINIMAL), undefined)
+  BUILD = build
+  RUSTC = rustc
+  TEST = test
+else
+  BUILD = minimal-versions build --direct
+  RUSTC = rustc
+  TEST = minimal-versions test --direct
+ endif
 
 ifeq ($(origin CLIPPY_FIX), undefined)
   CLIPPY_OPTS = --all-targets --no-deps
@@ -119,7 +131,7 @@ build:
 build-tests:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${PROFILE_FLAGS}" \
-	cargo test --no-run ${RELEASE_FLAG} ${TARGET_ARGS}
+	cargo ${TEST} --no-run ${RELEASE_FLAG} ${TARGET_ARGS}
 
 ## Build stratis-utils only
 build-utils:

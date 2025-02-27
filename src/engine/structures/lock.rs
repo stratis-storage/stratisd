@@ -945,9 +945,6 @@ impl<U, T> Into<Vec<SomeLockReadGuard<U, T>>> for AllLockReadGuard<U, T>
 where
     U: AsUuid,
 {
-    // Needed because Rust mutability rules will prevent using lock_record mutably in two
-    // different closures in the same iterator.
-    #[allow(clippy::needless_collect)]
     fn into(self) -> Vec<SomeLockReadGuard<U, T>> {
         let mut lock_record = self.0.lock().expect("Mutex only acquired internally");
         assert!(lock_record.write_locked.is_empty());
@@ -1123,9 +1120,6 @@ impl<U, T> Into<Vec<SomeLockWriteGuard<U, T>>> for AllLockWriteGuard<U, T>
 where
     U: AsUuid,
 {
-    // Needed because Rust mutability rules will prevent using lock_record mutably in two
-    // different closures in the same iterator.
-    #[allow(clippy::needless_collect)]
     fn into(self) -> Vec<SomeLockWriteGuard<U, T>> {
         let mut lock_record = self.0.lock().expect("Mutex only locked internally");
         assert!(lock_record.read_locked.is_empty());

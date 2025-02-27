@@ -1328,7 +1328,7 @@ where
         backstore: &B,
     ) -> StratisResult<HashMap<FilesystemUuid, StratFilesystemDiff>> {
         let mut updated = HashMap::default();
-        let mut remaining_space = if !self.enable_overprov {
+        let start_remaining_space = if !self.enable_overprov {
             let sum = self.filesystem_logical_size_sum()?;
             Some(Sectors(
                 room_for_data(
@@ -1340,6 +1340,14 @@ where
         } else {
             None
         };
+
+        // It is tempting to exit early if the remaining space is 0. But this
+        // is incorrect. If the remaining space is 0, that just means that the
+        // pool is not overprovisioned and that the total logical size of the
+        // filesystems consumes the whole available space. It is still necessary
+        // to enter the thread scope to detect filesystem usage changes.
+
+        let mut remaining_space = start_remaining_space;
 
         scope(|s| {
             // This collect is needed to ensure all threads are spawned in
@@ -1411,7 +1419,7 @@ where
             });
         });
 
-        if remaining_space == Some(Sectors(0)) {
+        if remaining_space == Some(Sectors(0)) && remaining_space != start_remaining_space {
             warn!(
                 "Overprovisioning protection must be disabled or more space must be added to the pool to extend the filesystem further"
             );

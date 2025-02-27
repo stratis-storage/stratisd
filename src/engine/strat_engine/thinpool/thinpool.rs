@@ -1421,7 +1421,7 @@ where
 
         if remaining_space == Some(Sectors(0)) && remaining_space != start_remaining_space {
             warn!(
-                "Overprovisioning protection must be disabled or more space must be added to the pool to extend the filesystem further"
+                "Overprovisioning protection must be disabled or more space must be added to pool {pool_uuid} to increase the size of any existing filesystem or to create a new filesystem on this pool"
             );
         }
 

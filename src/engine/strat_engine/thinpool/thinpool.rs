@@ -1354,7 +1354,6 @@ where
             // parallel, not each thread being spawned and immediately joined
             // in the next iterator step which would result in sequential
             // iteration.
-            #[allow(clippy::needless_collect)]
             let handles = self
                 .filesystems
                 .iter_mut()
@@ -1401,7 +1400,6 @@ where
             // parallel, not each thread being spawned and immediately joined
             // in the next iterator step which would result in sequential
             // iteration.
-            #[allow(clippy::needless_collect)]
             let handles = needs_save.into_iter()
                 .map(|(name, uuid, fs)| {
                     s.spawn(move || {

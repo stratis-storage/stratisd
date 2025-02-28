@@ -950,8 +950,7 @@ where
         assert!(lock_record.write_locked.is_empty());
         assert!(!lock_record.all_write_locked);
 
-        let guards = self
-            .1
+        self.1
             .iter()
             .map(|(n, u, t)| {
                 (
@@ -959,9 +958,6 @@ where
                     SomeLockReadGuard(Arc::clone(&self.0), *u, n.clone(), *t as *const _, true),
                 )
             })
-            .collect::<Vec<_>>();
-        guards
-            .into_iter()
             .map(|(u, guard)| {
                 lock_record.add_read_lock(u, None);
                 guard
@@ -1126,8 +1122,7 @@ where
         assert!(lock_record.write_locked.is_empty());
         assert_eq!(lock_record.all_read_locked, 0);
 
-        let guards = self
-            .1
+        self.1
             .iter()
             .map(|(n, u, t)| {
                 (
@@ -1135,9 +1130,6 @@ where
                     SomeLockWriteGuard(Arc::clone(&self.0), *u, n.clone(), *t, true),
                 )
             })
-            .collect::<Vec<_>>();
-        guards
-            .into_iter()
             .map(|(u, guard)| {
                 lock_record.add_write_lock(u, None);
                 guard

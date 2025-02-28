@@ -100,9 +100,6 @@ fn parse_args() -> Command {
                 Command::new("is-stopped")
                     .arg(Arg::new("name").long("name").num_args(0))
                     .arg(Arg::new("id").required(true)),
-                Command::new("is-bound")
-                    .arg(Arg::new("name").long("name").num_args(0))
-                    .arg(Arg::new("id").required(true)),
                 Command::new("has-passphrase")
                     .arg(Arg::new("name").long("name").num_args(0))
                     .arg(Arg::new("id").required(true)),
@@ -463,20 +460,6 @@ fn main() -> Result<(), String> {
                     )?)
                 };
                 println!("{}", pool::pool_is_stopped(id)?);
-                Ok(())
-            } else if let Some(args) = subcommand.subcommand_matches("is-bound") {
-                let id = if args.get_flag("name") {
-                    PoolIdentifier::Name(Name::new(
-                        args.get_one::<String>("id").expect("required").to_owned(),
-                    ))
-                } else {
-                    PoolIdentifier::Uuid(PoolUuid::parse_str(
-                        args.get_one::<String>("id")
-                            .map(|s| s.as_str())
-                            .expect("required"),
-                    )?)
-                };
-                println!("{}", pool::pool_is_bound(id)?);
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("has-passphrase") {
                 let id = if args.get_flag("name") {

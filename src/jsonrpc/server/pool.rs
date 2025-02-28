@@ -284,24 +284,31 @@ pub async fn pool_is_encrypted(
     let guard = engine.get_pool(id.clone()).await;
     if let Some((_, _, pool)) = guard.as_ref().map(|guard| guard.as_tuple()) {
         Ok(pool.is_encrypted())
-    } else if let Some(poolinfo) = stopped.stopped.get(match id {
-        PoolIdentifier::Uuid(ref u) => u,
-        PoolIdentifier::Name(ref n) => stopped
-            .name_to_uuid
-            .get(n)
-            .ok_or_else(|| StratisError::Msg(format!("Could not find pool with name {n}")))?,
-    }) {
-        match poolinfo
+    } else {
+        let pool_uuid = match id {
+            PoolIdentifier::Uuid(ref u) => u,
+            PoolIdentifier::Name(ref n) => stopped
+                .name_to_uuid
+                .get(n)
+                .ok_or_else(|| StratisError::Msg(format!("Could not find pool with name {n}")))?,
+        };
+        if let Some(poolinfo) = stopped
+            .stopped
+            .get(pool_uuid)
+            .or_else(|| stopped.partially_constructed.get(pool_uuid))
+        {
+            match poolinfo
             .metadata_version
             .ok_or_else(|| StratisError::Msg("Found multiple metadata versions".to_string()))?
-        {
-            StratSigblockVersion::V1 => Ok(poolinfo.info.is_some()),
-            StratSigblockVersion::V2 => Ok(poolinfo.features.as_ref().ok_or_else(|| {
-                StratisError::Msg("Pool reports metadata version V2 but not features are available for the stopped pool".to_string())
-            })?.encryption),
+            {
+                StratSigblockVersion::V1 => Ok(poolinfo.info.is_some()),
+                StratSigblockVersion::V2 => Ok(poolinfo.features.as_ref().ok_or_else(|| {
+                    StratisError::Msg("Pool reports metadata version V2 but not features are available for the stopped pool".to_string())
+                })?.encryption),
+            }
+        } else {
+            Err(StratisError::Msg(format!("Pool with {id} not found")))
         }
-    } else {
-        Err(StratisError::Msg(format!("Pool with {id} not found")))
     }
 }
 

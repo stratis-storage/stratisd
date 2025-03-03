@@ -87,6 +87,7 @@ features = ["clock", "std"]
 
 [dependencies.clap]
 version = "4.5.0"
+features = ["cargo"]
 optional = true
 
 [dependencies.crc]

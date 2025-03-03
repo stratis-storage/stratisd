@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 
-use clap::{Arg, ArgAction, ArgGroup, Command};
+use clap::{crate_authors, Arg, ArgAction, ArgGroup, Command};
 
 use crate::tools::{check_metadata, dump_metadata, legacy_pool};
 
@@ -21,9 +21,11 @@ struct StratisDumpMetadata;
 impl StratisDumpMetadata {
     fn cmd() -> Command {
         Command::new("stratis-dumpmetadata")
+            .author(crate_authors!())
             .version(VERSION)
             .about("Reads Stratis metadata from a Stratis device and displays it")
             .next_line_help(true)
+            .help_template("{author-section}")
             .arg(
                 Arg::new("dev")
                     .value_parser(clap::value_parser!(PathBuf))

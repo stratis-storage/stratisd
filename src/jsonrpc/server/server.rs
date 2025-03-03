@@ -191,13 +191,6 @@ impl StratisParams {
                     false,
                 )))
             }
-            StratisParamType::PoolIsBound(id) => {
-                expects_fd!(self.fd_opt, false);
-                Ok(StratisRet::PoolIsBound(stratis_result_to_return(
-                    pool::pool_is_bound(engine, id).await,
-                    false,
-                )))
-            }
             StratisParamType::PoolHasPassphrase(id) => {
                 expects_fd!(self.fd_opt, false);
                 Ok(StratisRet::PoolHasPassphrase(stratis_result_to_return(

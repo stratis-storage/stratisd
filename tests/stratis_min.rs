@@ -337,13 +337,6 @@ fn test_stratis_min_pool_properties_invalid_uuid() {
         .stderr(predicate::str::contains("Uuid error"));
 
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();
-    cmd.arg("pool").arg("is-bound").arg("pn");
-    cmd.assert()
-        .failure()
-        .code(1)
-        .stderr(predicate::str::contains("Uuid error"));
-
-    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
     cmd.arg("pool").arg("has-passphrase").arg("pn");
     cmd.assert()
         .failure()
@@ -663,19 +656,6 @@ fn stratis_min_pool_is_stopped() {
 // Test if a pool is stopped.
 fn test_stratis_min_pool_is_stopped() {
     test_with_stratisd_min_sim(stratis_min_pool_is_stopped);
-}
-
-fn stratis_min_pool_is_bound() {
-    stratis_min_create_pool_and_fs();
-    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
-    cmd.arg("pool").arg("is-bound").arg("--name").arg("pn");
-    cmd.assert().success();
-}
-
-#[test]
-// Test if a pool is bound.
-fn test_stratis_min_pool_is_bound() {
-    test_with_stratisd_min_sim(stratis_min_pool_is_bound);
 }
 
 fn stratis_min_pool_has_passphrase() {

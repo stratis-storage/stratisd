@@ -5,20 +5,24 @@ endif
 
 ifeq ($(origin AUDITABLE), undefined)
   BUILD = build
+  CLIPPY = clippy
   RUSTC = rustc
   TEST = test
 else
   BUILD = auditable build
+  CLIPPY = clippy
   RUSTC = auditable rustc
   TEST = test
 endif
 
 ifeq ($(origin MINIMAL), undefined)
   BUILD = build
+  CLIPPY = clippy
   RUSTC = rustc
   TEST = test
 else
   BUILD = minimal-versions build --direct
+  CLIPPY = minimal-versions clippy --direct
   RUSTC = rustc
   TEST = minimal-versions test --direct
  endif
@@ -406,29 +410,29 @@ docs/%.8: docs/%.txt
 
 ## Run clippy on stratisd_proc_macros
 clippy-macros:
-	cd stratisd_proc_macros && cargo clippy --all-features ${CLIPPY_OPTS}
+	cd stratisd_proc_macros && cargo ${CLIPPY} --all-features ${CLIPPY_OPTS}
 
 ## Run clippy on the -min build
 clippy-min:
-	cargo clippy ${CLIPPY_OPTS} ${MIN_FEATURES}
-	cargo clippy ${CLIPPY_OPTS} ${SYSTEMD_FEATURES}
-	cargo clippy ${CLIPPY_OPTS} ${EXTRAS_FEATURES}
+	cargo ${CLIPPY} ${CLIPPY_OPTS} ${MIN_FEATURES}
+	cargo ${CLIPPY} ${CLIPPY_OPTS} ${SYSTEMD_FEATURES}
+	cargo ${CLIPPY} ${CLIPPY_OPTS} ${EXTRAS_FEATURES}
 
 ## Run clippy on the udev utils
 clippy-udev-utils:
-	cargo clippy ${CLIPPY_OPTS} ${UDEV_FEATURES}
+	cargo ${CLIPPY} ${CLIPPY_OPTS} ${UDEV_FEATURES}
 
 ## Run clippy on the utils binary
 clippy-utils:
-	cargo clippy ${CLIPPY_OPTS} ${UTILS_FEATURES}
+	cargo ${CLIPPY} ${CLIPPY_OPTS} ${UTILS_FEATURES}
 
 ## Run clippy on no-ipc-build
 clippy-no-ipc:
-	cargo clippy ${CLIPPY_OPTS} ${NO_IPC_FEATURES}
+	cargo ${CLIPPY} ${CLIPPY_OPTS} ${NO_IPC_FEATURES}
 
 ## Run clippy on the current source tree
 clippy: clippy-macros clippy-min clippy-udev-utils clippy-no-ipc clippy-utils
-	cargo clippy ${CLIPPY_OPTS}
+	cargo ${CLIPPY} ${CLIPPY_OPTS}
 
 ## Lint Python parts of the source code
 lint:

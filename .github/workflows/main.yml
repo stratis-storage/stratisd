@@ -167,6 +167,8 @@ jobs:
         run: make test-stratisd-min
       - name: Run stratis-min cli tests
         run: make test-stratis-min
+      - name: Run stratis-tools tests
+        run: make test-stratisd-tools
 
   shell-checks:
     runs-on: ubuntu-22.04

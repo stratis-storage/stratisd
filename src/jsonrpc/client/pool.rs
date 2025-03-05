@@ -34,7 +34,7 @@ pub fn pool_start(
     prompt: bool,
 ) -> StratisResult<()> {
     if prompt {
-        let password = prompt_password()?
+        let password = prompt_password(false)?
             .ok_or_else(|| StratisError::Msg("Password provided was empty".to_string()))?;
 
         let (read_end, write_end) = pipe()?;

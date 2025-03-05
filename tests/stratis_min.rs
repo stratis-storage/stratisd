@@ -403,9 +403,24 @@ fn test_stratis_min_create_destroy() {
     test_with_stratisd_min_sim(stratis_min_create_destroy);
 }
 
+fn stratis_min_create_encrypted_keydesc_non_matching() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.write_stdin("thisisatestpassphrase\nthisisdifferentthough\n")
+        .arg("key")
+        .arg("set")
+        .arg("--capture-key")
+        .arg("testkey");
+    cmd.assert().failure().code(1);
+}
+
+#[test]
+fn test_stratis_min_create_encrypted_keydesc_non_matching() {
+    test_with_stratisd_min_sim(stratis_min_create_encrypted_keydesc_non_matching);
+}
+
 fn stratis_min_create_encrypted_keydesc() {
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();
-    cmd.write_stdin("thisisatestpassphrase\n")
+    cmd.write_stdin("thisisatestpassphrase\nthisisatestpassphrase\n")
         .arg("key")
         .arg("set")
         .arg("--capture-key")
@@ -428,14 +443,14 @@ fn test_stratis_min_create_encrypted_keydesc() {
 
 fn stratis_min_create_encrypted_keydesc_bind_clevis() {
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();
-    cmd.write_stdin("thisisatestpassphrase\n")
+    cmd.write_stdin("thisisatestpassphrase\nthisisatestpassphrase\n")
         .arg("key")
         .arg("set")
         .arg("--capture-key")
         .arg("testkey");
     cmd.assert().success();
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();
-    cmd.write_stdin("thisisanewtestpassphrase\n")
+    cmd.write_stdin("thisisanewtestpassphrase\nthisisanewtestpassphrase\n")
         .arg("key")
         .arg("set")
         .arg("--capture-key")
@@ -609,7 +624,7 @@ fn test_stratis_min_pool_is_encrypted() {
 
 fn stratis_min_encrypted_pool_start() {
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();
-    cmd.write_stdin("thisisatestpassphrase\n")
+    cmd.write_stdin("thisisatestpassphrase\nthisisatestpassphrase\n")
         .arg("key")
         .arg("set")
         .arg("--capture-key")
@@ -643,6 +658,50 @@ fn stratis_min_encrypted_pool_start() {
 // Verify that an encrypted pool can be started
 fn test_stratis_min_encrypted_pool_start() {
     test_with_stratisd_min_sim(stratis_min_encrypted_pool_start)
+}
+
+fn stratis_min_encrypted_pool_start_prompt() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.write_stdin("thisisatestpassphrase\nthisisatestpassphrase\n")
+        .arg("key")
+        .arg("set")
+        .arg("--capture-key")
+        .arg("testkey");
+    cmd.assert().success();
+
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool")
+        .arg("create")
+        .arg("--key-descs")
+        .arg("testkey:0")
+        .arg("pn")
+        .arg("/dev/n");
+    cmd.assert().success();
+
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("stop").arg("--name").arg("pn");
+    cmd.assert().success();
+
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("key").arg("unset").arg("testkey");
+    cmd.assert().success();
+
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.write_stdin("thisisatestpassphrase\n")
+        .arg("pool")
+        .arg("start")
+        .arg("--name")
+        .arg("pn")
+        .arg("--token-slot")
+        .arg("any")
+        .arg("--prompt");
+    cmd.assert().success();
+}
+
+#[test]
+// Verify that an encrypted pool can be started by specifying passphrase
+fn test_stratis_min_encrypted_pool_start_prompt() {
+    test_with_stratisd_min_sim(stratis_min_encrypted_pool_start_prompt)
 }
 
 fn stratis_min_pool_is_stopped() {
@@ -746,7 +805,7 @@ fn test_stratis_min_list_defaults() {
 
 fn stratis_min_key_set() {
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();
-    cmd.write_stdin("thisisatestpassphrase\n")
+    cmd.write_stdin("thisisatestpassphrase\nthisisatestpassphrase\n")
         .arg("key")
         .arg("set")
         .arg("--capture-key")

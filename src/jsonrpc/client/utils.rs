@@ -217,7 +217,7 @@ pub fn to_suffix_repr(size: u128) -> String {
     })
 }
 
-fn get_pass(prompt: &str) -> StratisResult<Option<String>> {
+fn get_pass(prompt: &str) -> StratisResult<String> {
     print!("{prompt}");
     stdout().flush()?;
 
@@ -245,16 +245,10 @@ fn get_pass(prompt: &str) -> StratisResult<Option<String>> {
         stdin.read_line(&mut password)?;
     }
 
-    let password = password.trim();
-
-    if password.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(password.to_string()))
-    }
+    Ok(password.trim().to_string())
 }
 
-pub fn prompt_password(verify: bool) -> StratisResult<Option<String>> {
+pub fn prompt_password(verify: bool) -> StratisResult<String> {
     let password = get_pass("Enter passphrase followed by return: ")?;
 
     if verify {

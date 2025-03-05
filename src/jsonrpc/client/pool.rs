@@ -34,7 +34,7 @@ pub fn pool_start(
     prompt: bool,
 ) -> StratisResult<()> {
     if prompt {
-        let password = prompt_password(false)?.unwrap_or_else(String::new);
+        let password = prompt_password(false)?;
 
         let (read_end, write_end) = pipe()?;
         write(write_end, password.as_bytes())?;

@@ -18,6 +18,7 @@ use devicemapper::{
     Bytes, DevId, DmDevice, DmName, DmOptions, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev,
     ThinStatus,
 };
+use libblkid_rs::BlkidProbe;
 
 use nix::{
     mount::{mount, umount, MsFlags},
@@ -472,6 +473,13 @@ impl StratFilesystem {
 
     pub fn thin_id(&self) -> ThinDevId {
         self.thin_dev.id()
+    }
+
+    /// Get the sector size reported by libblkid for this filesystem.
+    pub fn block_size(&self) -> StratisResult<u64> {
+        let mut probe = BlkidProbe::new_from_filename(&self.devnode())?;
+        let top = probe.get_topology()?;
+        Ok(top.get_logical_sector_size())
     }
 }
 

@@ -56,8 +56,7 @@ pub fn set_up_crypt_logging() {
             CryptLogLevel::Verbose | CryptLogLevel::DebugJson | CryptLogLevel::Debug => {
                 trace!("{}", msg)
             }
-            CryptLogLevel::Normal => info!("{}", msg),
-            CryptLogLevel::Error => error!("{}", msg),
+            CryptLogLevel::Normal | CryptLogLevel::Error => info!("{}", msg),
         }
     }
 
@@ -854,7 +853,7 @@ unsafe extern "C" fn open(
             0
         }
         Err(e) => {
-            error!("{}", e.to_string());
+            info!("{}", e.to_string());
             let guard = CLEVIS_ERROR
                 .get()
                 .expect("Must have been initialized")

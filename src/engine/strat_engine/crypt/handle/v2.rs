@@ -199,7 +199,7 @@ fn get_passphrase(
                 Ok(None) => {
                     info!("Failed to find the given token; trying next unlock method");
                 }
-                Err(e) => info!("Error searching keyring: {e}"),
+                Err(e) => info!("Error attempting to unlock with clevis: {e}"),
             },
         }
     }

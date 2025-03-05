@@ -245,10 +245,12 @@ fn get_pass(prompt: &str) -> StratisResult<Option<String>> {
         stdin.read_line(&mut password)?;
     }
 
+    let password = password.trim();
+
     if password.is_empty() {
         Ok(None)
     } else {
-        Ok(Some(password.trim().to_string()))
+        Ok(Some(password.to_string()))
     }
 }
 

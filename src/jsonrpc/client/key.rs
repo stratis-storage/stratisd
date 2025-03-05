@@ -20,8 +20,11 @@ pub fn key_set(key_desc: KeyDescription, keyfile_path: Option<&str>) -> StratisR
             do_request!(KeySet, key_desc; file.as_raw_fd())
         }
         None => {
-            let password = prompt_password(true)?
-                .ok_or_else(|| StratisError::Msg("Password provided was empty".to_string()))?;
+            let password = prompt_password(true)?;
+
+            if password.is_empty() {
+                return Err(StratisError::Msg("Password provided was empty".to_string()));
+            }
 
             let (read_end, write_end) = pipe()?;
             write(write_end, password.as_bytes())?;

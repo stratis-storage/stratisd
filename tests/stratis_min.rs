@@ -87,6 +87,85 @@ fn test_stratis_min_create_with_clevis_1() {
         ));
 }
 
+#[test]
+// stratis-min should fail without using the IPC when setting a key if the
+// user-specified key is empty.
+fn test_stratis_min_set_key_empty() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.write_stdin("\n\n")
+        .arg("key")
+        .arg("set")
+        .arg("--capture-key")
+        .arg("testkey");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("empty"));
+}
+
+#[test]
+// stratis-min should fail without using the IPC when setting a key if the
+// user-specified keys are differently matched whitespace.
+fn test_stratis_min_set_key_whitespace() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.write_stdin("              \n      \n")
+        .arg("key")
+        .arg("set")
+        .arg("--capture-key")
+        .arg("testkey");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("not match"));
+}
+
+fn stratis_min_pool_start_empty_key() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.write_stdin("thisisatestpassphrase\nthisisatestpassphrase\n")
+        .arg("key")
+        .arg("set")
+        .arg("--capture-key")
+        .arg("testkey");
+    cmd.assert().success();
+
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool")
+        .arg("create")
+        .arg("--key-descs")
+        .arg("testkey:0")
+        .arg("pn")
+        .arg("/dev/n");
+    cmd.assert().success();
+
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("key").arg("unset").arg("testkey");
+    cmd.assert().success();
+
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("stop").arg("--name").arg("pn");
+    cmd.assert().success();
+
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.write_stdin("\n")
+        .arg("pool")
+        .arg("start")
+        .arg("--name")
+        .arg("pn")
+        .arg("--token-slot=any")
+        .arg("--prompt");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("empty"));
+}
+
+#[test]
+// Test that when an empty key is specified on pool start,
+// stratis-min returns an error with a message containing "empty".
+fn test_stratis_min_pool_start_empty_key() {
+    test_with_stratisd_min_sim(stratis_min_pool_start_empty_key);
+}
+
 // Test parsing when creating a pool w/ clevis tang, and a URL.
 fn stratis_min_create_with_clevis_url() {
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();
@@ -416,6 +495,21 @@ fn stratis_min_create_encrypted_keydesc_non_matching() {
 #[test]
 fn test_stratis_min_create_encrypted_keydesc_non_matching() {
     test_with_stratisd_min_sim(stratis_min_create_encrypted_keydesc_non_matching);
+}
+
+fn stratis_min_set_whitespace_key() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.write_stdin("     \n     \n")
+        .arg("key")
+        .arg("set")
+        .arg("--capture-key")
+        .arg("testkey");
+    cmd.assert().success();
+}
+
+#[test]
+fn test_stratis_min_set_whitespace_key() {
+    test_with_stratisd_min_sim(stratis_min_set_whitespace_key);
 }
 
 fn stratis_min_create_encrypted_keydesc() {

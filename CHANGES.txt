@@ -1,6 +1,6 @@
 stratisd 3.8.0
 ==============
-Recommended Rust toolchain version: 1.82.0
+Recommended Rust toolchain version: 1.85.0
 Recommended development platform for Python development: Fedora 40
 
 * Indicates new for minor version 8
@@ -9,7 +9,16 @@ Recommended development platform for Python development: Fedora 40
 * Increase D-Bus revision number to 8:
   https://github.com/stratis-storage/stratisd/pull/3652
 
+* Add infrastructure for supporting multiple token slots per unlock method:
+  https://github.com/stratis-storage/stratisd/issues/3598
+  https://github.com/stratis-storage/stratisd/pull/3785
+  https://github.com/stratis-storage/stratisd/pull/3779
+  https://github.com/stratis-storage/stratisd/pull/3772
+  https://github.com/stratis-storage/stratisd/pull/3771
+  https://github.com/stratis-storage/stratisd/pull/3720
+
 * Introduce metadata version v2:
+  https://github.com/stratis-storage/stratisd/pull/3769
   https://github.com/stratis-storage/stratisd/pull/3745
   https://github.com/stratis-storage/stratisd/pull/3733
   https://github.com/stratis-storage/stratisd/pull/3706
@@ -55,6 +64,16 @@ Recommended development platform for Python development: Fedora 40
 - Relax fairness restriction on AllOrSomeLock:
   https://github.com/stratis-storage/stratisd/pull/3543
   https://github.com/stratis-storage/stratisd/pull/3544
+
+* stratis-min: Trim password before checking for emptiness:
+  https://github.com/stratis-storage/stratisd/pull/3784
+
+* stratis-min: Use password verification when setting passphrase:
+  https://github.com/stratis-storage/stratisd/issues/3593
+  https://github.com/stratis-storage/stratisd/pull/3783
+
+* Emit warning log entry only when non-overprovisioned pool becomes full:
+  https://github.com/stratis-storage/stratisd/pull/3778
 
 * Capture stderr on clevis bind failure:
   https://github.com/stratis-storage/stratisd/pull/3743
@@ -106,7 +125,7 @@ Recommended development platform for Python development: Fedora 40
 - Fix log message in SetCreateAction:
   https://github.com/stratis-storage/stratisd/pull/3548
 
-* Return parser error on invalid command-line arguments more:
+* stratis-min: Return parser error on invalid command-line arguments more:
   https://github.com/stratis-storage/stratisd/pull/3734
   https://github.com/stratis-storage/stratisd/pull/3719
 
@@ -160,6 +179,12 @@ Recommended development platform for Python development: Fedora 40
 - Use loopdev-3 instead of loopdev crate:
   https://github.com/stratis-storage/stratisd/pull/3498
 
+* Increase lower bounds of stratisd_proc_macros dependencies:
+  https://github.com/stratis-storage/stratisd/pull/3776
+
+* Increase rand dependency lower bound to 0.9.0:
+  https://github.com/stratis-storage/stratisd/pull/3762
+
 * Increase devicemapper-sys dependency lower bound to 0.3.1;
   increase pkg-config dependency lower bound to 0.3.31:
   https://github.com/stratis-storage/stratisd/pull/3735
@@ -170,7 +195,11 @@ Recommended development platform for Python development: Fedora 40
 * Increase clap dependency lower bound to 4.5.0:
   https://github.com/stratis-storage/stratisd/pull/3736
 
-* Increase libcryptsetup dependency lower bound to 0.12.0:
+* Broaden libcblkid-rs dependency version requirement:
+  https://github.com/stratis-storage/stratisd/pull/3767
+
+* Broaden libcryptsetup-rs dependency version requirement:
+  https://github.com/stratis-storage/stratisd/pull/3766
   https://github.com/stratis-storage/stratisd/pull/3747
   https://github.com/stratis-storage/stratisd/pull/3739
 
@@ -255,6 +284,11 @@ Recommended development platform for Python development: Fedora 40
   https://github.com/stratis-storage/stratisd/pull/3602
 
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3782
+  https://github.com/stratis-storage/stratisd/pull/3777
+  https://github.com/stratis-storage/stratisd/pull/3773
+  https://github.com/stratis-storage/stratisd/pull/3770
+  https://github.com/stratis-storage/stratisd/pull/3765
   https://github.com/stratis-storage/stratisd/pull/3761
   https://github.com/stratis-storage/stratisd/pull/3760
   https://github.com/stratis-storage/stratisd/pull/3755

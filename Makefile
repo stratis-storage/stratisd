@@ -3,29 +3,22 @@ else
   PROFILE_FLAGS = -C instrument-coverage
 endif
 
-ifeq ($(origin AUDITABLE), undefined)
-  BUILD = build
-  CLIPPY = clippy
-  RUSTC = rustc
-  TEST = test
-else
+ifneq ($(origin AUDITABLE), undefined)
   BUILD = auditable build
   CLIPPY = clippy
   RUSTC = auditable rustc
   TEST = test
-endif
-
-ifeq ($(origin MINIMAL), undefined)
-  BUILD = build
-  CLIPPY = clippy
-  RUSTC = rustc
-  TEST = test
-else
+else ifneq ($(origin MINIMAL), undefined)
   BUILD = minimal-versions build --direct
   CLIPPY = minimal-versions clippy --direct
   RUSTC = rustc
   TEST = minimal-versions test --direct
- endif
+else
+  BUILD = build
+  CLIPPY = clippy
+  RUSTC = rustc
+  TEST = test
+endif
 
 ifeq ($(origin CLIPPY_FIX), undefined)
   CLIPPY_OPTS = --all-targets --no-deps

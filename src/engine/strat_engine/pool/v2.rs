@@ -28,6 +28,7 @@ use crate::{
                 blockdev::{v2::StratBlockDev, InternalBlockDev},
                 ProcessedPathInfos, UnownedDevices,
             },
+            crypt::DEFAULT_CRYPT_DATA_OFFSET_V2,
             liminal::DeviceSet,
             metadata::{MDADataSize, BDA},
             serde_structs::{FlexDevsSave, PoolFeatures, PoolSave, Recordable},
@@ -37,11 +38,11 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            Diff, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo, Key,
-            KeyDescription, Name, OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolUuid,
-            PropChangeAction, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
-            SizedKeyMemory, StratFilesystemDiff, StratPoolDiff, StratSigblockVersion,
-            TokenUnlockMethod, ValidatedIntegritySpec,
+            Diff, EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo,
+            Key, KeyDescription, Name, OffsetDirection, OptionalTokenSlotInput, PoolDiff,
+            PoolEncryptionInfo, PoolUuid, PropChangeAction, ReencryptedDevice, RegenAction,
+            RenameAction, SetCreateAction, SetDeleteAction, SizedKeyMemory, StratFilesystemDiff,
+            StratPoolDiff, StratSigblockVersion, TokenUnlockMethod, ValidatedIntegritySpec,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -1165,6 +1166,76 @@ impl Pool for StratPool {
         }
     }
 
+    #[pool_mutating_action("NoRequests")]
+    fn encrypt_pool(
+        &mut self,
+        name: &Name,
+        pool_uuid: PoolUuid,
+        encryption_info: &InputEncryptionInfo,
+    ) -> StratisResult<CreateAction<EncryptedDevice>> {
+        match self.backstore.encryption_info() {
+            Some(_) => Ok(CreateAction::Identity),
+            None => {
+                self.thin_pool.suspend()?;
+                let encrypt_res = self
+                    .backstore
+                    .encrypt(pool_uuid, &mut self.thin_pool, encryption_info)
+                    .map(|_| {
+                        self.thin_pool.set_device(
+                            self.backstore.device().expect(
+                                "Since thin pool exists, space must have been allocated \
+                             from the backstore, so backstore must have a cap device",
+                            ),
+                            DEFAULT_CRYPT_DATA_OFFSET_V2,
+                            OffsetDirection::Backwards,
+                        )
+                    });
+                self.thin_pool.resume()?;
+                let metadata_res = self.write_metadata(name);
+                let _ = encrypt_res?;
+                metadata_res?;
+                Ok(CreateAction::Created(EncryptedDevice))
+            }
+        }
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn reencrypt_pool(&mut self) -> StratisResult<ReencryptedDevice> {
+        self.thin_pool.suspend()?;
+        let encrypt_res = self.backstore.reencrypt();
+        self.thin_pool.resume()?;
+        encrypt_res.map(|_| ReencryptedDevice)
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn decrypt_pool(
+        &mut self,
+        name: &Name,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<DeleteAction<EncryptedDevice>> {
+        match self.backstore.encryption_info() {
+            None => Ok(DeleteAction::Identity),
+            Some(_) => {
+                self.thin_pool.suspend()?;
+                let encrypt_res = self.backstore.decrypt(pool_uuid).map(|_| {
+                    self.thin_pool.set_device(
+                        self.backstore.device().expect(
+                            "Since thin pool exists, space must have been allocated \
+                             from the backstore, so backstore must have a cap device",
+                        ),
+                        DEFAULT_CRYPT_DATA_OFFSET_V2,
+                        OffsetDirection::Forwards,
+                    )
+                });
+                self.thin_pool.resume()?;
+                let metadata_res = self.write_metadata(name);
+                let _ = encrypt_res?;
+                metadata_res?;
+                Ok(DeleteAction::Deleted(EncryptedDevice))
+            }
+        }
+    }
+
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {
         serde_json::to_string(&self.record(pool_name)).map_err(|e| e.into())
     }
@@ -1961,6 +2032,221 @@ mod tests {
         real::test_with_spec(
             &real::DeviceLimits::Exactly(3, None, None),
             clevis_test_multiple_token_slots,
+        );
+    }
+
+    /// Tests online encryption functionality by performing online encryption and then stopping and
+    /// starting the pool.
+    fn clevis_test_online_encrypt(paths: &[&Path]) {
+        fn test_online_encrypt_with_key(paths: &[&Path], key_desc: &KeyDescription) {
+            unshare_mount_namespace().unwrap();
+
+            let engine = StratEngine::initialize().unwrap();
+
+            let pool_uuid = test_async!(engine.create_pool(
+                "encrypt_with_both",
+                paths,
+                None,
+                IntegritySpec::default(),
+            ))
+            .unwrap()
+            .changed()
+            .unwrap();
+
+            {
+                let mut handle =
+                    test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid))).unwrap();
+                let (name, _, pool) = handle.as_mut_tuple();
+                assert!(!pool.is_encrypted());
+                pool.encrypt_pool(
+                    &name,
+                    pool_uuid,
+                    &InputEncryptionInfo::new(
+                        vec![(None, key_desc.to_owned())],
+                        vec![(
+                            None,
+                            (
+                                "tang".to_string(),
+                                json!({
+                                    "url": env::var("TANG_URL").expect("TANG_URL env var required"),
+                                    "stratis:tang:trust_url": true,
+                                }),
+                            ),
+                        )],
+                    )
+                    .unwrap()
+                    .unwrap(),
+                )
+                .unwrap();
+                assert!(pool.is_encrypted());
+            }
+
+            test_async!(engine.stop_pool(PoolIdentifier::Uuid(pool_uuid), true)).unwrap();
+            test_async!(engine.start_pool(
+                PoolIdentifier::Uuid(pool_uuid),
+                TokenUnlockMethod::Any,
+                None
+            ))
+            .unwrap();
+            test_async!(engine.destroy_pool(pool_uuid)).unwrap();
+        }
+
+        crypt::insert_and_cleanup_key(paths, test_online_encrypt_with_key);
+    }
+
+    #[test]
+    fn clevis_loop_test_online_encrypt() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(2, None),
+            clevis_test_online_encrypt,
+        );
+    }
+
+    #[test]
+    fn clevis_real_test_online_encrypt() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(2, None, None),
+            clevis_test_online_encrypt,
+        );
+    }
+
+    /// Tests online reencryption functionality by performing online reencryption and then stopping and
+    /// starting the pool.
+    fn clevis_test_online_reencrypt(paths: &[&Path]) {
+        fn test_online_encrypt_with_key(paths: &[&Path], key_desc: &KeyDescription) {
+            unshare_mount_namespace().unwrap();
+
+            let engine = StratEngine::initialize().unwrap();
+
+            let pool_uuid = test_async!(engine.create_pool(
+                "encrypt_with_both",
+                paths,
+                InputEncryptionInfo::new(
+                    vec![(None, key_desc.to_owned())],
+                    vec![(
+                        None,
+                        (
+                            "tang".to_string(),
+                            json!({
+                                "url": env::var("TANG_URL").expect("TANG_URL env var required"),
+                                "stratis:tang:trust_url": true,
+                            }),
+                        )
+                    )]
+                )
+                .unwrap()
+                .as_ref(),
+                IntegritySpec::default(),
+            ))
+            .unwrap()
+            .changed()
+            .unwrap();
+
+            {
+                let mut handle =
+                    test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid))).unwrap();
+                let (_, _, pool) = handle.as_mut_tuple();
+                assert!(pool.is_encrypted());
+                pool.reencrypt_pool().unwrap();
+                assert!(pool.is_encrypted());
+            }
+
+            test_async!(engine.stop_pool(PoolIdentifier::Uuid(pool_uuid), true)).unwrap();
+            test_async!(engine.start_pool(
+                PoolIdentifier::Uuid(pool_uuid),
+                TokenUnlockMethod::Any,
+                None
+            ))
+            .unwrap();
+            test_async!(engine.destroy_pool(pool_uuid)).unwrap();
+        }
+
+        crypt::insert_and_cleanup_key(paths, test_online_encrypt_with_key);
+    }
+
+    #[test]
+    fn clevis_loop_test_online_reencrypt() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(2, None),
+            clevis_test_online_reencrypt,
+        );
+    }
+
+    #[test]
+    fn clevis_real_test_online_reencrypt() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(2, None, None),
+            clevis_test_online_reencrypt,
+        );
+    }
+
+    /// Tests online encryption functionality by performing online encryption and then stopping and
+    /// starting the pool.
+    fn clevis_test_online_decrypt(paths: &[&Path]) {
+        fn test_online_encrypt_with_key(paths: &[&Path], key_desc: &KeyDescription) {
+            unshare_mount_namespace().unwrap();
+
+            let engine = StratEngine::initialize().unwrap();
+
+            let pool_uuid = test_async!(engine.create_pool(
+                "encrypt_with_both",
+                paths,
+                InputEncryptionInfo::new(
+                    vec![(None, key_desc.to_owned())],
+                    vec![(
+                        None,
+                        (
+                            "tang".to_string(),
+                            json!({
+                                "url": env::var("TANG_URL").expect("TANG_URL env var required"),
+                                "stratis:tang:trust_url": true,
+                            }),
+                        ),
+                    )],
+                )
+                .unwrap()
+                .as_ref(),
+                IntegritySpec::default(),
+            ))
+            .unwrap()
+            .changed()
+            .unwrap();
+
+            {
+                let mut handle =
+                    test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid))).unwrap();
+                let (name, _, pool) = handle.as_mut_tuple();
+                assert!(pool.is_encrypted());
+                pool.decrypt_pool(&name, pool_uuid).unwrap();
+                assert!(!pool.is_encrypted());
+            }
+
+            test_async!(engine.stop_pool(PoolIdentifier::Uuid(pool_uuid), true)).unwrap();
+            test_async!(engine.start_pool(
+                PoolIdentifier::Uuid(pool_uuid),
+                TokenUnlockMethod::None,
+                None
+            ))
+            .unwrap();
+            test_async!(engine.destroy_pool(pool_uuid)).unwrap();
+        }
+
+        crypt::insert_and_cleanup_key(paths, test_online_encrypt_with_key);
+    }
+
+    #[test]
+    fn clevis_loop_test_online_decrypt() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(2, None),
+            clevis_test_online_decrypt,
+        );
+    }
+
+    #[test]
+    fn clevis_real_test_online_decrypt() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(2, None, None),
+            clevis_test_online_decrypt,
         );
     }
 }

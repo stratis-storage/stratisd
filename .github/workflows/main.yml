@@ -299,8 +299,8 @@ jobs:
         working-directory: ./testing
       - name: Switch
         run: |
-          git checkout -b mulkieran-inconsistent-metadata-test-fix master
-          git pull https://github.com/mulkieran/testing.git inconsistent-metadata-test-fix
+          git checkout -b mulkieran-multiple-tokens master
+          git pull https://github.com/mulkieran/testing.git multiple-tokens
         working-directory: ./testing
       - name: Run stratisd_cert.py
         run: >

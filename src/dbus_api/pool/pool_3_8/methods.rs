@@ -134,7 +134,11 @@ pub fn unbind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
                 pool_path.get_name(),
                 pool.encryption_info().map(|either| {
                     either.map_left(|ei| {
-                        (token_slot.is_some() && token_slot == lowest_token_slot, ei)
+                        (
+                            token_slot.is_none()
+                                || (token_slot.is_some() && token_slot == lowest_token_slot),
+                            ei,
+                        )
                     })
                 }),
             );
@@ -262,7 +266,11 @@ pub fn unbind_keyring(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult 
                 pool_path.get_name(),
                 pool.encryption_info().map(|either| {
                     either.map_left(|ei| {
-                        (token_slot.is_some() && token_slot == lowest_token_slot, ei)
+                        (
+                            token_slot.is_none()
+                                || (token_slot.is_some() && token_slot == lowest_token_slot),
+                            ei,
+                        )
                     })
                 }),
             );
@@ -329,7 +337,11 @@ pub fn rebind_keyring(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult 
                 pool_path.get_name(),
                 pool.encryption_info().map(|either| {
                     either.map_left(|ei| {
-                        (token_slot.is_some() && token_slot == lowest_token_slot, ei)
+                        (
+                            token_slot.is_none()
+                                || (token_slot.is_some() && token_slot == lowest_token_slot),
+                            ei,
+                        )
                     })
                 }),
             );
@@ -392,7 +404,11 @@ pub fn rebind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
                 pool_path.get_name(),
                 pool.encryption_info().map(|either| {
                     either.map_left(|ei| {
-                        (token_slot.is_some() && token_slot == lowest_token_slot, ei)
+                        (
+                            token_slot.is_none()
+                                || (token_slot.is_some() && token_slot == lowest_token_slot),
+                            ei,
+                        )
                     })
                 }),
             );

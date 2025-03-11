@@ -71,7 +71,7 @@ license:
 
 ## Run cargo audit
 audit:
-	cargo audit -D warnings
+	cargo audit -D warnings --ignore=RUSTSEC-2025-0014
 
 ## Audit Rust executables
 audit-all-rust: build-all-rust

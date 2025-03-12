@@ -26,6 +26,8 @@ else
   CLIPPY_OPTS = --fix
 endif
 
+AUDIT_OPTS = -D warnings --ignore=RUSTSEC-2025-0014
+
 ifeq ($(origin TARGET), undefined)
 else
   TARGET_ARGS = --target=${TARGET}
@@ -71,11 +73,11 @@ license:
 
 ## Run cargo audit
 audit:
-	cargo audit -D warnings --ignore=RUSTSEC-2025-0014
+	cargo audit ${AUDIT_OPTS}
 
 ## Audit Rust executables
 audit-all-rust: build-all-rust
-	cargo audit -D warnings bin \
+	cargo audit ${AUDIT_OPTS} bin \
 		./target/${PROFILEDIR}/stratisd \
 		./target/${PROFILEDIR}/stratisd-min \
 		./target/${PROFILEDIR}/stratis-min \

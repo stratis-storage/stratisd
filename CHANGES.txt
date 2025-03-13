@@ -1,3 +1,12 @@
+stratisd 3.8.1
+==============
+Recommended Rust toolchain version: 1.85.0
+Recommended development platform for Python development: Fedora 40
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3794
+
+
 stratisd 3.8.0
 ==============
 Recommended Rust toolchain version: 1.85.0

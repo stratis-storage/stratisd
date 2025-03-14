@@ -35,6 +35,12 @@ use crate::{
     },
 };
 
+/// Type for encryption input for multiple token slots.
+pub type EncryptionInfos<'a> = (
+    Vec<((bool, u32), &'a str)>,
+    Vec<((bool, u32), &'a str, &'a str)>,
+);
+
 /// Type for lockable D-Bus tree object.
 pub type LockableTree = Lockable<Arc<RwLock<Tree<MTSync<TData>, TData>>>>;
 
@@ -116,6 +122,7 @@ pub enum DbusAction {
     FsOriginChange(Path<'static>, Option<FilesystemUuid>),
     FsSizeLimitChange(Path<'static>, Option<Sectors>),
     FsMergeScheduledChange(Path<'static>, bool),
+    PoolEncryptionChange(Path<'static>, bool),
     FsBackgroundChange(
         FilesystemUuid,
         SignalChange<Option<Bytes>>,
@@ -472,6 +479,19 @@ impl DbusContext {
         {
             warn!(
                 "Block device total physical size change event could not be sent to the processing thread; no signal will be sent out for the block device total physical size state change: {}",
+                e,
+            )
+        }
+    }
+
+    /// Send changed signal for changed encryption status of pool.
+    pub fn push_pool_encryption_status_change(&self, path: &Path<'static>, encrypted: bool) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::PoolEncryptionChange(path.clone(), encrypted))
+        {
+            warn!(
+                "Encryption status change event could not be sent to the processing thread; no signal will be sent out for the encryption status state change: {}",
                 e,
             )
         }

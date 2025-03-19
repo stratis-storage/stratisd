@@ -142,7 +142,7 @@ version = "0.2.155"
 optional = true
 
 [dependencies.libcryptsetup-rs]
-version = ">=0.11.2,<0.13.0"
+version = "0.12.0"
 features = ["mutex"]
 optional = true
 

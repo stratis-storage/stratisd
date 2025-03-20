@@ -4,11 +4,12 @@
 
 // Code to handle the backing store of a pool.
 
-use std::{cmp, collections::HashMap, iter::once, path::PathBuf};
+use std::{cmp, collections::HashMap, iter::once, path::Path, path::PathBuf};
 
 use chrono::{DateTime, Utc};
 use either::Either;
 use serde_json::Value;
+use tempfile::TempDir;
 
 use devicemapper::{
     CacheDev, CacheDevTargetTable, CacheTargetParams, DevId, Device, DmDevice, DmFlags, DmOptions,
@@ -23,12 +24,16 @@ use crate::{
                 blockdevmgr::BlockDevMgr, cache_tier::CacheTier, data_tier::DataTier,
                 devices::UnownedDevices, shared::BlockSizeSummary,
             },
-            crypt::{handle::v2::CryptHandle, manual_wipe, DEFAULT_CRYPT_DATA_OFFSET_V2},
+            crypt::{
+                back_up_luks_header, handle::v2::CryptHandle, manual_wipe, restore_luks_header,
+                DEFAULT_CRYPT_DATA_OFFSET_V2,
+            },
             dm::{get_dm, list_of_backstore_devices, remove_optional_devices, DEVICEMAPPER_PATH},
             metadata::{MDADataSize, BDA},
             names::{format_backstore_ids, CacheRole},
             serde_structs::{BackstoreSave, CapSave, PoolFeatures, PoolSave, Recordable},
             shared::bds_to_bdas,
+            thinpool::ThinPool,
             types::BDARecordResult,
             writing::wipe_sectors,
         },
@@ -1317,6 +1322,70 @@ impl Backstore {
 
     pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
         self.data_tier.grow(dev)
+    }
+
+    pub fn encrypt(
+        &mut self,
+        pool_uuid: PoolUuid,
+        thinpool: &mut ThinPool<Self>,
+        encryption_info: &InputEncryptionInfo,
+    ) -> StratisResult<()> {
+        let (dm_name, _) = format_backstore_ids(pool_uuid, CacheRole::Cache);
+        let handle = CryptHandle::encrypt(
+            pool_uuid,
+            thinpool,
+            Path::new(&format!("/dev/mapper/{}", &dm_name.to_string())),
+            encryption_info,
+        )?;
+        self.enc = Some(Either::Right(handle));
+        Ok(())
+    }
+
+    pub fn reencrypt(&self) -> StratisResult<()> {
+        match self.enc {
+            Some(Either::Left(_)) => {
+                Err(StratisError::Msg("Encrypted pool where the encrypted device has not yet been created cannot be reencrypted".to_string()))
+            }
+            Some(Either::Right(ref handle)) => {
+                let tmp_dir = TempDir::new()?;
+                let h = back_up_luks_header(handle.luks2_device_path(), &tmp_dir)?;
+                let (slot, key, new_slot) = match handle.setup_reencrypt() {
+                    Ok(tup) => tup,
+                    Err(causal_e) => {
+                        if let Err(rollback_e) = restore_luks_header(handle.luks2_device_path(), &h) {
+                            return Err(StratisError::RollbackError {
+                                causal_error: Box::new(causal_e),
+                                rollback_error: Box::new(rollback_e),
+                                level: ActionAvailability::Full,
+                            });
+                        } else {
+                            return Err(causal_e)
+                        }
+                    }
+                };
+                handle.do_reencrypt(slot, key, new_slot)?;
+                Ok(())
+            }
+            None => {
+                Err(StratisError::Msg("Unencrypted device cannot be reencrypted".to_string()))
+            }
+        }
+    }
+
+    pub fn decrypt(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        let handle = self
+            .enc
+            .take()
+            .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?
+            .right()
+            .ok_or_else(|| {
+                StratisError::Msg("No space has been allocated from the backstore".to_string())
+            })?;
+        let luks2_path = handle.luks2_device_path().to_owned();
+
+        handle.decrypt(pool_uuid)?;
+        manual_wipe(&luks2_path, Sectors(0), DEFAULT_CRYPT_DATA_OFFSET_V2)?;
+        Ok(())
     }
 
     /// A summary of block sizes

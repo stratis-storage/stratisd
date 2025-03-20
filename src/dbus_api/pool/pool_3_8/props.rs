@@ -10,6 +10,13 @@ use crate::dbus_api::{
     types::TData,
 };
 
+pub fn get_pool_metadata_version(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_pool_property(i, p, |(_, _, pool)| Ok(shared::pool_metadata_version(pool)))
+}
+
 pub fn get_pool_key_descs(
     i: &mut IterAppend<'_>,
     p: &PropInfo<'_, MTSync<TData>, TData>,

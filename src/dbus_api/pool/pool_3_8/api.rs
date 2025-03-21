@@ -13,11 +13,20 @@ use crate::dbus_api::{
                 bind_clevis, bind_keyring, rebind_clevis, rebind_keyring, unbind_clevis,
                 unbind_keyring,
             },
-            props::{get_pool_clevis_infos, get_pool_key_descs},
+            props::{get_pool_clevis_infos, get_pool_key_descs, get_pool_metadata_version},
         },
     },
     types::TData,
 };
+
+pub fn metadata_version_property(
+    f: &Factory<MTSync<TData>, TData>,
+) -> Property<MTSync<TData>, TData> {
+    f.property::<u64, _>(consts::POOL_METADATA_VERSION_PROP, ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::Const)
+        .on_get(get_pool_metadata_version)
+}
 
 pub fn bind_clevis_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("BindClevis", (), bind_clevis)

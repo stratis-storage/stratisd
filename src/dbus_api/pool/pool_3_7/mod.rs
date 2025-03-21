@@ -4,9 +4,5 @@
 
 mod api;
 mod methods;
-mod props;
 
-pub use api::{
-    destroy_filesystems_method, get_fs_metadata_method, get_metadata_method,
-    metadata_version_property,
-};
+pub use api::{destroy_filesystems_method, get_fs_metadata_method, get_metadata_method};

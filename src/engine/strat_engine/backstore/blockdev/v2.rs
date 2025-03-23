@@ -187,6 +187,11 @@ impl StratBlockDev {
         &self.devnode
     }
 
+    /// Return the allocations for integrity metadata on this block device.
+    pub fn meta_allocs(&self) -> Vec<(Sectors, Sectors)> {
+        self.integrity_meta_allocs.clone()
+    }
+
     /// Scan the block device specified by physical_path for its size.
     pub fn scan_blkdev_size(physical_path: &Path) -> StratisResult<Sectors> {
         Ok(blkdev_size(&File::open(physical_path)?)?.sectors())

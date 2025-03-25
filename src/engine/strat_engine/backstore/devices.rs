@@ -274,7 +274,7 @@ impl fmt::Display for BlockSizes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "BLKSSSZGET: {}, BLKPBSZGET: {}",
+            "BLKSSZGET: {}, BLKPBSZGET: {}",
             self.logical_sector_size, self.physical_sector_size
         )
     }

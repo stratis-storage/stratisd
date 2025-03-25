@@ -71,8 +71,8 @@ jobs:
           crate: cargo-audit
       - name: Run cargo-update
         run: cargo update
-      - name: Run cargo-clippy
-        run: make -f Makefile clippy
+      - name: Build all targets
+        run: make -f Makefile build-all
       - name: Run cargo-audit
         run: make -f Makefile audit
 

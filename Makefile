@@ -26,7 +26,7 @@ else
   CLIPPY_OPTS = --fix
 endif
 
-AUDIT_OPTS = -D warnings --ignore=RUSTSEC-2025-0014
+AUDIT_OPTS = -D warnings
 
 ifeq ($(origin TARGET), undefined)
 else

@@ -16,22 +16,6 @@ with `stratisd`.
 
 See [https://stratis-storage.github.io/](https://stratis-storage.github.io/).
 
-## Getting involved
-
-### Communication channels
-
-If you have questions, please don't hesitate to ask them, either on the mailing list or
-IRC.
-
-#### Mailing list
-
-Development mailing list: stratis-devel@lists.fedorahosted.org, -- subscribe
-[here](https://lists.fedoraproject.org/admin/lists/stratis-devel.lists.fedorahosted.org/).
-
-#### IRC
-
-irc.libera.chat #stratis-storage.
-
 ## For Developers
 
 Stratisd is written in [Rust](https://www.rust-lang.org), which helps the
@@ -41,8 +25,7 @@ language runtime.
 ### Issue tracking and Development
 
 Stratisd development uses GitHub issue tracking, and new development occurs via
-GitHub pull requests (PRs). Patches or bug reports may also be sent to the
-mailing list, if preferred.
+GitHub pull requests (PRs).
 
 ### Setting up for development
 

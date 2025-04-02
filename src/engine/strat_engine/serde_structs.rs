@@ -77,12 +77,16 @@ pub enum PoolFeatures {
     Raid,
     Integrity,
     Encryption,
+    KeyDescriptionEnabled,
+    ClevisEnabled,
 }
 
 impl From<Vec<PoolFeatures>> for Features {
     fn from(v: Vec<PoolFeatures>) -> Self {
         Features {
             encryption: v.contains(&PoolFeatures::Encryption),
+            key_description_enabled: v.contains(&PoolFeatures::KeyDescriptionEnabled),
+            clevis_enabled: v.contains(&PoolFeatures::ClevisEnabled),
         }
     }
 }

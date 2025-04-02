@@ -706,6 +706,7 @@ impl Pool for StratPool {
     #[pool_rollback]
     fn bind_clevis(
         &mut self,
+        _: &Name,
         token_slot: OptionalTokenSlotInput,
         pin: &str,
         clevis_info: &Value,
@@ -726,6 +727,7 @@ impl Pool for StratPool {
     #[pool_rollback]
     fn bind_keyring(
         &mut self,
+        _: &Name,
         token_slot: OptionalTokenSlotInput,
         key_description: &KeyDescription,
     ) -> StratisResult<CreateAction<(Key, u32)>> {
@@ -771,7 +773,11 @@ impl Pool for StratPool {
 
     #[pool_mutating_action("NoRequests")]
     #[pool_rollback]
-    fn unbind_keyring(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Key>> {
+    fn unbind_keyring(
+        &mut self,
+        _: &Name,
+        token_slot: Option<u32>,
+    ) -> StratisResult<DeleteAction<Key>> {
         if token_slot.is_some() {
             return Err(StratisError::Msg(
                 "Token slot can only be provided for V2 pools".to_string(),
@@ -788,7 +794,11 @@ impl Pool for StratPool {
 
     #[pool_mutating_action("NoRequests")]
     #[pool_rollback]
-    fn unbind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Clevis>> {
+    fn unbind_clevis(
+        &mut self,
+        _: &Name,
+        token_slot: Option<u32>,
+    ) -> StratisResult<DeleteAction<Clevis>> {
         if token_slot.is_some() {
             return Err(StratisError::Msg(
                 "Token slot can only be provided for V2 pools".to_string(),

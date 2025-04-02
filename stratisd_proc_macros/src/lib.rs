@@ -61,7 +61,7 @@ fn add_method_guards(method: &mut ImplItemFn, level: Ident) {
 /// Process the arguments in the argument list. There is special handling for
 /// receivers. Typed `self` parameters are not currently supported in this macro
 /// but support can be added if needed.
-fn process_arguments(fn_arg: &FnArg) -> (Ident, PatType) {
+fn process_arguments(fn_arg: &FnArg) -> Option<(Ident, PatType)> {
     match fn_arg {
         FnArg::Receiver(Receiver {
             reference,
@@ -75,7 +75,7 @@ fn process_arguments(fn_arg: &FnArg) -> (Ident, PatType) {
             let self_ident = Ident::new("self", Span::call_site());
             let pool_ident = Ident::new("pool", Span::call_site());
 
-            (
+            Some((
                 self_ident,
                 PatType {
                     attrs: Vec::new(),
@@ -94,20 +94,20 @@ fn process_arguments(fn_arg: &FnArg) -> (Ident, PatType) {
                         .expect("Valid type"),
                     ),
                 },
-            )
+            ))
         }
         FnArg::Typed(typed) => {
-            let ident = if let Pat::Ident(PatIdent { ref ident, .. }) = *typed.pat {
+            if let Pat::Ident(PatIdent { ref ident, .. }) = *typed.pat {
                 if *ident == "self" {
                     panic!("Typed self parameters are not currently supported");
                 } else {
-                    ident.clone()
+                    Some((ident.clone(), typed.clone()))
                 }
+            } else if matches!(&*typed.pat, Pat::Wild(_)) {
+                None
             } else {
                 panic!("Unrecognized argument format");
-            };
-
-            (ident, typed.clone())
+            }
         }
     }
 }
@@ -144,7 +144,7 @@ fn wrap_method(f: &mut ImplItemFn) {
     let mut wrapped_sig = f.sig.clone();
     wrapped_sig.ident = wrapped_ident.clone();
 
-    let (args, arg_idents) = f.sig.inputs.iter().map(process_arguments).fold(
+    let (args, arg_idents) = f.sig.inputs.iter().filter_map(process_arguments).fold(
         (Vec::new(), Vec::new()),
         |(mut args, mut arg_idents), (ident, arg)| {
             args.push(arg);

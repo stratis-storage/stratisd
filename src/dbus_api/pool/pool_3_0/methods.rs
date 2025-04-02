@@ -366,7 +366,8 @@ pub fn bind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut pool = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let mut lock = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let (name, _, pool) = lock.as_mut_tuple();
 
     let json: Value = match serde_json::from_str(&json_string) {
         Ok(j) => j,
@@ -376,7 +377,7 @@ pub fn bind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         }
     };
     let msg = match handle_action!(
-        pool.bind_clevis(OptionalTokenSlotInput::Legacy, pin.as_str(), &json),
+        pool.bind_clevis(&name, OptionalTokenSlotInput::Legacy, pin.as_str(), &json),
         dbus_context,
         pool_path.get_name()
     ) {
@@ -418,9 +419,14 @@ pub fn unbind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut pool = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let mut lock = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let (name, _, pool) = lock.as_mut_tuple();
 
-    let msg = match handle_action!(pool.unbind_clevis(None), dbus_context, pool_path.get_name()) {
+    let msg = match handle_action!(
+        pool.unbind_clevis(&name, None),
+        dbus_context,
+        pool_path.get_name()
+    ) {
         Ok(DeleteAction::Identity) => {
             return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
@@ -469,10 +475,11 @@ pub fn bind_keyring(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut pool = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let mut lock = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let (name, _, pool) = lock.as_mut_tuple();
 
     let msg = match handle_action!(
-        pool.bind_keyring(OptionalTokenSlotInput::Legacy, &key_desc),
+        pool.bind_keyring(&name, OptionalTokenSlotInput::Legacy, &key_desc),
         dbus_context,
         pool_path.get_name()
     ) {
@@ -514,10 +521,11 @@ pub fn unbind_keyring(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult 
         return_message
     );
 
-    let mut pool = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let mut lock = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let (name, _, pool) = lock.as_mut_tuple();
 
     let msg = match handle_action!(
-        pool.unbind_keyring(None),
+        pool.unbind_keyring(&name, None),
         dbus_context,
         pool_path.get_name()
     ) {

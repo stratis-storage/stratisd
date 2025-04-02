@@ -633,7 +633,7 @@ impl DeviceSet {
             .map(|opt| {
                 (
                     opt.expect("self.as_opened_set().is_some() if pool is unencrypted"),
-                    Some(Features { encryption: true }),
+                    None,
                 )
             }),
         }

@@ -45,24 +45,26 @@ impl Pool for AnyPool {
 
     fn bind_clevis(
         &mut self,
+        name: &Name,
         token_slot: OptionalTokenSlotInput,
         pin: &str,
         clevis_info: &Value,
     ) -> StratisResult<CreateAction<(Clevis, u32)>> {
         match self {
-            AnyPool::V1(p) => p.bind_clevis(token_slot, pin, clevis_info),
-            AnyPool::V2(p) => p.bind_clevis(token_slot, pin, clevis_info),
+            AnyPool::V1(p) => p.bind_clevis(name, token_slot, pin, clevis_info),
+            AnyPool::V2(p) => p.bind_clevis(name, token_slot, pin, clevis_info),
         }
     }
 
     fn bind_keyring(
         &mut self,
+        name: &Name,
         token_slot: OptionalTokenSlotInput,
         key_description: &KeyDescription,
     ) -> StratisResult<CreateAction<(Key, u32)>> {
         match self {
-            AnyPool::V1(p) => p.bind_keyring(token_slot, key_description),
-            AnyPool::V2(p) => p.bind_keyring(token_slot, key_description),
+            AnyPool::V1(p) => p.bind_keyring(name, token_slot, key_description),
+            AnyPool::V2(p) => p.bind_keyring(name, token_slot, key_description),
         }
     }
 
@@ -84,17 +86,25 @@ impl Pool for AnyPool {
         }
     }
 
-    fn unbind_keyring(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Key>> {
+    fn unbind_keyring(
+        &mut self,
+        name: &Name,
+        token_slot: Option<u32>,
+    ) -> StratisResult<DeleteAction<Key>> {
         match self {
-            AnyPool::V1(p) => p.unbind_keyring(token_slot),
-            AnyPool::V2(p) => p.unbind_keyring(token_slot),
+            AnyPool::V1(p) => p.unbind_keyring(name, token_slot),
+            AnyPool::V2(p) => p.unbind_keyring(name, token_slot),
         }
     }
 
-    fn unbind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Clevis>> {
+    fn unbind_clevis(
+        &mut self,
+        name: &Name,
+        token_slot: Option<u32>,
+    ) -> StratisResult<DeleteAction<Clevis>> {
         match self {
-            AnyPool::V1(p) => p.unbind_clevis(token_slot),
-            AnyPool::V2(p) => p.unbind_clevis(token_slot),
+            AnyPool::V1(p) => p.unbind_clevis(name, token_slot),
+            AnyPool::V2(p) => p.unbind_clevis(name, token_slot),
         }
     }
 

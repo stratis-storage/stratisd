@@ -41,7 +41,9 @@ pub fn bind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut pool = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let mut lock = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let (name, _, pool) = lock.as_mut_tuple();
+
     let lowest_token_slot = pool
         .encryption_info()
         .and_then(|either| either.left())
@@ -66,7 +68,7 @@ pub fn bind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     };
 
     let msg = match handle_action!(
-        pool.bind_clevis(token_slot, pin.as_str(), &json),
+        pool.bind_clevis(&name, token_slot, pin.as_str(), &json),
         dbus_context,
         pool_path.get_name()
     ) {
@@ -113,7 +115,9 @@ pub fn unbind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut pool = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let mut lock = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let (name, _, pool) = lock.as_mut_tuple();
+
     let lowest_token_slot = pool
         .encryption_info()
         .and_then(|either| either.left())
@@ -122,7 +126,7 @@ pub fn unbind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         .map(|(token_slot, _)| token_slot);
 
     let msg = match handle_action!(
-        pool.unbind_clevis(token_slot),
+        pool.unbind_clevis(&name, token_slot),
         dbus_context,
         pool_path.get_name()
     ) {
@@ -182,7 +186,9 @@ pub fn bind_keyring(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut pool = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let mut lock = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let (name, _, pool) = lock.as_mut_tuple();
+
     let token_slot = match tuple_to_option(token_slot_tuple) {
         Some(t) => OptionalTokenSlotInput::Some(t),
         None => match pool.metadata_version() {
@@ -198,7 +204,7 @@ pub fn bind_keyring(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         .map(|(token_slot, _)| token_slot);
 
     let msg = match handle_action!(
-        pool.bind_keyring(token_slot, &key_desc),
+        pool.bind_keyring(&name, token_slot, &key_desc),
         dbus_context,
         pool_path.get_name()
     ) {
@@ -245,7 +251,9 @@ pub fn unbind_keyring(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult 
         return_message
     );
 
-    let mut pool = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let mut lock = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let (name, _, pool) = lock.as_mut_tuple();
+
     let lowest_token_slot = pool
         .encryption_info()
         .and_then(|either| either.left())
@@ -254,7 +262,7 @@ pub fn unbind_keyring(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult 
         .map(|(token_slot, _)| token_slot);
 
     let msg = match handle_action!(
-        pool.unbind_keyring(token_slot),
+        pool.unbind_keyring(&name, token_slot),
         dbus_context,
         pool_path.get_name()
     ) {

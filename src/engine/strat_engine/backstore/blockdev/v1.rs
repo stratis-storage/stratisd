@@ -95,13 +95,13 @@ impl StratBlockDev {
     /// Allocate space for the Stratis metadata on the device.
     /// - dev: the device, identified by number
     /// - devnode: for encrypted devices, the logical and physical
-    ///            paths; for unencrypted devices, the physical path
+    ///   paths; for unencrypted devices, the physical path
     /// - bda: the device's BDA
     /// - other_segments: segments allocated outside Stratis metadata region
     /// - user_info: user settable identifying information
     /// - hardware_info: identifying information in the hardware
     /// - key_description: optional argument enabling encryption using
-    ///                    the specified key in the kernel keyring
+    ///   the specified key in the kernel keyring
     ///
     /// Returns an error if it is impossible to allocate all segments on the
     /// device.

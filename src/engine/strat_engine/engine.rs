@@ -75,7 +75,7 @@ impl StratEngine {
     /// 1. Verify the existence of Stratis /dev directory.
     /// 2. Setup all the pools belonging to the engine.
     ///    a. Places any devices which belong to a pool, but are not complete
-    ///       in the incomplete pools data structure.
+    ///    in the incomplete pools data structure.
     ///
     /// Returns an error if the kernel doesn't support required DM features.
     /// Returns an error if there was an error reading device nodes.

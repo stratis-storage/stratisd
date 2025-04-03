@@ -24,7 +24,7 @@ fn add_method_guards(method: &mut ImplItemFn, level: Ident) {
             ..
         }) = &**ty
         {
-            if let Some(PathSegment { ident, .. }) = segments.iter().last() {
+            if let Some(PathSegment { ident, .. }) = segments.iter().next_back() {
                 if &ident.to_string() == "StratisResult" {
                     parse::<Stmt>(TokenStream::from(quote! {
                         if self.action_avail >= crate::engine::types::ActionAvailability::#level {

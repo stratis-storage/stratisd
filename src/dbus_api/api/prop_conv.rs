@@ -130,6 +130,12 @@ pub fn stopped_pools_to_prop(pools: &StoppedPoolsInfo, metadata: bool) -> Stoppe
                             if f.encryption {
                                 feat.insert("encryption".to_string(), true);
                             }
+                            if f.key_description_enabled {
+                                feat.insert("key_description_present".to_string(), true);
+                            }
+                            if f.clevis_enabled {
+                                feat.insert("clevis_present".to_string(), true);
+                            }
                             Variant(Box::new((true, feat)))
                         }
                         None => Variant(Box::new((false, HashMap::<String, bool>::new()))),

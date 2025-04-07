@@ -426,7 +426,7 @@ impl DbusTreeHandler {
             .map(|either| {
                 either.as_ref().left().map(|(b, _)| *b).unwrap_or(false) || either.is_right()
             })
-            .expect("Should be encrypted to send signal")
+            .unwrap_or(true)
             && self
                 .property_changed_invalidated_signal(
                     &item,
@@ -507,7 +507,7 @@ impl DbusTreeHandler {
             .map(|either| {
                 either.as_ref().left().map(|(b, _)| *b).unwrap_or(false) || either.is_right()
             })
-            .expect("Should be encrypted to send signal")
+            .unwrap_or(true)
             && self
                 .property_changed_invalidated_signal(
                     &item,

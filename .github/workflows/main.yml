@@ -82,6 +82,8 @@ jobs:
       options: --privileged --userns=host --ipc=host -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: stratisd
       - name: Install dependencies
         run: >
           dnf install -y
@@ -112,19 +114,26 @@ jobs:
           toolchain: 1.74.0  # LOWEST SUPPORTED RUST TOOLCHAIN
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
+        working-directory: stratisd
       - name: Install stratisd
         run: PROFILEDIR=debug make -f Makefile install
+        working-directory: stratisd
       - name: Workaround for dbus inotify
         run: cp stratisd.conf /usr/share/dbus-1/system.d
+        working-directory: stratisd
       - name: Check out stratis-cli
-        run: git clone https://github.com/stratis-storage/stratis-cli.git
+        uses: actions/checkout@v4
+        with:
+          repository: stratis-storage/stratis-cli
+          path: stratis-cli
+          ref: master
       - name: Run stratis-cli tests
         run: >
           RUST_LOG=stratisd=debug
           STRATISD=/usr/libexec/stratisd
           PYTHONPATH=./src
           make dbus-tests
-        working-directory: ./stratis-cli
+        working-directory: stratis-cli
 
   stratis-min-cli-checks:
     runs-on: ubuntu-22.04
@@ -251,13 +260,15 @@ jobs:
     strategy:
       matrix:
         include:
-          - rev: HEAD
+          - rev: master
             options: --post-test-check=verify-filesystem-symlinks --post-test-check=verify-pool-metadata --highest-revision-number=8
           - rev: v3.6.2
             options: --highest-revision-number=6
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: stratisd
       - name: Run apt-get update
         run: sudo apt-get -q update
       - name: Install dependencies
@@ -290,17 +301,21 @@ jobs:
           toolchain: 1.74.0  # LOWEST SUPPORTED RUST TOOLCHAIN
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
+        working-directory: stratisd
       - name: Install stratisd
         run: sudo make PROFILEDIR=debug -f Makefile install
+        working-directory: stratisd
       - name: Workaround for dbus inotify
         run: sudo cp stratisd.conf /usr/share/dbus-1/system.d
+        working-directory: stratisd
       - name: Reload udev
         run: sudo udevadm control --reload
       - name: Clone testing repo
-        run: git clone https://github.com/stratis-storage/testing.git
-      - name: Checkout revision ${{ matrix.rev }}
-        run: git checkout -b new-branch ${{ matrix.rev }}
-        working-directory: ./testing
+        uses: actions/checkout@v4
+        with:
+          repository: stratis-storage/testing
+          path: testing
+          ref: ${{ matrix.rev }}
       - name: Run stratisd_cert.py
         run: >
           sudo
@@ -311,4 +326,4 @@ jobs:
           --post-test-check=verify-sysfs
           --post-test-check=verify-private-symlinks
           ${{ matrix.options }}
-        working-directory: ./testing
+        working-directory: testing

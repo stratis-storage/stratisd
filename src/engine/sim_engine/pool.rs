@@ -322,6 +322,12 @@ impl Pool for SimPool {
             }
         };
 
+        if encryption_info.num_free_token_slots() == 0 {
+            return Err(StratisError::Msg(
+                "Reached limit of 15 token and keyslots for pool".to_string(),
+            ));
+        }
+
         let token_slot_to_add = match token_slot {
             OptionalTokenSlotInput::Some(t) => {
                 if let Some(info) = encryption_info.get_info(t) {
@@ -379,6 +385,12 @@ impl Pool for SimPool {
                 ))
             }
         };
+
+        if encryption_info.num_free_token_slots() == 0 {
+            return Err(StratisError::Msg(
+                "Reached limit of 15 token and keyslots for pool".to_string(),
+            ));
+        }
 
         let token_slot_to_add = match token_slot {
             OptionalTokenSlotInput::Some(t) => {
@@ -985,6 +997,12 @@ impl Pool for SimPool {
         );
 
         Ok(PropChangeAction::NewValue(scheduled))
+    }
+
+    fn free_token_slots(&self) -> Option<u8> {
+        self.encryption_info
+            .as_ref()
+            .map(|ei| ei.num_free_token_slots())
     }
 }
 

@@ -395,4 +395,11 @@ impl Pool for AnyPool {
             AnyPool::V2(p) => p.set_fs_merge_scheduled(fs_uuid, new_scheduled),
         }
     }
+
+    fn free_token_slots(&self) -> Option<u8> {
+        match self {
+            AnyPool::V1(p) => p.free_token_slots(),
+            AnyPool::V2(p) => p.free_token_slots(),
+        }
+    }
 }

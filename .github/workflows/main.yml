@@ -289,6 +289,7 @@ jobs:
       - name: Install Python dependencies
         run: >
           sudo python -m pip install
+          deepdiff
           dbus-python
           dbus-python-client-gen
           justbytes

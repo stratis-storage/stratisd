@@ -262,8 +262,6 @@ jobs:
         include:
           - rev: master
             options: --post-test-check=verify-filesystem-symlinks --post-test-check=verify-pool-metadata --highest-revision-number=8
-          - rev: v3.6.2
-            options: --highest-revision-number=6
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -291,6 +289,7 @@ jobs:
       - name: Install Python dependencies
         run: >
           sudo python -m pip install
+          deepdiff
           dbus-python
           dbus-python-client-gen
           justbytes
@@ -315,7 +314,7 @@ jobs:
         with:
           repository: stratis-storage/testing
           path: testing
-          ref: ${{ matrix.rev }}
+          ref: refs/pull/317/head
       - name: Run stratisd_cert.py
         run: >
           sudo

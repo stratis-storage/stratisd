@@ -1341,6 +1341,10 @@ impl Pool for StratPool {
             Ok(PropChangeAction::Identity)
         }
     }
+
+    fn free_token_slots(&self) -> Option<u8> {
+        None
+    }
 }
 
 pub struct StratPoolState {

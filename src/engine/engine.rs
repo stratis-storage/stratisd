@@ -419,6 +419,9 @@ pub trait Pool: Debug + Send + Sync {
         fs: FilesystemUuid,
         new_scheduled: bool,
     ) -> StratisResult<PropChangeAction<bool>>;
+
+    /// Get number of free token slots for pool.
+    fn free_token_slots(&self) -> Option<u8>;
 }
 
 pub type HandleEvents<P> = (

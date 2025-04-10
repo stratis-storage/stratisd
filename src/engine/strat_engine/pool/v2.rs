@@ -1235,6 +1235,11 @@ impl Pool for StratPool {
             Ok(PropChangeAction::Identity)
         }
     }
+
+    fn free_token_slots(&self) -> Option<u8> {
+        self.encryption_info()
+            .and_then(|ei| ei.either(|e| Some(e.num_free_token_slots()), |_| None))
+    }
 }
 
 pub struct StratPoolState {

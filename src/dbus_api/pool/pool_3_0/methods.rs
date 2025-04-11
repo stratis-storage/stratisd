@@ -376,6 +376,9 @@ pub fn bind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
             return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
+
+    let free_token_slots = pool.free_token_slots();
+
     let msg = match handle_action!(
         pool.bind_clevis(&name, OptionalTokenSlotInput::Legacy, pin.as_str(), &json),
         dbus_context,
@@ -390,6 +393,11 @@ pub fn bind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
                 pool.encryption_info()
                     .map(|either| either.map_left(|ei| (true, ei))),
             );
+            let new_free_token_slots = pool.free_token_slots();
+            if free_token_slots != new_free_token_slots {
+                dbus_context
+                    .push_pool_free_token_slots_change(pool_path.get_name(), new_free_token_slots);
+            }
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(e) => {
@@ -422,6 +430,8 @@ pub fn unbind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let mut lock = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
     let (name, _, pool) = lock.as_mut_tuple();
 
+    let free_token_slots = pool.free_token_slots();
+
     let msg = match handle_action!(
         pool.unbind_clevis(&name, None),
         dbus_context,
@@ -436,6 +446,11 @@ pub fn unbind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
                 pool.encryption_info()
                     .map(|either| either.map_left(|ei| (true, ei))),
             );
+            let new_free_token_slots = pool.free_token_slots();
+            if free_token_slots != new_free_token_slots {
+                dbus_context
+                    .push_pool_free_token_slots_change(pool_path.get_name(), new_free_token_slots);
+            }
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(e) => {
@@ -478,6 +493,8 @@ pub fn bind_keyring(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let mut lock = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
     let (name, _, pool) = lock.as_mut_tuple();
 
+    let free_token_slots = pool.free_token_slots();
+
     let msg = match handle_action!(
         pool.bind_keyring(&name, OptionalTokenSlotInput::Legacy, &key_desc),
         dbus_context,
@@ -492,6 +509,11 @@ pub fn bind_keyring(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
                 pool.encryption_info()
                     .map(|either| either.map_left(|ei| (true, ei))),
             );
+            let new_free_token_slots = pool.free_token_slots();
+            if free_token_slots != new_free_token_slots {
+                dbus_context
+                    .push_pool_free_token_slots_change(pool_path.get_name(), new_free_token_slots);
+            }
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(e) => {
@@ -524,6 +546,8 @@ pub fn unbind_keyring(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult 
     let mut lock = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
     let (name, _, pool) = lock.as_mut_tuple();
 
+    let free_token_slots = pool.free_token_slots();
+
     let msg = match handle_action!(
         pool.unbind_keyring(&name, None),
         dbus_context,
@@ -538,6 +562,11 @@ pub fn unbind_keyring(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult 
                 pool.encryption_info()
                     .map(|either| either.map_left(|ei| (true, ei))),
             );
+            let new_free_token_slots = pool.free_token_slots();
+            if free_token_slots != new_free_token_slots {
+                dbus_context
+                    .push_pool_free_token_slots_change(pool_path.get_name(), new_free_token_slots);
+            }
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(e) => {

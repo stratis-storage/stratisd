@@ -13,13 +13,14 @@ use crate::dbus_api::{
                 bind_clevis, bind_keyring, rebind_clevis, rebind_keyring, unbind_clevis,
                 unbind_keyring,
             },
-            props::{get_pool_clevis_infos, get_pool_key_descs, get_pool_metadata_version},
+            props::{
+                get_pool_clevis_infos, get_pool_free_token_slots, get_pool_key_descs,
+                get_pool_metadata_version,
+            },
         },
     },
     types::TData,
 };
-
-use super::props::get_pool_free_token_slots;
 
 pub fn metadata_version_property(
     f: &Factory<MTSync<TData>, TData>,

@@ -1,3 +1,15 @@
+ifeq ($(origin MANIFEST_PATH), undefined)
+else
+  MANIFEST_PATH_ARGS = --manifest-path=${MANIFEST_PATH}
+endif
+
+ifeq ($(origin FEDORA_RELEASE), undefined)
+else
+  FEDORA_RELEASE_ARGS = --release=${FEDORA_RELEASE}
+endif
+
+IGNORE_ARGS ?=
+
 ifeq ($(origin PROFILE), undefined)
 else
   PROFILE_FLAGS = -C instrument-coverage
@@ -439,6 +451,16 @@ lint:
 	bandit ./src/bin/utils/stratis-decode-dm --skip B101
 	pyright ./src/bin/utils/stratis-decode-dm
 
+COMPARE_FEDORA_VERSIONS ?=
+## Verify that a script for comparing version specs with Fedora is available
+test-compare-fedora-versions:
+	echo "Testing that COMPARE_FEDORA_VERSIONS environment variable is set to a valid path"
+	test -e "${COMPARE_FEDORA_VERSIONS}"
+
+## Verify that the dependency specs are satisfied in Fedora
+check-fedora-versions: test-compare-fedora-versions
+	${COMPARE_FEDORA_VERSIONS} ${MANIFEST_PATH_ARGS} ${FEDORA_RELEASE_ARGS} ${IGNORE_ARGS}
+
 .PHONY:
 	audit
 	audit-all-rust
@@ -450,6 +472,7 @@ lint:
 	build-udev-utils
 	build-stratis-base32-decode
 	build-stratis-str-cmp
+	check-fedora-versions
 	check-typos
 	clean
 	clean-ancillary
@@ -493,6 +516,7 @@ lint:
 	test-clevis-loop-should-fail-valgrind
 	test-clevis-real
 	test-clevis-real-should-fail
+	test-compare-fedora-versions
 	test-stratisd-tools
 	tmtlint
 	yamllint

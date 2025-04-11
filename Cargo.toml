@@ -19,7 +19,6 @@ exclude = [
     "/.packit.yaml",
     "/_typos.toml",
     "/Makefile",
-    "/Makefile_dependencies",
     "/README_tests.md",
     "/docs",
     "/dracut",

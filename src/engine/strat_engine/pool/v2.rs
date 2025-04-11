@@ -362,6 +362,20 @@ impl StratPool {
         if self.is_encrypted() {
             features.push(PoolFeatures::Encryption);
         }
+        if let Some(ei) = self.encryption_info() {
+            if ei.as_ref().either(
+                |e| e.all_key_descriptions().count() > 0,
+                |pei| matches!(pei.key_description(), Ok(Some(_))),
+            ) {
+                features.push(PoolFeatures::KeyDescriptionEnabled);
+            }
+            if ei.as_ref().either(
+                |e| e.all_clevis_infos().count() > 0,
+                |pei| matches!(pei.clevis_info(), Ok(Some(_))),
+            ) {
+                features.push(PoolFeatures::ClevisEnabled);
+            }
+        }
         PoolSave {
             name: name.to_owned(),
             backstore: self.backstore.record(),
@@ -646,13 +660,17 @@ impl Pool for StratPool {
     #[pool_mutating_action("NoRequests")]
     fn bind_clevis(
         &mut self,
+        name: &Name,
         token_slot: OptionalTokenSlotInput,
         pin: &str,
         clevis_info: &Value,
     ) -> StratisResult<CreateAction<(Clevis, u32)>> {
         let changed = self.backstore.bind_clevis(token_slot, pin, clevis_info)?;
         match changed {
-            Some(t) => Ok(CreateAction::Created((Clevis, t))),
+            Some(t) => {
+                self.write_metadata(name)?;
+                Ok(CreateAction::Created((Clevis, t)))
+            }
             None => Ok(CreateAction::Identity),
         }
     }
@@ -660,12 +678,16 @@ impl Pool for StratPool {
     #[pool_mutating_action("NoRequests")]
     fn bind_keyring(
         &mut self,
+        name: &Name,
         token_slot: OptionalTokenSlotInput,
         key_description: &KeyDescription,
     ) -> StratisResult<CreateAction<(Key, u32)>> {
         let changed = self.backstore.bind_keyring(token_slot, key_description)?;
         match changed {
-            Some(t) => Ok(CreateAction::Created((Key, t))),
+            Some(t) => {
+                self.write_metadata(name)?;
+                Ok(CreateAction::Created((Key, t)))
+            }
             None => Ok(CreateAction::Identity),
         }
     }
@@ -691,9 +713,14 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action("NoRequests")]
-    fn unbind_keyring(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Key>> {
+    fn unbind_keyring(
+        &mut self,
+        name: &Name,
+        token_slot: Option<u32>,
+    ) -> StratisResult<DeleteAction<Key>> {
         let changed = self.backstore.unbind_keyring(token_slot)?;
         if changed {
+            self.write_metadata(name)?;
             Ok(DeleteAction::Deleted(Key))
         } else {
             Ok(DeleteAction::Identity)
@@ -701,9 +728,14 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action("NoRequests")]
-    fn unbind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Clevis>> {
+    fn unbind_clevis(
+        &mut self,
+        name: &Name,
+        token_slot: Option<u32>,
+    ) -> StratisResult<DeleteAction<Clevis>> {
         let changed = self.backstore.unbind_clevis(token_slot)?;
         if changed {
+            self.write_metadata(name)?;
             Ok(DeleteAction::Deleted(Clevis))
         } else {
             Ok(DeleteAction::Identity)
@@ -1202,6 +1234,11 @@ impl Pool for StratPool {
         } else {
             Ok(PropChangeAction::Identity)
         }
+    }
+
+    fn free_token_slots(&self) -> Option<u8> {
+        self.encryption_info()
+            .and_then(|ei| ei.either(|e| Some(e.num_free_token_slots()), |_| None))
     }
 }
 
@@ -1822,6 +1859,7 @@ mod tests {
 
             let engine = StratEngine::initialize().unwrap();
 
+            let name = Name::new("clevis_only".to_string());
             let first = paths[0];
             let pool_uuid_clevis_only = test_async!(engine.create_pool(
                 "clevis_only",
@@ -1841,9 +1879,10 @@ mod tests {
                     test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid_clevis_only)))
                         .unwrap();
 
-                assert!(handle_clevis_only.unbind_clevis(Some(0)).is_err());
+                assert!(handle_clevis_only.unbind_clevis(&name, Some(0)).is_err());
                 handle_clevis_only
                     .bind_clevis(
+                        &name,
                         OptionalTokenSlotInput::None,
                         "tang",
                         &json!({
@@ -1853,12 +1892,13 @@ mod tests {
                     )
                     .unwrap();
                 handle_clevis_only
-                    .bind_keyring(OptionalTokenSlotInput::None, key_desc)
+                    .bind_keyring(&name, OptionalTokenSlotInput::None, key_desc)
                     .unwrap();
             }
 
             test_async!(engine.destroy_pool(pool_uuid_clevis_only)).unwrap();
 
+            let name = Name::new("keyring_only".to_string());
             let second = paths[1];
             let pool_uuid_keyring_only = test_async!(engine.create_pool(
                 "keyring_only",
@@ -1877,9 +1917,10 @@ mod tests {
                     test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid_keyring_only)))
                         .unwrap();
 
-                assert!(handle_keyring_only.unbind_keyring(Some(0)).is_err());
+                assert!(handle_keyring_only.unbind_keyring(&name, Some(0)).is_err());
                 handle_keyring_only
                     .bind_clevis(
+                        &name,
                         OptionalTokenSlotInput::None,
                         "tang",
                         &json!({
@@ -1889,13 +1930,14 @@ mod tests {
                     )
                     .unwrap();
                 matches!(
-                    handle_keyring_only.bind_keyring(OptionalTokenSlotInput::None, key_desc),
+                    handle_keyring_only.bind_keyring(&name, OptionalTokenSlotInput::None, key_desc),
                     Ok(CreateAction::Identity)
                 );
             }
 
             test_async!(engine.destroy_pool(pool_uuid_keyring_only)).unwrap();
 
+            let name = Name::new("both".to_string());
             let third = paths[2];
             let pool_uuid_both = test_async!(engine.create_pool(
                 "both",
@@ -1919,10 +1961,11 @@ mod tests {
                 let mut handle_both =
                     test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid_both))).unwrap();
 
-                assert!(handle_both.unbind_keyring(Some(1)).is_err());
-                assert!(handle_both.unbind_clevis(Some(0)).is_err());
+                assert!(handle_both.unbind_keyring(&name, Some(1)).is_err());
+                assert!(handle_both.unbind_clevis(&name, Some(0)).is_err());
                 matches!(
                     handle_both.bind_clevis(
+                        &name,
                         OptionalTokenSlotInput::Some(1),
                         "tang",
                         &json!({
@@ -1933,11 +1976,11 @@ mod tests {
                     Ok(CreateAction::Identity)
                 );
                 matches!(
-                    handle_both.bind_keyring(OptionalTokenSlotInput::Some(0), key_desc),
+                    handle_both.bind_keyring(&name, OptionalTokenSlotInput::Some(0), key_desc),
                     Ok(CreateAction::Identity)
                 );
                 matches!(
-                    handle_both.bind_keyring(OptionalTokenSlotInput::Some(2), key_desc,),
+                    handle_both.bind_keyring(&name, OptionalTokenSlotInput::Some(2), key_desc,),
                     Ok(CreateAction::Created(_))
                 );
             }

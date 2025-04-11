@@ -176,8 +176,8 @@ pub async fn pool_bind_keyring(
         .await
         .ok_or_else(|| StratisError::Msg(format!("Pool with {id} not found")))?;
 
-    let (_, _, pool) = guard.as_mut_tuple();
-    match pool.bind_keyring(token_slot, key_desc)? {
+    let (name, _, pool) = guard.as_mut_tuple();
+    match pool.bind_keyring(&name, token_slot, key_desc)? {
         CreateAction::Created(_key) => Ok(true),
         CreateAction::Identity => Ok(false),
     }
@@ -196,8 +196,8 @@ pub async fn pool_bind_clevis<'a>(
         .await
         .ok_or_else(|| StratisError::Msg(format!("Pool with {id} not found")))?;
 
-    let (_, _, pool) = guard.as_mut_tuple();
-    match pool.bind_clevis(token_slot, pin, clevis_info)? {
+    let (name, _, pool) = guard.as_mut_tuple();
+    match pool.bind_clevis(&name, token_slot, pin, clevis_info)? {
         CreateAction::Created(_clevis) => Ok(true),
         CreateAction::Identity => Ok(false),
     }
@@ -214,8 +214,8 @@ pub async fn pool_unbind_keyring(
         .await
         .ok_or_else(|| StratisError::Msg(format!("Pool with {id} not found")))?;
 
-    let (_, _, pool) = guard.as_mut_tuple();
-    match pool.unbind_keyring(token_slot)? {
+    let (name, _, pool) = guard.as_mut_tuple();
+    match pool.unbind_keyring(&name, token_slot)? {
         DeleteAction::Deleted(_key_desc) => Ok(true),
         DeleteAction::Identity => Ok(false),
     }
@@ -232,8 +232,8 @@ pub async fn pool_unbind_clevis(
         .await
         .ok_or_else(|| StratisError::Msg(format!("Pool with {id} not found")))?;
 
-    let (_, _, pool) = guard.as_mut_tuple();
-    match pool.unbind_clevis(token_slot)? {
+    let (name, _, pool) = guard.as_mut_tuple();
+    match pool.unbind_clevis(&name, token_slot)? {
         DeleteAction::Deleted(_clevis) => Ok(true),
         DeleteAction::Identity => Ok(false),
     }

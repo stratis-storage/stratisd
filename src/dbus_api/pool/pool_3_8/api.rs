@@ -13,7 +13,10 @@ use crate::dbus_api::{
                 bind_clevis, bind_keyring, rebind_clevis, rebind_keyring, unbind_clevis,
                 unbind_keyring,
             },
-            props::{get_pool_clevis_infos, get_pool_key_descs, get_pool_metadata_version},
+            props::{
+                get_pool_clevis_infos, get_pool_free_token_slots, get_pool_key_descs,
+                get_pool_metadata_version,
+            },
         },
     },
     types::TData,
@@ -110,4 +113,13 @@ pub fn clevis_infos_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSy
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_clevis_infos)
+}
+
+pub fn free_token_slots_property(
+    f: &Factory<MTSync<TData>, TData>,
+) -> Property<MTSync<TData>, TData> {
+    f.property::<(bool, u8), _>(consts::POOL_FREE_TOKEN_SLOTS_PROP, ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::True)
+        .on_get(get_pool_free_token_slots)
 }

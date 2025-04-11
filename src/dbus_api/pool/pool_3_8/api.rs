@@ -19,6 +19,8 @@ use crate::dbus_api::{
     types::TData,
 };
 
+use super::props::get_pool_free_token_slots;
+
 pub fn metadata_version_property(
     f: &Factory<MTSync<TData>, TData>,
 ) -> Property<MTSync<TData>, TData> {
@@ -110,4 +112,13 @@ pub fn clevis_infos_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSy
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_clevis_infos)
+}
+
+pub fn free_token_slots_property(
+    f: &Factory<MTSync<TData>, TData>,
+) -> Property<MTSync<TData>, TData> {
+    f.property::<(bool, u8), _>(consts::POOL_FREE_TOKEN_SLOTS_PROP, ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::True)
+        .on_get(get_pool_free_token_slots)
 }

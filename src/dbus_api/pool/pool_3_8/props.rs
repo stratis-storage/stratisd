@@ -32,3 +32,10 @@ pub fn get_pool_clevis_infos(
         Ok(shared::pool_clevis_infos_prop(pool))
     })
 }
+
+pub fn get_pool_free_token_slots(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_pool_property(i, p, |(_, _, pool)| Ok(shared::pool_free_token_slots(pool)))
+}

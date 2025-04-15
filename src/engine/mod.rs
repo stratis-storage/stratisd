@@ -17,7 +17,7 @@ pub use self::{
     structures::{AllLockReadGuard, ExclusiveGuard, SharedGuard, Table},
     types::{
         ActionAvailability, BlockDevTier, ClevisInfo, CreateAction, DeleteAction, DevUuid, Diff,
-        EncryptionInfo, EngineAction, FilesystemUuid, GrowAction, InputEncryptionInfo,
+        EncryptionInfo, EngineAction, Features, FilesystemUuid, GrowAction, InputEncryptionInfo,
         IntegritySpec, IntegrityTagSpec, KeyDescription, Lockable, LockedPoolInfo, LockedPoolsInfo,
         MappingCreateAction, MappingDeleteAction, MaybeInconsistent, Name, OptionalTokenSlotInput,
         PoolDiff, PoolEncryptionInfo, PoolIdentifier, PoolUuid, PropChangeAction, RenameAction,

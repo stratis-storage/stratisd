@@ -345,22 +345,69 @@ pub async fn pool_has_passphrase(
     engine: Arc<dyn Engine>,
     id: PoolIdentifier<PoolUuid>,
 ) -> StratisResult<bool> {
-    let locked = engine.locked_pools().await;
+    let stopped = engine.stopped_pools().await;
     let guard = engine.get_pool(id.clone()).await;
     if let Some((_, _, pool)) = guard.as_ref().map(|guard| guard.as_tuple()) {
-        Ok(match pool.encryption_info() {
+        return Ok(match pool.encryption_info() {
             Some(Either::Left(ei)) => ei.all_key_descriptions().count() > 0,
             Some(Either::Right(ei)) => ei.key_description()?.is_some(),
             None => false,
-        })
-    } else if let Some(info) = locked.locked.get(match id {
+        });
+    }
+    let pool_uuid = match id {
         PoolIdentifier::Uuid(ref u) => u,
-        PoolIdentifier::Name(ref n) => locked
+        PoolIdentifier::Name(ref n) => stopped
             .name_to_uuid
             .get(n)
             .ok_or_else(|| StratisError::Msg(format!("Could not find pool with name {n}")))?,
-    }) {
-        Ok(info.info.key_description()?.is_some())
+    };
+    if let Some(info) = stopped
+        .stopped
+        .get(pool_uuid)
+        .or_else(|| stopped.partially_constructed.get(pool_uuid))
+    {
+        Ok(match (info.info.as_ref(), info.features.as_ref()) {
+            (Some(_), Some(_)) => unreachable!(),
+            (Some(ei), _) => ei.key_description()?.is_some(),
+            (_, Some(f)) => f.key_description_enabled,
+            (_, _) => false,
+        })
+    } else {
+        Err(StratisError::Msg(format!("Pool with {id} not found")))
+    }
+}
+
+pub async fn pool_is_bound(
+    engine: Arc<dyn Engine>,
+    id: PoolIdentifier<PoolUuid>,
+) -> StratisResult<bool> {
+    let stopped = engine.stopped_pools().await;
+    let guard = engine.get_pool(id.clone()).await;
+    if let Some((_, _, pool)) = guard.as_ref().map(|guard| guard.as_tuple()) {
+        return Ok(match pool.encryption_info() {
+            Some(Either::Left(ei)) => ei.all_clevis_infos().count() > 0,
+            Some(Either::Right(ei)) => ei.clevis_info()?.is_some(),
+            None => false,
+        });
+    }
+    let pool_uuid = match id {
+        PoolIdentifier::Uuid(ref u) => u,
+        PoolIdentifier::Name(ref n) => stopped
+            .name_to_uuid
+            .get(n)
+            .ok_or_else(|| StratisError::Msg(format!("Could not find pool with name {n}")))?,
+    };
+    if let Some(info) = stopped
+        .stopped
+        .get(pool_uuid)
+        .or_else(|| stopped.partially_constructed.get(pool_uuid))
+    {
+        Ok(match (info.info.as_ref(), info.features.as_ref()) {
+            (Some(_), Some(_)) => unreachable!(),
+            (Some(ei), _) => ei.clevis_info()?.is_some(),
+            (_, Some(f)) => f.clevis_enabled,
+            (_, _) => false,
+        })
     } else {
         Err(StratisError::Msg(format!("Pool with {id} not found")))
     }

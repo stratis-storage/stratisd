@@ -16,7 +16,7 @@ while ! stratis-min pool is-stopped "$STRATIS_ROOTFS_UUID" >/dev/null; do
 done
 
 if $(stratis-min pool is-stopped "$STRATIS_ROOTFS_UUID"); then
-	if $(stratis-min pool is-encrypted "$STRATIS_ROOTFS_UUID"); then
+	if $(stratis-min pool has-passphrase "$STRATIS_ROOTFS_UUID"); then
 		ATTEMPTS_REMAINING=3
 		if
 			! while [ $((ATTEMPTS_REMAINING--)) -gt 0 ]; do
@@ -27,7 +27,8 @@ if $(stratis-min pool is-stopped "$STRATIS_ROOTFS_UUID"); then
 			echo Failed to start pool with UUID $STRATIS_ROOTFS_UUID using a passphrase >&2
 			exit 1
 		fi
-	else
+	fi
+	if ! $(stratis-min pool is-encrypted "$STRATIS_ROOTFS_UUID"); then
 		if ! stratis-min pool start "$STRATIS_ROOTFS_UUID"; then
 			echo Failed to start pool with UUID $STRATIS_ROOTFS_UUID >&2
 			exit 1

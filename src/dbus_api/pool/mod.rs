@@ -307,7 +307,8 @@ pub fn create_dbus_pool<'a>(
                 .add_p(pool_3_1::fs_limit_property(&f))
                 .add_p(pool_3_1::enable_overprov_property(&f))
                 .add_p(pool_3_1::no_alloc_space_property(&f))
-                .add_p(pool_3_8::metadata_version_property(&f)),
+                .add_p(pool_3_8::metadata_version_property(&f))
+                .add_p(pool_3_8::free_token_slots_property(&f)),
         );
 
     let path = object_path.get_name().to_owned();
@@ -454,7 +455,8 @@ pub fn get_pool_properties(
             consts::POOL_FS_LIMIT_PROP => shared::pool_fs_limit(pool),
             consts::POOL_OVERPROV_PROP => shared::pool_overprov_enabled(pool),
             consts::POOL_NO_ALLOCABLE_SPACE_PROP => shared::pool_no_alloc_space(pool),
-            consts::POOL_METADATA_VERSION_PROP => shared::pool_metadata_version(pool)
+            consts::POOL_METADATA_VERSION_PROP => shared::pool_metadata_version(pool),
+            consts::POOL_FREE_TOKEN_SLOTS_PROP => shared::pool_free_token_slots(pool)
         }
     }
 }

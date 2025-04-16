@@ -109,6 +109,7 @@ pub enum DbusAction {
     PoolCacheChange(Path<'static>, bool),
     PoolFsLimitChange(Path<'static>, u64),
     PoolOverprovModeChange(Path<'static>, bool),
+    PoolFreeTokenSlots(Path<'static>, Option<u8>),
     LockedPoolsChange(LockedPoolsInfo),
     StoppedPoolsChange(StoppedPoolsInfo),
     BlockdevUserInfoChange(Path<'static>, Option<String>),
@@ -400,6 +401,19 @@ impl DbusContext {
         {
             warn!(
                 "D-Bus pool overprovisioning mode change event could not be sent to the processing thread; no signal will be sent out for the filesystem overprovisioning mode of pool with path {}: {}",
+                item, e,
+            )
+        }
+    }
+
+    /// Send changed signal for pool overprovisioning mode property.
+    pub fn push_pool_free_token_slots_change(&self, item: &Path<'static>, new_ts: Option<u8>) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::PoolFreeTokenSlots(item.clone(), new_ts))
+        {
+            warn!(
+                "D-Bus pool free token slots event could not be sent to the processing thread; no signal will be sent out for the free token slots event of pool with path {}: {}",
                 item, e,
             )
         }

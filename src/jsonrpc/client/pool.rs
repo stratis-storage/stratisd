@@ -154,6 +154,16 @@ pub fn pool_has_passphrase(id: PoolIdentifier<PoolUuid>) -> StratisResult<bool> 
     }
 }
 
+// stratis-min pool is-bound
+pub fn pool_is_bound(id: PoolIdentifier<PoolUuid>) -> StratisResult<bool> {
+    let (is_bound, rc, rs) = do_request!(PoolIsBound, id);
+    if rc != 0 {
+        Err(StratisError::Msg(rs))
+    } else {
+        Ok(is_bound)
+    }
+}
+
 pub fn pool_bind_keyring(
     id: PoolIdentifier<PoolUuid>,
     token_slot: OptionalTokenSlotInput,

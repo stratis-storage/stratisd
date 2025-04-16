@@ -16,7 +16,7 @@ while ! stratis-min pool is-stopped "$STRATIS_ROOTFS_UUID" >/dev/null; do
 done
 
 if $(stratis-min pool is-stopped "$STRATIS_ROOTFS_UUID"); then
-	if $(stratis-min pool is-encrypted "$STRATIS_ROOTFS_UUID"); then
+	if $(stratis-min pool is-bound "$STRATIS_ROOTFS_UUID"); then
 		if ! stratis-min pool start --token-slot=any "$STRATIS_ROOTFS_UUID"; then
 			echo Failed to start pool with UUID $STRATIS_ROOTFS_UUID using an unattended unlock method. >&2
 			exit 1

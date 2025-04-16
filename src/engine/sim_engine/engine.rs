@@ -279,6 +279,16 @@ impl Engine for SimEngine {
                         metadata_version: Some(StratSigblockVersion::V2),
                         features: Some(Features {
                             encryption: pool.is_encrypted(),
+                            key_description_enabled: pool
+                                .encryption_info()
+                                .and_then(|either| either.left())
+                                .map(|ei| ei.all_key_descriptions().count() > 0)
+                                .unwrap_or(false),
+                            clevis_enabled: pool
+                                .encryption_info()
+                                .and_then(|either| either.left())
+                                .map(|ei| ei.all_clevis_infos().count() > 0)
+                                .unwrap_or(false),
                         }),
                     },
                 );

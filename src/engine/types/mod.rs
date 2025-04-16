@@ -233,6 +233,8 @@ pub struct StoppedPoolInfo {
 #[derive(Debug, Eq, PartialEq)]
 pub struct Features {
     pub encryption: bool,
+    pub key_description_enabled: bool,
+    pub clevis_enabled: bool,
 }
 
 #[derive(Default, Debug, Eq, PartialEq)]

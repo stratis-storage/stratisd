@@ -1159,8 +1159,12 @@ mod test {
                 .as_ref()
                 .expect("Passed Clevis info"),
                 |pool| {
-                    pool.bind_keyring(OptionalTokenSlotInput::Legacy, key_desc)
-                        .unwrap();
+                    pool.bind_keyring(
+                        &Name::new(name.to_string()),
+                        OptionalTokenSlotInput::Legacy,
+                        key_desc,
+                    )
+                    .unwrap();
                 },
                 TokenUnlockMethod::from(Some(UnlockMethod::Clevis)),
             );
@@ -1271,7 +1275,8 @@ mod test {
                 .as_ref()
                 .expect("Passed both key description and CLevis Info"),
                 |pool| {
-                    pool.unbind_keyring(None).unwrap();
+                    pool.unbind_keyring(&Name::new(name.to_string()), None)
+                        .unwrap();
                 },
                 TokenUnlockMethod::from(Some(UnlockMethod::Keyring)),
             );
@@ -1322,6 +1327,7 @@ mod test {
                     .expect("Passed key description"),
                 |pool| {
                     pool.bind_clevis(
+                        &Name::new(name.to_string()),
                         OptionalTokenSlotInput::Legacy,
                         "tang",
                         &json!({
@@ -1440,7 +1446,8 @@ mod test {
                 .as_ref()
                 .expect("Passed key description and Clevis info"),
                 |pool| {
-                    pool.unbind_clevis(None).unwrap();
+                    pool.unbind_clevis(&Name::new(name.to_string()), None)
+                        .unwrap();
                 },
                 TokenUnlockMethod::from(Some(UnlockMethod::Clevis)),
             );

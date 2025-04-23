@@ -191,6 +191,7 @@ pub fn get_blockdevs_legacy(
     backstore_save: &BackstoreSave,
     infos: &HashMap<DevUuid, Box<LStratisDevInfo>>,
     mut bdas: HashMap<DevUuid, BDA>,
+    omit_uuids: Vec<DevUuid>,
 ) -> BDARecordResult<(Vec<v1::StratBlockDev>, Vec<v1::StratBlockDev>)> {
     let recorded_data_map: HashMap<DevUuid, (usize, &BaseBlockDevSave)> = backstore_save
         .data_tier
@@ -232,7 +233,12 @@ pub fn get_blockdevs_legacy(
 
     let (mut datadevs, mut cachedevs): (Vec<v1::StratBlockDev>, Vec<v1::StratBlockDev>) =
         (vec![], vec![]);
-    let dev_uuids = infos.keys().collect::<HashSet<_>>();
+
+    let mut dev_uuids = infos.keys().collect::<HashSet<_>>();
+    for dev_uuid in omit_uuids {
+        dev_uuids.remove(&dev_uuid);
+    }
+
     for dev_uuid in dev_uuids {
         match get_blockdev_legacy(
             infos.get(dev_uuid).expect("bdas.keys() == infos.keys()"),

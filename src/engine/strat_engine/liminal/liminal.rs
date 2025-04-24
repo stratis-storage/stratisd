@@ -853,7 +853,7 @@ impl LiminalDevices {
             if let Some(true) | None = metadata.started {
                 match metadata_version {
                     StratSigblockVersion::V1 => setup_pool_legacy(
-                        pools, pool_uuid, luks_info, infos, bdas, timestamp, metadata, false,
+                        pools, pool_uuid, luks_info, infos, bdas, timestamp, metadata, true,
                     )
                     .map(Either::Left),
                     StratSigblockVersion::V2 => setup_pool(

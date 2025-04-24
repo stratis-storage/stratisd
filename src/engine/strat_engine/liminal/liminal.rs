@@ -198,7 +198,7 @@ impl LiminalDevices {
             };
 
             setup_pool_legacy(
-                pools, pool_uuid, luks_info, infos, bdas, timestamp, metadata, false,
+                pools, pool_uuid, luks_info, infos, bdas, timestamp, metadata, true,
             )
         }
 

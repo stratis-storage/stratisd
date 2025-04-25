@@ -6,7 +6,7 @@
 use std::{env, path::PathBuf};
 
 #[cfg(feature = "systemd_compat")]
-use bindgen::{Builder, RustTarget};
+use bindgen::Builder;
 use pkg_config::Config;
 
 fn main() {
@@ -21,7 +21,11 @@ fn main() {
     #[cfg(feature = "systemd_compat")]
     {
         let bindings = Builder::default()
-            .rust_target(RustTarget::Stable_1_73)
+            .rust_target(
+                env!("CARGO_PKG_RUST_VERSION")
+                    .parse()
+                    .expect("valid rust version"),
+            )
             .header_contents(
                 "systemd-header.h",
                 "#include <systemd/sd-daemon.h>\n#include <systemd/sd-journal.h>",

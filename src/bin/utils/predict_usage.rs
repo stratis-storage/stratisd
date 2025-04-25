@@ -184,9 +184,8 @@ fn predict_pool_metadata_usage(
             (*s).checked_sub(*stratis_metadata_alloc)
                 .and_then(|r| r.checked_sub(*integrity_deduction))
                 .map(Sectors)
-                .map(|x| {
+                .inspect(|&x| {
                     info!("Size after deductions: {:}", x);
-                    x
                 })
                 .ok_or_else(|| {
                     Box::new(PredictError(

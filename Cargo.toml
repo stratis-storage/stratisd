@@ -36,7 +36,7 @@ members = [".", "stratisd_proc_macros"]
 [workspace.package]
 authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.org>"]
 edition = "2021"
-rust-version = "1.77.0"  # LOWEST SUPPORTED RUST TOOLCHAIN
+rust-version = "1.74.0"  # LOWEST SUPPORTED RUST TOOLCHAIN
 
 [[bin]]
 name = "stratisd"

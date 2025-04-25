@@ -111,7 +111,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.77.0  # LOWEST SUPPORTED RUST TOOLCHAIN
+          toolchain: 1.74.0  # LOWEST SUPPORTED RUST TOOLCHAIN
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
         working-directory: stratisd
@@ -298,7 +298,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.77.0  # LOWEST SUPPORTED RUST TOOLCHAIN
+          toolchain: 1.74.0  # LOWEST SUPPORTED RUST TOOLCHAIN
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
         working-directory: stratisd

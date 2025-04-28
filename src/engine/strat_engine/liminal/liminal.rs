@@ -198,7 +198,16 @@ impl LiminalDevices {
             };
 
             setup_pool_legacy(
-                pools, pool_uuid, luks_info, infos, bdas, timestamp, metadata, true,
+                pools,
+                pool_uuid,
+                luks_info,
+                infos,
+                bdas,
+                timestamp,
+                metadata,
+                pool_uuid
+                    == PoolUuid::parse_str("301ed57d-4493-44a0-a3b7-784568637336")
+                        .expect("valid UUID"),
             )
         }
 
@@ -853,7 +862,16 @@ impl LiminalDevices {
             if let Some(true) | None = metadata.started {
                 match metadata_version {
                     StratSigblockVersion::V1 => setup_pool_legacy(
-                        pools, pool_uuid, luks_info, infos, bdas, timestamp, metadata, true,
+                        pools,
+                        pool_uuid,
+                        luks_info,
+                        infos,
+                        bdas,
+                        timestamp,
+                        metadata,
+                        pool_uuid
+                            == PoolUuid::parse_str("301ed57d-4493-44a0-a3b7-784568637336")
+                                .expect("valid UUID"),
                     )
                     .map(Either::Left),
                     StratSigblockVersion::V2 => setup_pool(

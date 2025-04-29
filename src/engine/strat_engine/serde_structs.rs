@@ -12,7 +12,9 @@
 // can convert to or from them when saving our current state, or
 // restoring state from saved metadata.
 
-use serde::{Serialize, Serializer};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_json::Value;
 
 use devicemapper::{Sectors, ThinDevId};
 
@@ -91,6 +93,30 @@ impl From<Vec<PoolFeatures>> for Features {
     }
 }
 
+fn serialize_date_time<S>(
+    timestamp: &Option<DateTime<Utc>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_i64(timestamp.expect("is some").timestamp())
+}
+
+fn deserialize_date_time<'a, D>(deserializer: D) -> Result<Option<DateTime<Utc>>, D::Error>
+where
+    D: Deserializer<'a>,
+{
+    match Value::deserialize(deserializer) {
+        Ok(Value::Number(n)) => Ok(DateTime::<Utc>::from_timestamp(
+            n.as_i64()
+                .ok_or_else(|| serde::de::Error::custom("Invalid integer type"))?,
+            0,
+        )),
+        _ => Err(serde::de::Error::custom("Invalid data type")),
+    }
+}
+
 // ALL structs that represent variable length metadata in pre-order
 // depth-first traversal order. Note that when organized by types rather than
 // values the structure is a DAG not a tree. This just means that there are
@@ -108,6 +134,11 @@ pub struct PoolSave {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
     pub features: Vec<PoolFeatures>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[serde(serialize_with = "serialize_date_time")]
+    #[serde(deserialize_with = "deserialize_date_time")]
+    pub last_reencrypt: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]

@@ -144,6 +144,7 @@ pub struct StratPool {
     thin_pool: ThinPool<Backstore>,
     action_avail: ActionAvailability,
     metadata_size: Sectors,
+    last_reencrypt: Option<DateTime<Utc>>,
 }
 
 #[strat_pool_impl_gen]
@@ -210,6 +211,7 @@ impl StratPool {
             thin_pool: thinpool,
             action_avail: ActionAvailability::Full,
             metadata_size,
+            last_reencrypt: None,
         };
 
         pool.write_metadata(&Name::new(name.to_owned()))?;
@@ -276,6 +278,7 @@ impl StratPool {
             thin_pool: thinpool,
             action_avail,
             metadata_size,
+            last_reencrypt: metadata.last_reencrypt,
         };
 
         // The value of the started field in the pool metadata needs to be
@@ -384,6 +387,7 @@ impl StratPool {
             thinpool_dev: self.thin_pool.record(),
             started: Some(true),
             features,
+            last_reencrypt: self.last_reencrypt,
         }
     }
 

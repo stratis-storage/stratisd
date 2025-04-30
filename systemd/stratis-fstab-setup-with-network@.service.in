@@ -1,0 +1,11 @@
+[Unit]
+Description=Set up Stratis filesystems in /etc/fstab that require the network
+Documentation=man:stratisd(8)
+DefaultDependencies=no
+Requires=stratisd-min-postinitrd.service
+After=stratisd-min-postinitrd.service network-online.target
+Before=remote-fs-pre.target
+
+[Service]
+ExecStart=@UNITEXECDIR@/stratis-fstab-setup %i
+Type=oneshot

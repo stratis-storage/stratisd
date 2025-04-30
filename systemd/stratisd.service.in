@@ -2,7 +2,7 @@
 Description=Stratis daemon
 Documentation=man:stratisd(8)
 DefaultDependencies=no
-After=local-fs.target
+After=multi-user.target
 
 [Service]
 BusName=org.storage.stratis3

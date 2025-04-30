@@ -420,7 +420,7 @@ mod tests {
 
     // 82102984128000 in decimal, approx 17 million years
     const UTC_TIMESTAMP_SECS_BOUND: i64 = 0x777_9beb_9f00;
-    const UTC_TIMESTAMP_NSECS_BOUND: u32 = 2_000_000_000u32;
+    const UTC_TIMESTAMP_NSECS_BOUND: u32 = 1_000_000_000u32;
 
     #[test]
     /// Verify that default MDAHeader is all 0s except for CRC and versions.

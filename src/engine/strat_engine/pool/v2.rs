@@ -1239,10 +1239,14 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action("NoRequests")]
-    fn reencrypt_pool(&mut self) -> StratisResult<ReencryptedDevice> {
+    fn reencrypt_pool(&mut self, name: &Name) -> StratisResult<ReencryptedDevice> {
         self.thin_pool.suspend()?;
         let encrypt_res = self.backstore.reencrypt();
+        if encrypt_res.is_ok() {
+            self.last_reencrypt = Some(Utc::now());
+        }
         self.thin_pool.resume()?;
+        self.write_metadata(name)?;
         encrypt_res.map(|_| ReencryptedDevice)
     }
 
@@ -1269,6 +1273,9 @@ impl Pool for StratPool {
                         direction,
                     )
                 });
+                if encrypt_res.is_ok() {
+                    self.last_reencrypt = None;
+                }
                 self.thin_pool.resume()?;
                 let metadata_res = self.write_metadata(name);
                 let _ = encrypt_res?;
@@ -2215,7 +2222,8 @@ mod tests {
                     test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid))).unwrap();
                 let (_, _, pool) = handle.as_mut_tuple();
                 assert!(pool.is_encrypted());
-                pool.reencrypt_pool().unwrap();
+                pool.reencrypt_pool(&Name::new("encrypt_with_both".to_string()))
+                    .unwrap();
                 assert!(pool.is_encrypted());
             }
 

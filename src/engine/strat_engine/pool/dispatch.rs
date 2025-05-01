@@ -433,4 +433,11 @@ impl Pool for AnyPool {
             AnyPool::V2(p) => p.free_token_slots(),
         }
     }
+
+    fn last_reencrypt(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+        match self {
+            AnyPool::V1(p) => p.last_reencrypt(),
+            AnyPool::V2(p) => p.last_reencrypt(),
+        }
+    }
 }

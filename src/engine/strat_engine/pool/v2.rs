@@ -1328,6 +1328,10 @@ impl Pool for StratPool {
         self.encryption_info()
             .and_then(|ei| ei.either(|e| Some(e.num_free_token_slots()), |_| None))
     }
+
+    fn last_reencrypt(&self) -> Option<DateTime<Utc>> {
+        self.last_reencrypt
+    }
 }
 
 pub struct StratPoolState {

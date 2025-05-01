@@ -1319,8 +1319,10 @@ impl Pool for StratPool {
         ))
     }
 
-    fn reencrypt_pool(&mut self) -> StratisResult<ReencryptedDevice> {
+    fn reencrypt_pool(&mut self, name: &Name) -> StratisResult<ReencryptedDevice> {
         self.backstore.reencrypt()?;
+        self.last_reencrypt = Some(Utc::now());
+        self.write_metadata(name)?;
         Ok(ReencryptedDevice)
     }
 

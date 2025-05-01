@@ -447,4 +447,11 @@ impl Pool for AnyPool {
             AnyPool::V2(p) => p.load_volume_key(uuid),
         }
     }
+
+    fn last_reencrypt(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+        match self {
+            AnyPool::V1(p) => p.last_reencrypt(),
+            AnyPool::V2(p) => p.last_reencrypt(),
+        }
+    }
 }

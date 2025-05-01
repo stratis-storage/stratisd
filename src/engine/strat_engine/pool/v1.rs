@@ -1426,6 +1426,10 @@ impl Pool for StratPool {
     fn load_volume_key(&mut self, _: PoolUuid) -> StratisResult<bool> {
         Ok(false)
     }
+
+    fn last_reencrypt(&self) -> Option<DateTime<Utc>> {
+        self.last_reencrypt
+    }
 }
 
 pub struct StratPoolState {

@@ -132,7 +132,9 @@ pub async fn reencrypt_pool_method(
     match tokio::task::spawn_blocking(move || {
         let mut guard = guard_res?;
 
-        handle_action!(guard.reencrypt_pool(pool_uuid))
+        let (name, _, pool) = guard.as_mut_tuple();
+
+        handle_action!(pool.reencrypt_pool(&name, pool_uuid))
     })
     .await
     {

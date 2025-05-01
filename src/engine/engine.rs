@@ -455,6 +455,9 @@ pub trait Pool: Debug + Send + Sync {
     ///
     /// Returns true if the key was newly loaded and false if the key was already loaded.
     fn load_volume_key(&mut self, uuid: PoolUuid) -> StratisResult<bool>;
+
+    /// Get the timestamp of the last online reencryption operation.
+    fn last_reencrypt(&self) -> Option<DateTime<Utc>>;
 }
 
 pub type HandleEvents<P> = (

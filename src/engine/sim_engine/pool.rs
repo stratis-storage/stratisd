@@ -582,6 +582,20 @@ impl Pool for SimPool {
         fs_uuids: &HashSet<FilesystemUuid>,
     ) -> StratisResult<SetDeleteAction<FilesystemUuid, (FilesystemUuid, Option<FilesystemUuid>)>>
     {
+        let to_be_merged = fs_uuids
+            .iter()
+            .filter(|u| {
+                self.get_filesystem(**u)
+                    .map(|(_, fs)| fs.merge_scheduled())
+                    .unwrap_or(false)
+            })
+            .collect::<Vec<_>>();
+
+        if !to_be_merged.is_empty() {
+            let err_str = format!("The filesystem destroy operation can not be begun until the revert operations for the following filesystem snapshots have been cancelled: {}", to_be_merged.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(", "));
+            return Err(StratisError::Msg(err_str));
+        }
+
         let mut snapshots = self
             .filesystems()
             .iter()

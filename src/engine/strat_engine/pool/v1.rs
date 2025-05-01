@@ -1379,6 +1379,10 @@ impl Pool for StratPool {
     fn free_token_slots(&self) -> Option<u8> {
         None
     }
+
+    fn last_reencrypt(&self) -> Option<DateTime<Utc>> {
+        self.last_reencrypt
+    }
 }
 
 pub struct StratPoolState {

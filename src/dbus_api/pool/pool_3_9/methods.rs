@@ -148,10 +148,10 @@ pub fn reencrypt_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult 
     );
 
     let mut guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
-    let (_, _, pool) = guard.as_mut_tuple();
+    let (name, _, pool) = guard.as_mut_tuple();
 
     let result = handle_action!(
-        pool.reencrypt_pool(pool_uuid),
+        pool.reencrypt_pool(&name, pool_uuid),
         dbus_context,
         pool_path.get_name()
     );

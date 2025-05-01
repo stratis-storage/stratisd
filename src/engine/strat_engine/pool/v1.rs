@@ -1392,6 +1392,10 @@ impl Pool for StratPool {
     fn load_volume_key(&mut self, _: PoolUuid) -> StratisResult<bool> {
         Ok(false)
     }
+
+    fn last_reencrypt(&self) -> Option<DateTime<Utc>> {
+        self.last_reencrypt
+    }
 }
 
 pub struct StratPoolState {
@@ -2008,7 +2012,8 @@ mod tests {
                     test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid))).unwrap();
                 let (_, _, pool) = handle.as_mut_tuple();
                 assert!(pool.is_encrypted());
-                pool.reencrypt_pool().unwrap();
+                pool.reencrypt_pool(&Name::new("encrypt_with_both".to_string()))
+                    .unwrap();
                 assert!(pool.is_encrypted());
             }
 

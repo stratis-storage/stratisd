@@ -440,6 +440,9 @@ pub trait Pool: Debug + Send + Sync {
 
     /// Get number of free token slots for pool.
     fn free_token_slots(&self) -> Option<u8>;
+
+    /// Get the timestamp of the last online reencryption operation.
+    fn last_reencrypt(&self) -> Option<DateTime<Utc>>;
 }
 
 pub type HandleEvents<P> = (

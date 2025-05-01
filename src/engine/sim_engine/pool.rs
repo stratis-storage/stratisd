@@ -1060,6 +1060,10 @@ impl Pool for SimPool {
             .as_ref()
             .map(|ei| ei.num_free_token_slots())
     }
+
+    fn last_reencrypt(&self) -> Option<DateTime<Utc>> {
+        self.last_reencrypt
+    }
 }
 
 #[cfg(test)]

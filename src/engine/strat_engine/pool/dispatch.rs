@@ -363,10 +363,14 @@ impl Pool for AnyPool {
         }
     }
 
-    fn reencrypt_pool(&mut self, pool_uuid: PoolUuid) -> StratisResult<ReencryptedDevice> {
+    fn reencrypt_pool(
+        &mut self,
+        name: &Name,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<ReencryptedDevice> {
         match self {
-            AnyPool::V1(p) => p.reencrypt_pool(pool_uuid),
-            AnyPool::V2(p) => p.reencrypt_pool(pool_uuid),
+            AnyPool::V1(p) => p.reencrypt_pool(name, pool_uuid),
+            AnyPool::V2(p) => p.reencrypt_pool(name, pool_uuid),
         }
     }
 

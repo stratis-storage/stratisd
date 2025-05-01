@@ -1894,7 +1894,19 @@ where
             .filter(|(_, snaps)| snaps.iter().any(|(_, scheduled)| *scheduled))
             .collect::<Vec<_>>();
         if !scheduled_for_merge.is_empty() {
-            let err_str = format!("The filesystem destroy operation can not be begun until the revert operations for the following filesystem snapshots have been cancelled: {}", scheduled_for_merge.iter().map(|(u, _)| u.to_string()).collect::<Vec<_>>().join(", "));
+            let origins = scheduled_for_merge
+                .iter()
+                .map(|(u, _)| u.to_string())
+                .collect::<Vec<_>>();
+            let snaps = scheduled_for_merge
+                .iter()
+                .flat_map(|(_, snaps)| {
+                    snaps
+                        .iter()
+                        .filter_map(|(u, m)| if *m { Some(u.to_string()) } else { None })
+                })
+                .collect::<Vec<_>>();
+            let err_str = format!("The filesystem destroy operation for filesystems ({}) can not be begun until the revert operations for the following filesystem snapshots have been cancelled: {}", origins.join(", "), snaps.join(", "));
             return Err(StratisError::Msg(err_str));
         }
 

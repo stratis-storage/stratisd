@@ -410,7 +410,11 @@ pub trait Pool: Debug + Send + Sync {
     ) -> StratisResult<CreateAction<EncryptedDevice>>;
 
     /// Reencrypt an encrypted pool.
-    fn reencrypt_pool(&mut self, pool_uuid: PoolUuid) -> StratisResult<ReencryptedDevice>;
+    fn reencrypt_pool(
+        &mut self,
+        name: &Name,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<ReencryptedDevice>;
 
     /// Decrypt an encrypted pool.
     fn decrypt_pool(

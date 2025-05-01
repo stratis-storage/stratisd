@@ -8,6 +8,7 @@ use std::{
     vec::Vec,
 };
 
+use chrono::{DateTime, Utc};
 use either::Either;
 use itertools::Itertools;
 use serde_json::{Map, Value};
@@ -45,6 +46,7 @@ pub struct SimPool {
     enable_overprov: bool,
     encryption_info: Option<EncryptionInfo>,
     integrity_spec: ValidatedIntegritySpec,
+    last_reencrypt: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
@@ -73,6 +75,7 @@ impl SimPool {
                 enable_overprov: true,
                 encryption_info: enc_info.cloned(),
                 integrity_spec,
+                last_reencrypt: None,
             },
         )
     }
@@ -940,12 +943,17 @@ impl Pool for SimPool {
         }
     }
 
-    fn reencrypt_pool(&mut self, pool_uuid: PoolUuid) -> StratisResult<ReencryptedDevice> {
+    fn reencrypt_pool(
+        &mut self,
+        _: &Name,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<ReencryptedDevice> {
         if self.encryption_info.is_none() {
             Err(StratisError::Msg(
                 "Cannot reencrypt unencrypted pool".to_string(),
             ))
         } else {
+            self.last_reencrypt = Some(Utc::now());
             Ok(ReencryptedDevice(pool_uuid))
         }
     }
@@ -959,6 +967,7 @@ impl Pool for SimPool {
             Ok(DeleteAction::Identity)
         } else {
             self.encryption_info = None;
+            self.last_reencrypt = None;
             Ok(DeleteAction::Deleted(EncryptedDevice(pool_uuid)))
         }
     }

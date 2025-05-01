@@ -1352,8 +1352,14 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action("NoRequests")]
-    fn reencrypt_pool(&mut self) -> StratisResult<ReencryptedDevice> {
-        self.backstore.reencrypt().map(|_| ReencryptedDevice)
+    fn reencrypt_pool(&mut self, name: &Name) -> StratisResult<ReencryptedDevice> {
+        self.backstore
+            .reencrypt()
+            .and_then(|_| {
+                self.last_reencrypt = Some(Utc::now());
+                self.write_metadata(name)
+            })
+            .map(|_| ReencryptedDevice)
     }
 
     fn decrypt_pool(
@@ -2077,7 +2083,8 @@ mod tests {
                     test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid))).unwrap();
                 let (_, _, pool) = handle.as_mut_tuple();
                 assert!(pool.is_encrypted());
-                pool.reencrypt_pool().unwrap();
+                pool.reencrypt_pool(&Name::new("encrypt_with_both".to_string()))
+                    .unwrap();
                 assert!(pool.is_encrypted());
             }
 

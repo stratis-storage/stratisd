@@ -407,7 +407,7 @@ pub trait Pool: Debug + Send + Sync {
     ) -> StratisResult<CreateAction<EncryptedDevice>>;
 
     /// Reencrypt an encrypted pool.
-    fn reencrypt_pool(&mut self) -> StratisResult<ReencryptedDevice>;
+    fn reencrypt_pool(&mut self, name: &Name) -> StratisResult<ReencryptedDevice>;
 
     /// Decrypt an encrypted pool.
     fn decrypt_pool(

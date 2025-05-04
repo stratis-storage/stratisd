@@ -1,3 +1,30 @@
+stratisd 3.8.1
+==============
+Recommended Rust toolchain version: 1.86.0
+Recommended development platform for Python development: Fedora 41
+
+- Increase strum dependency lower bound to 0.27.0:
+  https://github.com/stratis-storage/stratisd/pull/3788
+
+- Increase libcryptsetup-rs dependency lower bound to 0.12.0:
+  https://github.com/stratis-storage/stratisd/pull/3795
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3815
+  https://github.com/stratis-storage/stratisd/pull/3814
+  https://github.com/stratis-storage/stratisd/pull/3813
+  https://github.com/stratis-storage/stratisd/pull/3812
+  https://github.com/stratis-storage/stratisd/pull/3808
+  https://github.com/stratis-storage/stratisd/pull/3807
+  https://github.com/stratis-storage/stratisd/pull/3806
+  https://github.com/stratis-storage/stratisd/pull/3803
+  https://github.com/stratis-storage/stratisd/pull/3802
+  https://github.com/stratis-storage/stratisd/pull/3797
+  https://github.com/stratis-storage/stratisd/pull/3794
+  https://github.com/stratis-storage/stratisd/pull/3757
+  https://github.com/stratis-storage/stratisd/pull/3731
+
+
 stratisd 3.8.0
 ==============
 Recommended Rust toolchain version: 1.85.0

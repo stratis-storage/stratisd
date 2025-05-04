@@ -106,12 +106,44 @@ pub struct PoolSave {
     pub features: Vec<PoolFeatures>,
 }
 
+impl PoolSave {
+    /// Return PoolSave with no cache info and all UUIDs specified in cache
+    pub fn decache(self) -> (PoolSave, Vec<DevUuid>) {
+        let cache_uuids = self.backstore.cache_uuids();
+        (
+            PoolSave {
+                backstore: self.backstore.decache(),
+                ..self
+            },
+            cache_uuids,
+        )
+    }
+}
+
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BackstoreSave {
     pub data_tier: DataTierSave,
     pub cap: CapSave,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_tier: Option<CacheTierSave>,
+}
+
+impl BackstoreSave {
+    // Return new struct with cache data removed
+    fn decache(self) -> BackstoreSave {
+        BackstoreSave {
+            cache_tier: None,
+            ..self
+        }
+    }
+
+    // Return UUIDs of all cache devices
+    fn cache_uuids(&self) -> Vec<DevUuid> {
+        self.cache_tier
+            .as_ref()
+            .map(|ct| ct.uuids())
+            .unwrap_or_default()
+    }
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -125,6 +157,12 @@ pub struct DataTierSave {
 pub struct BlockDevSave {
     pub allocs: Vec<Vec<BaseDevSave>>,
     pub devs: Vec<BaseBlockDevSave>,
+}
+
+impl BlockDevSave {
+    fn uuids(&self) -> Vec<DevUuid> {
+        self.devs.iter().map(|bb| bb.uuid).collect::<Vec<_>>()
+    }
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -159,6 +197,12 @@ pub struct CapSave {
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CacheTierSave {
     pub blockdev: BlockDevSave,
+}
+
+impl CacheTierSave {
+    fn uuids(&self) -> Vec<DevUuid> {
+        self.blockdev.uuids()
+    }
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]

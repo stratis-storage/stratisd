@@ -265,10 +265,6 @@ impl StratPool {
             Err(e) => return Err((e, backstore.into_bdas())),
         };
 
-        // TODO: Remove in stratisd 4.0
-        let mut needs_save = metadata.thinpool_dev.fs_limit.is_none()
-            || metadata.thinpool_dev.feature_args.is_none();
-
         let metadata_size = backstore.datatier_metadata_size();
         let mut pool = StratPool {
             backstore,
@@ -277,18 +273,11 @@ impl StratPool {
             metadata_size,
         };
 
-        // The value of the started field in the pool metadata needs to be
-        // updated unless the value is already present in the metadata and has
-        // value true.
-        needs_save |= !metadata.started.unwrap_or(false);
-
-        if needs_save {
-            if let Err(err) = pool.write_metadata(pool_name) {
-                if let StratisError::ActionDisabled(avail) = err {
-                    warn!("Pool-level metadata could not be written for pool with name {} and UUID {} because pool is in a limited availability state, {},  which prevents any pool actions; pool will remain set up", pool_name, uuid, avail);
-                } else {
-                    return Err((err, pool.backstore.into_bdas()));
-                }
+        if let Err(err) = pool.write_metadata(pool_name) {
+            if let StratisError::ActionDisabled(avail) = err {
+                warn!("Pool-level metadata could not be written for pool with name {} and UUID {} because pool is in a limited availability state, {},  which prevents any pool actions; pool will remain set up", pool_name, uuid, avail);
+            } else {
+                return Err((err, pool.backstore.into_bdas()));
             }
         }
 

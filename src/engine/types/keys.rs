@@ -271,6 +271,8 @@ pub struct EncryptionInfo {
 }
 
 impl EncryptionInfo {
+    pub const MAX_TOKEN_SLOTS: u8 = 15;
+
     pub fn new() -> Self {
         EncryptionInfo {
             encryption_infos: HashMap::default(),
@@ -406,6 +408,13 @@ impl EncryptionInfo {
             )
             .next()
             .cloned()
+    }
+
+    /// Returns number of free token slots in the encryption information.
+    #[allow(clippy::cast_possible_truncation)]
+    pub fn num_free_token_slots(&self) -> u8 {
+        // Can use as here as the number of token slots can never increase beyond 15.
+        Self::MAX_TOKEN_SLOTS - self.encryption_infos.len() as u8
     }
 }
 

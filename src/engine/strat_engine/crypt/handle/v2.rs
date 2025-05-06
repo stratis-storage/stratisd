@@ -533,10 +533,11 @@ impl CryptHandle {
         pin: &str,
         json: &Value,
     ) -> StratisResult<u32> {
-        if self.metadata.encryption_info.all_token_slots().count() >= 15 {
-            return Err(StratisError::Msg(
-                "Reached limit of 15 token and keyslots for pool".to_string(),
-            ));
+        if self.metadata.encryption_info.num_free_token_slots() == 0 {
+            return Err(StratisError::Msg(format!(
+                "Reached limit of {} token and keyslots for pool",
+                EncryptionInfo::MAX_TOKEN_SLOTS,
+            )));
         }
 
         let mut json_owned = json.clone();
@@ -632,10 +633,11 @@ impl CryptHandle {
         token_slot: Option<u32>,
         key_desc: &KeyDescription,
     ) -> StratisResult<u32> {
-        if self.metadata.encryption_info.all_token_slots().count() >= 15 {
-            return Err(StratisError::Msg(
-                "Reached limit of 15 token and keyslots for pool".to_string(),
-            ));
+        if self.metadata.encryption_info.num_free_token_slots() == 0 {
+            return Err(StratisError::Msg(format!(
+                "Reached limit of {} token and keyslots for pool",
+                EncryptionInfo::MAX_TOKEN_SLOTS,
+            )));
         }
 
         let mut device = self.acquire_crypt_device()?;

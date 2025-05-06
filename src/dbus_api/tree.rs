@@ -35,7 +35,8 @@ use crate::{
             fs_origin_to_prop, fs_size_limit_to_prop, fs_size_to_prop, fs_used_to_prop,
         },
         pool::prop_conv::{
-            avail_actions_to_prop, clevis_info_to_prop, key_desc_to_prop, pool_alloc_to_prop,
+            avail_actions_to_prop, clevis_info_to_prop, clevis_infos_to_prop, key_desc_to_prop,
+            key_descs_to_prop, pool_alloc_to_prop, pool_free_token_slots_to_prop,
             pool_size_to_prop, pool_used_to_prop,
         },
         types::{
@@ -50,8 +51,6 @@ use crate::{
     },
     stratis::{StratisError, StratisResult},
 };
-
-use super::pool::prop_conv::{clevis_infos_to_prop, key_descs_to_prop};
 
 type PropertySignal = HashMap<String, (HashMap<String, Variant<Box<dyn RefArg>>>, Vec<String>)>;
 
@@ -1176,6 +1175,26 @@ impl DbusTreeHandler {
         }
     }
 
+    /// Send a signal indicating that the pool filesystem limit has changed.
+    pub fn handle_pool_free_token_slots_change(&self, path: Path<'static>, new_ts: Option<u8>) {
+        let prop = pool_free_token_slots_to_prop(new_ts);
+        if let Err(e) = self.property_changed_invalidated_signal(
+            &path,
+            prop_hashmap!(
+                consts::POOL_INTERFACE_NAME_3_8 => {
+                    Vec::new(),
+                    consts::POOL_FREE_TOKEN_SLOTS_PROP.to_string() =>
+                    box_variant!(prop)
+                }
+            ),
+        ) {
+            warn!(
+                "Failed to send a signal over D-Bus indicating pool free token slots change: {}",
+                e
+            );
+        }
+    }
+
     /// Send a signal indicating that the pool total allocated size has changed.
     fn handle_pool_foreground_change(
         &self,
@@ -1420,6 +1439,10 @@ impl DbusTreeHandler {
             }
             DbusAction::PoolFsLimitChange(path, new_limit) => {
                 self.handle_pool_fs_limit_change(path, new_limit);
+                Ok(true)
+            }
+            DbusAction::PoolFreeTokenSlots(path, new_ts) => {
+                self.handle_pool_free_token_slots_change(path, new_ts);
                 Ok(true)
             }
             DbusAction::FsSizeLimitChange(path, new_limit) => {

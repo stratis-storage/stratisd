@@ -154,3 +154,8 @@ pub fn pool_alloc_to_prop(alloc: Bytes) -> String {
 pub fn pool_used_to_prop(used: Option<Bytes>) -> (bool, String) {
     option_to_tuple(used.map(|u| (*u).to_string()), String::new())
 }
+
+/// Generate a D-Bus representation of the free token slots in the pool.
+pub fn pool_free_token_slots_to_prop(ts: Option<u8>) -> (bool, u8) {
+    option_to_tuple(ts, 0)
+}

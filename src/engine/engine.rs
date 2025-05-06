@@ -190,6 +190,7 @@ pub trait Pool: Debug + Send + Sync {
     /// * if token_slot is None: bind to any available token_slot
     fn bind_clevis(
         &mut self,
+        name: &Name,
         token_slot: OptionalTokenSlotInput,
         pin: &str,
         clevis_info: &Value,
@@ -205,6 +206,7 @@ pub trait Pool: Debug + Send + Sync {
     /// * if token_slot is None: bind to any available token slot
     fn bind_keyring(
         &mut self,
+        name: &Name,
         token_slot: OptionalTokenSlotInput,
         key_desc: &KeyDescription,
     ) -> StratisResult<CreateAction<(Key, u32)>>;
@@ -235,7 +237,11 @@ pub trait Pool: Debug + Send + Sync {
     /// V2: Unbinds crypt device from the given key description token specified by token slot.
     /// * if token_slot is Some(_): unbind specific token slot
     /// * if token_slot is None: unbind first key description token slot
-    fn unbind_keyring(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Key>>;
+    fn unbind_keyring(
+        &mut self,
+        name: &Name,
+        token_slot: Option<u32>,
+    ) -> StratisResult<DeleteAction<Key>>;
 
     /// V1: Unbinds crypt device from the Clevis token
     /// * token_slot is always None
@@ -243,7 +249,11 @@ pub trait Pool: Debug + Send + Sync {
     /// V2: Unbinds crypt device from the given Clevis token specified by token slot.
     /// * if token_slot is Some(_): unbind specific token slot
     /// * if token_slot is None: unbind first Clevis token slot
-    fn unbind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Clevis>>;
+    fn unbind_clevis(
+        &mut self,
+        name: &Name,
+        token_slot: Option<u32>,
+    ) -> StratisResult<DeleteAction<Clevis>>;
 
     /// Ensures that all designated filesystems are gone from pool.
     /// Returns a list of the filesystems found, and actually destroyed.
@@ -409,6 +419,9 @@ pub trait Pool: Debug + Send + Sync {
         fs: FilesystemUuid,
         new_scheduled: bool,
     ) -> StratisResult<PropChangeAction<bool>>;
+
+    /// Get number of free token slots for pool.
+    fn free_token_slots(&self) -> Option<u8>;
 }
 
 pub type HandleEvents<P> = (

@@ -308,6 +308,7 @@ impl Pool for SimPool {
 
     fn bind_clevis(
         &mut self,
+        _: &Name,
         token_slot: OptionalTokenSlotInput,
         pin: &str,
         clevis_info: &Value,
@@ -320,6 +321,13 @@ impl Pool for SimPool {
                 ))
             }
         };
+
+        if encryption_info.num_free_token_slots() == 0 {
+            return Err(StratisError::Msg(format!(
+                "Reached limit of {} token and keyslots for pool",
+                EncryptionInfo::MAX_TOKEN_SLOTS,
+            )));
+        }
 
         let token_slot_to_add = match token_slot {
             OptionalTokenSlotInput::Some(t) => {
@@ -366,6 +374,7 @@ impl Pool for SimPool {
 
     fn bind_keyring(
         &mut self,
+        _: &Name,
         token_slot: OptionalTokenSlotInput,
         key_description: &KeyDescription,
     ) -> StratisResult<CreateAction<(Key, u32)>> {
@@ -377,6 +386,13 @@ impl Pool for SimPool {
                 ))
             }
         };
+
+        if encryption_info.num_free_token_slots() == 0 {
+            return Err(StratisError::Msg(format!(
+                "Reached limit of {} token and keyslots for pool",
+                EncryptionInfo::MAX_TOKEN_SLOTS,
+            )));
+        }
 
         let token_slot_to_add = match token_slot {
             OptionalTokenSlotInput::Some(t) => {
@@ -437,7 +453,11 @@ impl Pool for SimPool {
         Ok(CreateAction::Created((Key, token_slot_to_add)))
     }
 
-    fn unbind_keyring(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Key>> {
+    fn unbind_keyring(
+        &mut self,
+        _: &Name,
+        token_slot: Option<u32>,
+    ) -> StratisResult<DeleteAction<Key>> {
         let encryption_info = match self.encryption_info.as_mut() {
             Some(ei) => ei,
             None => {
@@ -475,7 +495,11 @@ impl Pool for SimPool {
         })
     }
 
-    fn unbind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<DeleteAction<Clevis>> {
+    fn unbind_clevis(
+        &mut self,
+        _: &Name,
+        token_slot: Option<u32>,
+    ) -> StratisResult<DeleteAction<Clevis>> {
         let encryption_info = match self.encryption_info.as_mut() {
             Some(ei) => ei,
             None => {
@@ -1001,6 +1025,12 @@ impl Pool for SimPool {
         );
 
         Ok(PropChangeAction::NewValue(scheduled))
+    }
+
+    fn free_token_slots(&self) -> Option<u8> {
+        self.encryption_info
+            .as_ref()
+            .map(|ei| ei.num_free_token_slots())
     }
 }
 

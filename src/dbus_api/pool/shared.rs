@@ -383,3 +383,8 @@ pub fn pool_set_overprov_mode(
 pub fn pool_no_alloc_space(pool: &dyn Pool) -> bool {
     pool.out_of_alloc_space()
 }
+
+#[inline]
+pub fn pool_free_token_slots(pool: &dyn Pool) -> (bool, u8) {
+    prop_conv::pool_free_token_slots_to_prop(pool.free_token_slots())
+}

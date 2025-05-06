@@ -15,7 +15,7 @@ use crate::dbus_api::{
             },
             props::{
                 get_pool_clevis_infos, get_pool_free_token_slots, get_pool_key_descs,
-                get_pool_metadata_version,
+                get_pool_last_reencrypted_timestamp, get_pool_metadata_version,
             },
         },
     },
@@ -169,4 +169,13 @@ pub fn decrypt_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<T
         .out_arg(("results", "b"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"))
+}
+
+pub fn last_reencrypted_timestamp_property(
+    f: &Factory<MTSync<TData>, TData>,
+) -> Property<MTSync<TData>, TData> {
+    f.property::<(bool, String), _>(consts::POOL_LAST_REENCRYPTED_TIMESTAMP_PROP, ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::True)
+        .on_get(get_pool_last_reencrypted_timestamp)
 }

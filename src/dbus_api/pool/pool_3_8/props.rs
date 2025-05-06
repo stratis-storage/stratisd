@@ -39,3 +39,12 @@ pub fn get_pool_free_token_slots(
 ) -> Result<(), MethodErr> {
     get_pool_property(i, p, |(_, _, pool)| Ok(shared::pool_free_token_slots(pool)))
 }
+
+pub fn get_pool_last_reencrypted_timestamp(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_pool_property(i, p, |(_, _, pool)| {
+        Ok(shared::pool_last_reencrypted_timestamp(pool))
+    })
+}

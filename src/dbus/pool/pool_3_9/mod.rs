@@ -48,8 +48,10 @@ use crate::{
 };
 
 mod methods;
+mod props;
 
 pub use methods::{decrypt_pool_method, encrypt_pool_method, reencrypt_pool_method};
+pub use props::last_reencrypted_timestamp_prop;
 
 pub struct PoolR9 {
     connection: Arc<Connection>,
@@ -445,5 +447,10 @@ impl PoolR9 {
     #[zbus(property(emits_changed_signal = "false"))]
     async fn metadata_version(&self) -> Result<u64, Error> {
         pool_prop(&self.engine, self.uuid, metadata_version_prop).await
+    }
+
+    #[zbus(property(emits_changed_signal = "true"))]
+    async fn last_reencrypted_timestamp(&self) -> Result<(bool, String), Error> {
+        pool_prop(&self.engine, self.uuid, last_reencrypted_timestamp_prop).await
     }
 }

@@ -997,6 +997,11 @@ impl DbusTreeHandler {
                     Vec::new(),
                     consts::FILESYSTEM_MERGE_SCHEDULED_PROP.to_string() =>
                     box_variant!(new_scheduled)
+                },
+                consts::FILESYSTEM_INTERFACE_NAME_3_8 => {
+                    Vec::new(),
+                    consts::FILESYSTEM_MERGE_SCHEDULED_PROP.to_string() =>
+                    box_variant!(new_scheduled)
                 }
             ),
         ) {

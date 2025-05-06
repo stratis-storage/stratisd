@@ -2,10 +2,14 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus_tree::{Factory, MTSync, Method};
+use dbus_tree::{Access, EmitsChangedSignal, Factory, MTSync, Method, Property};
 
 use crate::dbus_api::{
-    pool::pool_3_9::methods::{decrypt_pool, encrypt_pool, reencrypt_pool},
+    consts,
+    pool::pool_3_9::{
+        methods::{decrypt_pool, encrypt_pool, reencrypt_pool},
+        props::get_pool_last_reencrypted_timestamp,
+    },
     types::TData,
 };
 
@@ -54,4 +58,13 @@ pub fn decrypt_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<T
         .out_arg(("results", "b"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"))
+}
+
+pub fn last_reencrypted_timestamp_property(
+    f: &Factory<MTSync<TData>, TData>,
+) -> Property<MTSync<TData>, TData> {
+    f.property::<(bool, String), _>(consts::POOL_LAST_REENCRYPTED_TIMESTAMP_PROP, ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::True)
+        .on_get(get_pool_last_reencrypted_timestamp)
 }

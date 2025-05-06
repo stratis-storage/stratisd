@@ -59,6 +59,7 @@ pub const POOL_NO_ALLOCABLE_SPACE_PROP: &str = "NoAllocSpace";
 pub const POOL_METADATA_VERSION_PROP: &str = "MetadataVersion";
 pub const POOL_FREE_TOKEN_SLOTS_PROP: &str = "FreeTokenSlots";
 pub const POOL_VOLUME_KEY_LOADED: &str = "VolumeKeyLoaded";
+pub const POOL_LAST_REENCRYPTED_TIMESTAMP_PROP: &str = "LastReencryptedTimestamp";
 
 pub const FILESYSTEM_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.filesystem.r0";
 pub const FILESYSTEM_INTERFACE_NAME_3_1: &str = "org.storage.stratis3.filesystem.r1";

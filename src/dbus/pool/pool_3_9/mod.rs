@@ -334,7 +334,7 @@ impl PoolR9 {
     }
 
     async fn reencrypt_pool(&self) -> (bool, u16, String) {
-        reencrypt_pool_method(&self.engine, self.uuid).await
+        reencrypt_pool_method(&self.engine, &self.connection, &self.manager, self.uuid).await
     }
 
     async fn decrypt_pool(&self) -> (bool, u16, String) {

@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use chrono::{DateTime, SecondsFormat, Utc};
 use dbus::arg::{RefArg, Variant};
 use either::Either;
 
@@ -158,4 +159,13 @@ pub fn pool_used_to_prop(used: Option<Bytes>) -> (bool, String) {
 /// Generate a D-Bus representation of the free token slots in the pool.
 pub fn pool_free_token_slots_to_prop(ts: Option<u8>) -> (bool, u8) {
     option_to_tuple(ts, 0)
+}
+
+/// Generate a D-Bus representation of the timestamp of the last time when the pool was
+/// reencrypted.
+pub fn pool_last_reencrypted_timestamp_to_prop(timestamp: Option<DateTime<Utc>>) -> (bool, String) {
+    option_to_tuple(
+        timestamp.map(|t| t.to_rfc3339_opts(SecondsFormat::Secs, true)),
+        String::new(),
+    )
 }

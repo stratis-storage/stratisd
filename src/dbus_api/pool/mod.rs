@@ -348,7 +348,8 @@ pub fn create_dbus_pool<'a>(
                 .add_p(pool_3_1::no_alloc_space_property(&f))
                 .add_p(pool_3_8::metadata_version_property(&f))
                 .add_p(pool_3_8::free_token_slots_property(&f))
-                .add_p(pool_3_8::volume_key_loaded_property(&f)),
+                .add_p(pool_3_8::volume_key_loaded_property(&f))
+                .add_p(pool_3_9::last_reencrypted_timestamp_property(&f)),
         );
 
     let path = object_path.get_name().to_owned();

@@ -12,6 +12,7 @@ use std::{
     },
 };
 
+use chrono::{DateTime, Utc};
 use dbus::{
     arg::{RefArg, Variant},
     blocking::SyncConnection,
@@ -124,6 +125,7 @@ pub enum DbusAction {
     FsSizeLimitChange(Path<'static>, Option<Sectors>),
     FsMergeScheduledChange(Path<'static>, bool),
     PoolEncryptionChange(Path<'static>, bool),
+    PoolReencryptTimestamp(Path<'static>, Option<DateTime<Utc>>),
     FsBackgroundChange(
         FilesystemUuid,
         SignalChange<Option<Bytes>>,
@@ -541,6 +543,22 @@ impl DbusContext {
         )) {
             warn!(
                 "D-Bus filesystem merge scheduled change event could not be sent to the processing thread; no signal will be sent out for the merge scheduled change of filesystem with path {item}: {e}"
+            )
+        }
+    }
+
+    /// Send changed signal for pool reencryption timestamp property.
+    pub fn push_pool_last_reencrypt_timestamp(
+        &self,
+        item: &Path<'static>,
+        timestamp: Option<DateTime<Utc>>,
+    ) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::PoolReencryptTimestamp(item.clone(), timestamp))
+        {
+            warn!(
+                "D-Bus pool reencrypt timestamp event could not be sent to the processing thread; no signal will be sent out for the pool reencryption timestamp change with path {item}: {e}"
             )
         }
     }

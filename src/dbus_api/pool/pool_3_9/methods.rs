@@ -156,7 +156,10 @@ pub fn reencrypt_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult 
         pool_path.get_name()
     );
     let msg = match result {
-        Ok(_) => return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string()),
+        Ok(_) => {
+            dbus_context.push_pool_last_reencrypt_timestamp(object_path, pool.last_reencrypt());
+            return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)
@@ -197,6 +200,7 @@ pub fn decrypt_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
             dbus_context.push_pool_key_desc_change(pool_path.get_name(), None);
             dbus_context.push_pool_clevis_info_change(pool_path.get_name(), None);
             dbus_context.push_pool_encryption_status_change(pool_path.get_name(), false);
+            dbus_context.push_pool_last_reencrypt_timestamp(object_path, pool.last_reencrypt());
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(err) => {

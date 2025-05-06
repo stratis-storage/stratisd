@@ -1550,3 +1550,14 @@ pub async fn send_encrypted_signal(connection: &Arc<Connection>, path: &ObjectPa
         "pool.r9"
     );
 }
+
+pub async fn send_last_reencrypted_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    send_signal!(
+        connection,
+        PoolR9,
+        path,
+        last_reencrypted_timestamp_changed,
+        "last reencryption timestamp",
+        "pool.r9"
+    );
+}

@@ -84,6 +84,7 @@ use self::cleanup_errors::{Error, Result};
 pub fn dm_stratis_devices_remove() -> Result<()> {
     /// One iteration of removing devicemapper devices
     fn one_iteration() -> Result<Vec<DmNameBuf>> {
+        #[allow(clippy::to_string_in_format_args)]
         get_dm()
             .list_devices()
             .map_err(|e| {

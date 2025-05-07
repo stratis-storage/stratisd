@@ -17,13 +17,10 @@ use devicemapper::{Bytes, DmNameBuf, Sectors};
 use stratisd_proc_macros::strat_pool_impl_gen;
 
 #[cfg(any(test, feature = "extras"))]
-use crate::engine::{
-    strat_engine::{
-        backstore::UnownedDevices,
-        metadata::MDADataSize,
-        thinpool::{ThinPoolSizeParams, DATA_BLOCK_SIZE},
-    },
-    types::InputEncryptionInfo,
+use crate::engine::strat_engine::{
+    backstore::UnownedDevices,
+    metadata::MDADataSize,
+    thinpool::{ThinPoolSizeParams, DATA_BLOCK_SIZE},
 };
 use crate::{
     engine::{
@@ -48,11 +45,12 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            Diff, FilesystemUuid, GrowAction, Key, KeyDescription, Name, OptionalTokenSlotInput,
-            PoolDiff, PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction, StratFilesystemDiff, StratPoolDiff, StratSigblockVersion,
+            Diff, EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo,
+            Key, KeyDescription, Name, OffsetDirection, OptionalTokenSlotInput, PoolDiff,
+            PoolEncryptionInfo, PoolUuid, PropChangeAction, ReencryptedDevice, RegenAction,
+            RenameAction, SetCreateAction, SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
+            StratSigblockVersion,
         },
-        EncryptionInfo, PropChangeAction,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -177,6 +175,7 @@ pub struct StratPool {
     thin_pool: ThinPool<Backstore>,
     action_avail: ActionAvailability,
     metadata_size: Sectors,
+    last_reencrypt: Option<DateTime<Utc>>,
 }
 
 #[strat_pool_impl_gen]
@@ -243,6 +242,7 @@ impl StratPool {
             thin_pool: thinpool,
             action_avail: ActionAvailability::Full,
             metadata_size,
+            last_reencrypt: None,
         };
 
         pool.write_metadata(&Name::new(name.to_owned()))?;
@@ -307,6 +307,7 @@ impl StratPool {
             thin_pool: thinpool,
             action_avail,
             metadata_size,
+            last_reencrypt: metadata.last_reencrypt,
         };
 
         // The value of the started field in the pool metadata needs to be
@@ -397,6 +398,7 @@ impl StratPool {
             thinpool_dev: self.thin_pool.record(),
             started: Some(true),
             features: vec![],
+            last_reencrypt: self.last_reencrypt,
         }
     }
 
@@ -666,10 +668,14 @@ impl Pool for StratPool {
                 )
                 .and_then(|bdi| {
                     self.thin_pool
-                        .set_device(self.backstore.device().expect(
-                            "Since thin pool exists, space must have been allocated \
+                        .set_device(
+                            self.backstore.device().expect(
+                                "Since thin pool exists, space must have been allocated \
                              from the backstore, so backstore must have a cap device",
-                        ))
+                            ),
+                            Sectors(0),
+                            OffsetDirection::Forwards,
+                        )
                         .and(Ok(bdi))
                 });
             self.thin_pool.resume()?;
@@ -1303,6 +1309,34 @@ impl Pool for StratPool {
         }
     }
 
+    fn encrypt_pool(
+        &mut self,
+        _: &Name,
+        _: PoolUuid,
+        _: &InputEncryptionInfo,
+    ) -> StratisResult<CreateAction<EncryptedDevice>> {
+        Err(StratisError::Msg(
+            "Encrypting an unencrypted device is only supported in V2 of the metadata".to_string(),
+        ))
+    }
+
+    fn reencrypt_pool(&mut self, name: &Name) -> StratisResult<ReencryptedDevice> {
+        self.backstore.reencrypt()?;
+        self.last_reencrypt = Some(Utc::now());
+        self.write_metadata(name)?;
+        Ok(ReencryptedDevice)
+    }
+
+    fn decrypt_pool(
+        &mut self,
+        _: &Name,
+        _: PoolUuid,
+    ) -> StratisResult<DeleteAction<EncryptedDevice>> {
+        Err(StratisError::Msg(
+            "Decrypting an encrypted device is only supported in V2 of the metadata".to_string(),
+        ))
+    }
+
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {
         serde_json::to_string(&self.record(pool_name)).map_err(|e| e.into())
     }
@@ -1344,6 +1378,10 @@ impl Pool for StratPool {
 
     fn free_token_slots(&self) -> Option<u8> {
         None
+    }
+
+    fn last_reencrypt(&self) -> Option<DateTime<Utc>> {
+        self.last_reencrypt
     }
 }
 

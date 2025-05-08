@@ -739,6 +739,7 @@ pub fn read_key(key_description: &KeyDescription) -> StratisResult<Option<SizedK
 }
 
 fn token_dispatch(json: &Value) -> StratisResult<Option<UnlockMechanism>> {
+    #[allow(clippy::to_string_in_format_args)]
     match json.get("type").and_then(|val| val.as_str()) {
         Some(CLEVIS_TOKEN_TYPE) => Ok(Some(UnlockMechanism::ClevisInfo(clevis_info_from_json(
             json,
@@ -843,6 +844,7 @@ unsafe extern "C" fn open(
     let res = open_safe(&mut safe_device, token);
     // Required to avoid double free
     forget(safe_device);
+    #[allow(clippy::to_string_in_format_args)]
     match res {
         Ok(pass) => {
             let malloc_pass = libc::malloc(pass.as_ref().len());

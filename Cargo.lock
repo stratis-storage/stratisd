@@ -781,9 +781,9 @@ checksum = "b5aba8db14291edd000dfcc4d620c7ebfb122c613afb886ca8803fa4e128a20a"
 
 [[package]]
 name = "libcryptsetup-rs"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "186b5b6114517ab1d6e25741c6fb21060aae750e70868842efc9dd1efd08baa1"
+checksum = "e15ad755ac75c4d999fcc961ac6428ab7435d67fec11317c1e62b31720f50dfb"
 dependencies = [
  "bitflags 2.4.0",
  "either",
@@ -791,6 +791,7 @@ dependencies = [
  "libcryptsetup-rs-sys",
  "log",
  "once_cell",
+ "per-thread-mutex",
  "pkg-config",
  "semver",
  "serde_json",
@@ -799,11 +800,11 @@ dependencies = [
 
 [[package]]
 name = "libcryptsetup-rs-sys"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c78b397341cb9aa5ddc8d11118754ed0eab4aeb9cee96ee7cbe83a7d2867b8d2"
+checksum = "66efc016fec48b158f880beca59ca1c901dc002483e1c6102d92b0bcb4273714"
 dependencies = [
- "bindgen 0.69.4",
+ "bindgen 0.71.1",
  "cc",
  "pkg-config",
  "semver",
@@ -873,9 +874,9 @@ checksum = "78b3ae25bc7c8c38cec158d1f2757ee79e9b3740fbc7ccf0e59e4b08d793fa89"
 
 [[package]]
 name = "log"
-version = "0.4.19"
+version = "0.4.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b06a4cde4c0f271a446782e3eff8de789548ce57dbc8eca9292c27f4a42004b4"
+checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 
 [[package]]
 name = "loopdev-3"
@@ -995,6 +996,16 @@ name = "once_cell"
 version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3fdb12b2476b595f9358c5161aa467c2438859caa136dec86c26fdd2efe17b92"
+
+[[package]]
+name = "per-thread-mutex"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b20d1aaa7fcf3cd5a7b4506c38594d25e122ad45dec6da7f85bac52f3a3e562c"
+dependencies = [
+ "libc",
+ "log",
+]
 
 [[package]]
 name = "pin-project-lite"

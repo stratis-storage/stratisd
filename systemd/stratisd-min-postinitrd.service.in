@@ -4,7 +4,6 @@ Documentation=man:stratisd(8)
 DefaultDependencies=no
 After=systemd-udevd.service
 Requires=systemd-udevd.service
-Before=local-fs-pre.target
 
 [Service]
 Type=notify

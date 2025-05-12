@@ -1,3 +1,78 @@
+stratisd 3.8.1
+==============
+Recommended Rust toolchain version: 1.86.0
+Recommended development platform for Python development: Fedora 41
+
+- Modify systemd unit files and dependencies:
+  https://github.com/stratis-storage/stratisd/issues/3348
+  https://github.com/stratis-storage/stratisd/pull/3826
+
+- Support additional encryption features in StoppedPools D-bus property:
+  https://github.com/stratis-storage/stratisd/issues/3805
+  https://github.com/stratis-storage/stratisd/pull/3811
+
+- Add signal for MergeScheduled property update for D-Bus revision 8:
+  https://github.com/stratis-storage/stratisd/pull/3831
+
+- Improve error message when destroying a to-be-reverted filesystem:
+  https://github.com/stratis-storage/stratisd/pull/3828
+
+- Increase strum dependency lower bound to 0.27.0:
+  https://github.com/stratis-storage/stratisd/pull/3788
+
+- Increase libcryptsetup-rs dependency lower bound to 0.12.0:
+  https://github.com/stratis-storage/stratisd/pull/3795
+
+- Increase tokio dependency lower bound to 1.44.2:
+  https://github.com/stratis-storage/stratisd/pull/3818
+
+- Increase libblkid-rs dependency lower bound to 0.4.0:
+  https://github.com/stratis-storage/stratisd/pull/3822
+
+- Increase bindgen dependency lower bound to 0.71.0;
+  use Cargo.toml's rust-version as rust target;
+  allow default features for bindgen dependency:
+  https://github.com/stratis-storage/stratisd/pull/3836
+  https://github.com/stratis-storage/stratisd/pull/3824
+  https://github.com/stratis-storage/stratisd/pull/3821
+
+- Increase libc dependency lower bound to 0.2.168:
+  https://github.com/stratis-storage/stratisd/pull/3832
+
+- Widen libcryptsetup-rs-sys dependency version specification:
+  https://github.com/stratis-storage/stratisd/pull/3833
+
+- stratisd_proc_macros: increase proc-macro2 dependency lower bound to 1.0.80:
+  https://github.com/stratis-storage/stratisd/pull/3835
+
+- Release stratisd_proc_macros 0.2.2:
+  https://github.com/stratis-storage/stratisd/pull/3834
+
+- Support wildcard arguments in stratisd_proc_macros:
+  https://github.com/stratis-storage/stratisd/issues/3809
+  https://github.com/stratis-storage/stratisd/pull/3830
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3829
+  https://github.com/stratis-storage/stratisd/pull/3827
+  https://github.com/stratis-storage/stratisd/pull/3825
+  https://github.com/stratis-storage/stratisd/pull/3823
+  https://github.com/stratis-storage/stratisd/pull/3820
+  https://github.com/stratis-storage/stratisd/pull/3815
+  https://github.com/stratis-storage/stratisd/pull/3814
+  https://github.com/stratis-storage/stratisd/pull/3813
+  https://github.com/stratis-storage/stratisd/pull/3812
+  https://github.com/stratis-storage/stratisd/pull/3808
+  https://github.com/stratis-storage/stratisd/pull/3807
+  https://github.com/stratis-storage/stratisd/pull/3806
+  https://github.com/stratis-storage/stratisd/pull/3803
+  https://github.com/stratis-storage/stratisd/pull/3802
+  https://github.com/stratis-storage/stratisd/pull/3797
+  https://github.com/stratis-storage/stratisd/pull/3794
+  https://github.com/stratis-storage/stratisd/pull/3757
+  https://github.com/stratis-storage/stratisd/pull/3731
+
+
 stratisd 3.8.0
 ==============
 Recommended Rust toolchain version: 1.85.0

@@ -198,7 +198,16 @@ impl LiminalDevices {
             };
 
             setup_pool_legacy(
-                pools, pool_uuid, luks_info, infos, bdas, timestamp, metadata,
+                pools,
+                pool_uuid,
+                luks_info,
+                infos,
+                bdas,
+                timestamp,
+                metadata,
+                pool_uuid
+                    == PoolUuid::parse_str("301ed57d-4493-44a0-a3b7-784568637336")
+                        .expect("valid UUID"),
             )
         }
 
@@ -853,7 +862,16 @@ impl LiminalDevices {
             if let Some(true) | None = metadata.started {
                 match metadata_version {
                     StratSigblockVersion::V1 => setup_pool_legacy(
-                        pools, pool_uuid, luks_info, infos, bdas, timestamp, metadata,
+                        pools,
+                        pool_uuid,
+                        luks_info,
+                        infos,
+                        bdas,
+                        timestamp,
+                        metadata,
+                        pool_uuid
+                            == PoolUuid::parse_str("301ed57d-4493-44a0-a3b7-784568637336")
+                                .expect("valid UUID"),
                     )
                     .map(Either::Left),
                     StratSigblockVersion::V2 => setup_pool(
@@ -1261,6 +1279,10 @@ fn load_stratis_metadata(
 ///
 /// If there is a name conflict between the set of devices in devices
 /// and some existing pool, return an error.
+///
+/// If omit_cache is set to true, do not set up the cache, even if a cache
+/// is present in the metadata. Do this by removing the cache information from
+/// the metadata.
 #[allow(clippy::too_many_arguments)]
 fn setup_pool_legacy(
     pools: &Table<PoolUuid, AnyPool>,
@@ -1270,6 +1292,7 @@ fn setup_pool_legacy(
     bdas: HashMap<DevUuid, BDA>,
     timestamp: DateTime<Utc>,
     metadata: PoolSave,
+    omit_cache: bool,
 ) -> BDARecordResult<(Name, AnyPool)> {
     if let Some((uuid, _)) = pools.get_by_name(&metadata.name) {
         return Err((
@@ -1281,7 +1304,13 @@ fn setup_pool_legacy(
             )), bdas));
     }
 
-    let (datadevs, cachedevs) = match get_blockdevs_legacy(&metadata.backstore, infos, bdas) {
+    let (metadata, cache_uuids_omitted) = if omit_cache {
+        metadata.decache()
+    } else {
+        (metadata, Vec::new())
+    };
+
+    let (datadevs, cachedevs) = match get_blockdevs_legacy(&metadata.backstore, infos, bdas, cache_uuids_omitted) {
         Err((err, bdas)) => return Err(
             (StratisError::Chained(
                 format!(
@@ -1293,6 +1322,8 @@ fn setup_pool_legacy(
             ), bdas)),
         Ok((datadevs, cachedevs)) => (datadevs, cachedevs),
     };
+
+    assert!(!omit_cache || cachedevs.is_empty());
 
     let pool_einfo = match luks_info {
         Ok(inner) => inner,
@@ -1311,7 +1342,7 @@ fn setup_pool_legacy(
         }
     };
 
-    v1::StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata, pool_einfo)
+    v1::StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata, pool_einfo, omit_cache)
         .map(|(name, mut pool)| {
             if pool.blockdevs().iter().map(|(_, _, bd)| {
                 bd.pool_name()

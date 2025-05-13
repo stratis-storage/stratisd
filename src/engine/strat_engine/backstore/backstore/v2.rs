@@ -4,11 +4,12 @@
 
 // Code to handle the backing store of a pool.
 
-use std::{cmp, collections::HashMap, iter::once, path::PathBuf};
+use std::{cmp, collections::HashMap, iter::once, path::Path, path::PathBuf};
 
 use chrono::{DateTime, Utc};
 use either::Either;
 use serde_json::Value;
+use tempfile::TempDir;
 
 use devicemapper::{
     CacheDev, CacheDevTargetTable, CacheTargetParams, DevId, Device, DmDevice, DmFlags, DmOptions,
@@ -23,19 +24,23 @@ use crate::{
                 blockdevmgr::BlockDevMgr, cache_tier::CacheTier, data_tier::DataTier,
                 devices::UnownedDevices, shared::BlockSizeSummary,
             },
-            crypt::{handle::v2::CryptHandle, manual_wipe, DEFAULT_CRYPT_DATA_OFFSET_V2},
+            crypt::{
+                back_up_luks_header, handle::v2::CryptHandle, manual_wipe, restore_luks_header,
+                DEFAULT_CRYPT_DATA_OFFSET_V2,
+            },
             dm::{get_dm, list_of_backstore_devices, remove_optional_devices, DEVICEMAPPER_PATH},
             metadata::{MDADataSize, BDA},
             names::{format_backstore_ids, CacheRole},
             serde_structs::{BackstoreSave, CapSave, PoolFeatures, PoolSave, Recordable},
             shared::bds_to_bdas,
+            thinpool::ThinPool,
             types::BDARecordResult,
             writing::wipe_sectors,
         },
         types::{
             ActionAvailability, BlockDevTier, DevUuid, EncryptionInfo, InputEncryptionInfo,
-            KeyDescription, OptionalTokenSlotInput, PoolUuid, SizedKeyMemory, TokenUnlockMethod,
-            UnlockMechanism, ValidatedIntegritySpec,
+            KeyDescription, OffsetDirection, OptionalTokenSlotInput, PoolUuid, SizedKeyMemory,
+            TokenUnlockMethod, UnlockMechanism, ValidatedIntegritySpec,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -132,32 +137,26 @@ fn make_placeholder_dev(
     LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), target).map_err(StratisError::from)
 }
 
-/// This structure can allocate additional space to the upper layer, but it
-/// cannot accept returned space. When it is extended to be able to accept
-/// returned space the allocation algorithm will have to be revised.
+/// Contains all devices that could potentially be the cap device and the allocations recorded on
+/// the cap device.
 #[derive(Debug)]
-pub struct Backstore {
-    /// Coordinate handling of blockdevs that back the cache. Optional, since
-    /// this structure can operate without a cache.
-    cache_tier: Option<CacheTier<StratBlockDev>>,
-    /// Coordinates handling of the blockdevs that form the base.
-    data_tier: DataTier<StratBlockDev>,
+struct CapDevice {
     /// A linear DM device.
     origin: Option<LinearDev>,
     /// A placeholder device to be converted to cache or a cache device.
     cache: Option<CacheDev>,
-    /// A placeholder device to be converted to cache; necessary for reencryption support.
-    placeholder: Option<LinearDev>,
     /// Either encryption information for a handle to be created at a later time or
     /// handle for encryption layer in backstore.
     enc: Option<Either<InputEncryptionInfo, CryptHandle>>,
+    /// A placeholder device to be converted to cache; necessary for reencryption support.
+    placeholder: Option<LinearDev>,
     /// Data allocations on the cap device,
     allocs: Vec<(Sectors, Sectors)>,
     /// Metadata allocations on the cache or placeholder device.
     crypt_meta_allocs: Vec<(Sectors, Sectors)>,
 }
 
-impl InternalBackstore for Backstore {
+impl CapDevice {
     fn device(&self) -> Option<Device> {
         self.enc
             .as_ref()
@@ -166,30 +165,24 @@ impl InternalBackstore for Backstore {
             .or_else(|| self.placeholder.as_ref().map(|lin| lin.device()))
     }
 
-    fn datatier_allocated_size(&self) -> Sectors {
-        self.allocs.iter().map(|(_, length)| *length).sum()
-    }
-
-    fn datatier_usable_size(&self) -> Sectors {
-        self.datatier_size() - self.datatier_metadata_size()
-    }
-
-    fn available_in_backstore(&self) -> Sectors {
-        self.datatier_usable_size() - self.datatier_allocated_size()
+    pub fn is_encrypted(&self) -> bool {
+        self.enc.is_some()
     }
 
     fn alloc(
         &mut self,
+        data_tier: &mut DataTier<StratBlockDev>,
+        available: Sectors,
         pool_uuid: PoolUuid,
         sizes: &[Sectors],
     ) -> StratisResult<Option<Vec<(Sectors, Sectors)>>> {
         let total_required = sizes.iter().cloned().sum();
-        if self.available_in_backstore() < total_required {
+        if available < total_required {
             return Ok(None);
         }
 
-        if self.data_tier.alloc(sizes) {
-            self.extend_cap_device(pool_uuid)?;
+        if data_tier.alloc(sizes) {
+            self.extend_cap_device(data_tier, pool_uuid)?;
         } else {
             return Ok(None);
         }
@@ -214,9 +207,43 @@ impl InternalBackstore for Backstore {
 
         Ok(Some(chunks))
     }
-}
 
-impl Backstore {
+    fn meta_alloc_cache(
+        &mut self,
+        data_tier: &mut DataTier<StratBlockDev>,
+        available: Sectors,
+        sizes: &[Sectors],
+    ) -> StratisResult<bool> {
+        let total_required = sizes.iter().cloned().sum();
+        if available < total_required {
+            return Ok(false);
+        }
+
+        if !data_tier.alloc(sizes) {
+            return Ok(false);
+        }
+
+        let mut chunks = Vec::new();
+        for size in sizes {
+            let next = self.calc_next_cache()?;
+            let seg = (next, *size);
+            chunks.push(seg);
+            self.crypt_meta_allocs.push(seg);
+        }
+
+        // Assert that the postcondition holds.
+        assert_eq!(
+            sizes,
+            chunks
+                .iter()
+                .map(|x| x.1)
+                .collect::<Vec<Sectors>>()
+                .as_slice()
+        );
+
+        Ok(true)
+    }
+
     /// Calculate next from all of the metadata and data allocations present in the backstore.
     fn calc_next_cache(&self) -> StratisResult<Sectors> {
         let mut all_allocs = if self.allocs.is_empty() {
@@ -271,6 +298,171 @@ impl Backstore {
             .unwrap_or(Sectors(0))
     }
 
+    /// Extend the cap device whether it is a cache or not. Create the DM
+    /// device if it does not already exist. Return an error if DM
+    /// operations fail. Use all segments currently allocated in the data tier.
+    fn extend_cap_device(
+        &mut self,
+        data_tier: &DataTier<StratBlockDev>,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<()> {
+        let create = match (
+            self.cache.as_mut(),
+            self.placeholder
+                .as_mut()
+                .and_then(|p| self.origin.as_mut().map(|o| (p, o))),
+            self.enc.as_mut(),
+        ) {
+            (None, None, None) => true,
+            (_, _, Some(Either::Left(_))) => true,
+            (Some(cache), None, Some(Either::Right(handle))) => {
+                let table = data_tier.segments.map_to_dm();
+                cache.set_origin_table(get_dm(), table)?;
+                cache.resume(get_dm())?;
+                handle.resize(None)?;
+                false
+            }
+            (Some(cache), None, None) => {
+                let table = data_tier.segments.map_to_dm();
+                cache.set_origin_table(get_dm(), table)?;
+                cache.resume(get_dm())?;
+                false
+            }
+            (None, Some((placeholder, origin)), Some(Either::Right(handle))) => {
+                let table = data_tier.segments.map_to_dm();
+                origin.set_table(get_dm(), table)?;
+                origin.resume(get_dm())?;
+                let table = vec![TargetLine::new(
+                    Sectors(0),
+                    origin.size(),
+                    LinearDevTargetParams::Linear(LinearTargetParams::new(
+                        origin.device(),
+                        Sectors(0),
+                    )),
+                )];
+                placeholder.set_table(get_dm(), table)?;
+                placeholder.resume(get_dm())?;
+                handle.resize(None)?;
+                false
+            }
+            (None, Some((cap, linear)), None) => {
+                let table = data_tier.segments.map_to_dm();
+                linear.set_table(get_dm(), table)?;
+                linear.resume(get_dm())?;
+                let table = vec![TargetLine::new(
+                    Sectors(0),
+                    linear.size(),
+                    LinearDevTargetParams::Linear(LinearTargetParams::new(
+                        linear.device(),
+                        Sectors(0),
+                    )),
+                )];
+                cap.set_table(get_dm(), table)?;
+                cap.resume(get_dm())?;
+                false
+            }
+            _ => panic!("NOT (self.cache().is_some() AND self.origin.is_some())"),
+        };
+
+        if create {
+            let table = data_tier.segments.map_to_dm();
+            let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
+            let origin = LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), table)?;
+            let placeholder = make_placeholder_dev(pool_uuid, &origin)?;
+            let handle = match self.enc {
+                Some(Either::Left(ref einfo)) => Some(CryptHandle::initialize(
+                    &once(DEVICEMAPPER_PATH)
+                        .chain(once(
+                            format_backstore_ids(pool_uuid, CacheRole::Cache)
+                                .0
+                                .to_string()
+                                .as_str(),
+                        ))
+                        .collect::<PathBuf>(),
+                    pool_uuid,
+                    einfo,
+                    None,
+                )?),
+                Some(Either::Right(_)) => unreachable!("Checked above"),
+                None => {
+                    manual_wipe(
+                        &placeholder.devnode(),
+                        Sectors(0),
+                        DEFAULT_CRYPT_DATA_OFFSET_V2,
+                    )?;
+                    None
+                }
+            };
+            self.origin = Some(origin);
+            self.placeholder = Some(placeholder);
+            self.enc = handle.map(Either::Right);
+        }
+
+        Ok(())
+    }
+
+    /// Shift alloc offset when the cap device has changed.
+    fn shift_alloc_offset(&mut self, offset: Sectors, direction: OffsetDirection) {
+        for (start, _) in self.allocs.iter_mut() {
+            match direction {
+                OffsetDirection::Forwards => {
+                    *start += offset;
+                }
+                OffsetDirection::Backwards => {
+                    *start -= offset;
+                }
+            }
+        }
+    }
+}
+
+/// This structure can allocate additional space to the upper layer, but it
+/// cannot accept returned space. When it is extended to be able to accept
+/// returned space the allocation algorithm will have to be revised.
+#[derive(Debug)]
+pub struct Backstore {
+    /// Coordinate handling of blockdevs that back the cache. Optional, since
+    /// this structure can operate without a cache.
+    cache_tier: Option<CacheTier<StratBlockDev>>,
+    /// Coordinates handling of the blockdevs that form the base.
+    data_tier: DataTier<StratBlockDev>,
+    /// Represents a cap device for the backstore.
+    cap_device: CapDevice,
+}
+
+impl InternalBackstore for Backstore {
+    fn device(&self) -> Option<Device> {
+        self.cap_device.device()
+    }
+
+    fn datatier_allocated_size(&self) -> Sectors {
+        self.cap_device
+            .allocs
+            .iter()
+            .map(|(_, length)| *length)
+            .sum()
+    }
+
+    fn datatier_usable_size(&self) -> Sectors {
+        self.datatier_size() - self.datatier_metadata_size()
+    }
+
+    fn available_in_backstore(&self) -> Sectors {
+        self.datatier_usable_size() - self.datatier_allocated_size()
+    }
+
+    fn alloc(
+        &mut self,
+        pool_uuid: PoolUuid,
+        sizes: &[Sectors],
+    ) -> StratisResult<Option<Vec<(Sectors, Sectors)>>> {
+        let available = self.available_in_backstore();
+        self.cap_device
+            .alloc(&mut self.data_tier, available, pool_uuid, sizes)
+    }
+}
+
+impl Backstore {
     /// Make a Backstore object from blockdevs that already belong to Stratis.
     /// Precondition: every device in datadevs and cachedevs has already been
     /// determined to belong to the pool with the specified pool_uuid.
@@ -420,22 +612,22 @@ impl Backstore {
                             Some(Either::Right(h))
                         } else {
                             return Err(
-                                (
-                                    StratisError::Msg(
-                                        "Metadata reported that encryption is enabled but no crypt header was found".to_string()
-                                    ),
-                                    data_tier
-                                        .block_mgr
-                                        .into_bdas()
-                                        .into_iter()
-                                        .chain(
-                                            cache_tier
-                                                .map(|ct| ct.block_mgr.into_bdas())
-                                                .unwrap_or_default(),
-                                        )
-                                        .collect::<HashMap<_, _>>(),
-                                )
-                            );
+                                    (
+                                        StratisError::Msg(
+                                            "Metadata reported that encryption is enabled but no crypt header was found".to_string()
+                                        ),
+                                        data_tier
+                                            .block_mgr
+                                            .into_bdas()
+                                            .into_iter()
+                                            .chain(
+                                                cache_tier
+                                                    .map(|ct| ct.block_mgr.into_bdas())
+                                                    .unwrap_or_default(),
+                                            )
+                                            .collect::<HashMap<_, _>>(),
+                                    )
+                                );
                         }
                     }
                     Err(e) => {
@@ -497,12 +689,14 @@ impl Backstore {
         Ok(Backstore {
             data_tier,
             cache_tier,
-            origin,
-            cache,
-            placeholder,
-            enc,
-            allocs: pool_save.backstore.cap.allocs.clone(),
-            crypt_meta_allocs: pool_save.backstore.cap.crypt_meta_allocs.clone(),
+            cap_device: CapDevice {
+                origin,
+                cache,
+                placeholder,
+                enc,
+                allocs: pool_save.backstore.cap.allocs.clone(),
+                crypt_meta_allocs: pool_save.backstore.cap.crypt_meta_allocs.clone(),
+            },
         })
     }
 
@@ -529,13 +723,15 @@ impl Backstore {
 
         let mut backstore = Backstore {
             data_tier,
-            placeholder: None,
             cache_tier: None,
-            cache: None,
-            origin: None,
-            enc: encryption_info.cloned().map(Either::Left),
-            allocs: Vec::new(),
-            crypt_meta_allocs: Vec::new(),
+            cap_device: CapDevice {
+                placeholder: None,
+                cache: None,
+                origin: None,
+                enc: encryption_info.cloned().map(Either::Left),
+                allocs: Vec::new(),
+                crypt_meta_allocs: Vec::new(),
+            },
         };
 
         let size = DEFAULT_CRYPT_DATA_OFFSET_V2;
@@ -549,35 +745,9 @@ impl Backstore {
     }
 
     fn meta_alloc_cache(&mut self, sizes: &[Sectors]) -> StratisResult<bool> {
-        let total_required = sizes.iter().cloned().sum();
         let available = self.available_in_backstore();
-        if available < total_required {
-            return Ok(false);
-        }
-
-        if !self.data_tier.alloc(sizes) {
-            return Ok(false);
-        }
-
-        let mut chunks = Vec::new();
-        for size in sizes {
-            let next = self.calc_next_cache()?;
-            let seg = (next, *size);
-            chunks.push(seg);
-            self.crypt_meta_allocs.push(seg);
-        }
-
-        // Assert that the postcondition holds.
-        assert_eq!(
-            sizes,
-            chunks
-                .iter()
-                .map(|x| x.1)
-                .collect::<Vec<Sectors>>()
-                .as_slice()
-        );
-
-        Ok(true)
+        self.cap_device
+            .meta_alloc_cache(&mut self.data_tier, available, sizes)
     }
 
     /// Initialize the cache tier and add cachedevs to the backstore.
@@ -609,16 +779,16 @@ impl Backstore {
 
                 let cache_tier = CacheTier::new(bdm)?;
 
-                let origin = self.origin
-                    .take()
-                    .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.origin.is_some())");
-                let placeholder = self.placeholder
-                    .take()
-                    .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.placeholder.is_some())");
+                let origin = self.cap_device.origin
+                        .take()
+                        .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.origin.is_some())");
+                let placeholder = self.cap_device.placeholder
+                        .take()
+                        .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.placeholder.is_some())");
 
                 let cache = make_cache(pool_uuid, &cache_tier, origin, Some(placeholder), true)?;
 
-                self.cache = Some(cache);
+                self.cap_device.cache = Some(cache);
 
                 let uuids = cache_tier
                     .block_mgr
@@ -654,6 +824,7 @@ impl Backstore {
         match self.cache_tier {
             Some(ref mut cache_tier) => {
                 let cache_device = self
+                    .cap_device
                     .cache
                     .as_mut()
                     .expect("cache_tier.is_some() <=> self.cache.is_some()");
@@ -688,105 +859,6 @@ impl Backstore {
         devices: UnownedDevices,
     ) -> StratisResult<Vec<DevUuid>> {
         self.data_tier.add(pool_uuid, devices)
-    }
-
-    /// Extend the cap device whether it is a cache or not. Create the DM
-    /// device if it does not already exist. Return an error if DM
-    /// operations fail. Use all segments currently allocated in the data tier.
-    fn extend_cap_device(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
-        let create = match (
-            self.cache.as_mut(),
-            self.placeholder
-                .as_mut()
-                .and_then(|p| self.origin.as_mut().map(|o| (p, o))),
-            self.enc.as_mut(),
-        ) {
-            (None, None, None) => true,
-            (_, _, Some(Either::Left(_))) => true,
-            (Some(cache), None, Some(Either::Right(handle))) => {
-                let table = self.data_tier.segments.map_to_dm();
-                cache.set_origin_table(get_dm(), table)?;
-                cache.resume(get_dm())?;
-                handle.resize(None)?;
-                false
-            }
-            (Some(cache), None, None) => {
-                let table = self.data_tier.segments.map_to_dm();
-                cache.set_origin_table(get_dm(), table)?;
-                cache.resume(get_dm())?;
-                false
-            }
-            (None, Some((placeholder, origin)), Some(Either::Right(handle))) => {
-                let table = self.data_tier.segments.map_to_dm();
-                origin.set_table(get_dm(), table)?;
-                origin.resume(get_dm())?;
-                let table = vec![TargetLine::new(
-                    Sectors(0),
-                    origin.size(),
-                    LinearDevTargetParams::Linear(LinearTargetParams::new(
-                        origin.device(),
-                        Sectors(0),
-                    )),
-                )];
-                placeholder.set_table(get_dm(), table)?;
-                placeholder.resume(get_dm())?;
-                handle.resize(None)?;
-                false
-            }
-            (None, Some((cap, linear)), None) => {
-                let table = self.data_tier.segments.map_to_dm();
-                linear.set_table(get_dm(), table)?;
-                linear.resume(get_dm())?;
-                let table = vec![TargetLine::new(
-                    Sectors(0),
-                    linear.size(),
-                    LinearDevTargetParams::Linear(LinearTargetParams::new(
-                        linear.device(),
-                        Sectors(0),
-                    )),
-                )];
-                cap.set_table(get_dm(), table)?;
-                cap.resume(get_dm())?;
-                false
-            }
-            _ => panic!("NOT (self.cache().is_some() AND self.origin.is_some())"),
-        };
-
-        if create {
-            let table = self.data_tier.segments.map_to_dm();
-            let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
-            let origin = LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), table)?;
-            let placeholder = make_placeholder_dev(pool_uuid, &origin)?;
-            let handle = match self.enc {
-                Some(Either::Left(ref einfo)) => Some(CryptHandle::initialize(
-                    &once(DEVICEMAPPER_PATH)
-                        .chain(once(
-                            format_backstore_ids(pool_uuid, CacheRole::Cache)
-                                .0
-                                .to_string()
-                                .as_str(),
-                        ))
-                        .collect::<PathBuf>(),
-                    pool_uuid,
-                    einfo,
-                    None,
-                )?),
-                Some(Either::Right(_)) => unreachable!("Checked above"),
-                None => {
-                    manual_wipe(
-                        &placeholder.devnode(),
-                        Sectors(0),
-                        DEFAULT_CRYPT_DATA_OFFSET_V2,
-                    )?;
-                    None
-                }
-            };
-            self.origin = Some(origin);
-            self.placeholder = Some(placeholder);
-            self.enc = handle.map(Either::Right);
-        }
-
-        Ok(())
     }
 
     /// Get only the datadevs in the pool.
@@ -852,17 +924,23 @@ impl Backstore {
     /// no ioctl is required.
     #[cfg(test)]
     fn size(&self) -> Sectors {
-        self.enc
+        self.cap_device
+            .enc
             .as_ref()
             .and_then(|either| either.as_ref().right().map(|handle| handle.size()))
-            .or_else(|| self.placeholder.as_ref().map(|d| d.size()))
-            .or_else(|| self.cache.as_ref().map(|d| d.size()))
+            .or_else(|| self.cap_device.placeholder.as_ref().map(|d| d.size()))
+            .or_else(|| self.cap_device.cache.as_ref().map(|d| d.size()))
             .unwrap_or(Sectors(0))
     }
 
     /// Destroy the entire store.
     pub fn destroy(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
-        if let Some(h) = self.enc.as_mut().and_then(|either| either.as_ref().right()) {
+        if let Some(h) = self
+            .cap_device
+            .enc
+            .as_mut()
+            .and_then(|either| either.as_ref().right())
+        {
             h.wipe()?;
         }
         let devs = list_of_backstore_devices(pool_uuid);
@@ -942,7 +1020,11 @@ impl Backstore {
     /// The space is included in the data_tier.allocated() result, since it is
     /// allocated from the assembled devices of the data tier.
     fn datatier_crypt_meta_size(&self) -> Sectors {
-        self.crypt_meta_allocs.iter().map(|(_, len)| *len).sum()
+        self.cap_device
+            .crypt_meta_allocs
+            .iter()
+            .map(|(_, len)| *len)
+            .sum()
     }
 
     /// Metadata size on the data tier, including crypt metadata space.
@@ -989,7 +1071,7 @@ impl Backstore {
     }
 
     pub fn is_encrypted(&self) -> bool {
-        self.enc.is_some()
+        self.cap_device.is_encrypted()
     }
 
     pub fn has_cache(&self) -> bool {
@@ -998,7 +1080,8 @@ impl Backstore {
 
     /// Get the encryption information for the backstore.
     pub fn encryption_info(&self) -> Option<&EncryptionInfo> {
-        self.enc
+        self.cap_device
+            .enc
             .as_ref()
             .and_then(|either| either.as_ref().right().map(|h| h.encryption_info()))
     }
@@ -1017,6 +1100,7 @@ impl Backstore {
         clevis_info: &Value,
     ) -> StratisResult<Option<u32>> {
         let handle = self
+            .cap_device
             .enc
             .as_mut()
             .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?
@@ -1076,6 +1160,7 @@ impl Backstore {
     /// * Returns Err(_) if unbinding failed.
     pub fn unbind_keyring(&mut self, token_slot: Option<u32>) -> StratisResult<bool> {
         let handle = self
+            .cap_device
             .enc
             .as_mut()
             .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?
@@ -1117,6 +1202,7 @@ impl Backstore {
     /// * Returns Err(_) if unbinding failed.
     pub fn unbind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<bool> {
         let handle = self
+            .cap_device
             .enc
             .as_mut()
             .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?
@@ -1165,6 +1251,7 @@ impl Backstore {
         key_desc: &KeyDescription,
     ) -> StratisResult<Option<u32>> {
         let handle = self
+            .cap_device
             .enc
             .as_mut()
             .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?
@@ -1240,6 +1327,7 @@ impl Backstore {
         key_desc: &KeyDescription,
     ) -> StratisResult<Option<bool>> {
         let handle = self
+            .cap_device
             .enc
             .as_mut()
             .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?
@@ -1287,6 +1375,7 @@ impl Backstore {
     /// result in a metadata change.
     pub fn rebind_clevis(&mut self, token_slot: Option<u32>) -> StratisResult<()> {
         let handle = self
+            .cap_device
             .enc
             .as_mut()
             .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?
@@ -1317,6 +1406,71 @@ impl Backstore {
 
     pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
         self.data_tier.grow(dev)
+    }
+
+    pub fn encrypt(
+        &mut self,
+        pool_uuid: PoolUuid,
+        thinpool: &mut ThinPool<Self>,
+        encryption_info: &InputEncryptionInfo,
+    ) -> StratisResult<()> {
+        let (dm_name, _) = format_backstore_ids(pool_uuid, CacheRole::Cache);
+        let handle = CryptHandle::encrypt(
+            pool_uuid,
+            thinpool,
+            Path::new(&format!("/dev/mapper/{}", &dm_name.to_string())),
+            encryption_info,
+        )?;
+        self.cap_device.enc = Some(Either::Right(handle));
+        Ok(())
+    }
+
+    pub fn reencrypt(&self) -> StratisResult<()> {
+        match self.cap_device.enc {
+            Some(Either::Left(_)) => {
+                Err(StratisError::Msg("Encrypted pool where the encrypted device has not yet been created cannot be reencrypted".to_string()))
+            }
+            Some(Either::Right(ref handle)) => {
+                let tmp_dir = TempDir::new()?;
+                let h = back_up_luks_header(handle.luks2_device_path(), &tmp_dir)?;
+                let (slot, key, new_slot) = match handle.setup_reencrypt() {
+                    Ok(tup) => tup,
+                    Err(causal_e) => {
+                        if let Err(rollback_e) = restore_luks_header(handle.luks2_device_path(), &h) {
+                            return Err(StratisError::RollbackError {
+                                causal_error: Box::new(causal_e),
+                                rollback_error: Box::new(rollback_e),
+                                level: ActionAvailability::Full,
+                            });
+                        } else {
+                            return Err(causal_e)
+                        }
+                    }
+                };
+                handle.do_reencrypt(slot, key, new_slot)?;
+                Ok(())
+            }
+            None => {
+                Err(StratisError::Msg("Unencrypted device cannot be reencrypted".to_string()))
+            }
+        }
+    }
+
+    pub fn decrypt(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        let handle = self
+            .cap_device
+            .enc
+            .take()
+            .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?
+            .right()
+            .ok_or_else(|| {
+                StratisError::Msg("No space has been allocated from the backstore".to_string())
+            })?;
+        let luks2_path = handle.luks2_device_path().to_owned();
+
+        handle.decrypt(pool_uuid)?;
+        manual_wipe(&luks2_path, Sectors(0), DEFAULT_CRYPT_DATA_OFFSET_V2)?;
+        Ok(())
     }
 
     /// A summary of block sizes
@@ -1353,6 +1507,10 @@ impl Backstore {
             ActionAvailability::Full
         }
     }
+
+    pub fn shift_alloc_offset(&mut self, offset: Sectors, direction: OffsetDirection) {
+        self.cap_device.shift_alloc_offset(offset, direction)
+    }
 }
 
 impl Into<Value> for &Backstore {
@@ -1379,8 +1537,8 @@ impl Recordable<BackstoreSave> for Backstore {
         BackstoreSave {
             cache_tier: self.cache_tier.as_ref().map(|c| c.record()),
             cap: CapSave {
-                allocs: self.allocs.clone(),
-                crypt_meta_allocs: self.crypt_meta_allocs.clone(),
+                allocs: self.cap_device.allocs.clone(),
+                crypt_meta_allocs: self.cap_device.crypt_meta_allocs.clone(),
             },
             data_tier: self.data_tier.record(),
         }
@@ -1416,14 +1574,14 @@ mod tests {
     ///   device
     fn invariant(backstore: &Backstore) {
         assert!(
-            (backstore.cache_tier.is_none() && backstore.cache.is_none())
+            (backstore.cache_tier.is_none() && backstore.cap_device.cache.is_none())
                 || (backstore.cache_tier.is_some()
-                    && backstore.cache.is_some()
-                    && backstore.origin.is_none())
+                    && backstore.cap_device.cache.is_some()
+                    && backstore.cap_device.origin.is_none())
         );
         assert_eq!(
             backstore.data_tier.allocated(),
-            match (&backstore.origin, &backstore.cache) {
+            match (&backstore.cap_device.origin, &backstore.cap_device.cache) {
                 (None, None) => DEFAULT_CRYPT_DATA_OFFSET_V2,
                 (&None, Some(cache)) => cache.size(),
                 (Some(linear), &None) => linear.size(),
@@ -1495,9 +1653,10 @@ mod tests {
         invariant(&backstore);
 
         assert_eq!(cache_uuids.len(), initcachepaths.len());
-        assert_matches!(backstore.origin, None);
+        assert_matches!(backstore.cap_device.origin, None);
 
         let cache_status = backstore
+            .cap_device
             .cache
             .as_ref()
             .map(|c| c.status(get_dm(), DmOptions::default()).unwrap())
@@ -1523,6 +1682,7 @@ mod tests {
         assert_eq!(cache_uuids.len(), cachedevpaths.len());
 
         let cache_status = backstore
+            .cap_device
             .cache
             .as_ref()
             .map(|c| c.status(get_dm(), DmOptions::default()).unwrap())

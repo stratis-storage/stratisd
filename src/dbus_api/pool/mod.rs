@@ -294,6 +294,9 @@ pub fn create_dbus_pool<'a>(
                 .add_m(pool_3_3::grow_physical_device_method(&f))
                 .add_m(pool_3_7::get_metadata_method(&f))
                 .add_m(pool_3_7::get_fs_metadata_method(&f))
+                .add_m(pool_3_8::encrypt_pool_method(&f))
+                .add_m(pool_3_8::reencrypt_pool_method(&f))
+                .add_m(pool_3_8::decrypt_pool_method(&f))
                 .add_p(pool_3_0::name_property(&f))
                 .add_p(pool_3_0::uuid_property(&f))
                 .add_p(pool_3_0::encrypted_property(&f))
@@ -308,7 +311,8 @@ pub fn create_dbus_pool<'a>(
                 .add_p(pool_3_1::enable_overprov_property(&f))
                 .add_p(pool_3_1::no_alloc_space_property(&f))
                 .add_p(pool_3_8::metadata_version_property(&f))
-                .add_p(pool_3_8::free_token_slots_property(&f)),
+                .add_p(pool_3_8::free_token_slots_property(&f))
+                .add_p(pool_3_8::last_reencrypted_timestamp_property(&f)),
         );
 
     let path = object_path.get_name().to_owned();
@@ -456,7 +460,8 @@ pub fn get_pool_properties(
             consts::POOL_OVERPROV_PROP => shared::pool_overprov_enabled(pool),
             consts::POOL_NO_ALLOCABLE_SPACE_PROP => shared::pool_no_alloc_space(pool),
             consts::POOL_METADATA_VERSION_PROP => shared::pool_metadata_version(pool),
-            consts::POOL_FREE_TOKEN_SLOTS_PROP => shared::pool_free_token_slots(pool)
+            consts::POOL_FREE_TOKEN_SLOTS_PROP => shared::pool_free_token_slots(pool),
+            consts::POOL_LAST_REENCRYPTED_TIMESTAMP_PROP => shared::pool_last_reencrypted_timestamp(pool)
         }
     }
 }

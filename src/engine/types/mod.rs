@@ -39,7 +39,7 @@ pub use crate::{
             keys::{
                 EncryptionInfo, InputEncryptionInfo, KeyDescription, OptionalTokenSlotInput,
                 PoolEncryptionInfo, SizedKeyMemory, TokenUnlockMethod, UnlockMechanism,
-                UnlockMethod,
+                UnlockMethod, VolumeKeyKeyDescription,
             },
         },
     },

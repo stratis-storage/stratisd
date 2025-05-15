@@ -22,8 +22,8 @@ use nix::unistd::getpid;
 use crate::dbus_api::DbusAction;
 use crate::{
     engine::{
-        register_clevis_token, set_up_crypt_logging, unshare_mount_namespace, Engine, SimEngine,
-        StratEngine, UdevEngineEvent,
+        create_process_keyring, register_clevis_token, set_up_crypt_logging,
+        unshare_mount_namespace, Engine, SimEngine, StratEngine, UdevEngineEvent,
     },
     stratis::{
         dm::dm_event_thread, errors::StratisResult, ipc_support::setup, stratis::VERSION,
@@ -69,6 +69,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
 
     set_up_crypt_logging();
     register_clevis_token()?;
+    create_process_keyring()?;
 
     let runtime = Builder::new_multi_thread()
         .enable_all()

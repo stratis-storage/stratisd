@@ -171,7 +171,11 @@ impl StratEngine {
                         cloned_enc_info.as_ref(),
                     )
                 })??;
-                pools.insert(Name::new(name.to_string()), pool_uuid, AnyPool::V1(pool));
+                pools.insert(
+                    Name::new(name.to_string()),
+                    pool_uuid,
+                    AnyPool::V1(Box::new(pool)),
+                );
                 pool_uuid
             };
 
@@ -564,7 +568,11 @@ impl Engine for StratEngine {
                         integrity_spec,
                     )
                 })??;
-                pools.insert(Name::new(name.to_string()), pool_uuid, AnyPool::V2(pool));
+                pools.insert(
+                    Name::new(name.to_string()),
+                    pool_uuid,
+                    AnyPool::V2(Box::new(pool)),
+                );
                 pool_uuid
             };
 

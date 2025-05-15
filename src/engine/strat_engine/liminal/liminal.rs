@@ -1320,7 +1320,7 @@ fn setup_pool_legacy(
                     warn!("Pool will not be able to be started by name; pool name metadata in LUKS2 token is not consistent across all devices: {}", e);
                 }
             }
-            (name, AnyPool::V1(pool))
+            (name, AnyPool::V1(Box::new(pool)))
         })
         .map_err(|(err, bdas)| {
             (StratisError::Chained(
@@ -1385,7 +1385,7 @@ fn setup_pool(
 
     v2::StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata, token_slot, passphrase)
             .map(|(name, pool)| {
-                (name, AnyPool::V2(pool))
+                (name, AnyPool::V2(Box::new(pool)))
             })
             .map_err(|(err, bdas)| {
                 (StratisError::Chained(

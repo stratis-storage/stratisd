@@ -36,7 +36,7 @@ pub use self::{
     },
     dm::{get_dm, get_dm_init},
     engine::StratEngine,
-    keys::StratKeyActions,
+    keys::{create_process_keyring, StratKeyActions},
     metadata::{StaticHeader, StaticHeaderResult, BDA},
     ns::unshare_mount_namespace,
     thinpool::ThinPoolSizeParams,

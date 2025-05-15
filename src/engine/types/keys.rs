@@ -21,7 +21,7 @@ use libcryptsetup_rs::SafeMemHandle;
 use crate::{
     engine::{
         strat_engine::{CLEVIS_LUKS_TOKEN_ID, LUKS2_TOKEN_ID},
-        types::{ClevisInfo, MaybeInconsistent},
+        types::{ClevisInfo, MaybeInconsistent, PoolUuid},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -704,6 +704,19 @@ impl TryFrom<&String> for KeyDescription {
 
     fn try_from(s: &String) -> StratisResult<KeyDescription> {
         KeyDescription::try_from(s.to_owned())
+    }
+}
+
+/// Key description specifically reserved for a pool volume key.
+pub struct VolumeKeyKeyDescription(PoolUuid);
+
+impl VolumeKeyKeyDescription {
+    pub fn new(pool_uuid: PoolUuid) -> Self {
+        VolumeKeyKeyDescription(pool_uuid)
+    }
+
+    pub(in super::super) fn uuid(&self) -> PoolUuid {
+        self.0
     }
 }
 

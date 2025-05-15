@@ -707,7 +707,7 @@ impl Backstore {
                 let table = self.data_tier.segments.map_to_dm();
                 cache.set_origin_table(get_dm(), table)?;
                 cache.resume(get_dm())?;
-                handle.resize(None)?;
+                handle.resize(pool_uuid, None)?;
                 false
             }
             (Some(cache), None, None) => {
@@ -730,7 +730,7 @@ impl Backstore {
                 )];
                 placeholder.set_table(get_dm(), table)?;
                 placeholder.resume(get_dm())?;
-                handle.resize(None)?;
+                handle.resize(pool_uuid, None)?;
                 false
             }
             (None, Some((cap, linear)), None) => {

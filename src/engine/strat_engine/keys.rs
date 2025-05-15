@@ -13,19 +13,28 @@ use crate::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
         shared::read_key_shared,
         strat_engine::names::KeyDescription,
-        types::{Key, MappingCreateAction, MappingDeleteAction, SizedKeyMemory},
+        types::{
+            Key, MappingCreateAction, MappingDeleteAction, SizedKeyMemory, VolumeKeyKeyDescription,
+        },
     },
     stratis::{StratisError, StratisResult},
 };
 
 /// A type corresponding to key IDs in the kernel keyring. In `libkeyutils`,
 /// this is represented as the C type `key_serial_t`.
-type KeySerial = u32;
+type KeySerial = i32;
 
 /// Search the persistent keyring for the given key description.
 pub(super) fn search_key_persistent(key_desc: &KeyDescription) -> StratisResult<Option<KeySerial>> {
     let keyring_id = get_persistent_keyring()?;
-    search_key(keyring_id, key_desc)
+    search_key(keyring_id, key_desc.to_system_string())
+}
+
+/// Search the process keyring for the given key description.
+pub(super) fn search_key_process(
+    key_desc: &VolumeKeyKeyDescription,
+) -> StratisResult<Option<KeySerial>> {
+    search_key(libc::KEY_SPEC_PROCESS_KEYRING, key_desc.to_system_string())
 }
 
 /// Read a key from the persistent keyring with the given key description.
@@ -33,7 +42,14 @@ pub(super) fn read_key_persistent(
     key_desc: &KeyDescription,
 ) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>> {
     let keyring_id = get_persistent_keyring()?;
-    read_key(keyring_id, key_desc)
+    read_key(keyring_id, key_desc.to_system_string())
+}
+
+/// Read a key from the process keyring with the given key description.
+pub(super) fn read_key_process(
+    key_desc: &VolumeKeyKeyDescription,
+) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>> {
+    read_key(libc::KEY_SPEC_PROCESS_KEYRING, key_desc.to_system_string())
 }
 
 /// Get the ID of the persistent root user keyring and attach it to
@@ -53,14 +69,30 @@ pub fn get_persistent_keyring() -> StratisResult<KeySerial> {
     }
 }
 
+/// Create the process keyring.
+pub fn create_process_keyring() -> StratisResult<KeySerial> {
+    // Attach persistent keyring to session keyring
+    match unsafe {
+        syscall(
+            SYS_keyctl,
+            libc::KEYCTL_GET_KEYRING_ID,
+            libc::KEY_SPEC_PROCESS_KEYRING,
+            1,
+        )
+    } {
+        i if i < 0 => Err(io::Error::last_os_error().into()),
+        i => convert_int!(i, libc::c_long, KeySerial),
+    }
+}
+
 /// Search for the given key description in the persistent root keyring.
 /// Returns the key ID or nothing if it was not found in the keyring.
-fn search_key(
-    keyring_id: KeySerial,
-    key_desc: &KeyDescription,
-) -> StratisResult<Option<KeySerial>> {
-    let key_desc_cstring = CString::new(key_desc.to_system_string())
-        .map_err(|_| StratisError::Msg("Invalid key description provided".to_string()))?;
+fn search_key(keyring_id: KeySerial, key_desc: String) -> StratisResult<Option<KeySerial>> {
+    let key_desc_cstring = CString::new(key_desc.clone()).map_err(|_| {
+        StratisError::Msg(format!(
+            "Key description {key_desc} could not be formatted as a C string"
+        ))
+    })?;
 
     let key_id = unsafe {
         syscall(
@@ -92,7 +124,7 @@ fn search_key(
 /// key description, `None` will be returned.
 fn read_key(
     keyring_id: KeySerial,
-    key_desc: &KeyDescription,
+    key_desc: String,
 ) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>> {
     let key_id_option = search_key(keyring_id, key_desc)?;
     let key_id = if let Some(ki) = key_id_option {
@@ -199,7 +231,7 @@ fn set_key_idem(
     key_data: SizedKeyMemory,
 ) -> StratisResult<MappingCreateAction<Key>> {
     let keyring_id = get_persistent_keyring()?;
-    match read_key(keyring_id, key_desc) {
+    match read_key(keyring_id, key_desc.to_system_string()) {
         Ok(Some((key_id, old_key_data))) => {
             let changed = reset_key(key_id, old_key_data, key_data)?;
             if changed {
@@ -243,9 +275,7 @@ impl KeyIdList {
     }
 
     /// Populate the list with IDs from the persistent root kernel keyring.
-    fn populate(&mut self) -> StratisResult<()> {
-        let keyring_id = get_persistent_keyring()?;
-
+    fn populate(&mut self, keyring_id: KeySerial) -> StratisResult<()> {
         // Read list of keys in the persistent keyring.
         let mut done = false;
         while !done {
@@ -376,14 +406,14 @@ impl KeyActions for StratKeyActions {
 
     fn list(&self) -> StratisResult<Vec<KeyDescription>> {
         let mut key_ids = KeyIdList::new();
-        key_ids.populate()?;
+        key_ids.populate(get_persistent_keyring()?)?;
         key_ids.to_key_descs()
     }
 
     fn unset(&self, key_desc: &KeyDescription) -> StratisResult<MappingDeleteAction<Key>> {
         let keyring_id = get_persistent_keyring()?;
 
-        if let Some(key_id) = search_key(keyring_id, key_desc)? {
+        if let Some(key_id) = search_key(keyring_id, key_desc.to_system_string())? {
             unset_key(key_id).map(|_| MappingDeleteAction::Deleted(Key))
         } else {
             Ok(MappingDeleteAction::Identity)

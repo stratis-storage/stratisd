@@ -37,19 +37,20 @@ use crate::{
                     DEFAULT_CRYPT_METADATA_SIZE_V2, STRATIS_MEK_SIZE,
                 },
                 shared::{
-                    acquire_crypt_device, activate, activate_by_token, add_keyring_keyslot,
-                    clevis_decrypt, clevis_info_from_json, device_from_physical_path,
+                    acquire_crypt_device, activate, add_keyring_keyslot, clevis_decrypt,
+                    clevis_info_from_json, device_from_physical_path,
                     encryption_info_from_metadata, ensure_wiped, get_keyslot_number,
                     interpret_clevis_config, read_key, wipe_fallback,
                 },
             },
             device::blkdev_size,
             dm::DEVICEMAPPER_PATH,
+            keys::read_key_process,
             names::format_crypt_backstore_name,
         },
         types::{
             DevicePath, EncryptionInfo, InputEncryptionInfo, KeyDescription, PoolUuid,
-            SizedKeyMemory, TokenUnlockMethod, UnlockMechanism,
+            SizedKeyMemory, TokenUnlockMethod, UnlockMechanism, VolumeKeyKeyDescription,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -161,6 +162,7 @@ fn setup_crypt_handle(
             token_slot.get_token_slot()?,
             passphrase,
             &metadata.activation_name,
+            Some(pool_uuid),
         )?
     }
 
@@ -425,7 +427,14 @@ impl CryptHandle {
         let encryption_info = encryption_info_from_metadata(device)?;
 
         let activation_name = format_crypt_backstore_name(&pool_uuid);
-        activate(device, &encryption_info, None, None, &activation_name)
+        activate(
+            device,
+            &encryption_info,
+            None,
+            None,
+            &activation_name,
+            Some(pool_uuid),
+        )
     }
 
     pub fn rollback(
@@ -731,7 +740,7 @@ impl CryptHandle {
     /// Changed the encrypted device size
     /// `None` will fill up the entire underlying physical device.
     /// `Some(_)` will resize the device to the given number of sectors.
-    pub fn resize(&mut self, size: Option<Sectors>) -> StratisResult<()> {
+    pub fn resize(&mut self, uuid: PoolUuid, size: Option<Sectors>) -> StratisResult<()> {
         let processed_size = match size {
             Some(s) => {
                 if s == Sectors(0) {
@@ -745,7 +754,18 @@ impl CryptHandle {
             None => 0,
         };
         let mut crypt = self.acquire_crypt_device()?;
-        activate_by_token(&mut crypt, None, None, CryptActivate::KEYRING_KEY)?;
+        let vk_kd = VolumeKeyKeyDescription::new(uuid);
+        let (_, vk) = read_key_process(&vk_kd)?.ok_or_else(|| {
+            StratisError::Msg(format!(
+                "Failed to get volume key for pool with UUID {}",
+                uuid
+            ))
+        })?;
+        crypt.activate_handle().activate_by_volume_key(
+            None,
+            Some(vk.as_ref()),
+            CryptActivate::KEYRING_KEY,
+        )?;
         crypt
             .context_handle()
             .resize(&self.activation_name().to_string(), processed_size)

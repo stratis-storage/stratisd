@@ -12,7 +12,7 @@ use devicemapper::{DmNameBuf, DmUuidBuf};
 
 pub use crate::engine::types::KeyDescription;
 use crate::{
-    engine::types::{DevUuid, FilesystemUuid, PoolUuid},
+    engine::types::{DevUuid, FilesystemUuid, PoolUuid, VolumeKeyKeyDescription},
     stratis::StratisResult,
 };
 
@@ -49,6 +49,12 @@ impl KeyDescription {
     /// to Stratis.
     pub fn to_system_string(&self) -> String {
         format!("{}{}", key_description_prefix(), self.as_application_str())
+    }
+}
+
+impl VolumeKeyKeyDescription {
+    pub fn to_system_string(&self) -> String {
+        format!("stratis-{FORMAT_VERSION}-vk-{}", self.uuid())
     }
 }
 

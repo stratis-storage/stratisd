@@ -9,6 +9,8 @@ use std::{
     path::Path,
 };
 
+use either::Either;
+
 use libcryptsetup_rs::SafeMemHandle;
 
 use crate::engine::{
@@ -76,7 +78,9 @@ where
 
     let result = catch_unwind(|| test_pre(physical_paths, &key_description));
 
-    let (_, key) = read_key_persistent(&key_description).unwrap().unwrap();
+    let (_, key) = read_key_persistent(Either::Left(&key_description))
+        .unwrap()
+        .unwrap();
     StratKeyActions.unset(&key_description).unwrap();
 
     if let Err(e) = result {

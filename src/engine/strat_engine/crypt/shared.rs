@@ -41,7 +41,9 @@ use crate::{
             dm::get_dm,
             keys,
         },
-        types::{KeyDescription, SizedKeyMemory, UnlockMechanism},
+        types::{
+            KeyDescription, PoolUuid, SizedKeyMemory, UnlockMechanism, VolumeKeyKeyDescription,
+        },
         EncryptionInfo,
     },
     stratis::{StratisError, StratisResult},
@@ -474,13 +476,30 @@ fn device_is_active(device: Option<&mut CryptDevice>, device_name: &DmName) -> S
 }
 
 /// Activate encrypted Stratis device.
+///
+/// Precondition: uuid.is_none() if pool metadata version == 1, uuid.is_some() if pool metadata
+/// version == 2
 pub fn activate(
     device: &mut CryptDevice,
     ei: &EncryptionInfo,
     unlock_method: Option<u32>,
     passphrase: Option<&SizedKeyMemory>,
     name: &DmName,
+    uuid: Option<PoolUuid>,
 ) -> StratisResult<()> {
+    let flags = match uuid {
+        Some(u) => {
+            let vk_kd = VolumeKeyKeyDescription::new(u);
+            device.activate_handle().set_keyring_to_link(
+                &vk_kd.to_system_string(),
+                None,
+                None,
+                Some("@p"),
+            )?;
+            CryptActivate::KEYRING_KEY
+        }
+        None => CryptActivate::empty(),
+    };
     if let Some(p) = passphrase {
         let key_slot =
             match unlock_method {
@@ -494,49 +513,39 @@ pub fn activate(
                 Some(&name.to_string()),
                 key_slot,
                 p.as_ref(),
-                CryptActivate::empty(),
+                flags,
             ),
             "Failed to activate device with name {}",
             name
         );
     } else {
-        match unlock_method {
-            Some(t) => {
-                if let Some(kd) = ei
-                    .get_info(t)
-                    .ok_or_else(|| StratisError::Msg(format!("Token slot {t} empty")))?
-                    .key_desc()
-                {
-                    let key_description_missing = keys::search_key_persistent(kd)
-                        .map_err(|_| {
-                            StratisError::Msg(format!(
-                                "Searching the persistent keyring for the key description {} failed.",
-                                kd.as_application_str(),
-                            ))
-                        })?
-                        .is_none();
-                    if key_description_missing {
-                        warn!(
-                            "Key description {} was not found in the keyring",
-                            kd.as_application_str()
-                        );
-                        return Err(StratisError::Msg(format!(
-                            "The key description \"{}\" is not currently set.",
+        if let Some(t) = unlock_method {
+            if let Some(kd) = ei
+                .get_info(t)
+                .ok_or_else(|| StratisError::Msg(format!("Token slot {t} empty")))?
+                .key_desc()
+            {
+                let key_description_missing = keys::search_key_persistent(kd)
+                    .map_err(|_| {
+                        StratisError::Msg(format!(
+                            "Searching the persistent keyring for the key description {} failed.",
                             kd.as_application_str(),
-                        )));
-                    }
+                        ))
+                    })?
+                    .is_none();
+                if key_description_missing {
+                    warn!(
+                        "Key description {} was not found in the keyring",
+                        kd.as_application_str()
+                    );
+                    return Err(StratisError::Msg(format!(
+                        "The key description \"{}\" is not currently set.",
+                        kd.as_application_str(),
+                    )));
                 }
             }
-            None => {
-                keys::get_persistent_keyring()?;
-            }
-        };
-        activate_by_token(
-            device,
-            Some(&name.to_string()),
-            unlock_method,
-            CryptActivate::empty(),
-        )?;
+        }
+        activate_by_token(device, Some(&name.to_string()), unlock_method, flags)?;
     }
 
     // Check activation status.

@@ -126,7 +126,7 @@ impl StratBlockDev {
 
         let allocator = match RangeAllocator::new(bda.dev_size(), &segments) {
             Ok(a) => a,
-            Err(e) => return Err((e, bda)),
+            Err(e) => return Err((e, Box::new(bda))),
         };
 
         let base_blksizes = match OpenOptions::new()
@@ -136,7 +136,7 @@ impl StratBlockDev {
             .and_then(|f| BlockSizes::read(&f))
         {
             Ok(blksizes) => blksizes,
-            Err(e) => return Err((e, bda)),
+            Err(e) => return Err((e, Box::new(bda))),
         };
 
         let blksizes = match underlying_device {
@@ -149,7 +149,7 @@ impl StratBlockDev {
                     .and_then(|f| BlockSizes::read(&f))
                 {
                     Ok(blksizes) => blksizes,
-                    Err(e) => return Err((e, bda)),
+                    Err(e) => return Err((e, Box::new(bda))),
                 };
 
                 StratSectorSizes {

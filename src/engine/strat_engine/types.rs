@@ -9,5 +9,5 @@ use crate::{
     stratis::StratisError,
 };
 
-pub type BDAResult<T> = Result<T, (StratisError, BDA)>;
+pub type BDAResult<T> = Result<T, (StratisError, Box<BDA>)>;
 pub type BDARecordResult<T> = Result<T, (StratisError, HashMap<DevUuid, BDA>)>;

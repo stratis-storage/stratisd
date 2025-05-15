@@ -314,7 +314,7 @@ jobs:
         with:
           repository: stratis-storage/testing
           path: testing
-          ref: refs/pull/317/head
+          ref: refs/pull/320/head
       - name: Run stratisd_cert.py
         run: >
           sudo

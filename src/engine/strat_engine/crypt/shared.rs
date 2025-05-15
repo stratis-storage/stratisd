@@ -39,9 +39,11 @@ use crate::{
                 TOKEN_KEYSLOTS_KEY, TOKEN_TYPE_KEY,
             },
             dm::get_dm,
-            keys,
+            keys::{self, get_persistent_keyring},
         },
-        types::{KeyDescription, SizedKeyMemory, UnlockMechanism},
+        types::{
+            KeyDescription, PoolUuid, SizedKeyMemory, UnlockMechanism, VolumeKeyKeyDescription,
+        },
         EncryptionInfo,
     },
     stratis::{StratisError, StratisResult},
@@ -474,13 +476,31 @@ fn device_is_active(device: Option<&mut CryptDevice>, device_name: &DmName) -> S
 }
 
 /// Activate encrypted Stratis device.
+///
+/// Precondition: uuid.is_none() if pool metadata version == 1, uuid.is_some() if pool metadata
+/// version == 2
 pub fn activate(
     device: &mut CryptDevice,
     ei: &EncryptionInfo,
     unlock_method: Option<u32>,
     passphrase: Option<&SizedKeyMemory>,
     name: &DmName,
+    uuid: Option<PoolUuid>,
 ) -> StratisResult<()> {
+    let id = get_persistent_keyring()?;
+    let flags = match uuid {
+        Some(u) => {
+            let vk_kd = VolumeKeyKeyDescription::new(u);
+            device.activate_handle().set_keyring_to_link(
+                &vk_kd.to_system_string(),
+                None,
+                None,
+                Some(&id.to_string()),
+            )?;
+            CryptActivate::KEYRING_KEY
+        }
+        None => CryptActivate::empty(),
+    };
     if let Some(p) = passphrase {
         let key_slot =
             match unlock_method {
@@ -494,7 +514,7 @@ pub fn activate(
                 Some(&name.to_string()),
                 key_slot,
                 p.as_ref(),
-                CryptActivate::empty(),
+                flags,
             ),
             "Failed to activate device with name {}",
             name
@@ -507,7 +527,7 @@ pub fn activate(
                     .ok_or_else(|| StratisError::Msg(format!("Token slot {t} empty")))?
                     .key_desc()
                 {
-                    let key_description_missing = keys::search_key_persistent(kd)
+                    let key_description_missing = keys::search_key_persistent(Either::Left(kd))
                         .map_err(|_| {
                             StratisError::Msg(format!(
                                 "Searching the persistent keyring for the key description {} failed.",
@@ -527,16 +547,9 @@ pub fn activate(
                     }
                 }
             }
-            None => {
-                keys::get_persistent_keyring()?;
-            }
+            None => (),
         };
-        activate_by_token(
-            device,
-            Some(&name.to_string()),
-            unlock_method,
-            CryptActivate::empty(),
-        )?;
+        activate_by_token(device, Some(&name.to_string()), unlock_method, flags)?;
     }
 
     // Check activation status.
@@ -727,7 +740,7 @@ pub fn luks2_token_type_is_valid(json: &Value) -> bool {
 ///
 /// Requires cryptsetup 2.3
 pub fn read_key(key_description: &KeyDescription) -> StratisResult<Option<SizedKeyMemory>> {
-    let read_key_result = keys::read_key_persistent(key_description);
+    let read_key_result = keys::read_key_persistent(Either::Left(key_description));
     if read_key_result.is_err() {
         warn!(
             "Failed to read the key with key description {}; encryption cannot \

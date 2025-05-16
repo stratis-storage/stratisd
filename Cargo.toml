@@ -144,10 +144,14 @@ optional = true
 version = "0.12.0"
 features = ["mutex"]
 optional = true
+git = "https://github.com/jbaublitz/libcryptsetup-rs"
+branch = "issue-stratisd-3810"
 
 [dependencies.libcryptsetup-rs-sys]
 version = ">=0.4.0,<0.6.0"
 optional = true
+git = "https://github.com/jbaublitz/libcryptsetup-rs"
+branch = "issue-stratisd-3810"
 
 [dependencies.libmount]
 version = "0.1.9"

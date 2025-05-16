@@ -4,6 +4,7 @@
 
 use std::{ffi::CString, io, mem::size_of, os::unix::io::RawFd, str};
 
+use either::Either;
 use libc::{syscall, SYS_add_key, SYS_keyctl};
 
 use libcryptsetup_rs::SafeMemHandle;
@@ -25,12 +26,12 @@ type KeySerial = u32;
 /// Search the persistent keyring for the given key description.
 pub(super) fn search_key_persistent(key_desc: &KeyDescription) -> StratisResult<Option<KeySerial>> {
     let keyring_id = get_persistent_keyring()?;
-    search_key(keyring_id, key_desc)
+    search_key(keyring_id, Either::Left(key_desc))
 }
 
 /// Read a key from the persistent keyring with the given key description.
 pub(super) fn read_key_persistent(
-    key_desc: &KeyDescription,
+    key_desc: Either<&KeyDescription, &str>,
 ) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>> {
     let keyring_id = get_persistent_keyring()?;
     read_key(keyring_id, key_desc)
@@ -57,10 +58,13 @@ pub fn get_persistent_keyring() -> StratisResult<KeySerial> {
 /// Returns the key ID or nothing if it was not found in the keyring.
 fn search_key(
     keyring_id: KeySerial,
-    key_desc: &KeyDescription,
+    key_desc: Either<&KeyDescription, &str>,
 ) -> StratisResult<Option<KeySerial>> {
-    let key_desc_cstring = CString::new(key_desc.to_system_string())
-        .map_err(|_| StratisError::Msg("Invalid key description provided".to_string()))?;
+    let key_desc_cstring = CString::new(match key_desc {
+        Either::Left(kd) => kd.to_system_string(),
+        Either::Right(s) => s.to_string(),
+    })
+    .map_err(|_| StratisError::Msg("Invalid key description provided".to_string()))?;
 
     let key_id = unsafe {
         syscall(
@@ -92,7 +96,7 @@ fn search_key(
 /// key description, `None` will be returned.
 fn read_key(
     keyring_id: KeySerial,
-    key_desc: &KeyDescription,
+    key_desc: Either<&KeyDescription, &str>,
 ) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>> {
     let key_id_option = search_key(keyring_id, key_desc)?;
     let key_id = if let Some(ki) = key_id_option {
@@ -196,7 +200,7 @@ fn set_key_idem(
     key_data: SizedKeyMemory,
 ) -> StratisResult<MappingCreateAction<Key>> {
     let keyring_id = get_persistent_keyring()?;
-    match read_key(keyring_id, key_desc) {
+    match read_key(keyring_id, Either::Left(key_desc)) {
         Ok(Some((key_id, old_key_data))) => {
             let changed = reset_key(key_id, old_key_data, key_data)?;
             if changed {
@@ -380,7 +384,7 @@ impl KeyActions for StratKeyActions {
     fn unset(&self, key_desc: &KeyDescription) -> StratisResult<MappingDeleteAction<Key>> {
         let keyring_id = get_persistent_keyring()?;
 
-        if let Some(key_id) = search_key(keyring_id, key_desc)? {
+        if let Some(key_id) = search_key(keyring_id, Either::Left(key_desc))? {
             unset_key(key_id).map(|_| MappingDeleteAction::Deleted(Key))
         } else {
             Ok(MappingDeleteAction::Identity)

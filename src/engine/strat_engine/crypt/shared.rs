@@ -39,9 +39,9 @@ use crate::{
                 TOKEN_KEYSLOTS_KEY, TOKEN_TYPE_KEY,
             },
             dm::get_dm,
-            keys,
+            keys::{self, get_persistent_keyring},
         },
-        types::{KeyDescription, SizedKeyMemory, UnlockMechanism},
+        types::{DevUuid, KeyDescription, PoolUuid, SizedKeyMemory, UnlockMechanism},
         EncryptionInfo,
     },
     stratis::{StratisError, StratisResult},
@@ -480,7 +480,22 @@ pub fn activate(
     unlock_method: Option<u32>,
     passphrase: Option<&SizedKeyMemory>,
     name: &DmName,
+    uuid: Either<PoolUuid, DevUuid>,
 ) -> StratisResult<()> {
+    let id = get_persistent_keyring()?;
+    device.activate_handle().set_keyring_to_link(
+        format!(
+            "stratis-vk-{}",
+            match uuid {
+                Either::Left(u) => format!("pool-{u}"),
+                Either::Right(u) => format!("dev-{u}"),
+            }
+        )
+        .as_str(),
+        None,
+        None,
+        Some(&id.to_string()),
+    )?;
     if let Some(p) = passphrase {
         let key_slot =
             match unlock_method {
@@ -494,7 +509,7 @@ pub fn activate(
                 Some(&name.to_string()),
                 key_slot,
                 p.as_ref(),
-                CryptActivate::empty(),
+                CryptActivate::KEYRING_KEY,
             ),
             "Failed to activate device with name {}",
             name
@@ -535,7 +550,7 @@ pub fn activate(
             device,
             Some(&name.to_string()),
             unlock_method,
-            CryptActivate::empty(),
+            CryptActivate::KEYRING_KEY,
         )?;
     }
 
@@ -727,7 +742,7 @@ pub fn luks2_token_type_is_valid(json: &Value) -> bool {
 ///
 /// Requires cryptsetup 2.3
 pub fn read_key(key_description: &KeyDescription) -> StratisResult<Option<SizedKeyMemory>> {
-    let read_key_result = keys::read_key_persistent(key_description);
+    let read_key_result = keys::read_key_persistent(Either::Left(key_description));
     if read_key_result.is_err() {
         warn!(
             "Failed to read the key with key description {}; encryption cannot \

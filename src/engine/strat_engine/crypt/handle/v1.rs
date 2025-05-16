@@ -415,6 +415,7 @@ fn setup_crypt_handle(
                 opt,
                 passphrase,
                 &metadata.activation_name,
+                Either::Right(metadata.identifiers.device_uuid),
             )?
         };
     }
@@ -752,7 +753,14 @@ impl CryptHandle {
 
         let encryption_info = encryption_info_from_metadata(device)?;
 
-        activate(device, &encryption_info, None, None, &activation_name)
+        activate(
+            device,
+            &encryption_info,
+            None,
+            None,
+            &activation_name,
+            Either::Right(dev_uuid),
+        )
     }
 
     pub fn rollback(

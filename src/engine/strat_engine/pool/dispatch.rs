@@ -25,8 +25,8 @@ use crate::{
 
 #[derive(Debug)]
 pub enum AnyPool {
-    V1(v1::StratPool),
-    V2(v2::StratPool),
+    V1(Box<v1::StratPool>),
+    V2(Box<v2::StratPool>),
 }
 
 impl Pool for AnyPool {

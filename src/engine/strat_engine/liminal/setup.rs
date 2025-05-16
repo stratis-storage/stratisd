@@ -246,7 +246,7 @@ pub fn get_blockdevs_legacy(
                 BlockDevTier::Cache => &mut cachedevs,
             }
             .push(blockdev),
-            Err((e, bda)) => return Err((e, tiers_to_bdas(datadevs, cachedevs, Some(bda)))),
+            Err((e, bda)) => return Err((e, tiers_to_bdas(datadevs, cachedevs, Some(*bda)))),
         }
     }
 
@@ -347,7 +347,7 @@ pub fn get_blockdevs(
                 BlockDevTier::Cache => &mut cachedevs,
             }
             .push(blockdev),
-            Err((e, bda)) => return Err((e, tiers_to_bdas(datadevs, cachedevs, Some(bda)))),
+            Err((e, bda)) => return Err((e, tiers_to_bdas(datadevs, cachedevs, Some(*bda)))),
         }
     }
 
@@ -399,7 +399,7 @@ fn get_blockdev_legacy(
         .and_then(|f| blkdev_size(&f))
     {
         Ok(actual_size) => actual_size,
-        Err(err) => return Err((err, bda)),
+        Err(err) => return Err((err, Box::new(bda))),
     };
 
     // Return an error if apparent size of Stratis block device appears to
@@ -415,7 +415,7 @@ fn get_blockdev_legacy(
             recorded_size,
             actual_size_sectors
         );
-        return Err((StratisError::Msg(err_msg), bda));
+        return Err((StratisError::Msg(err_msg), Box::new(bda)));
     }
 
     let dev_uuid = bda.dev_uuid();
@@ -437,7 +437,7 @@ fn get_blockdev_legacy(
                 bda.identifiers(),
                 info.dev_info
             );
-            return Err((StratisError::Msg(err_msg), bda));
+            return Err((StratisError::Msg(err_msg), Box::new(bda)));
         }
     };
 
@@ -453,13 +453,13 @@ fn get_blockdev_legacy(
     };
     let handle = match CryptHandle::setup(physical_path, TokenUnlockMethod::None, None) {
         Ok(h) => h,
-        Err(e) => return Err((e, bda)),
+        Err(e) => return Err((e, Box::new(bda))),
     };
     let underlying_device = match handle {
         Some(handle) => UnderlyingDevice::Encrypted(handle),
         None => UnderlyingDevice::Unencrypted(match DevicePath::new(physical_path) {
             Ok(d) => d,
-            Err(e) => return Err((e, bda)),
+            Err(e) => return Err((e, Box::new(bda))),
         }),
     };
     Ok((
@@ -494,7 +494,7 @@ fn get_blockdev(
         .and_then(|f| blkdev_size(&f))
     {
         Ok(actual_size) => actual_size,
-        Err(err) => return Err((err, bda)),
+        Err(err) => return Err((err, Box::new(bda))),
     };
 
     // Return an error if apparent size of Stratis block device appears to
@@ -510,7 +510,7 @@ fn get_blockdev(
             recorded_size,
             actual_size_sectors
         );
-        return Err((StratisError::Msg(err_msg), bda));
+        return Err((StratisError::Msg(err_msg), Box::new(bda)));
     }
 
     let dev_uuid = bda.dev_uuid();
@@ -532,13 +532,13 @@ fn get_blockdev(
                 bda.identifiers(),
                 info.dev_info
             );
-            return Err((StratisError::Msg(err_msg), bda));
+            return Err((StratisError::Msg(err_msg), Box::new(bda)));
         }
     };
 
     let devnode = match DevicePath::new(&info.dev_info.devnode) {
         Ok(d) => d,
-        Err(e) => return Err((e, bda)),
+        Err(e) => return Err((e, Box::new(bda))),
     };
 
     // This should always succeed since the actual size is at

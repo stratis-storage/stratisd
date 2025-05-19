@@ -475,6 +475,32 @@ fn device_is_active(device: Option<&mut CryptDevice>, device_name: &DmName) -> S
     }
 }
 
+/// Load the volume key for a V2 pool into the process keyring.
+pub fn load_vk_to_keyring(
+    device: &mut CryptDevice,
+    passphrase: Option<&SizedKeyMemory>,
+    uuid: PoolUuid,
+) -> StratisResult<()> {
+    let vk_kd = VolumeKeyKeyDescription::new(uuid);
+    device.activate_handle().set_keyring_to_link(
+        &vk_kd.to_system_string(),
+        None,
+        None,
+        Some("@p"),
+    )?;
+    if let Some(p) = passphrase {
+        device.activate_handle().activate_by_passphrase(
+            None,
+            None,
+            p.as_ref(),
+            CryptActivate::KEYRING_KEY,
+        )?;
+    } else {
+        activate_by_token(device, None, None, CryptActivate::KEYRING_KEY)?;
+    }
+    Ok(())
+}
+
 /// Activate encrypted Stratis device.
 ///
 /// Precondition: uuid.is_none() if pool metadata version == 1, uuid.is_some() if pool metadata

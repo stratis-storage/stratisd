@@ -1,8 +1,3 @@
-ifeq ($(origin MANIFEST_PATH), undefined)
-else
-  MANIFEST_PATH_ARGS = --manifest-path=${MANIFEST_PATH}
-endif
-
 ifeq ($(origin FEDORA_RELEASE), undefined)
 else
   FEDORA_RELEASE_ARGS = --release=${FEDORA_RELEASE}
@@ -461,7 +456,7 @@ test-compare-fedora-versions:
 
 ## Verify that the dependency specs are satisfied in Fedora
 check-fedora-versions: test-compare-fedora-versions
-	${COMPARE_FEDORA_VERSIONS} ${MANIFEST_PATH_ARGS} ${FEDORA_RELEASE_ARGS} ${IGNORE_ARGS}
+	${COMPARE_FEDORA_VERSIONS} ${FEDORA_RELEASE_ARGS} ${IGNORE_ARGS}
 
 .PHONY:
 	audit

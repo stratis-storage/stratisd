@@ -40,7 +40,7 @@ use crate::{
                     acquire_crypt_device, activate, add_keyring_keyslot, clevis_decrypt,
                     clevis_info_from_json, device_from_physical_path,
                     encryption_info_from_metadata, ensure_wiped, get_keyslot_number,
-                    interpret_clevis_config, read_key, wipe_fallback,
+                    interpret_clevis_config, load_vk_to_keyring, read_key, wipe_fallback,
                 },
             },
             device::blkdev_size,
@@ -164,6 +164,8 @@ fn setup_crypt_handle(
             &metadata.activation_name,
             Some(pool_uuid),
         )?
+    } else if let Err(e) = load_vk_to_keyring(device, passphrase, pool_uuid) {
+        warn!("Failed to load volume key into keyring on startup: {e}");
     }
 
     let device = get_devno_from_path(&metadata.activated_path)?;

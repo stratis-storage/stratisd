@@ -1,3 +1,42 @@
+stratisd 3.8.2
+==============
+Recommended Rust toolchain version: 1.87.0
+Recommended development platform for Python development: Fedora 41
+
+- Maintain volume key in process keyring for started encrypted pools:
+  https://github.com/stratis-storage/stratisd/issues/3810
+  https://github.com/stratis-storage/stratisd/pull/3841
+
+- Set stratisd version to 3.8.2:
+  https://github.com/stratis-storage/stratisd/pull/3863
+
+- Set permissions to root-only on keys set in the keyring:
+  https://github.com/stratis-storage/stratisd/pull/3846
+
+- Increase libcryptsetup-rs dependency lower bound to 0.13.1;
+  Increase libcryptsetup-rs-sys dependency lower bound to 0.6.0:
+  https://github.com/stratis-storage/stratisd/pull/3849
+  https://github.com/stratis-storage/stratisd/pull/3844
+
+- Increase log dependency lower bound to 0.4.20:
+  https://github.com/stratis-storage/stratisd/pull/3847
+
+- Increase lowest supported version of Rust to 1.77:
+  https://github.com/stratis-storage/stratisd/pull/3851
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3862
+  https://github.com/stratis-storage/stratisd/pull/3860
+  https://github.com/stratis-storage/stratisd/pull/3859
+  https://github.com/stratis-storage/stratisd/pull/3858
+  https://github.com/stratis-storage/stratisd/pull/3853
+  https://github.com/stratis-storage/stratisd/pull/3852
+  https://github.com/stratis-storage/stratisd/pull/3850
+  https://github.com/stratis-storage/stratisd/pull/3848
+  https://github.com/stratis-storage/stratisd/pull/3843
+  https://github.com/stratis-storage/stratisd/pull/3842
+
+
 stratisd 3.8.1
 ==============
 Recommended Rust toolchain version: 1.86.0

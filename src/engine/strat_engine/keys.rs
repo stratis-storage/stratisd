@@ -4,7 +4,7 @@
 
 use std::{ffi::CString, io, mem::size_of, os::unix::io::RawFd, str};
 
-use libc::{syscall, SYS_add_key, SYS_keyctl};
+use libc::{syscall, SYS_add_key, SYS_keyctl, KEYCTL_SETPERM};
 
 use libcryptsetup_rs::SafeMemHandle;
 
@@ -161,7 +161,7 @@ fn set_key(
     let key_desc_cstring = CString::new(key_desc.to_system_string())
         .map_err(|_| StratisError::Msg("Invalid key description provided".to_string()))?;
     // Add a key to the kernel keyring
-    if unsafe {
+    let serial = match unsafe {
         libc::syscall(
             SYS_add_key,
             concat!("user", "\0").as_ptr(),
@@ -170,8 +170,11 @@ fn set_key(
             key_data.as_ref().len(),
             keyring_id,
         )
-    } < 0
-    {
+    } {
+        i if i < 0 => return Err(io::Error::last_os_error().into()),
+        i => i,
+    };
+    if unsafe { libc::syscall(SYS_keyctl, KEYCTL_SETPERM, serial, 0x003f_0000) } < 0 {
         Err(io::Error::last_os_error().into())
     } else {
         Ok(())

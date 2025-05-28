@@ -12,7 +12,13 @@
 // can convert to or from them when saving our current state, or
 // restoring state from saved metadata.
 
-use serde::{Serialize, Serializer};
+use std::fmt;
+
+use chrono::{DateTime, Utc};
+use serde::{
+    de::{self, Visitor},
+    Deserializer, Serialize, Serializer,
+};
 
 use devicemapper::{Sectors, ThinDevId};
 
@@ -91,6 +97,43 @@ impl From<Vec<PoolFeatures>> for Features {
     }
 }
 
+fn serialize_date_time<S>(
+    timestamp: &Option<DateTime<Utc>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_i64(timestamp.expect("is some").timestamp())
+}
+
+fn deserialize_date_time<'a, D>(deserializer: D) -> Result<Option<DateTime<Utc>>, D::Error>
+where
+    D: Deserializer<'a>,
+{
+    struct TimestampVisitor;
+
+    impl Visitor<'_> for TimestampVisitor {
+        type Value = DateTime<Utc>;
+
+        fn expecting(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+            write!(f, "a timestamp in form i64")
+        }
+
+        fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            match DateTime::<Utc>::from_timestamp(v, 0) {
+                Some(dt) => Ok(dt),
+                None => Err(de::Error::invalid_value(de::Unexpected::Signed(v), &self)),
+            }
+        }
+    }
+
+    deserializer.deserialize_i64(TimestampVisitor).map(Some)
+}
+
 // ALL structs that represent variable length metadata in pre-order
 // depth-first traversal order. Note that when organized by types rather than
 // values the structure is a DAG not a tree. This just means that there are
@@ -108,6 +151,11 @@ pub struct PoolSave {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
     pub features: Vec<PoolFeatures>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[serde(serialize_with = "serialize_date_time")]
+    #[serde(deserialize_with = "deserialize_date_time")]
+    pub last_reencrypt: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]

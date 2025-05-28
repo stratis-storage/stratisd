@@ -388,3 +388,10 @@ pub fn pool_no_alloc_space(pool: &dyn Pool) -> bool {
 pub fn pool_free_token_slots(pool: &dyn Pool) -> (bool, u8) {
     prop_conv::pool_free_token_slots_to_prop(pool.free_token_slots())
 }
+
+/// Generate a D-Bus representation of the timestamp of the last time when the pool was
+/// reencrypted.
+#[inline]
+pub fn pool_last_reencrypted_timestamp(pool: &dyn Pool) -> (bool, String) {
+    prop_conv::pool_last_reencrypted_timestamp_to_prop(pool.last_reencrypt())
+}

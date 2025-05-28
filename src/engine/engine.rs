@@ -22,13 +22,13 @@ use crate::{
         structures::{AllLockReadGuard, AllLockWriteGuard, SomeLockReadGuard, SomeLockWriteGuard},
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo, IntegritySpec, Key,
-            KeyDescription, LockedPoolsInfo, MappingCreateAction, MappingDeleteAction, Name,
-            OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolIdentifier, PoolUuid,
-            PropChangeAction, RegenAction, RenameAction, ReportType, SetCreateAction,
-            SetDeleteAction, SetUnlockAction, StartAction, StopAction, StoppedPoolsInfo,
-            StratBlockDevDiff, StratFilesystemDiff, StratSigblockVersion, TokenUnlockMethod,
-            UdevEngineEvent, UnlockMethod,
+            EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo,
+            IntegritySpec, Key, KeyDescription, LockedPoolsInfo, MappingCreateAction,
+            MappingDeleteAction, Name, OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo,
+            PoolIdentifier, PoolUuid, PropChangeAction, ReencryptedDevice, RegenAction,
+            RenameAction, ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction,
+            StartAction, StopAction, StoppedPoolsInfo, StratBlockDevDiff, StratFilesystemDiff,
+            StratSigblockVersion, TokenUnlockMethod, UdevEngineEvent, UnlockMethod,
         },
     },
     stratis::StratisResult,
@@ -398,6 +398,24 @@ pub trait Pool: Debug + Send + Sync {
         limit: Option<Bytes>,
     ) -> StratisResult<PropChangeAction<Option<Sectors>>>;
 
+    /// Encrypted an unencrypted pool.
+    fn encrypt_pool(
+        &mut self,
+        name: &Name,
+        pool_uuid: PoolUuid,
+        encryption_info: &InputEncryptionInfo,
+    ) -> StratisResult<CreateAction<EncryptedDevice>>;
+
+    /// Reencrypt an encrypted pool.
+    fn reencrypt_pool(&mut self, name: &Name) -> StratisResult<ReencryptedDevice>;
+
+    /// Decrypt an encrypted pool.
+    fn decrypt_pool(
+        &mut self,
+        name: &Name,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<DeleteAction<EncryptedDevice>>;
+
     /// Return the metadata that would be written if metadata were written.
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String>;
 
@@ -422,6 +440,9 @@ pub trait Pool: Debug + Send + Sync {
 
     /// Get number of free token slots for pool.
     fn free_token_slots(&self) -> Option<u8>;
+
+    /// Get the timestamp of the last online reencryption operation.
+    fn last_reencrypt(&self) -> Option<DateTime<Utc>>;
 }
 
 pub type HandleEvents<P> = (

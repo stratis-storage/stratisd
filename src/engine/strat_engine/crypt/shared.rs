@@ -4,7 +4,7 @@
 
 use std::{
     fs::OpenOptions,
-    io::{Seek, SeekFrom, Write},
+    io::{self, Seek, SeekFrom, Write},
     mem::forget,
     path::{Path, PathBuf},
     slice::from_raw_parts_mut,
@@ -498,7 +498,17 @@ pub fn load_vk_to_keyring(
     } else {
         activate_by_token(device, None, None, CryptActivate::KEYRING_KEY)?;
     }
-    Ok(())
+    let serial = keys::search_key_process(&vk_kd)?.ok_or_else(|| {
+        StratisError::Msg(format!(
+            "Volume key with description {} not found in keyring",
+            vk_kd.to_system_string()
+        ))
+    })?;
+    if unsafe { libc::syscall(libc::SYS_keyctl, libc::KEYCTL_SETPERM, serial, 0x003f_0000) } < 0 {
+        Err(io::Error::last_os_error().into())
+    } else {
+        Ok(())
+    }
 }
 
 /// Activate encrypted Stratis device.
@@ -572,6 +582,20 @@ pub fn activate(
             }
         }
         activate_by_token(device, Some(&name.to_string()), unlock_method, flags)?;
+    }
+
+    if let Some(uuid) = uuid {
+        let vk_kd = VolumeKeyKeyDescription::new(uuid);
+        let serial = keys::search_key_process(&vk_kd)?.ok_or_else(|| {
+            StratisError::Msg(format!(
+                "Volume key with description {} not found in keyring",
+                vk_kd.to_system_string()
+            ))
+        })?;
+        if unsafe { libc::syscall(libc::SYS_keyctl, libc::KEYCTL_SETPERM, serial, 0x003f_0000) } < 0
+        {
+            return Err(io::Error::last_os_error().into());
+        }
     }
 
     // Check activation status.

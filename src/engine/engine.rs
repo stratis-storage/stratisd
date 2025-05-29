@@ -422,6 +422,14 @@ pub trait Pool: Debug + Send + Sync {
 
     /// Get number of free token slots for pool.
     fn free_token_slots(&self) -> Option<u8>;
+
+    /// Indicates whether the volume key for this pool is loaded into the keyring.
+    fn volume_key_is_loaded(&self, uuid: PoolUuid) -> StratisResult<bool>;
+
+    /// Load volume key for this pool into the keyring.
+    ///
+    /// Returns true if the key was newly loaded and false if the key was already loaded.
+    fn load_volume_key(&mut self, uuid: PoolUuid) -> StratisResult<bool>;
 }
 
 pub type HandleEvents<P> = (

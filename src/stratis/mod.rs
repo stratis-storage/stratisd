@@ -11,6 +11,7 @@ pub use self::{
 mod dm;
 mod errors;
 mod ipc_support;
+mod keys;
 mod run;
 #[allow(clippy::module_inception)]
 mod stratis;

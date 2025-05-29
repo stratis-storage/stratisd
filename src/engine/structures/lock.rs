@@ -838,7 +838,7 @@ where
 unsafe impl<U, T> Send for SomeLockWriteGuard<U, T>
 where
     U: AsUuid + Send,
-    T: Send,
+    T: ?Sized + Send,
 {
 }
 
@@ -1159,7 +1159,7 @@ where
 unsafe impl<U, T> Send for AllLockWriteGuard<U, T>
 where
     U: AsUuid + Send,
-    T: Send,
+    T: ?Sized + Send,
 {
 }
 

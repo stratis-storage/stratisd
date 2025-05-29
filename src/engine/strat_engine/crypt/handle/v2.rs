@@ -457,6 +457,13 @@ impl CryptHandle {
         }
     }
 
+    /// Load the volume key for the crypt device at the given path into the keyring.
+    pub fn load_vk_to_keyring(physical_path: &Path, uuid: PoolUuid) -> StratisResult<()> {
+        let mut device = acquire_crypt_device(physical_path)?;
+        load_vk_to_keyring(&mut device, None, uuid)?;
+        Ok(())
+    }
+
     /// Acquire the crypt device handle for the physical path in this `CryptHandle`.
     pub(super) fn acquire_crypt_device(&self) -> StratisResult<CryptDevice> {
         acquire_crypt_device(self.luks2_device_path())

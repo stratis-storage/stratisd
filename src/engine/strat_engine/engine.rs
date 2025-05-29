@@ -13,7 +13,7 @@ use async_trait::async_trait;
 use futures::{executor::block_on, future::join_all};
 use serde_json::Value;
 use tokio::{
-    sync::RwLock,
+    sync::{mpsc, RwLock},
     task::{spawn_blocking, JoinHandle},
 };
 
@@ -46,6 +46,8 @@ use crate::{
     },
     stratis::{StratisError, StratisResult},
 };
+
+use super::names::KeyDescription;
 
 type EventNumbers = HashMap<PoolUuid, HashMap<DmNameBuf, u32>>;
 type PoolJoinHandles = Vec<JoinHandle<StratisResult<(PoolUuid, PoolDiff)>>>;
@@ -80,7 +82,7 @@ impl StratEngine {
     /// Returns an error if the kernel doesn't support required DM features.
     /// Returns an error if there was an error reading device nodes.
     /// Returns an error if the executables on which it depends can not be found.
-    pub fn initialize() -> StratisResult<StratEngine> {
+    pub fn initialize(sender: mpsc::UnboundedSender<KeyDescription>) -> StratisResult<StratEngine> {
         let fs = MemoryFilesystem::new()?;
         verify_executables()?;
 
@@ -94,7 +96,7 @@ impl StratEngine {
             pools: AllOrSomeLock::new(pools),
             liminal_devices: Lockable::new_shared(liminal_devices),
             watched_dev_last_event_nrs: Lockable::new_shared(HashMap::new()),
-            key_handler: Arc::new(StratKeyActions),
+            key_handler: Arc::new(StratKeyActions::new(sender)),
             fs,
         })
     }

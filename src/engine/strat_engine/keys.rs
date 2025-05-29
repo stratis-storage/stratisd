@@ -2,9 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{ffi::CString, io, mem::size_of, os::unix::io::RawFd, str};
+use std::{ffi::CString, fmt, io, mem::size_of, os::unix::io::RawFd, str};
 
 use libc::{syscall, SYS_add_key, SYS_keyctl, KEYCTL_SETPERM};
+use tokio::sync::mpsc;
 
 use libcryptsetup_rs::SafeMemHandle;
 
@@ -16,6 +17,7 @@ use crate::{
         types::{
             Key, MappingCreateAction, MappingDeleteAction, SizedKeyMemory, VolumeKeyKeyDescription,
         },
+        EngineAction,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -374,8 +376,13 @@ fn unset_key(key_id: KeySerial) -> StratisResult<()> {
 }
 
 /// Handle for kernel keyring interaction.
-#[derive(Debug)]
-pub struct StratKeyActions;
+pub struct StratKeyActions(mpsc::UnboundedSender<KeyDescription>);
+
+impl fmt::Debug for StratKeyActions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "StratKeyActions")
+    }
+}
 
 #[cfg(test)]
 impl StratKeyActions {
@@ -392,6 +399,12 @@ impl StratKeyActions {
     }
 }
 
+impl StratKeyActions {
+    pub fn new(sender: mpsc::UnboundedSender<KeyDescription>) -> Self {
+        StratKeyActions(sender)
+    }
+}
+
 impl KeyActions for StratKeyActions {
     fn set(
         &self,
@@ -401,7 +414,17 @@ impl KeyActions for StratKeyActions {
         let mut memory = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
         let bytes = read_key_shared(key_fd, memory.as_mut())?;
 
-        set_key_idem(key_desc, SizedKeyMemory::new(memory, bytes))
+        match set_key_idem(key_desc, SizedKeyMemory::new(memory, bytes)) {
+            Ok(i) => {
+                if i.is_changed() {
+                    if let Err(e) = self.0.send(key_desc.clone()) {
+                        warn!("Failed to communicate key addition to processing thread: {e}");
+                    }
+                }
+                Ok(i)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     fn list(&self) -> StratisResult<Vec<KeyDescription>> {

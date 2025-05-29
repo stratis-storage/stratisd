@@ -12,7 +12,10 @@ use std::sync::{
 use tokio::{
     runtime::Builder,
     select, signal,
-    sync::{broadcast::channel, mpsc::unbounded_channel},
+    sync::{
+        broadcast::channel,
+        mpsc::{self, unbounded_channel},
+    },
     task,
 };
 
@@ -23,11 +26,11 @@ use crate::dbus_api::DbusAction;
 use crate::{
     engine::{
         create_process_keyring, register_clevis_token, set_up_crypt_logging,
-        unshare_mount_namespace, Engine, SimEngine, StratEngine, UdevEngineEvent,
+        unshare_mount_namespace, Engine, KeyDescription, SimEngine, StratEngine, UdevEngineEvent,
     },
     stratis::{
-        dm::dm_event_thread, errors::StratisResult, ipc_support::setup, stratis::VERSION,
-        timer::run_timers, udev_monitor::udev_thread,
+        dm::dm_event_thread, errors::StratisResult, ipc_support::setup, keys::load_vks,
+        stratis::VERSION, timer::run_timers, udev_monitor::udev_thread,
     },
 };
 
@@ -90,7 +93,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
         })
         .build()?;
     runtime.block_on(async move {
-        async fn start_threads(engine: Arc<dyn Engine>, sim: bool) -> StratisResult<()> {
+        async fn start_threads(engine: Arc<dyn Engine>, sim: bool, key_recv: Option<mpsc::UnboundedReceiver<KeyDescription>>) -> StratisResult<()> {
             let (trigger, should_exit) = channel(1);
             let (udev_sender, udev_receiver) = unbounded_channel::<UdevEngineEvent>();
             #[cfg(feature = "dbus_enabled")]
@@ -116,10 +119,11 @@ pub fn run(sim: bool) -> StratisResult<()> {
                 dbus_sender.clone(),
             );
             let join_timer = run_timers(
-                engine,
+                Arc::clone(&engine),
                 #[cfg(feature = "dbus_enabled")]
                 dbus_sender,
             );
+            let vks = load_vks(engine, key_recv);
 
             select! {
                 res = join_udev => {
@@ -149,6 +153,14 @@ pub fn run(sim: bool) -> StratisResult<()> {
                         info!("The timer thread exited; shutting down stratisd...");
                     }
                 },
+                res = vks => {
+                    if let Err(e) = res {
+                        error!("The key description thread exited with an error: {e}; shutting down stratisd...");
+                        return Err(e);
+                    } else {
+                        info!("The key description thread exited; shutting down stratisd...");
+                    }
+                }
                 _ = join_signal => {
                     info!("Caught SIGINT; exiting...");
                 },
@@ -164,18 +176,20 @@ pub fn run(sim: bool) -> StratisResult<()> {
         info!("stratis daemon version {} started", VERSION);
         if sim {
             info!("Using SimEngine");
-            start_threads(Arc::new(SimEngine::default()), sim).await
+            start_threads(Arc::new(SimEngine::default()), sim, None).await
         } else {
             info!("Using StratEngine");
+            let (sender, recv) = unbounded_channel();
             start_threads(
-                Arc::new(match StratEngine::initialize() {
+                Arc::new(match StratEngine::initialize(sender) {
                     Ok(engine) => engine,
                     Err(e) => {
                         error!("Failed to start up stratisd engine: {}; exiting", e);
                         return Err(e);
                     }
                 }),
-                sim
+                sim,
+                Some(recv),
             ).await
         }
     })?;

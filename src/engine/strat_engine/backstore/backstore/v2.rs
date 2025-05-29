@@ -25,6 +25,7 @@ use crate::{
             },
             crypt::{handle::v2::CryptHandle, manual_wipe, DEFAULT_CRYPT_DATA_OFFSET_V2},
             dm::{get_dm, list_of_backstore_devices, remove_optional_devices, DEVICEMAPPER_PATH},
+            keys::search_key_process,
             metadata::{MDADataSize, BDA},
             names::{format_backstore_ids, CacheRole},
             serde_structs::{BackstoreSave, CapSave, PoolFeatures, PoolSave, Recordable},
@@ -35,7 +36,7 @@ use crate::{
         types::{
             ActionAvailability, BlockDevTier, DevUuid, EncryptionInfo, InputEncryptionInfo,
             KeyDescription, OptionalTokenSlotInput, PoolUuid, SizedKeyMemory, TokenUnlockMethod,
-            UnlockMechanism, ValidatedIntegritySpec,
+            UnlockMechanism, ValidatedIntegritySpec, VolumeKeyKeyDescription,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -1351,6 +1352,29 @@ impl Backstore {
             ActionAvailability::NoPoolChanges
         } else {
             ActionAvailability::Full
+        }
+    }
+
+    /// Check whether a volume key is in the kernel keyring for a crypt device in the backstore.
+    pub fn volume_key_is_loaded(uuid: PoolUuid) -> StratisResult<bool> {
+        Ok(search_key_process(&VolumeKeyKeyDescription::new(uuid))?.is_some())
+    }
+
+    /// Load volume key into the kernel keyring for a crypt device in the backstore.
+    pub fn load_volume_key(uuid: PoolUuid) -> StratisResult<bool> {
+        let crypt_physical_path = &once(DEVICEMAPPER_PATH)
+            .chain(once(
+                format_backstore_ids(uuid, CacheRole::Cache)
+                    .0
+                    .to_string()
+                    .as_str(),
+            ))
+            .collect::<PathBuf>();
+        if Self::volume_key_is_loaded(uuid)? {
+            Ok(false)
+        } else {
+            CryptHandle::load_vk_to_keyring(crypt_physical_path, uuid)?;
+            Ok(true)
         }
     }
 }

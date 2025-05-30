@@ -1345,6 +1345,14 @@ impl Pool for StratPool {
     fn free_token_slots(&self) -> Option<u8> {
         None
     }
+
+    fn volume_key_is_loaded(&self, _: PoolUuid) -> StratisResult<bool> {
+        Ok(false)
+    }
+
+    fn load_volume_key(&self, _: PoolUuid) -> StratisResult<bool> {
+        Ok(false)
+    }
 }
 
 pub struct StratPoolState {

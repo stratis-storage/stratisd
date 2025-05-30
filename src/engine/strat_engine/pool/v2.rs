@@ -1240,6 +1240,15 @@ impl Pool for StratPool {
         self.encryption_info()
             .and_then(|ei| ei.either(|e| Some(e.num_free_token_slots()), |_| None))
     }
+
+    fn volume_key_is_loaded(&self, uuid: PoolUuid) -> StratisResult<bool> {
+        self.backstore.volume_key_is_loaded(uuid)
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn load_volume_key(&self, uuid: PoolUuid) -> StratisResult<bool> {
+        self.backstore.load_volume_key(uuid)
+    }
 }
 
 pub struct StratPoolState {

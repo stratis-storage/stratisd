@@ -49,6 +49,23 @@ pub(super) fn read_key_persistent(
     )
 }
 
+/// Unset a key from the persistent keyring with the given key description.
+pub(super) fn unset_key_persistent(
+    key_desc: Either<&KeyDescription, &VolumeKeyKeyDescription>,
+) -> StratisResult<bool> {
+    let keyring_id = get_persistent_keyring()?;
+    match search_key(
+        keyring_id,
+        key_desc.either(|kd| kd.to_system_string(), |vk| vk.to_system_string()),
+    )? {
+        Some(key_id) => {
+            unset_key(keyring_id, key_id)?;
+            Ok(true)
+        }
+        None => Ok(false),
+    }
+}
+
 /// Get the ID of the persistent root user keyring and attach it to
 /// the session keyring.
 pub fn get_persistent_keyring() -> StratisResult<KeySerial> {
@@ -347,9 +364,7 @@ impl KeyIdList {
 }
 
 /// Unset the key with ID `key_id` in the root persistent keyring.
-fn unset_key(key_id: KeySerial) -> StratisResult<()> {
-    let keyring_id = get_persistent_keyring()?;
-
+fn unset_key(keyring_id: KeySerial, key_id: KeySerial) -> StratisResult<()> {
     match unsafe { syscall(SYS_keyctl, libc::KEYCTL_UNLINK, key_id, keyring_id) } {
         i if i < 0 => Err(io::Error::last_os_error().into()),
         _ => Ok(()),
@@ -418,7 +433,7 @@ impl KeyActions for StratKeyActions {
         let keyring_id = get_persistent_keyring()?;
 
         if let Some(key_id) = search_key(keyring_id, key_desc.to_system_string())? {
-            unset_key(key_id).map(|_| MappingDeleteAction::Deleted(Key))
+            unset_key(keyring_id, key_id).map(|_| MappingDeleteAction::Deleted(Key))
         } else {
             Ok(MappingDeleteAction::Identity)
         }

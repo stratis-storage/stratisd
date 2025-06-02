@@ -75,9 +75,9 @@ jobs:
           - task: make -f Makefile build-no-ipc
             toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     container:
-      image: ubuntu:jammy
+      image: ubuntu:noble
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v4
@@ -113,9 +113,9 @@ jobs:
           - task: RUST_LOG=stratisd=debug make -f Makefile test-loop-root
             toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     container:
-      image: ubuntu:jammy
+      image: ubuntu:noble
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev --ipc=host
     steps:
       - uses: actions/checkout@v4

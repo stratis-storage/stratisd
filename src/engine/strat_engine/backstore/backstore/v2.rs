@@ -25,7 +25,7 @@ use crate::{
             },
             crypt::{handle::v2::CryptHandle, manual_wipe, DEFAULT_CRYPT_DATA_OFFSET_V2},
             dm::{get_dm, list_of_backstore_devices, remove_optional_devices, DEVICEMAPPER_PATH},
-            keys::search_key_process,
+            keys::{search_key_process, unset_key_process},
             metadata::{MDADataSize, BDA},
             names::{format_backstore_ids, CacheRole},
             serde_structs::{BackstoreSave, CapSave, PoolFeatures, PoolSave, Recordable},
@@ -871,7 +871,8 @@ impl Backstore {
         if let Some(ref mut cache_tier) = self.cache_tier {
             cache_tier.destroy()?;
         }
-        self.data_tier.destroy()
+        self.data_tier.destroy()?;
+        unset_key_process(&VolumeKeyKeyDescription::new(pool_uuid)).map(|_| ())
     }
 
     /// Teardown the DM devices in the backstore.
@@ -881,7 +882,8 @@ impl Backstore {
         if let Some(ref mut cache_tier) = self.cache_tier {
             cache_tier.block_mgr.teardown()?;
         }
-        self.data_tier.block_mgr.teardown()
+        self.data_tier.block_mgr.teardown()?;
+        unset_key_process(&VolumeKeyKeyDescription::new(pool_uuid)).map(|_| ())
     }
 
     /// Consume the backstore and convert it into a set of BDAs representing

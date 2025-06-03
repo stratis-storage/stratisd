@@ -574,7 +574,7 @@ impl CryptHandle {
                     devno,
                 ))
             })
-            .map_err(|e| {
+            .inspect_err(|_| {
                 if let Err(err) =
                     Self::rollback(&mut device, physical_path, &activation_name)
                 {
@@ -583,7 +583,6 @@ impl CryptHandle {
                         err
                     );
                 }
-                e
             })
     }
 

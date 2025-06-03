@@ -75,7 +75,7 @@ jobs:
           - task: make -f Makefile build-no-ipc
             toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     container:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev
@@ -107,10 +107,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - task: RUST_LOG=stratisd=debug make -f Makefile test-loop
+          - task: RUST_LOG=stratisd=debug make -f Makefile test-loop-root
             toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     container:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev --ipc=host
@@ -154,10 +154,10 @@ jobs:
         include:
           - task: >-
               TANG_URL=localhost
-              make -f Makefile test-clevis-loop-should-fail
+              make -f Makefile test-clevis-loop-should-fail-root
             toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     container:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev --ipc=host

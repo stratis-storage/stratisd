@@ -27,7 +27,7 @@ jobs:
               make -f Makefile test-clevis-loop-should-fail-valgrind
             toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     container:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev
@@ -62,7 +62,7 @@ jobs:
           - task: RUST_LOG=stratisd=debug make -f Makefile test-loop-valgrind
             toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     container:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev --ipc=host
@@ -107,7 +107,7 @@ jobs:
           - toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           # MANDATORY CHECKS USING LOWEST SUPPORTED ENVIRONMENT PROXY
           - toolchain: 1.77.0  # LOWEST SUPPORTED RUST TOOLCHAIN
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies for Ubuntu
@@ -162,7 +162,7 @@ jobs:
 
   # PYTHON-BASED TESTS WITH TANG
   python-based-checks_with_tang:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     container:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev --userns=host --ipc=host -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1 -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev

@@ -22,6 +22,7 @@ fn start_stratisd_min(sim: bool) -> Result<Child, Box<dyn std::error::Error>> {
 
 fn stop_stratisd_min(mut daemon: Child) -> Result<(), Box<dyn std::error::Error>> {
     daemon.kill()?;
+    daemon.wait()?;
     Ok(())
 }
 

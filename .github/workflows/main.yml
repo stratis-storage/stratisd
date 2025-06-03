@@ -173,9 +173,9 @@ jobs:
           components: cargo
           toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Run stratisd-min cli tests
-        run: make test-stratisd-min
+        run: make test-stratisd-min-root
       - name: Run stratis-min cli tests
-        run: make test-stratis-min
+        run: make test-stratis-min-root
       - name: Run stratis-tools tests
         run: make test-stratisd-tools
 

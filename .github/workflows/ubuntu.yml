@@ -110,7 +110,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - task: RUST_LOG=stratisd=debug make -f Makefile test-loop
+          - task: RUST_LOG=stratisd=debug make -f Makefile test-loop-root
             toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-22.04

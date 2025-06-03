@@ -342,6 +342,10 @@ clean-primary:
 ## Remove installed items
 clean: clean-cfg clean-ancillary clean-primary
 
+## Tests with loop devices as root
+test-loop-root:
+	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test loop_ -- --skip clevis_loop_
+
 ## Tests with loop devices
 test-loop:
 	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test loop_ -- --skip clevis_loop_
@@ -349,6 +353,10 @@ test-loop:
 ## Tests run under valgrind with loop devices
 test-loop-valgrind:
 	RUST_TEST_THREADS=1 sudo -E valgrind --leak-check=full --num-callers=500 $(shell cargo test --no-run --all-features --message-format=json 2>/dev/null | jq -r 'select(.target.src_path == "'${PWD}/src/lib.rs'") | select(.executable != null) | .executable') loop_ --skip real_ --skip clevis_
+
+## Tests with real devices as root
+test-real-root:
+	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test real_ -- --skip clevis_real_
 
 ## Tests with real devices
 test-real:
@@ -362,13 +370,25 @@ test:
 test-valgrind:
 	RUST_TEST_THREADS=1 valgrind --leak-check=full --num-callers=500 $(shell cargo test --no-run --all-features --message-format=json 2>/dev/null | jq -r 'select(.target.src_path == "'${PWD}/src/lib.rs'") | select(.executable != null) | .executable') --skip real_ --skip loop_ --skip clevis_
 
+## Clevis tests with real devices as root
+test-clevis-real-root:
+	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test clevis_real_ -- --skip clevis_real_should_fail
+
 ## Clevis tests with real devices
 test-clevis-real:
 	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test clevis_real_ -- --skip clevis_real_should_fail
 
+## Clevis real device tests that are expected to fail as root
+test-clevis-real-should-fail-root:
+	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test clevis_real_should_fail
+
 ## Clevis real device tests that are expected to fail
 test-clevis-real-should-fail:
 	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test clevis_real_should_fail
+
+## Clevis tests with loop devices as root
+test-clevis-loop-root:
+	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test clevis_loop_ -- --skip clevis_loop_should_fail_
 
 ## Clevis tests with loop devices
 test-clevis-loop:
@@ -378,6 +398,10 @@ test-clevis-loop:
 test-clevis-loop-valgrind:
 	RUST_TEST_THREADS=1 sudo -E valgrind --leak-check=full --num-callers=500 $(shell cargo test --no-run --all-features --message-format=json 2>/dev/null | jq -r 'select(.target.src_path == "'${PWD}/src/lib.rs'") | select(.executable != null) | .executable') clevis_loop_ --skip clevis_loop_should_fail_
 
+## Clevis loop device tests that are expected to fail as root
+test-clevis-loop-should-fail-root:
+	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test clevis_loop_should_fail_
+
 ## Clevis loop device tests that are expected to fail
 test-clevis-loop-should-fail:
 	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test clevis_loop_should_fail_
@@ -386,9 +410,17 @@ test-clevis-loop-should-fail:
 test-clevis-loop-should-fail-valgrind:
 	RUST_TEST_THREADS=1 sudo -E valgrind --leak-check=full --num-callers=500 $(shell cargo test --no-run --all-features --message-format=json 2>/dev/null | jq -r 'select(.target.src_path == "'${PWD}/src/lib.rs'") | select(.executable != null) | .executable') clevis_loop_should_fail_
 
+## Test stratisd-min CLI as root
+test-stratisd-min-root:
+	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test --no-default-features --features "engine,min" test_stratisd_min
+
 ## Test stratisd-min CLI
 test-stratisd-min:
 	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test --no-default-features --features "engine,min" test_stratisd_min
+
+## Test stratis-min CLI
+test-stratis-min-root:
+	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test --no-default-features --features "engine,min" test_stratis_min
 
 ## Test stratis-min CLI
 test-stratis-min:
@@ -505,16 +537,26 @@ check-fedora-versions: test-compare-fedora-versions
 	test
 	test-valgrind
 	test-loop
+	test-loop-root
 	test-loop-valgrind
 	test-real
+	test-real-root
 	test-clevis-loop
+	test-clevis-loop-root
 	test-clevis-loop-valgrind
 	test-clevis-loop-should-fail
+	test-clevis-loop-should-fail-root
 	test-clevis-loop-should-fail-valgrind
 	test-clevis-real
+	test-clevis-real-root
 	test-clevis-real-should-fail
+	test-clevis-real-should-fail-root
 	test-compare-fedora-versions
 	test-stratisd-tools
+	test-stratis-min
+	test-stratis-min-root
+	test-stratisd-min
+	test-stratisd-min-root
 	tmtlint
 	yamllint
 

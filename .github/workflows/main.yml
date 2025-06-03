@@ -78,7 +78,7 @@ jobs:
   stratis-cli-checks:
     runs-on: ubuntu-24.04
     container:
-      image: fedora:35  # LOWEST DEVELOPMENT ENVIRONMENT
+      image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged --userns=host --ipc=host -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1
     steps:
       - uses: actions/checkout@v4

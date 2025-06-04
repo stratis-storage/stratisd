@@ -251,6 +251,7 @@ SPECS = {
     <property name="Encrypted" type="b" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>
+    <property name="FreeTokenSlots" type="(by)" access="read" />
     <property name="FsLimit" type="t" access="readwrite" />
     <property name="HasCache" type="b" access="read" />
     <property name="KeyDescriptions" type="v" access="read" />

@@ -21,6 +21,10 @@ startup-tests:
 start-tests:
 	python3 -m unittest ${UNITTEST_OPTS} tests.udev.test_start
 
+.PHONY: extend-tests
+extend-tests:
+	python3 -m unittest ${UNITTEST_OPTS} tests.udev.test_extend
+
 .PHONY: fmt
 fmt:
 	isort src tests

@@ -13,7 +13,7 @@ use async_trait::async_trait;
 use futures::{executor::block_on, future::join_all};
 use serde_json::Value;
 use tokio::{
-    sync::RwLock,
+    sync::{mpsc, RwLock},
     task::{spawn_blocking, JoinHandle},
 };
 
@@ -29,6 +29,7 @@ use crate::{
             dm::get_dm,
             keys::StratKeyActions,
             liminal::{find_all, DeviceSet, LiminalDevices},
+            names::KeyDescription,
             ns::MemoryFilesystem,
             pool::{v1, v2, AnyPool},
         },
@@ -80,7 +81,7 @@ impl StratEngine {
     /// Returns an error if the kernel doesn't support required DM features.
     /// Returns an error if there was an error reading device nodes.
     /// Returns an error if the executables on which it depends can not be found.
-    pub fn initialize() -> StratisResult<StratEngine> {
+    pub fn initialize(sender: mpsc::UnboundedSender<KeyDescription>) -> StratisResult<StratEngine> {
         let fs = MemoryFilesystem::new()?;
         verify_executables()?;
 
@@ -94,7 +95,7 @@ impl StratEngine {
             pools: AllOrSomeLock::new(pools),
             liminal_devices: Lockable::new_shared(liminal_devices),
             watched_dev_last_event_nrs: Lockable::new_shared(HashMap::new()),
-            key_handler: Arc::new(StratKeyActions),
+            key_handler: Arc::new(StratKeyActions::new(sender)),
             fs,
         })
     }
@@ -897,6 +898,7 @@ mod test {
     };
 
     use retry::{delay::Fixed, retry};
+    use tokio::sync::mpsc::unbounded_channel;
 
     use devicemapper::Sectors;
 
@@ -916,7 +918,8 @@ mod test {
     /// Verify that a pool rename causes the pool metadata to get the new name.
     fn test_pool_rename(paths: &[&Path]) {
         unshare_mount_namespace().unwrap();
-        let engine = StratEngine::initialize().unwrap();
+        let (send, _recv) = unbounded_channel();
+        let engine = StratEngine::initialize(send).unwrap();
 
         let name1 = "name1";
         let uuid1 = test_async!(engine.create_pool(name1, paths, None, IntegritySpec::default()))
@@ -1000,7 +1003,8 @@ mod test {
         assert_eq!(action, RenameAction::Renamed(uuid1));
         engine.teardown().unwrap();
 
-        let engine = StratEngine::initialize().unwrap();
+        let (send, _recv) = unbounded_channel();
+        let engine = StratEngine::initialize(send).unwrap();
         let pool_name: String = test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid1)))
             .unwrap()
             .as_tuple()
@@ -1039,7 +1043,8 @@ mod test {
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
-        let engine = StratEngine::initialize().unwrap();
+        let (send, _recv) = unbounded_channel();
+        let engine = StratEngine::initialize(send).unwrap();
 
         let name1 = "name1";
         let uuid1 = test_async!(engine.create_pool(name1, paths1, None, IntegritySpec::default()))
@@ -1061,14 +1066,16 @@ mod test {
 
         engine.teardown().unwrap();
 
-        let engine = StratEngine::initialize().unwrap();
+        let (send, _recv) = unbounded_channel();
+        let engine = StratEngine::initialize(send).unwrap();
 
         assert!(test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid1))).is_some());
         assert!(test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid2))).is_some());
 
         engine.teardown().unwrap();
 
-        let engine = StratEngine::initialize().unwrap();
+        let (send, _recv) = unbounded_channel();
+        let engine = StratEngine::initialize(send).unwrap();
 
         assert!(test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid1))).is_some());
         assert!(test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid2))).is_some());
@@ -1098,7 +1105,8 @@ mod test {
         F: FnOnce(&mut AnyPool) + UnwindSafe,
     {
         unshare_mount_namespace().unwrap();
-        let engine = StratEngine::initialize().unwrap();
+        let (send, _recv) = unbounded_channel();
+        let engine = StratEngine::initialize(send).unwrap();
         let uuid = test_async!(engine.create_pool_legacy(name, data_paths, Some(encryption_info)))
             .unwrap()
             .changed()
@@ -1534,7 +1542,8 @@ mod test {
     /// Test creating a pool and stopping it. Check that the pool is stopped and
     /// then restart the engine, check that it is still stopped, and then start it.
     fn test_start_stop(paths: &[&Path]) {
-        let engine = StratEngine::initialize().unwrap();
+        let (send, _recv) = unbounded_channel();
+        let engine = StratEngine::initialize(send).unwrap();
         let name = "pool_name";
         let uuid = test_async!(engine.create_pool(name, paths, None, IntegritySpec::default()))
             .unwrap()
@@ -1550,7 +1559,8 @@ mod test {
 
         engine.teardown().unwrap();
 
-        let engine = StratEngine::initialize().unwrap();
+        let (send, _recv) = unbounded_channel();
+        let engine = StratEngine::initialize(send).unwrap();
         assert_eq!(test_async!(engine.stopped_pools()).stopped.len(), 1);
         assert_eq!(test_async!(engine.pools()).len(), 0);
 

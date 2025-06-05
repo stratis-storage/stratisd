@@ -2,9 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{ffi::CString, io, mem::size_of, os::unix::io::RawFd, str};
+use std::{ffi::CString, fmt, io, mem::size_of, os::unix::io::RawFd, str};
 
+use either::Either;
 use libc::{syscall, SYS_add_key, SYS_keyctl, KEYCTL_SETPERM};
+use tokio::sync::mpsc;
 
 use libcryptsetup_rs::SafeMemHandle;
 
@@ -13,7 +15,10 @@ use crate::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
         shared::read_key_shared,
         strat_engine::names::KeyDescription,
-        types::{Key, MappingCreateAction, MappingDeleteAction, SizedKeyMemory},
+        types::{
+            Key, MappingCreateAction, MappingDeleteAction, SizedKeyMemory, VolumeKeyKeyDescription,
+        },
+        EngineAction,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -23,17 +28,42 @@ use crate::{
 type KeySerial = u32;
 
 /// Search the persistent keyring for the given key description.
-pub(super) fn search_key_persistent(key_desc: &KeyDescription) -> StratisResult<Option<KeySerial>> {
+pub(super) fn search_key_persistent(
+    key_desc: Either<&KeyDescription, &VolumeKeyKeyDescription>,
+) -> StratisResult<Option<KeySerial>> {
     let keyring_id = get_persistent_keyring()?;
-    search_key(keyring_id, key_desc)
+    search_key(
+        keyring_id,
+        key_desc.either(|kd| kd.to_system_string(), |vk| vk.to_system_string()),
+    )
 }
 
 /// Read a key from the persistent keyring with the given key description.
 pub(super) fn read_key_persistent(
-    key_desc: &KeyDescription,
+    key_desc: Either<&KeyDescription, &VolumeKeyKeyDescription>,
 ) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>> {
     let keyring_id = get_persistent_keyring()?;
-    read_key(keyring_id, key_desc)
+    read_key(
+        keyring_id,
+        key_desc.either(|kd| kd.to_system_string(), |vk| vk.to_system_string()),
+    )
+}
+
+/// Unset a key from the persistent keyring with the given key description.
+pub(super) fn unset_key_persistent(
+    key_desc: Either<&KeyDescription, &VolumeKeyKeyDescription>,
+) -> StratisResult<bool> {
+    let keyring_id = get_persistent_keyring()?;
+    match search_key(
+        keyring_id,
+        key_desc.either(|kd| kd.to_system_string(), |vk| vk.to_system_string()),
+    )? {
+        Some(key_id) => {
+            unset_key(keyring_id, key_id)?;
+            Ok(true)
+        }
+        None => Ok(false),
+    }
 }
 
 /// Get the ID of the persistent root user keyring and attach it to
@@ -55,12 +85,12 @@ pub fn get_persistent_keyring() -> StratisResult<KeySerial> {
 
 /// Search for the given key description in the persistent root keyring.
 /// Returns the key ID or nothing if it was not found in the keyring.
-fn search_key(
-    keyring_id: KeySerial,
-    key_desc: &KeyDescription,
-) -> StratisResult<Option<KeySerial>> {
-    let key_desc_cstring = CString::new(key_desc.to_system_string())
-        .map_err(|_| StratisError::Msg("Invalid key description provided".to_string()))?;
+fn search_key(keyring_id: KeySerial, key_desc: String) -> StratisResult<Option<KeySerial>> {
+    let key_desc_cstring = CString::new(key_desc.clone()).map_err(|_| {
+        StratisError::Msg(format!(
+            "Key description {key_desc} could not be formatted as a C string"
+        ))
+    })?;
 
     let key_id = unsafe {
         syscall(
@@ -92,7 +122,7 @@ fn search_key(
 /// key description, `None` will be returned.
 fn read_key(
     keyring_id: KeySerial,
-    key_desc: &KeyDescription,
+    key_desc: String,
 ) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>> {
     let key_id_option = search_key(keyring_id, key_desc)?;
     let key_id = if let Some(ki) = key_id_option {
@@ -199,7 +229,7 @@ fn set_key_idem(
     key_data: SizedKeyMemory,
 ) -> StratisResult<MappingCreateAction<Key>> {
     let keyring_id = get_persistent_keyring()?;
-    match read_key(keyring_id, key_desc) {
+    match read_key(keyring_id, key_desc.to_system_string()) {
         Ok(Some((key_id, old_key_data))) => {
             let changed = reset_key(key_id, old_key_data, key_data)?;
             if changed {
@@ -334,9 +364,7 @@ impl KeyIdList {
 }
 
 /// Unset the key with ID `key_id` in the root persistent keyring.
-fn unset_key(key_id: KeySerial) -> StratisResult<()> {
-    let keyring_id = get_persistent_keyring()?;
-
+fn unset_key(keyring_id: KeySerial, key_id: KeySerial) -> StratisResult<()> {
     match unsafe { syscall(SYS_keyctl, libc::KEYCTL_UNLINK, key_id, keyring_id) } {
         i if i < 0 => Err(io::Error::last_os_error().into()),
         _ => Ok(()),
@@ -344,8 +372,13 @@ fn unset_key(key_id: KeySerial) -> StratisResult<()> {
 }
 
 /// Handle for kernel keyring interaction.
-#[derive(Debug)]
-pub struct StratKeyActions;
+pub struct StratKeyActions(mpsc::UnboundedSender<KeyDescription>);
+
+impl fmt::Debug for StratKeyActions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "StratKeyActions")
+    }
+}
 
 #[cfg(test)]
 impl StratKeyActions {
@@ -362,6 +395,12 @@ impl StratKeyActions {
     }
 }
 
+impl StratKeyActions {
+    pub fn new(sender: mpsc::UnboundedSender<KeyDescription>) -> Self {
+        StratKeyActions(sender)
+    }
+}
+
 impl KeyActions for StratKeyActions {
     fn set(
         &self,
@@ -371,7 +410,17 @@ impl KeyActions for StratKeyActions {
         let mut memory = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
         let bytes = read_key_shared(key_fd, memory.as_mut())?;
 
-        set_key_idem(key_desc, SizedKeyMemory::new(memory, bytes))
+        match set_key_idem(key_desc, SizedKeyMemory::new(memory, bytes)) {
+            Ok(i) => {
+                if i.is_changed() {
+                    if let Err(e) = self.0.send(key_desc.clone()) {
+                        warn!("Failed to communicate key addition to processing thread: {e}");
+                    }
+                }
+                Ok(i)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     fn list(&self) -> StratisResult<Vec<KeyDescription>> {
@@ -383,8 +432,8 @@ impl KeyActions for StratKeyActions {
     fn unset(&self, key_desc: &KeyDescription) -> StratisResult<MappingDeleteAction<Key>> {
         let keyring_id = get_persistent_keyring()?;
 
-        if let Some(key_id) = search_key(keyring_id, key_desc)? {
-            unset_key(key_id).map(|_| MappingDeleteAction::Deleted(Key))
+        if let Some(key_id) = search_key(keyring_id, key_desc.to_system_string())? {
+            unset_key(keyring_id, key_id).map(|_| MappingDeleteAction::Deleted(Key))
         } else {
             Ok(MappingDeleteAction::Identity)
         }

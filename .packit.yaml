@@ -29,14 +29,9 @@ srpm_build_deps:
 
 jobs:
     - job: copr_build
-      trigger: pull_request
-      additional_repos:
-          - copr://packit/stratis-storage-libcryptsetup-rs-master
-      targets:
-          - fedora-all
-
-    - job: copr_build
-      trigger: commit
+      trigger:
+          - commit
+          - pull_request
       additional_repos:
           - copr://packit/stratis-storage-libcryptsetup-rs-master
       targets:
@@ -44,7 +39,9 @@ jobs:
 
     - job: tests
       identifier: local
-      trigger: pull_request
+      trigger:
+          - commit
+          - pull_request
       targets:
           - fedora-all
 

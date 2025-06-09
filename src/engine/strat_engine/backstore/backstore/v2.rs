@@ -143,7 +143,7 @@ pub struct Backstore {
     data_tier: DataTier<StratBlockDev>,
     /// A linear DM device.
     origin: Option<LinearDev>,
-    /// A placeholder device to be converted to cache or a cache device.
+    /// A cache device.
     cache: Option<CacheDev>,
     /// A placeholder device to be converted to cache; necessary for reencryption support.
     placeholder: Option<LinearDev>,
@@ -152,7 +152,7 @@ pub struct Backstore {
     enc: Option<Either<InputEncryptionInfo, CryptHandle>>,
     /// Data allocations on the cap device,
     allocs: Vec<(Sectors, Sectors)>,
-    /// Metadata allocations on the cache or placeholder device.
+    /// Metadata allocations on the cache or origin device.
     crypt_meta_allocs: Vec<(Sectors, Sectors)>,
 }
 
@@ -162,7 +162,7 @@ impl InternalBackstore for Backstore {
             .as_ref()
             .and_then(|either| either.as_ref().right().map(|h| h.device()))
             .or_else(|| self.cache.as_ref().map(|c| c.device()))
-            .or_else(|| self.placeholder.as_ref().map(|lin| lin.device()))
+            .or_else(|| self.origin.as_ref().map(|lin| lin.device()))
     }
 
     fn datatier_allocated_size(&self) -> Sectors {
@@ -321,7 +321,7 @@ impl Backstore {
             }
         };
 
-        let (placeholder, cache, cache_tier, origin) = if !cachedevs.is_empty() {
+        let (cache, cache_tier, origin) = if !cachedevs.is_empty() {
             let block_mgr = BlockDevMgr::new(cachedevs, Some(last_update_time));
             match pool_save.backstore.cache_tier {
                 Some(ref cache_tier_save) => {
@@ -339,7 +339,7 @@ impl Backstore {
                             return Err(e);
                         }
                     };
-                    (None, Some(cache_device), Some(cache_tier), None)
+                    (Some(cache_device), Some(cache_tier), None)
                 }
                 None => {
                     let err_msg = "Cachedevs exist, but cache metadata does not exist";
@@ -347,31 +347,57 @@ impl Backstore {
                 }
             }
         } else {
-            let placeholder = make_placeholder_dev(pool_uuid, &origin)?;
-            (Some(placeholder), None, None, Some(origin))
+            (None, None, Some(origin))
         };
 
         let metadata_enc_enabled = pool_save.features.contains(&PoolFeatures::Encryption);
-        let crypt_physical_path = &once(DEVICEMAPPER_PATH)
-            .chain(once(
-                format_backstore_ids(pool_uuid, CacheRole::Cache)
-                    .0
-                    .to_string()
-                    .as_str(),
-            ))
-            .collect::<PathBuf>();
-        let has_header = match CryptHandle::load_metadata(crypt_physical_path, pool_uuid) {
+        let crypt_physical_path = match cache
+            .as_ref()
+            .map(|c| c.devnode())
+            .or_else(|| origin.as_ref().map(|o| o.devnode()))
+        {
+            Some(p) => p,
+            None => {
+                return Err(StratisError::Msg(
+                    "No allocations to backstore detected".to_string(),
+                ));
+            }
+        };
+        let has_header = match CryptHandle::load_metadata(&crypt_physical_path, pool_uuid) {
             Ok(opt) => opt.is_some(),
             Err(e) => {
                 return Err(e);
             }
         };
-        let enc = match (metadata_enc_enabled, has_header, passphrase.as_ref()) {
+        let (placeholder, enc) = match (metadata_enc_enabled, has_header, passphrase.as_ref()) {
             (true, true, pass) => {
-                match CryptHandle::setup(crypt_physical_path, pool_uuid, token_slot, pass) {
+                let placeholder = match (metadata_enc_enabled, cache.as_ref()) {
+                    (false, _) => None,
+                    (_, Some(_)) => None,
+                    (_, None) => match make_placeholder_dev(
+                        pool_uuid,
+                        origin.as_ref().expect("Must succeed, is_some()"),
+                    ) {
+                        Ok(pl) => Some(pl),
+                        Err(e) => return Err(e),
+                    },
+                };
+                match CryptHandle::setup(
+                    match placeholder
+                        .as_ref()
+                        .map(|p| p.devnode())
+                        .or_else(|| cache.as_ref().map(|c| c.devnode()))
+                    {
+                        Some(ref p) => p,
+                        None => return Err(StratisError::Msg("".to_string())),
+                    },
+                    pool_uuid,
+                    token_slot,
+                    pass,
+                ) {
                     Ok(opt) => {
                         if let Some(h) = opt {
-                            Some(Either::Right(h))
+                            (placeholder, Some(Either::Right(h)))
                         } else {
                             return Err(StratisError::Msg(
                                 "Metadata reported that encryption is enabled but no crypt header was found".to_string()
@@ -393,7 +419,7 @@ impl Backstore {
                         .to_string(),
                 ));
             }
-            (false, _, _) => None,
+            (false, _, _) => (None, None),
         };
 
         Ok(Backstore {
@@ -488,8 +514,6 @@ impl Backstore {
     ///
     /// Precondition: Must be invoked only after some space has been allocated
     /// from the backstore. This ensures that there is certainly a cap device.
-    // Precondition: self.cache.is_none() && self.placeholder.is_some()
-    // Postcondition: self.cache.is_some() && self.placeholder.is_none()
     pub fn init_cache(
         &mut self,
         pool_uuid: PoolUuid,
@@ -514,11 +538,9 @@ impl Backstore {
                 let origin = self.origin
                     .take()
                     .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.origin.is_some())");
-                let placeholder = self.placeholder
-                    .take()
-                    .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.placeholder.is_some())");
+                let placeholder = self.placeholder.take();
 
-                let cache = make_cache(pool_uuid, &cache_tier, origin, Some(placeholder), true)?;
+                let cache = make_cache(pool_uuid, &cache_tier, origin, placeholder, true)?;
 
                 self.cache = Some(cache);
 
@@ -598,27 +620,26 @@ impl Backstore {
     fn extend_cap_device(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
         let create = match (
             self.cache.as_mut(),
-            self.placeholder
-                .as_mut()
-                .and_then(|p| self.origin.as_mut().map(|o| (p, o))),
+            self.placeholder.as_mut(),
+            self.origin.as_mut(),
             self.enc.as_mut(),
         ) {
-            (None, None, None) => true,
-            (_, _, Some(Either::Left(_))) => true,
-            (Some(cache), None, Some(Either::Right(handle))) => {
+            (None, None, None, None) => true,
+            (_, _, _, Some(Either::Left(_))) => true,
+            (Some(cache), None, None, Some(Either::Right(handle))) => {
                 let table = self.data_tier.segments.map_to_dm();
                 cache.set_origin_table(get_dm(), table)?;
                 cache.resume(get_dm())?;
                 handle.resize(pool_uuid, None)?;
                 false
             }
-            (Some(cache), None, None) => {
+            (Some(cache), None, None, None) => {
                 let table = self.data_tier.segments.map_to_dm();
                 cache.set_origin_table(get_dm(), table)?;
                 cache.resume(get_dm())?;
                 false
             }
-            (None, Some((placeholder, origin)), Some(Either::Right(handle))) => {
+            (None, Some(placeholder), Some(origin), Some(Either::Right(handle))) => {
                 let table = self.data_tier.segments.map_to_dm();
                 origin.set_table(get_dm(), table)?;
                 origin.resume(get_dm())?;
@@ -635,56 +656,58 @@ impl Backstore {
                 handle.resize(pool_uuid, None)?;
                 false
             }
-            (None, Some((cap, linear)), None) => {
+            (None, None, Some(linear), None) => {
                 let table = self.data_tier.segments.map_to_dm();
                 linear.set_table(get_dm(), table)?;
                 linear.resume(get_dm())?;
-                let table = vec![TargetLine::new(
-                    Sectors(0),
-                    linear.size(),
-                    LinearDevTargetParams::Linear(LinearTargetParams::new(
-                        linear.device(),
-                        Sectors(0),
-                    )),
-                )];
-                cap.set_table(get_dm(), table)?;
-                cap.resume(get_dm())?;
                 false
             }
-            _ => panic!("NOT (self.cache().is_some() AND self.origin.is_some())"),
+            _ => panic!("NOT (self.cache().is_some() AND self.placeholder.is_some())"),
         };
 
         if create {
             let table = self.data_tier.segments.map_to_dm();
             let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
             let origin = LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), table)?;
-            let placeholder = make_placeholder_dev(pool_uuid, &origin)?;
-            let handle = match self.enc {
-                Some(Either::Left(ref einfo)) => Some(CryptHandle::initialize(
-                    &once(DEVICEMAPPER_PATH)
-                        .chain(once(
-                            format_backstore_ids(pool_uuid, CacheRole::Cache)
-                                .0
-                                .to_string()
-                                .as_str(),
-                        ))
-                        .collect::<PathBuf>(),
-                    pool_uuid,
-                    einfo,
-                    None,
-                )?),
+            let (placeholder, handle) = match self.enc {
+                Some(Either::Left(ref einfo)) => {
+                    let placeholder = if self.cache.is_some() {
+                        None
+                    } else {
+                        Some(make_placeholder_dev(pool_uuid, &origin)?)
+                    };
+                    (
+                        placeholder,
+                        Some(CryptHandle::initialize(
+                            &once(DEVICEMAPPER_PATH)
+                                .chain(once(
+                                    format_backstore_ids(pool_uuid, CacheRole::Cache)
+                                        .0
+                                        .to_string()
+                                        .as_str(),
+                                ))
+                                .collect::<PathBuf>(),
+                            pool_uuid,
+                            einfo,
+                            None,
+                        )?),
+                    )
+                }
                 Some(Either::Right(_)) => unreachable!("Checked above"),
                 None => {
                     manual_wipe(
-                        &placeholder.devnode(),
+                        &match self.cache.as_ref() {
+                            Some(c) => c.devnode(),
+                            None => origin.devnode(),
+                        },
                         Sectors(0),
                         DEFAULT_CRYPT_DATA_OFFSET_V2,
                     )?;
-                    None
+                    (None, None)
                 }
             };
             self.origin = Some(origin);
-            self.placeholder = Some(placeholder);
+            self.placeholder = placeholder;
             self.enc = handle.map(Either::Right);
         }
 
@@ -757,8 +780,8 @@ impl Backstore {
         self.enc
             .as_ref()
             .and_then(|either| either.as_ref().right().map(|handle| handle.size()))
-            .or_else(|| self.placeholder.as_ref().map(|d| d.size()))
             .or_else(|| self.cache.as_ref().map(|d| d.size()))
+            .or_else(|| self.origin.as_ref().map(|d| d.size()))
             .unwrap_or(Sectors(0))
     }
 
@@ -1514,7 +1537,7 @@ mod tests {
 
         invariant(&backstore);
 
-        assert_eq!(backstore.device(), old_device);
+        assert_ne!(backstore.device(), old_device);
 
         backstore.destroy(pool_uuid).unwrap();
     }

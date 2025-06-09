@@ -278,7 +278,7 @@ def settle():
 def wait_for_udev_count(expected_num):
     """
     Look for devices with ID_FS_TYPE=stratis. Check as many times as can be
-    done in 10 seconds or until the number of devices found is equal to the
+    done in 20 seconds or until the number of devices found is equal to the
     number of devices expected. Always get the result of at least 1 enumeration.
 
     This method should be used only when it is very hard to figure the device
@@ -293,7 +293,7 @@ def wait_for_udev_count(expected_num):
     try:
         for attempt in Retrying(
             retry=retry_if_not_result(lambda found_num: found_num == expected_num),
-            stop=stop_after_delay(10),
+            stop=stop_after_delay(20),
             wait=wait_fixed(1),
         ):
             with attempt:

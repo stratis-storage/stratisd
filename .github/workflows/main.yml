@@ -81,6 +81,8 @@ jobs:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged --userns=host --ipc=host -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1
     steps:
+      - name: Install git for checkout action
+        run: dnf install -y git
       - uses: actions/checkout@v4
         with:
           path: stratisd
@@ -95,7 +97,6 @@ jobs:
           dbus-devel
           device-mapper-devel
           libblkid-devel
-          git
           glibc-static
           make
           ncurses
@@ -121,7 +122,35 @@ jobs:
       - name: Workaround for dbus inotify
         run: cp stratisd.conf /usr/share/dbus-1/system.d
         working-directory: stratisd
-      - name: Check out stratis-cli
+      - name: Check out jbaublitz/stratis-cli
+        id: jbaublitz
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          repository: jbaublitz/stratis-cli
+          path: jbaublitz
+          ref: ${{ github.head_ref }}
+      - name: Check out mulkieran/stratis-cli
+        id: mulkieran
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          repository: mulkieran/stratis-cli
+          path: mulkieran
+          ref: ${{ github.head_ref }}
+      - name: Check if both checkouts succeeded
+        if: steps.jbaublitz.outcome == 'success' && steps.mulkieran.outcome == 'success'
+        run: |
+          echo "Branch conflict!"
+          exit 1
+      - name: Conditionally make jbaublitz checkout branch the chosen one
+        if: steps.jbaublitz.outcome == 'success'
+        run: mv jbaublitz stratis-cli
+      - name: Conditionally make mulkieran checkout branch the chosen one
+        if: steps.mulkieran.outcome == 'success'
+        run: mv mulkieran stratis-cli
+      - name: Check out stratis-cli if no alternative branch was checked out
+        if: steps.mulkieran.outcome == 'failure' && steps.jbaublitz.outcome == 'failure'
         uses: actions/checkout@v4
         with:
           repository: stratis-storage/stratis-cli
@@ -261,11 +290,10 @@ jobs:
       matrix:
         include:
           - rev: master
-            options: --post-test-check=verify-filesystem-symlinks --post-test-check=verify-pool-metadata --highest-revision-number=8
-          - rev: v3.6.2
-            options: --highest-revision-number=6
     runs-on: ubuntu-24.04
     steps:
+      - name: Install git for checkout action
+        run: DEBIAN_FRONTEND=noninteractive sudo apt-get install -y git
       - uses: actions/checkout@v4
         with:
           path: stratisd
@@ -310,12 +338,40 @@ jobs:
         working-directory: stratisd
       - name: Reload udev
         run: sudo udevadm control --reload
-      - name: Clone testing repo
+      - name: Check out jbaublitz/testing
+        id: jbaublitz
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          repository: jbaublitz/testing
+          path: jbaublitz
+          ref: ${{ github.head_ref }}
+      - name: Check out mulkieran/testing
+        id: mulkieran
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          repository: mulkieran/testing
+          path: mulkieran
+          ref: ${{ github.head_ref }}
+      - name: Check if both checkouts succeeded
+        if: steps.jbaublitz.outcome == 'success' && steps.mulkieran.outcome == 'success'
+        run: |
+          echo "Branch conflict!"
+          exit 1
+      - name: Conditionally make jbaublitz checkout branch the chosen one
+        if: steps.jbaublitz.outcome == 'success'
+        run: mv jbaublitz testing
+      - name: Conditionally make mulkieran checkout branch the chosen one
+        if: steps.mulkieran.outcome == 'success'
+        run: mv mulkieran testing
+      - name: Check out testing if no alternative branch was checked out
+        if: steps.mulkieran.outcome == 'failure' && steps.jbaublitz.outcome == 'failure'
         uses: actions/checkout@v4
         with:
           repository: stratis-storage/testing
           path: testing
-          ref: ${{ matrix.rev }}
+          ref: master
       - name: Run stratisd_cert.py
         run: >
           sudo
@@ -325,5 +381,7 @@ jobs:
           --post-test-check=monitor-dbus
           --post-test-check=verify-sysfs
           --post-test-check=verify-private-symlinks
-          ${{ matrix.options }}
+          --post-test-check=verify-filesystem-symlinks
+          --post-test-check=verify-pool-metadata
+          --highest-revision-number=8
         working-directory: testing

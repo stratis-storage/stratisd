@@ -1345,6 +1345,14 @@ impl Pool for StratPool {
     fn free_token_slots(&self) -> Option<u8> {
         None
     }
+
+    fn volume_key_is_loaded(&self, _: PoolUuid) -> StratisResult<bool> {
+        Ok(false)
+    }
+
+    fn load_volume_key(&mut self, _: PoolUuid) -> StratisResult<bool> {
+        Ok(false)
+    }
 }
 
 pub struct StratPoolState {
@@ -1398,6 +1406,7 @@ mod tests {
     };
 
     use nix::mount::{mount, umount, MsFlags};
+    use tokio::sync::mpsc::unbounded_channel;
 
     use devicemapper::{Bytes, IEC, SECTOR_SIZE};
 
@@ -1828,7 +1837,8 @@ mod tests {
     /// Set up for testing physical device growth.
     fn test_grow_physical_pre_grow(paths: &[&Path]) {
         let pool_name = Name::new("pool".to_string());
-        let engine = StratEngine::initialize().unwrap();
+        let (send, _recv) = unbounded_channel();
+        let engine = StratEngine::initialize(send).unwrap();
         let pool_uuid = test_async!(engine.create_pool_legacy(&pool_name, paths, None))
             .unwrap()
             .changed()
@@ -1887,7 +1897,8 @@ mod tests {
     /// and that the pool registers new available allocation space if it is out of space
     /// at the time of device growth.
     fn test_grow_physical_post_grow(_: &[&Path]) {
-        let engine = StratEngine::initialize().unwrap();
+        let (send, _recv) = unbounded_channel();
+        let engine = StratEngine::initialize(send).unwrap();
 
         let mut pools = test_async!(engine.pools_mut());
         assert!(pools.len() == 1);

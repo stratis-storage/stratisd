@@ -9,6 +9,8 @@ use std::{
     path::Path,
 };
 
+use tokio::sync::mpsc::unbounded_channel;
+
 use libcryptsetup_rs::SafeMemHandle;
 
 use crate::engine::{
@@ -55,7 +57,8 @@ where
 
     let result = catch_unwind(|| test(physical_paths, &key_description));
 
-    StratKeyActions.unset(&key_description).unwrap();
+    let (send, _recv) = unbounded_channel();
+    StratKeyActions::new(send).unset(&key_description).unwrap();
 
     if let Err(e) = result {
         resume_unwind(e)
@@ -77,7 +80,8 @@ where
     let result = catch_unwind(|| test_pre(physical_paths, &key_description));
 
     let (_, key) = read_key_persistent(&key_description).unwrap().unwrap();
-    StratKeyActions.unset(&key_description).unwrap();
+    let (send, _recv) = unbounded_channel();
+    StratKeyActions::new(send).unset(&key_description).unwrap();
 
     if let Err(e) = result {
         resume_unwind(e)
@@ -101,8 +105,10 @@ where
 
     let result = catch_unwind(|| test(physical_paths, &key_description1, &key_description2));
 
-    StratKeyActions.unset(&key_description1).unwrap();
-    StratKeyActions.unset(&key_description2).unwrap();
+    let (send, _recv) = unbounded_channel();
+    let strat_key_actions = StratKeyActions::new(send);
+    strat_key_actions.unset(&key_description1).unwrap();
+    strat_key_actions.unset(&key_description2).unwrap();
 
     if let Err(e) = result {
         resume_unwind(e)

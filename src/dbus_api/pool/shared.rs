@@ -388,3 +388,13 @@ pub fn pool_no_alloc_space(pool: &dyn Pool) -> bool {
 pub fn pool_free_token_slots(pool: &dyn Pool) -> (bool, u8) {
     prop_conv::pool_free_token_slots_to_prop(pool.free_token_slots())
 }
+
+/// Generate a variant that represents either an error message or a boolean indicating whether the
+/// volume key is loaded.
+#[inline]
+pub fn pool_volume_key_loaded(pool: &dyn Pool, pool_uuid: PoolUuid) -> Variant<Box<dyn RefArg>> {
+    match pool.volume_key_is_loaded(pool_uuid) {
+        Ok(b) => Variant(Box::new(b)),
+        Err(e) => Variant(Box::new(e.to_string())),
+    }
+}

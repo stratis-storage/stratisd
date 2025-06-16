@@ -152,7 +152,7 @@ jobs:
         if: github.event_name == 'pull_request' && steps.mulkieran.outcome == 'success'
         run: mv mulkieran stratis-cli
       - name: Check out stratis-cli if no alternative branch was checked out
-        if: github.event_name == 'pull_request' && steps.mulkieran.outcome == 'failure' && steps.jbaublitz.outcome == 'failure'
+        if: github.event_name != 'pull_request' || (github.event_name == 'pull_request' && steps.mulkieran.outcome == 'failure' && steps.jbaublitz.outcome == 'failure')
         uses: actions/checkout@v4
         with:
           repository: stratis-storage/stratis-cli
@@ -370,7 +370,7 @@ jobs:
         if: github.event_name == 'pull_request' && steps.mulkieran.outcome == 'success'
         run: mv mulkieran testing
       - name: Check out testing if no alternative branch was checked out
-        if: github.event_name == 'pull_request' && steps.mulkieran.outcome == 'failure' && steps.jbaublitz.outcome == 'failure'
+        if: github.event_name != 'pull_request' || (github.event_name == 'pull_request' && steps.mulkieran.outcome == 'failure' && steps.jbaublitz.outcome == 'failure')
         uses: actions/checkout@v4
         with:
           repository: stratis-storage/testing

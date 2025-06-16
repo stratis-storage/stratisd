@@ -50,7 +50,6 @@ jobs:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
-      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -60,6 +59,7 @@ jobs:
           cryptsetup-devel
           dbus-devel
           device-mapper-devel
+          git
           libblkid-devel
           make
           ncurses
@@ -72,6 +72,7 @@ jobs:
       - uses: baptiste0928/cargo-install@v3
         with:
           crate: typos-cli
+      - uses: actions/checkout@v4
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -81,11 +82,6 @@ jobs:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged --userns=host --ipc=host -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1
     steps:
-      - name: Install git for checkout action
-        run: dnf install -y git
-      - uses: actions/checkout@v4
-        with:
-          path: stratisd
       - name: Install dependencies
         run: >
           dnf install -y
@@ -96,8 +92,9 @@ jobs:
           dbus-tools
           dbus-devel
           device-mapper-devel
-          libblkid-devel
+          git
           glibc-static
+          libblkid-devel
           make
           ncurses
           python3-coverage
@@ -113,6 +110,12 @@ jobs:
         with:
           components: cargo
           toolchain: 1.77.0  # LOWEST SUPPORTED RUST TOOLCHAIN
+      - uses: actions/checkout@v4
+        with:
+          path: stratisd
+      - name: Overwrite stratisd dependencies as necessary
+        uses: ./.github/actions/stratisd-modify-action
+        working-directory: stratisd
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
         working-directory: stratisd
@@ -172,7 +175,6 @@ jobs:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged --userns=host --ipc=host -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1
     steps:
-      - uses: actions/checkout@v4
       - name: Install dependencies
         run: >
           dnf install -y
@@ -184,9 +186,9 @@ jobs:
           dbus-devel
           device-mapper-devel
           device-mapper-persistent-data
-          libblkid-devel
           git
           glibc-static
+          libblkid-devel
           make
           ncurses
           python3-coverage
@@ -203,6 +205,9 @@ jobs:
         with:
           components: cargo
           toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+      - uses: actions/checkout@v4
+      - name: Overwrite stratisd dependencies as necessary
+        uses: ./.github/actions/stratisd-modify-action
       - name: Run stratisd-min cli tests
         run: make test-stratisd-min-root
       - name: Run stratis-min cli tests
@@ -215,13 +220,14 @@ jobs:
     container:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
-      - uses: actions/checkout@v4
       - name: Install dependencies
         run: >
           dnf install -y
+          git
           make
           ncurses
           shfmt
+      - uses: actions/checkout@v4
       - name: Run shell check
         run: make -f Makefile fmt-shell-ci
 
@@ -230,17 +236,18 @@ jobs:
     container:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
-      - uses: actions/checkout@v4
       - name: Install dependencies
         run: >
           dnf install -y
           bandit
+          git
           make
           pip
           pylint
           python3-dbus
       - name: Install pyright
         run: pip install --user pyright
+      - uses: actions/checkout@v4
       - name: Run lint
         run: >
           PATH=${PATH}:/github/home/.local/bin
@@ -252,7 +259,6 @@ jobs:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
-      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -264,6 +270,7 @@ jobs:
           dbus-tools
           device-mapper-devel
           device-mapper-persistent-data
+          git
           glibc-static
           libblkid-devel
           make
@@ -276,6 +283,9 @@ jobs:
         with:
           components: cargo
           toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+      - uses: actions/checkout@v4
+      - name: Overwrite stratisd dependencies as necessary
+        uses: ./.github/actions/stratisd-modify-action
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd
@@ -294,11 +304,6 @@ jobs:
           - rev: master
     runs-on: ubuntu-24.04
     steps:
-      - name: Install git for checkout action
-        run: DEBIAN_FRONTEND=noninteractive sudo apt-get install -y git
-      - uses: actions/checkout@v4
-        with:
-          path: stratisd
       - name: Run apt-get update
         run: sudo apt-get -q update
       - name: Install dependencies
@@ -308,6 +313,7 @@ jobs:
           asciidoc
           clang
           curl
+          git
           libblkid-dev
           libcryptsetup-dev
           libdbus-1-dev
@@ -329,6 +335,12 @@ jobs:
         with:
           components: cargo
           toolchain: 1.77.0  # LOWEST SUPPORTED RUST TOOLCHAIN
+      - uses: actions/checkout@v4
+        with:
+          path: stratisd
+      - name: Overwrite stratisd dependencies as necessary
+        uses: ./.github/actions/stratisd-modify-action
+        working-directory: stratisd
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
         working-directory: stratisd

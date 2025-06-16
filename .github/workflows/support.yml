@@ -61,16 +61,17 @@ jobs:
     runs-on: ubuntu-24.04
     container: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
-      - uses: actions/checkout@v4
       - name: Install dependencies
         run: >
           dnf install -y
+          git
           make
           ncurses
           pip
           ${{ matrix.dependencies }}
       - name: Install pyright
         run: pip install --user pyright
+      - uses: actions/checkout@v4
       - name: Run test
         run: ${{ matrix.task }}
         working-directory: ${{ matrix.working-directory }}

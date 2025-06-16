@@ -80,7 +80,6 @@ jobs:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev
     steps:
-      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -90,6 +89,7 @@ jobs:
           dbus-devel
           device-mapper-persistent-data
           device-mapper-devel
+          git
           libblkid-devel
           make
           ncurses
@@ -99,6 +99,9 @@ jobs:
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
+      - uses: actions/checkout@v4
+      - name: Overwrite stratisd dependencies as necessary
+        uses: ./.github/actions/stratisd-modify-action
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -115,7 +118,6 @@ jobs:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev --ipc=host
     steps:
-      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -124,6 +126,7 @@ jobs:
           cryptsetup-devel
           curl
           dbus-devel
+          git
           glibc-static
           device-mapper-devel
           device-mapper-persistent-data
@@ -138,6 +141,9 @@ jobs:
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
+      - uses: actions/checkout@v4
+      - name: Overwrite stratisd dependencies as necessary
+        uses: ./.github/actions/stratisd-modify-action
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd
@@ -162,7 +168,6 @@ jobs:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev --ipc=host
     steps:
-      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -172,6 +177,7 @@ jobs:
           cryptsetup-devel
           curl
           dbus-devel
+          git
           glibc-static
           device-mapper-devel
           device-mapper-persistent-data
@@ -186,6 +192,9 @@ jobs:
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
+      - uses: actions/checkout@v4
+      - name: Overwrite stratisd dependencies as necessary
+        uses: ./.github/actions/stratisd-modify-action
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd

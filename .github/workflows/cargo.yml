@@ -31,11 +31,6 @@ jobs:
     container:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
-      - name: Install git for checkout action
-        run: dnf install -y git
-      - uses: actions/checkout@v4
-        with:
-          path: stratisd
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -44,6 +39,7 @@ jobs:
           cryptsetup-devel
           dbus-devel
           device-mapper-devel
+          git
           libblkid-devel
           make
           ncurses
@@ -55,6 +51,9 @@ jobs:
         with:
           components: cargo
           toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+      - uses: actions/checkout@v4
+        with:
+          path: stratisd
       - name: Check out ci repo
         uses: actions/checkout@v4
         with:

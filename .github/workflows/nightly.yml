@@ -21,7 +21,6 @@ jobs:
     container:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
-      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -30,6 +29,7 @@ jobs:
           cryptsetup-devel
           dbus-devel
           device-mapper-devel
+          git
           libblkid-devel
           make
           ncurses
@@ -41,6 +41,7 @@ jobs:
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
+      - uses: actions/checkout@v4
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -49,7 +50,6 @@ jobs:
     container:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
-      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -59,6 +59,7 @@ jobs:
           dbus-devel
           device-mapper-devel
           glibc-static
+          git
           libblkid-devel
           make
           ncurses
@@ -71,6 +72,7 @@ jobs:
       - uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-audit
+      - uses: actions/checkout@v4
       - name: Run cargo-update
         run: cargo update
       - name: Build all targets
@@ -89,7 +91,6 @@ jobs:
     container:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
-      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -97,6 +98,7 @@ jobs:
           curl
           cryptsetup-devel
           dbus-devel
+          git
           glibc-static
           libblkid-devel
           make
@@ -115,6 +117,7 @@ jobs:
       - uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-auditable
+      - uses: actions/checkout@v4
       - name: Run matrix task
         run: ${{ matrix.task }}
 
@@ -123,11 +126,6 @@ jobs:
     container:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
-      - name: Install git for checkout action
-        run: dnf install -y git
-      - uses: actions/checkout@v4
-        with:
-          path: stratisd
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -136,6 +134,7 @@ jobs:
           cryptsetup-devel
           dbus-devel
           device-mapper-devel
+          git
           libblkid-devel
           make
           ncurses
@@ -147,6 +146,9 @@ jobs:
         with:
           components: cargo
           toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+      - uses: actions/checkout@v4
+        with:
+          path: stratisd
       - name: Check out ci repo
         uses: actions/checkout@v4
         with:
@@ -170,13 +172,8 @@ jobs:
         working-directory: stratisd
 
   python-based-tests:
-    strategy:
-      matrix:
-        include:
-          - toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
       - name: Run apt-get update
         run: sudo apt-get -q update
       - name: Install dependencies
@@ -186,6 +183,7 @@ jobs:
           asciidoc
           clang
           curl
+          git
           libblkid-dev
           libcryptsetup-dev
           libdbus-1-dev
@@ -209,7 +207,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: ${{ matrix.toolchain }}
+          toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+      - uses: actions/checkout@v4
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd
@@ -218,7 +217,7 @@ jobs:
         run: sudo cp stratisd.conf /usr/share/dbus-1/system.d
       - name: Reload udev
         run: sudo udevadm control --reload
-      - name: Tests using Rust ${{ matrix.toolchain }}
+      - name: Run some tests in client-dbus
         run: >
           sudo make
           RUST_LOG=stratisd=debug

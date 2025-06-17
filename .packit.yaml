@@ -31,44 +31,16 @@ jobs:
     - job: copr_build
       trigger: pull_request
       additional_repos:
-          - https://download.copr.fedorainfracloud.org/results/packit/stratis-storage-libcryptsetup-rs-master/fedora-rawhide-x86_64
+          - copr://packit/stratis-storage-libcryptsetup-rs-master
       targets:
-          - fedora-rawhide
+          - fedora-all
 
     - job: copr_build
       trigger: commit
       additional_repos:
-          - https://download.copr.fedorainfracloud.org/results/packit/stratis-storage-libcryptsetup-rs-master/fedora-rawhide-x86_64
+          - copr://packit/stratis-storage-libcryptsetup-rs-master
       targets:
-          - fedora-rawhide
-
-    - job: copr_build
-      trigger: pull_request
-      additional_repos:
-          - https://download.copr.fedorainfracloud.org/results/packit/stratis-storage-libcryptsetup-rs-master/fedora-42-x86_64
-      targets:
-          - fedora-42
-
-    - job: copr_build
-      trigger: commit
-      additional_repos:
-          - https://download.copr.fedorainfracloud.org/results/packit/stratis-storage-libcryptsetup-rs-master/fedora-42-x86_64
-      targets:
-          - fedora-42
-
-    - job: copr_build
-      trigger: pull_request
-      additional_repos:
-          - https://download.copr.fedorainfracloud.org/results/packit/stratis-storage-libcryptsetup-rs-master/fedora-41-x86_64
-      targets:
-          - fedora-41
-
-    - job: copr_build
-      trigger: commit
-      additional_repos:
-          - https://download.copr.fedorainfracloud.org/results/packit/stratis-storage-libcryptsetup-rs-master/fedora-41-x86_64
-      targets:
-          - fedora-41
+          - fedora-all
 
     - job: tests
       identifier: local

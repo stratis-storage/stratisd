@@ -18,6 +18,9 @@ Recommended development platform for Python development: Fedora 41
   https://github.com/stratis-storage/stratisd/pull/3851
 
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3860
+  https://github.com/stratis-storage/stratisd/pull/3859
+  https://github.com/stratis-storage/stratisd/pull/3858
   https://github.com/stratis-storage/stratisd/pull/3853
   https://github.com/stratis-storage/stratisd/pull/3852
   https://github.com/stratis-storage/stratisd/pull/3850

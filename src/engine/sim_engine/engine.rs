@@ -329,6 +329,7 @@ impl Engine for SimEngine {
         id: PoolIdentifier<PoolUuid>,
         token_slot: TokenUnlockMethod,
         passphrase_fd: Option<RawFd>,
+        _remove_cache: bool,
     ) -> StratisResult<StartAction<PoolUuid>> {
         if let Some(guard) = self.pools.read(id.clone()).await {
             let (_, pool_uuid, pool) = guard.as_tuple();

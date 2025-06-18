@@ -15,7 +15,7 @@ use crate::dbus_api::{
             },
             props::{
                 get_pool_clevis_infos, get_pool_free_token_slots, get_pool_key_descs,
-                get_pool_metadata_version,
+                get_pool_metadata_version, get_pool_volume_key_loaded,
             },
         },
     },
@@ -122,4 +122,13 @@ pub fn free_token_slots_property(
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_free_token_slots)
+}
+
+pub fn volume_key_loaded_property(
+    f: &Factory<MTSync<TData>, TData>,
+) -> Property<MTSync<TData>, TData> {
+    f.property::<Variant<Box<dyn RefArg>>, _>(consts::POOL_VOLUME_KEY_LOADED, ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::False)
+        .on_get(get_pool_volume_key_loaded)
 }

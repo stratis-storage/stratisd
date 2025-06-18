@@ -39,3 +39,12 @@ pub fn get_pool_free_token_slots(
 ) -> Result<(), MethodErr> {
     get_pool_property(i, p, |(_, _, pool)| Ok(shared::pool_free_token_slots(pool)))
 }
+
+pub fn get_pool_volume_key_loaded(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_pool_property(i, p, |(_, uuid, pool)| {
+        Ok(shared::pool_volume_key_loaded(pool, uuid))
+    })
+}

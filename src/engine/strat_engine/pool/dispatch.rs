@@ -402,4 +402,18 @@ impl Pool for AnyPool {
             AnyPool::V2(p) => p.free_token_slots(),
         }
     }
+
+    fn volume_key_is_loaded(&self, uuid: PoolUuid) -> StratisResult<bool> {
+        match self {
+            AnyPool::V1(p) => p.volume_key_is_loaded(uuid),
+            AnyPool::V2(p) => p.volume_key_is_loaded(uuid),
+        }
+    }
+
+    fn load_volume_key(&mut self, uuid: PoolUuid) -> StratisResult<bool> {
+        match self {
+            AnyPool::V1(p) => p.load_volume_key(uuid),
+            AnyPool::V2(p) => p.load_volume_key(uuid),
+        }
+    }
 }

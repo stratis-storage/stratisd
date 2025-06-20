@@ -329,7 +329,7 @@ impl Engine for SimEngine {
         id: PoolIdentifier<PoolUuid>,
         token_slot: TokenUnlockMethod,
         passphrase_fd: Option<RawFd>,
-        _remove_cache: bool,
+        remove_cache: bool,
     ) -> StratisResult<StartAction<PoolUuid>> {
         if let Some(guard) = self.pools.read(id.clone()).await {
             let (_, pool_uuid, pool) = guard.as_tuple();
@@ -345,7 +345,7 @@ impl Engine for SimEngine {
                 Ok(StartAction::Identity)
             }
         } else {
-            let (name, pool_uuid, pool) = match id {
+            let (name, pool_uuid, mut pool) = match id {
                 PoolIdentifier::Name(n) => self
                     .stopped_pools
                     .write()
@@ -393,6 +393,9 @@ impl Engine for SimEngine {
                 return Err(StratisError::Msg(format!(
                     "Pool with UUID {pool_uuid} is not encrypted but a passphrase was provided"
                 )));
+            }
+            if remove_cache {
+                pool.clear_cache();
             }
             self.pools.modify_all().await.insert(name, pool_uuid, pool);
             Ok(StartAction::Started(pool_uuid))

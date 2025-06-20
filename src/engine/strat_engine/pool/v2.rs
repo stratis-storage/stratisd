@@ -235,6 +235,7 @@ impl StratPool {
         metadata: &PoolSave,
         token_slot: TokenUnlockMethod,
         passphrase: Option<SizedKeyMemory>,
+        remove_cache: bool,
     ) -> BDARecordResult<(Name, StratPool)> {
         if let Err(e) = check_metadata(metadata) {
             return Err((e, tiers_to_bdas(datadevs, cachedevs, None)));
@@ -266,7 +267,8 @@ impl StratPool {
         };
 
         // TODO: Remove in stratisd 4.0
-        let mut needs_save = metadata.thinpool_dev.fs_limit.is_none()
+        let mut needs_save = remove_cache
+            || metadata.thinpool_dev.fs_limit.is_none()
             || metadata.thinpool_dev.feature_args.is_none();
 
         let metadata_size = backstore.datatier_metadata_size();

@@ -64,7 +64,8 @@ pub fn start_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let ret = match handle_action!(block_on(dbus_context.engine.start_pool(
         PoolIdentifier::Uuid(pool_uuid),
         TokenUnlockMethod::from(unlock_method),
-        None
+        None,
+        false,
     ))) {
         Ok(StartAction::Started(_)) => {
             let guard = match block_on(

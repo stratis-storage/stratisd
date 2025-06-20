@@ -31,14 +31,14 @@ jobs:
     - job: copr_build
       trigger: pull_request
       additional_repos:
-          - https://download.copr.fedorainfracloud.org/results/packit/stratis-storage-libcryptsetup-rs-master/fedora-$releasever-x86_64
+          - copr://stratis-storage-libcryptsetup-rs-master/fedora-$releasever-x86_64
       targets:
           - fedora-all
 
     - job: copr_build
       trigger: commit
       additional_repos:
-          - https://download.copr.fedorainfracloud.org/results/packit/stratis-storage-libcryptsetup-rs-master/fedora-$releasever-x86_64
+          - copr://stratis-storage-libcryptsetup-rs-master/fedora-$releasever-x86_64
       targets:
           - fedora-all
 

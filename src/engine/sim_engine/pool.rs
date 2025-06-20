@@ -114,6 +114,11 @@ impl SimPool {
         }
     }
 
+    /// Clear cache devices.
+    pub fn clear_cache(&mut self) {
+        self.cache_devs.clear();
+    }
+
     pub fn record(&self, name: &str) -> PoolSave {
         PoolSave {
             name: name.to_owned(),

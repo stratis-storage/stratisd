@@ -227,6 +227,7 @@ impl StratPool {
     ///   * key_description.is_none() -> no StratBlockDev in datadevs has a
     ///   key description.
     ///   * no StratBlockDev in cachdevs has a key description
+    #[allow(clippy::too_many_arguments)]
     pub fn setup(
         uuid: PoolUuid,
         datadevs: Vec<StratBlockDev>,
@@ -235,6 +236,7 @@ impl StratPool {
         metadata: &PoolSave,
         token_slot: TokenUnlockMethod,
         passphrase: Option<SizedKeyMemory>,
+        remove_cache: bool,
     ) -> BDARecordResult<(Name, StratPool)> {
         if let Err(e) = check_metadata(metadata) {
             return Err((e, tiers_to_bdas(datadevs, cachedevs, None)));
@@ -264,8 +266,9 @@ impl StratPool {
             Err(e) => return Err((e, backstore.into_bdas())),
         };
 
+        let mut needs_save = remove_cache;
         // TODO: Remove in stratisd 4.0
-        let mut needs_save = metadata.thinpool_dev.fs_limit.is_none()
+        needs_save |= metadata.thinpool_dev.fs_limit.is_none()
             || metadata.thinpool_dev.feature_args.is_none();
 
         let metadata_size = backstore.datatier_metadata_size();

@@ -261,6 +261,8 @@ impl StratPool {
     ///   * key_description.is_none() -> no StratBlockDev in datadevs has a
     ///   key description.
     ///   * no StratBlockDev in cachdevs has a key description
+    ///
+    ///   If cache was omitted, then metadata must be written.
     pub fn setup(
         uuid: PoolUuid,
         datadevs: Vec<StratBlockDev>,
@@ -268,7 +270,10 @@ impl StratPool {
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
         encryption_info: Option<PoolEncryptionInfo>,
+        omitted_cache: bool,
     ) -> BDARecordResult<(Name, StratPool)> {
+        let mut needs_save = omitted_cache;
+
         if let Err(e) = check_metadata(metadata) {
             return Err((e, tiers_to_bdas(datadevs, cachedevs, None)));
         }
@@ -298,7 +303,7 @@ impl StratPool {
         };
 
         // TODO: Remove in stratisd 4.0
-        let mut needs_save = metadata.thinpool_dev.fs_limit.is_none()
+        needs_save |= metadata.thinpool_dev.fs_limit.is_none()
             || metadata.thinpool_dev.feature_args.is_none();
 
         let metadata_size = backstore.datatier_metadata_size();

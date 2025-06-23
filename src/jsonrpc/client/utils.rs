@@ -222,7 +222,7 @@ fn get_pass(prompt: &str) -> StratisResult<Option<String>> {
     stdout().flush()?;
 
     let stdin = stdin();
-    let istty = isatty(stdin.as_raw_fd()).unwrap_or(false);
+    let istty = isatty(&stdin).unwrap_or(false);
 
     let mut password = String::new();
     if istty {

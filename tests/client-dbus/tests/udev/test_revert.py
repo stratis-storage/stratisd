@@ -160,6 +160,7 @@ class TestRevert(UdevTest):
                     "id_type": "name",
                     "unlock_method": (False, (False, 0)),
                     "key_fd": (False, 0),
+                    "remove_cache": False,
                 },
             )
 
@@ -278,6 +279,7 @@ class TestRevert(UdevTest):
                     "id_type": "name",
                     "unlock_method": (False, (False, 0)),
                     "key_fd": (False, 0),
+                    "remove_cache": False,
                 },
             )
 

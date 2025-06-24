@@ -3,6 +3,9 @@ stratisd 3.8.2
 Recommended Rust toolchain version: 1.87.0
 Recommended development platform for Python development: Fedora 41
 
+- Set stratisd version to 3.8.2:
+  https://github.com/stratis-storage/stratisd/pull/3863
+
 - Set permissions to root-only on keys set in the keyring:
   https://github.com/stratis-storage/stratisd/pull/3846
 

@@ -52,6 +52,7 @@ SPECS = {
       <arg name="id_type" type="s" direction="in" />
       <arg name="unlock_method" type="(b(bu))" direction="in" />
       <arg name="key_fd" type="(bh)" direction="in" />
+      <arg name="remove_cache" type="b" direction="in" />
       <arg name="result" type="(b(oaoao))" direction="out" />
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />

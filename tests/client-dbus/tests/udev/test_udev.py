@@ -273,6 +273,7 @@ class UdevTest3(UdevTest):
                         "unlock_method": (True, (True, 1)),
                         "id_type": "uuid",
                         "key_fd": (False, 0),
+                        "remove_cache": False,
                     },
                 )
             else:
@@ -283,6 +284,7 @@ class UdevTest3(UdevTest):
                         "unlock_method": (True, (False, 0)),
                         "id_type": "uuid",
                         "key_fd": (False, 0),
+                        "remove_cache": False,
                     },
                 )
 
@@ -396,6 +398,7 @@ class UdevTest4(UdevTest):
                         "unlock_method": (True, (True, 1)),
                         "id_type": "uuid",
                         "key_fd": (False, 0),
+                        "remove_cache": False,
                     },
                 )
             else:
@@ -406,6 +409,7 @@ class UdevTest4(UdevTest):
                         "unlock_method": (True, (False, 0)),
                         "id_type": "uuid",
                         "key_fd": (False, 0),
+                        "remove_cache": False,
                     },
                 )
 
@@ -429,6 +433,7 @@ class UdevTest4(UdevTest):
                         "unlock_method": (True, (True, 1)),
                         "id_type": "uuid",
                         "key_fd": (False, 0),
+                        "remove_cache": False,
                     },
                 )
             else:
@@ -439,6 +444,7 @@ class UdevTest4(UdevTest):
                         "unlock_method": (True, (False, 0)),
                         "id_type": "uuid",
                         "key_fd": (False, 0),
+                        "remove_cache": False,
                     },
                 )
 
@@ -585,6 +591,7 @@ class UdevTest5(UdevTest):
                             "unlock_method": (True, (True, 1)),
                             "id_type": "uuid",
                             "key_fd": (False, 0),
+                            "remove_cache": False,
                         },
                     )
                 else:
@@ -595,6 +602,7 @@ class UdevTest5(UdevTest):
                             "unlock_method": (True, (False, 0)),
                             "id_type": "uuid",
                             "key_fd": (False, 0),
+                            "remove_cache": False,
                         },
                     )
 
@@ -632,6 +640,7 @@ class UdevTest5(UdevTest):
                                     "unlock_method": (True, (True, 1)),
                                     "id_type": "uuid",
                                     "key_fd": (False, 0),
+                                    "remove_cache": False,
                                 },
                             )
                 else:
@@ -655,6 +664,7 @@ class UdevTest5(UdevTest):
                                 "unlock_method": (encrypted, (False, 0)),
                                 "id_type": "uuid",
                                 "key_fd": (False, 0),
+                                "remove_cache": False,
                             },
                         )
 
@@ -828,6 +838,7 @@ class UdevTest7(UdevTest):
                         "unlock_method": (True, (True, 1)),
                         "id_type": "name",
                         "key_fd": (False, 0),
+                        "remove_cache": False,
                     },
                 )
             else:
@@ -838,6 +849,7 @@ class UdevTest7(UdevTest):
                         "unlock_method": (True, (False, 0)),
                         "id_type": "name",
                         "key_fd": (False, 0),
+                        "remove_cache": False,
                     },
                 )
             self.assertFalse(changed)
@@ -854,6 +866,7 @@ class UdevTest7(UdevTest):
                     "unlock_method": (False, (False, 0)),
                     "id_type": "name",
                     "key_fd": (False, 0),
+                    "remove_cache": False,
                 },
             )
             self.assertFalse(changed)
@@ -876,6 +889,7 @@ class UdevTest7(UdevTest):
                         "unlock_method": (True, (True, 1)),
                         "id_type": "name",
                         "key_fd": (False, 0),
+                        "remove_cache": False,
                     },
                 )
             else:
@@ -886,6 +900,7 @@ class UdevTest7(UdevTest):
                         "unlock_method": (True, (False, 0)),
                         "id_type": "name",
                         "key_fd": (False, 0),
+                        "remove_cache": False,
                     },
                 )
             self.assertTrue(changed)
@@ -901,6 +916,7 @@ class UdevTest7(UdevTest):
                     "unlock_method": (False, (False, 0)),
                     "id_type": "name",
                     "key_fd": (False, 0),
+                    "remove_cache": False,
                 },
             )
             self.assertTrue(changed)

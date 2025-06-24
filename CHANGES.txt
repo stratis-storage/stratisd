@@ -10,7 +10,7 @@ Recommended development platform for Python development: Fedora 41
   https://github.com/stratis-storage/stratisd/pull/3846
 
 - Increase libcryptsetup-rs dependency lower bound to 0.13.1;
-  Increase libcryptsetup-rs-sys dependency lower bound to 0.5.0:
+  Increase libcryptsetup-rs-sys dependency lower bound to 0.6.0:
   https://github.com/stratis-storage/stratisd/pull/3849
   https://github.com/stratis-storage/stratisd/pull/3844
 

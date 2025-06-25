@@ -266,6 +266,9 @@ SPECS = {
     <property name="Uuid" type="s" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>
+    <property name="VolumeKeyLoaded" type="v" access="read">
+      <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false" />
+    </property>
   </interface>
 """,
 }

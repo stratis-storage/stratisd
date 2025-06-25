@@ -1240,6 +1240,15 @@ impl Pool for StratPool {
         self.encryption_info()
             .and_then(|ei| ei.either(|e| Some(e.num_free_token_slots()), |_| None))
     }
+
+    fn volume_key_is_loaded(&self, uuid: PoolUuid) -> StratisResult<bool> {
+        Backstore::volume_key_is_loaded(uuid)
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn load_volume_key(&mut self, uuid: PoolUuid) -> StratisResult<bool> {
+        Backstore::load_volume_key(uuid)
+    }
 }
 
 pub struct StratPoolState {
@@ -1294,6 +1303,7 @@ mod tests {
     };
 
     use nix::mount::{mount, umount, MsFlags};
+    use tokio::sync::mpsc::unbounded_channel;
 
     use devicemapper::{Bytes, IEC, SECTOR_SIZE};
 
@@ -1745,7 +1755,8 @@ mod tests {
     /// Set up for testing physical device growth.
     fn test_grow_physical_pre_grow(paths: &[&Path]) {
         let pool_name = Name::new("pool".to_string());
-        let engine = StratEngine::initialize().unwrap();
+        let (send, _recv) = unbounded_channel();
+        let engine = StratEngine::initialize(send).unwrap();
         let pool_uuid =
             test_async!(engine.create_pool(&pool_name, paths, None, IntegritySpec::default()))
                 .unwrap()
@@ -1805,7 +1816,8 @@ mod tests {
     /// and that the pool registers new available allocation space if it is out of space
     /// at the time of device growth.
     fn test_grow_physical_post_grow(_: &[&Path]) {
-        let engine = StratEngine::initialize().unwrap();
+        let (send, _recv) = unbounded_channel();
+        let engine = StratEngine::initialize(send).unwrap();
 
         let mut pools = test_async!(engine.pools_mut());
         assert!(pools.len() == 1);
@@ -1857,7 +1869,8 @@ mod tests {
         fn test_multiple_token_slots_with_key(paths: &[&Path], key_desc: &KeyDescription) {
             unshare_mount_namespace().unwrap();
 
-            let engine = StratEngine::initialize().unwrap();
+            let (send, _recv) = unbounded_channel();
+            let engine = StratEngine::initialize(send).unwrap();
 
             let name = Name::new("clevis_only".to_string());
             let first = paths[0];

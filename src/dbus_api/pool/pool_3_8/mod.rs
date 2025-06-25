@@ -9,5 +9,5 @@ mod props;
 pub use api::{
     bind_clevis_method, bind_keyring_method, clevis_infos_property, free_token_slots_property,
     key_descs_property, metadata_version_property, rebind_clevis_method, rebind_keyring_method,
-    unbind_clevis_method, unbind_keyring_method,
+    unbind_clevis_method, unbind_keyring_method, volume_key_loaded_property,
 };

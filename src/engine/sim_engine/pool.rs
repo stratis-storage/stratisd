@@ -1032,6 +1032,14 @@ impl Pool for SimPool {
             .as_ref()
             .map(|ei| ei.num_free_token_slots())
     }
+
+    fn volume_key_is_loaded(&self, _: PoolUuid) -> StratisResult<bool> {
+        Ok(false)
+    }
+
+    fn load_volume_key(&mut self, _: PoolUuid) -> StratisResult<bool> {
+        Ok(false)
+    }
 }
 
 #[cfg(test)]

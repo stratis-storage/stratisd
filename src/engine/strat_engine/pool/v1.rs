@@ -17,13 +17,10 @@ use devicemapper::{Bytes, DmNameBuf, Sectors};
 use stratisd_proc_macros::strat_pool_impl_gen;
 
 #[cfg(any(test, feature = "extras"))]
-use crate::engine::{
-    strat_engine::{
-        backstore::UnownedDevices,
-        metadata::MDADataSize,
-        thinpool::{ThinPoolSizeParams, DATA_BLOCK_SIZE},
-    },
-    types::InputEncryptionInfo,
+use crate::engine::strat_engine::{
+    backstore::UnownedDevices,
+    metadata::MDADataSize,
+    thinpool::{ThinPoolSizeParams, DATA_BLOCK_SIZE},
 };
 use crate::{
     engine::{
@@ -48,11 +45,12 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            Diff, FilesystemUuid, GrowAction, Key, KeyDescription, Name, OptionalTokenSlotInput,
-            PoolDiff, PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction, StratFilesystemDiff, StratPoolDiff, StratSigblockVersion,
+            Diff, EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo,
+            Key, KeyDescription, Name, OffsetDirection, OptionalTokenSlotInput, PoolDiff,
+            PoolEncryptionInfo, PoolUuid, PropChangeAction, ReencryptedDevice, RegenAction,
+            RenameAction, SetCreateAction, SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
+            StratSigblockVersion,
         },
-        EncryptionInfo, PropChangeAction,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -177,6 +175,7 @@ pub struct StratPool {
     thin_pool: ThinPool<Backstore>,
     action_avail: ActionAvailability,
     metadata_size: Sectors,
+    last_reencrypt: Option<DateTime<Utc>>,
 }
 
 #[strat_pool_impl_gen]
@@ -243,6 +242,7 @@ impl StratPool {
             thin_pool: thinpool,
             action_avail: ActionAvailability::Full,
             metadata_size,
+            last_reencrypt: None,
         };
 
         pool.write_metadata(&Name::new(name.to_owned()))?;
@@ -307,6 +307,7 @@ impl StratPool {
             thin_pool: thinpool,
             action_avail,
             metadata_size,
+            last_reencrypt: metadata.last_reencrypt,
         };
 
         // The value of the started field in the pool metadata needs to be
@@ -397,6 +398,7 @@ impl StratPool {
             thinpool_dev: self.thin_pool.record(),
             started: Some(true),
             features: vec![],
+            last_reencrypt: self.last_reencrypt,
         }
     }
 
@@ -666,10 +668,14 @@ impl Pool for StratPool {
                 )
                 .and_then(|bdi| {
                     self.thin_pool
-                        .set_device(self.backstore.device().expect(
-                            "Since thin pool exists, space must have been allocated \
+                        .set_device(
+                            self.backstore.device().expect(
+                                "Since thin pool exists, space must have been allocated \
                              from the backstore, so backstore must have a cap device",
-                        ))
+                            ),
+                            Sectors(0),
+                            OffsetDirection::Forwards,
+                        )
                         .and(Ok(bdi))
                 });
             self.thin_pool.resume()?;
@@ -1303,6 +1309,34 @@ impl Pool for StratPool {
         }
     }
 
+    fn encrypt_pool(
+        &mut self,
+        _: &Name,
+        _: PoolUuid,
+        _: &InputEncryptionInfo,
+    ) -> StratisResult<CreateAction<EncryptedDevice>> {
+        Err(StratisError::Msg(
+            "Encrypting an unencrypted device is only supported in V2 of the metadata".to_string(),
+        ))
+    }
+
+    fn reencrypt_pool(&mut self, name: &Name) -> StratisResult<ReencryptedDevice> {
+        self.backstore.reencrypt()?;
+        self.last_reencrypt = Some(Utc::now());
+        self.write_metadata(name)?;
+        Ok(ReencryptedDevice)
+    }
+
+    fn decrypt_pool(
+        &mut self,
+        _: &Name,
+        _: PoolUuid,
+    ) -> StratisResult<DeleteAction<EncryptedDevice>> {
+        Err(StratisError::Msg(
+            "Decrypting an encrypted device is only supported in V2 of the metadata".to_string(),
+        ))
+    }
+
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {
         serde_json::to_string(&self.record(pool_name)).map_err(|e| e.into())
     }
@@ -1353,6 +1387,10 @@ impl Pool for StratPool {
     fn load_volume_key(&mut self, _: PoolUuid) -> StratisResult<bool> {
         Ok(false)
     }
+
+    fn last_reencrypt(&self) -> Option<DateTime<Utc>> {
+        self.last_reencrypt
+    }
 }
 
 pub struct StratPoolState {
@@ -1401,6 +1439,7 @@ impl DumpState<'_> for StratPool {
 #[cfg(test)]
 mod tests {
     use std::{
+        env,
         fs::OpenOptions,
         io::{BufWriter, Read, Write},
     };
@@ -1414,11 +1453,11 @@ mod tests {
         strat_engine::{
             cmd::udev_settle,
             pool::AnyPool,
-            tests::{loopbacked, real},
+            tests::{crypt, loopbacked, real},
             thinpool::ThinPoolStatusDigest,
         },
-        types::{EngineAction, PoolIdentifier},
-        StratEngine,
+        types::{EngineAction, PoolIdentifier, TokenUnlockMethod},
+        Engine, StratEngine,
     };
 
     use super::*;
@@ -1930,6 +1969,75 @@ mod tests {
             &loopbacked::DeviceLimits::Exactly(2, Some(Sectors(10 * IEC::Mi))),
             test_grow_physical_pre_grow,
             test_grow_physical_post_grow,
+        );
+    }
+
+    /// Tests online reencryption functionality by performing online reencryption and then stopping and
+    /// starting the pool.
+    fn clevis_test_online_reencrypt(paths: &[&Path]) {
+        fn test_online_encrypt_with_key(paths: &[&Path], key_desc: &KeyDescription) {
+            let (send, _recv) = unbounded_channel();
+            let engine = StratEngine::initialize(send).unwrap();
+
+            let pool_uuid = test_async!(engine.create_pool_legacy(
+                "encrypt_with_both",
+                paths,
+                InputEncryptionInfo::new(
+                    vec![(None, key_desc.to_owned())],
+                    vec![(
+                        None,
+                        (
+                            "tang".to_string(),
+                            json!({
+                                "url": env::var("TANG_URL").expect("TANG_URL env var required"),
+                                "stratis:tang:trust_url": true,
+                            }),
+                        )
+                    )]
+                )
+                .unwrap()
+                .as_ref(),
+            ))
+            .unwrap()
+            .changed()
+            .unwrap();
+
+            {
+                let mut handle =
+                    test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid))).unwrap();
+                let (_, _, pool) = handle.as_mut_tuple();
+                assert!(pool.is_encrypted());
+                pool.reencrypt_pool(&Name::new("encrypt_with_both".to_string()))
+                    .unwrap();
+                assert!(pool.is_encrypted());
+            }
+
+            test_async!(engine.stop_pool(PoolIdentifier::Uuid(pool_uuid), true)).unwrap();
+            test_async!(engine.start_pool(
+                PoolIdentifier::Uuid(pool_uuid),
+                TokenUnlockMethod::Any,
+                None
+            ))
+            .unwrap();
+            test_async!(engine.destroy_pool(pool_uuid)).unwrap();
+        }
+
+        crypt::insert_and_cleanup_key(paths, test_online_encrypt_with_key);
+    }
+
+    #[test]
+    fn clevis_loop_test_online_reencrypt() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(2, None),
+            clevis_test_online_reencrypt,
+        );
+    }
+
+    #[test]
+    fn clevis_real_test_online_reencrypt() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(2, None, None),
+            clevis_test_online_reencrypt,
         );
     }
 }

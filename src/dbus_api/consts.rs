@@ -16,6 +16,7 @@ pub const MANAGER_INTERFACE_NAME_3_5: &str = "org.storage.stratis3.Manager.r5";
 pub const MANAGER_INTERFACE_NAME_3_6: &str = "org.storage.stratis3.Manager.r6";
 pub const MANAGER_INTERFACE_NAME_3_7: &str = "org.storage.stratis3.Manager.r7";
 pub const MANAGER_INTERFACE_NAME_3_8: &str = "org.storage.stratis3.Manager.r8";
+pub const MANAGER_INTERFACE_NAME_3_9: &str = "org.storage.stratis3.Manager.r9";
 pub const REPORT_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.Report.r0";
 pub const REPORT_INTERFACE_NAME_3_1: &str = "org.storage.stratis3.Report.r1";
 pub const REPORT_INTERFACE_NAME_3_2: &str = "org.storage.stratis3.Report.r2";
@@ -25,6 +26,7 @@ pub const REPORT_INTERFACE_NAME_3_5: &str = "org.storage.stratis3.Report.r5";
 pub const REPORT_INTERFACE_NAME_3_6: &str = "org.storage.stratis3.Report.r6";
 pub const REPORT_INTERFACE_NAME_3_7: &str = "org.storage.stratis3.Report.r7";
 pub const REPORT_INTERFACE_NAME_3_8: &str = "org.storage.stratis3.Report.r8";
+pub const REPORT_INTERFACE_NAME_3_9: &str = "org.storage.stratis3.Report.r9";
 
 pub const LOCKED_POOLS_PROP: &str = "LockedPools";
 pub const STOPPED_POOLS_PROP: &str = "StoppedPools";
@@ -38,6 +40,7 @@ pub const POOL_INTERFACE_NAME_3_5: &str = "org.storage.stratis3.pool.r5";
 pub const POOL_INTERFACE_NAME_3_6: &str = "org.storage.stratis3.pool.r6";
 pub const POOL_INTERFACE_NAME_3_7: &str = "org.storage.stratis3.pool.r7";
 pub const POOL_INTERFACE_NAME_3_8: &str = "org.storage.stratis3.pool.r8";
+pub const POOL_INTERFACE_NAME_3_9: &str = "org.storage.stratis3.pool.r9";
 pub const POOL_NAME_PROP: &str = "Name";
 pub const POOL_UUID_PROP: &str = "Uuid";
 pub const POOL_HAS_CACHE_PROP: &str = "HasCache";
@@ -56,6 +59,7 @@ pub const POOL_NO_ALLOCABLE_SPACE_PROP: &str = "NoAllocSpace";
 pub const POOL_METADATA_VERSION_PROP: &str = "MetadataVersion";
 pub const POOL_FREE_TOKEN_SLOTS_PROP: &str = "FreeTokenSlots";
 pub const POOL_VOLUME_KEY_LOADED: &str = "VolumeKeyLoaded";
+pub const POOL_LAST_REENCRYPTED_TIMESTAMP_PROP: &str = "LastReencryptedTimestamp";
 
 pub const FILESYSTEM_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.filesystem.r0";
 pub const FILESYSTEM_INTERFACE_NAME_3_1: &str = "org.storage.stratis3.filesystem.r1";
@@ -66,6 +70,7 @@ pub const FILESYSTEM_INTERFACE_NAME_3_5: &str = "org.storage.stratis3.filesystem
 pub const FILESYSTEM_INTERFACE_NAME_3_6: &str = "org.storage.stratis3.filesystem.r6";
 pub const FILESYSTEM_INTERFACE_NAME_3_7: &str = "org.storage.stratis3.filesystem.r7";
 pub const FILESYSTEM_INTERFACE_NAME_3_8: &str = "org.storage.stratis3.filesystem.r8";
+pub const FILESYSTEM_INTERFACE_NAME_3_9: &str = "org.storage.stratis3.filesystem.r9";
 pub const FILESYSTEM_NAME_PROP: &str = "Name";
 pub const FILESYSTEM_UUID_PROP: &str = "Uuid";
 pub const FILESYSTEM_USED_PROP: &str = "Used";
@@ -86,6 +91,7 @@ pub const BLOCKDEV_INTERFACE_NAME_3_5: &str = "org.storage.stratis3.blockdev.r5"
 pub const BLOCKDEV_INTERFACE_NAME_3_6: &str = "org.storage.stratis3.blockdev.r6";
 pub const BLOCKDEV_INTERFACE_NAME_3_7: &str = "org.storage.stratis3.blockdev.r7";
 pub const BLOCKDEV_INTERFACE_NAME_3_8: &str = "org.storage.stratis3.blockdev.r8";
+pub const BLOCKDEV_INTERFACE_NAME_3_9: &str = "org.storage.stratis3.blockdev.r9";
 pub const BLOCKDEV_DEVNODE_PROP: &str = "Devnode";
 pub const BLOCKDEV_HARDWARE_INFO_PROP: &str = "HardwareInfo";
 pub const BLOCKDEV_USER_INFO_PROP: &str = "UserInfo";
@@ -109,6 +115,7 @@ pub fn standard_pool_interfaces() -> Vec<String> {
         POOL_INTERFACE_NAME_3_6,
         POOL_INTERFACE_NAME_3_7,
         POOL_INTERFACE_NAME_3_8,
+        POOL_INTERFACE_NAME_3_9,
     ]
     .iter()
     .map(|s| (*s).to_string())
@@ -127,6 +134,7 @@ pub fn standard_filesystem_interfaces() -> Vec<String> {
         FILESYSTEM_INTERFACE_NAME_3_6,
         FILESYSTEM_INTERFACE_NAME_3_7,
         FILESYSTEM_INTERFACE_NAME_3_8,
+        FILESYSTEM_INTERFACE_NAME_3_9,
     ]
     .iter()
     .map(|s| (*s).to_string())
@@ -145,6 +153,7 @@ pub fn standard_blockdev_interfaces() -> Vec<String> {
         BLOCKDEV_INTERFACE_NAME_3_6,
         BLOCKDEV_INTERFACE_NAME_3_7,
         BLOCKDEV_INTERFACE_NAME_3_8,
+        BLOCKDEV_INTERFACE_NAME_3_9,
     ]
     .iter()
     .map(|s| (*s).to_string())

@@ -23,6 +23,9 @@ pub struct Key;
 /// Return value indicating clevis operation
 pub struct Clevis;
 
+/// Return value indicating an encrypt operation on the pool
+pub struct EncryptedDevice;
+
 /// A trait for a generic kind of action. Defines the type of the thing to
 /// be changed, and also a method to indicate what changed.
 pub trait EngineAction {
@@ -132,6 +135,19 @@ where
                     f,
                     "The snapshot requested for creation is already present; no action taken"
                 )
+            }
+        }
+    }
+}
+
+impl Display for CreateAction<EncryptedDevice> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CreateAction::Created(_) => {
+                write!(f, "Unencrypted pool successfully encrypted")
+            }
+            CreateAction::Identity => {
+                write!(f, "The requested pool was already encrypted")
             }
         }
     }
@@ -574,6 +590,19 @@ impl Display for DeleteAction<Key> {
     }
 }
 
+impl Display for DeleteAction<EncryptedDevice> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DeleteAction::Deleted(_) => {
+                write!(f, "Encrypted pool successfully decrypted")
+            }
+            DeleteAction::Identity => {
+                write!(f, "The requested pool was already decrypted")
+            }
+        }
+    }
+}
+
 /// An action which may delete multiple things.
 /// This action may also cause other values to require updating.
 #[derive(Debug, PartialEq, Eq)]
@@ -833,5 +862,14 @@ impl<T> EngineAction for PropChangeAction<T> {
             PropChangeAction::NewValue(t) => Some(t),
             PropChangeAction::Identity => None,
         }
+    }
+}
+
+/// Return value indicating a successful reencrypt operation on the pool
+pub struct ReencryptedDevice;
+
+impl Display for ReencryptedDevice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Reencryption operation was completed successfully")
     }
 }

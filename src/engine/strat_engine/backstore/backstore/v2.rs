@@ -1341,7 +1341,7 @@ impl Backstore {
         let cache_tier_bs_summary: Option<BlockSizeSummary> =
             self.block_size_summary(BlockDevTier::Cache);
         if let Err(err) = data_tier_bs_summary.validate() {
-            warn!("Disabling pool changes for this pool: {}", err);
+            warn!("Disabling pool changes for this pool: {err}");
             ActionAvailability::NoPoolChanges
         } else if let Some(Err(err)) = cache_tier_bs_summary.map(|ct| ct.validate()) {
             // NOTE: This condition should be impossible. Since the cache is
@@ -1350,7 +1350,7 @@ impl Backstore {
             // rejected, there should be no unused devices in a cache. If, for
             // some reason this condition fails, though, NoPoolChanges would
             // be the correct state to put the pool in.
-            warn!("Disabling pool changes for this pool: {}", err);
+            warn!("Disabling pool changes for this pool: {err}");
             ActionAvailability::NoPoolChanges
         } else {
             ActionAvailability::Full

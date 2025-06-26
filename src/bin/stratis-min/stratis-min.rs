@@ -702,7 +702,7 @@ fn main() -> Result<(), String> {
                         .to_owned(),
                 )
                 .map(|origin| {
-                    println!("{}", origin);
+                    println!("{origin}");
                 })?;
                 Ok(())
             } else {

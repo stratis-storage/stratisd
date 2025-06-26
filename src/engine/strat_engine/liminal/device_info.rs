@@ -50,7 +50,7 @@ impl fmt::Display for LLuksInfo {
             self.dev_info, self.identifiers, self.encryption_info,
         )?;
         if let Some(ref pn) = self.pool_name {
-            write!(f, ", {}", pn)
+            write!(f, ", {pn}")
         } else {
             Ok(())
         }
@@ -366,24 +366,24 @@ impl LInfo {
                 if linfo.dev_info.devnode == path {
                     None
                 } else {
-                    warn!("Device with pool UUID {}, device UUID {} appears to have been removed but the path did not match the known Stratis device with these identifiers", pool_uuid, dev_uuid);
+                    warn!("Device with pool UUID {pool_uuid}, device UUID {dev_uuid} appears to have been removed but the path did not match the known Stratis device with these identifiers");
                     Some(LInfo::Luks(linfo))
                 }
             }
             LInfo::Stratis(sinfo) => {
                 if Some(path) == sinfo.luks.as_ref().map(|i| i.dev_info.devnode.as_path()) {
-                    info!("Encrypted backing device with pool UUID {}, device UUID {} is no longer available; removing activated devicemapper device as well", pool_uuid, dev_uuid);
+                    info!("Encrypted backing device with pool UUID {pool_uuid}, device UUID {dev_uuid} is no longer available; removing activated devicemapper device as well");
                     None
                 } else if path == sinfo.dev_info.devnode {
                     if let Some(l) = sinfo.luks {
-                        info!("Encrypted Stratis device with pool UUID {}, device UUID {} is no longer available; marking encrypted backing device as closed", pool_uuid, dev_uuid);
+                        info!("Encrypted Stratis device with pool UUID {pool_uuid}, device UUID {dev_uuid} is no longer available; marking encrypted backing device as closed");
                         Some(LInfo::Luks(l))
                     } else {
-                        info!("Stratis device with pool UUID {}, device UUID {} is no longer available", pool_uuid, dev_uuid);
+                        info!("Stratis device with pool UUID {pool_uuid}, device UUID {dev_uuid} is no longer available");
                         None
                     }
                 } else {
-                    warn!("Device with pool UUID {}, device UUID {} appears to have been removed but the path did not match the known Stratis device with these identifiers", pool_uuid, dev_uuid);
+                    warn!("Device with pool UUID {pool_uuid}, device UUID {dev_uuid} appears to have been removed but the path did not match the known Stratis device with these identifiers");
                     Some(LInfo::Stratis(sinfo))
                 }
             }
@@ -742,23 +742,22 @@ impl DeviceSet {
             Some(LInfo::Luks(linfo)) => {
                 if path == linfo.dev_info.devnode {
                     info!(
-                        "Device with pool UUID {}, device UUID {} is no longer available",
-                        pool_uuid, dev_uuid
+                        "Device with pool UUID {pool_uuid}, device UUID {dev_uuid} is no longer available"
                     );
                 } else {
-                    warn!("Device with pool UUID {}, device UUID {} appears to have been removed but the path did not match the known Stratis device with these identifiers", pool_uuid, dev_uuid);
+                    warn!("Device with pool UUID {pool_uuid}, device UUID {dev_uuid} appears to have been removed but the path did not match the known Stratis device with these identifiers");
                     self.internal.insert(dev_uuid, LInfo::Luks(linfo));
                 }
             }
             Some(LInfo::Stratis(sinfo)) => {
                 if Some(path) == sinfo.luks.as_ref().map(|i| i.dev_info.devnode.as_path()) {
-                    info!("Encrypted backing device with pool UUID {}, device UUID {} is no longer available; removing activated devicemapper device as well", pool_uuid, dev_uuid);
+                    info!("Encrypted backing device with pool UUID {pool_uuid}, device UUID {dev_uuid} is no longer available; removing activated devicemapper device as well");
                 } else if path == sinfo.dev_info.devnode {
                     if let Some(l) = sinfo.luks {
-                        info!("Encrypted Stratis device with pool UUID {}, device UUID {} is no longer available; marking encrypted backing device as closed", pool_uuid, dev_uuid);
+                        info!("Encrypted Stratis device with pool UUID {pool_uuid}, device UUID {dev_uuid} is no longer available; marking encrypted backing device as closed");
                         self.internal.insert(dev_uuid, LInfo::Luks(l));
                     } else {
-                        info!("Stratis device with pool UUID {}, device UUID {} is no longer available", pool_uuid, dev_uuid);
+                        info!("Stratis device with pool UUID {pool_uuid}, device UUID {dev_uuid} is no longer available");
                     }
                 }
             }
@@ -776,8 +775,7 @@ impl DeviceSet {
         match self.internal.remove(&device_uuid) {
             None => {
                 info!(
-                    "Device information {} discovered and inserted into the set for its pool UUID",
-                    info
+                    "Device information {info} discovered and inserted into the set for its pool UUID"
                 );
                 self.internal.insert(device_uuid, info.into());
             }
@@ -788,8 +786,7 @@ impl DeviceSet {
                 }
                 Either::Left(info) => {
                     info!(
-                        "Device information {} replaces previous device information for the same device UUID in the set for its pool UUID",
-                        info
+                        "Device information {info} replaces previous device information for the same device UUID in the set for its pool UUID"
                     );
                     self.internal.insert(device_uuid, info);
                 }

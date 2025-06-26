@@ -55,19 +55,13 @@ pub async fn dm_event_thread(
             let pool_diffs = engine.pool_evented(Some(&evented)).await;
             for action in DbusAction::from_pool_diffs(pool_diffs) {
                 if let Err(e) = sender.send(action) {
-                    warn!(
-                        "Failed to update D-Bus layer with changed engine properties: {}",
-                        e
-                    );
+                    warn!("Failed to update D-Bus layer with changed engine properties: {e}");
                 }
             }
             let fs_diffs = engine.fs_evented(Some(&evented)).await;
             for action in DbusAction::from_fs_diffs(fs_diffs) {
                 if let Err(e) = sender.send(action) {
-                    warn!(
-                        "Failed to update D-Bus layer with changed engine properties: {}",
-                        e
-                    );
+                    warn!("Failed to update D-Bus layer with changed engine properties: {e}");
                 }
             }
         }
@@ -89,7 +83,7 @@ pub async fn dm_event_thread(
                     )
                     .await
                     {
-                        warn!("Failed to process devicemapper event: {}", e);
+                        warn!("Failed to process devicemapper event: {e}");
                     }
                     trace!("Finished handling of devicemapper event");
                 }

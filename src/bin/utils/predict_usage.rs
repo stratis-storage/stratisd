@@ -172,20 +172,17 @@ fn predict_pool_metadata_usage(
     let stratis_avail_sizes = device_sizes
         .iter()
         .map(|&s| {
-            info!("Total size of device: {:}", s);
+            info!("Total size of device: {s:}");
 
             let integrity_deduction = integrity_meta_space(s, integrity_spec);
-            info!(
-                "Deduction for stratis metadata: {:}",
-                stratis_metadata_alloc
-            );
+            info!("Deduction for stratis metadata: {stratis_metadata_alloc:}");
 
-            info!("Deduction for integrity space: {:}", integrity_deduction);
+            info!("Deduction for integrity space: {integrity_deduction:}");
             (*s).checked_sub(*stratis_metadata_alloc)
                 .and_then(|r| r.checked_sub(*integrity_deduction))
                 .map(Sectors)
                 .inspect(|&x| {
-                    info!("Size after deductions: {:}", x);
+                    info!("Size after deductions: {x:}");
                 })
                 .ok_or_else(|| {
                     Box::new(PredictError(

@@ -260,13 +260,12 @@ impl LiminalDevices {
                     }));
                 } else {
                     warn!(
-                        "Failed to read BDA of device with pool UUID {}, dev UUID, {}; ignoring",
-                        pool_uuid, dev_uuid
+                        "Failed to read BDA of device with pool UUID {pool_uuid}, dev UUID, {dev_uuid}; ignoring"
                     );
                 }
             }),
             Err(e) => {
-                warn!("Failed to scan for newly unlocked Stratis devices: {}", e);
+                warn!("Failed to scan for newly unlocked Stratis devices: {e}");
                 return Err(e);
             }
         }
@@ -281,7 +280,7 @@ impl LiminalDevices {
                 let err = StratisError::Msg(format!(
                     "Some of the devices in pool with UUID {pool_uuid} are unopened"
                 ));
-                info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {}", err);
+                info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {err}");
                 self.handle_stopped_pool(pool_uuid, ds);
                 return Err(err);
             }
@@ -308,14 +307,11 @@ impl LiminalDevices {
                         }
                     })
                     .collect();
-                info!(
-                    "Pool with name \"{}\" and UUID \"{}\" set up",
-                    name, pool_uuid
-                );
+                info!("Pool with name \"{name}\" and UUID \"{pool_uuid}\" set up");
                 Ok((name, pool_uuid, pool, uuids))
             }
             Err((err, bdas)) => {
-                info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {}", err);
+                info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {err}");
                 let device_set = reconstruct_stratis_infos(infos, bdas);
                 self.handle_stopped_pool(pool_uuid, device_set);
                 Err(err)
@@ -429,14 +425,11 @@ impl LiminalDevices {
                         }
                     })
                     .collect();
-                info!(
-                    "Pool with name \"{}\" and UUID \"{}\" set up",
-                    name, pool_uuid
-                );
+                info!("Pool with name \"{name}\" and UUID \"{pool_uuid}\" set up");
                 Ok((name, pool_uuid, pool, Vec::new()))
             }
             Err((err, bdas)) => {
-                info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {}", err);
+                info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {err}");
                 let device_set = reconstruct_stratis_infos(infos, bdas);
                 self.handle_stopped_pool(pool_uuid, device_set);
                 Err(err)
@@ -569,7 +562,7 @@ impl LiminalDevices {
                             Ok(())
                         }
                         Err(e) => {
-                            warn!("Failed to stop partially constructed pool: {}", e);
+                            warn!("Failed to stop partially constructed pool: {e}");
                             self.partially_constructed_pools
                                 .insert(pool_uuid, device_set);
                             Err(e)
@@ -582,7 +575,7 @@ impl LiminalDevices {
                         Ok(())
                     }
                     Err(e) => {
-                        warn!("Failed to stop partially constructed pool: {}", e);
+                        warn!("Failed to stop partially constructed pool: {e}");
                         self.partially_constructed_pools
                             .insert(pool_uuid, device_set);
                         Err(e)
@@ -770,7 +763,7 @@ impl LiminalDevices {
                         }
                     },
                     Err(e) => {
-                        info!("Error while attempting to determine pool name for pool with UUID {}: {}; this may resolve when more devices appear and are processed", pool_uuid, e);
+                        info!("Error while attempting to determine pool name for pool with UUID {pool_uuid}: {e}; this may resolve when more devices appear and are processed");
                     }
                     _ => (),
                 }
@@ -792,7 +785,7 @@ impl LiminalDevices {
                                         }
                                     }
                                     Err(e) => {
-                                        warn!("Failed to check size of block devices in newly set up pool: {}", e);
+                                        warn!("Failed to check size of block devices in newly set up pool: {e}");
                                     }
                                 }
                                 (pool_name, *pool_uuid, pool)
@@ -811,7 +804,7 @@ impl LiminalDevices {
                                         }
                                     }
                                     Err(e) => {
-                                        warn!("Failed to check size of block devices in newly set up pool: {}", e);
+                                        warn!("Failed to check size of block devices in newly set up pool: {e}");
                                     }
                                 }
                                 (pool_name, *pool_uuid, pool)
@@ -884,7 +877,7 @@ impl LiminalDevices {
                 let err = StratisError::Msg(format!(
                     "Some of the devices in pool with UUID {pool_uuid} are unopened"
                 ));
-                info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {}", err);
+                info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {err}");
                 self.handle_stopped_pool(pool_uuid, ds);
                 return None;
             }
@@ -918,10 +911,7 @@ impl LiminalDevices {
                         }
                     })
                     .collect();
-                info!(
-                    "Pool with name \"{}\" and UUID \"{}\" set up",
-                    name, pool_uuid
-                );
+                info!("Pool with name \"{name}\" and UUID \"{pool_uuid}\" set up");
                 Some((name, pool))
             }
             Ok(Either::Right(bdas)) => {
@@ -930,7 +920,7 @@ impl LiminalDevices {
                 None
             }
             Err((err, bdas)) => {
-                info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {}", err);
+                info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {err}");
                 let device_set = reconstruct_stratis_infos(infos, bdas);
                 self.handle_stopped_pool(pool_uuid, device_set);
                 None
@@ -1024,16 +1014,12 @@ impl LiminalDevices {
                     match pool {
                         AnyPool::V1(p) => {
                             if p.get_strat_blockdev(device_uuid).is_none() {
-                                warn!("Found a device with {} that identifies itself as belonging to pool with UUID {}, but that pool is already up and running and does not appear to contain the device",
-                                      info,
-                                      pool_uuid);
+                                warn!("Found a device with {info} that identifies itself as belonging to pool with UUID {pool_uuid}, but that pool is already up and running and does not appear to contain the device");
                             }
                         }
                         AnyPool::V2(p) => {
                             if p.get_strat_blockdev(device_uuid).is_none() {
-                                warn!("Found a device with {} that identifies itself as belonging to pool with UUID {}, but that pool is already up and running and does not appear to contain the device",
-                                      info,
-                                      pool_uuid);
+                                warn!("Found a device with {info} that identifies itself as belonging to pool with UUID {pool_uuid}, but that pool is already up and running and does not appear to contain the device");
                             }
                         }
                     }
@@ -1064,7 +1050,7 @@ impl LiminalDevices {
                             }
                         }
                         Err(e) => {
-                            info!("Error while attempting to determine pool name for pool with UUID {}: {}; this may resolve when more devices appear and are processed", pool_uuid, e);
+                            info!("Error while attempting to determine pool name for pool with UUID {pool_uuid}: {e}; this may resolve when more devices appear and are processed");
                         }
                         _ => (),
                     }
@@ -1153,10 +1139,7 @@ impl LiminalDevices {
                     };
                 }
                 Err(e) => {
-                    warn!(
-                        "Unable to detect leftover devices: {}; putting in stopped pools",
-                        e
-                    );
+                    warn!("Unable to detect leftover devices: {e}; putting in stopped pools");
                     self.stopped_pools.insert(pool_uuid, device_set);
                 }
             }
@@ -1317,7 +1300,7 @@ fn setup_pool_legacy(
                 bd.pool_name()
             }).any(|name| name != Some(Some(&Name::new(metadata.name.clone()))) || matches!(name, Some(None))) {
                 if let Err(e) = pool.rename_pool(&name) {
-                    warn!("Pool will not be able to be started by name; pool name metadata in LUKS2 token is not consistent across all devices: {}", e);
+                    warn!("Pool will not be able to be started by name; pool name metadata in LUKS2 token is not consistent across all devices: {e}");
                 }
             }
             (name, AnyPool::V1(Box::new(pool)))

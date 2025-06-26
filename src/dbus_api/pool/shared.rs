@@ -258,7 +258,7 @@ where
     F: Fn((Name, PoolUuid, &mut dyn Pool)) -> Result<PropChangeAction<R>, String>,
     R: Display,
 {
-    info!("Setting property {}", prop_name);
+    info!("Setting property {prop_name}");
     let res =
         pool_set_operation(p.tree, p.path.get_name(), setter).map_err(|ref e| MethodErr::failed(e));
     handle_action!(res)

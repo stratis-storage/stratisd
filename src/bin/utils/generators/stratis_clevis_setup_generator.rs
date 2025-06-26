@@ -60,7 +60,7 @@ pub fn generator(early_dir: String) -> Result<(), Box<dyn Error>> {
 
     let res = generator_with_err(early_dir);
     if let Err(ref e) = res {
-        error!("systemd generator failed with error: {}", e);
+        error!("systemd generator failed with error: {e}");
     }
     res
 }

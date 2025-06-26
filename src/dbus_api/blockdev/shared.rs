@@ -135,7 +135,7 @@ where
     F: Fn(&Name, &mut dyn Pool, DevUuid) -> Result<R, String>,
     R: ToDisplay,
 {
-    info!("Setting property {}", prop_name);
+    info!("Setting property {prop_name}");
     let res = blockdev_pool_level_set_operation(p.tree, p.path.get_name(), setter)
         .map_err(|ref e| MethodErr::failed(e));
     let res_display = res.as_ref().map(|o| o.to_display());

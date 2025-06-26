@@ -533,6 +533,7 @@ pub trait Engine: Debug + Report + Send + Sync {
         pool_id: PoolIdentifier<PoolUuid>,
         token_slot: TokenUnlockMethod,
         passphrase_fd: Option<RawFd>,
+        remove_cache: bool,
     ) -> StratisResult<StartAction<PoolUuid>>;
 
     /// Stop and tear down a pool, storing the information for it to be started

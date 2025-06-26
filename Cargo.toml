@@ -338,7 +338,6 @@ linkedlist = { level = "deny", priority = 4 }
 macro_use_imports = { level = "deny", priority = 4 }
 manual_ok_or = { level = "deny", priority = 4 }
 match_bool = { level = "deny", priority = 4 }
-match_on_vec_items = { level = "deny", priority = 4 }
 match_wild_err_arm = { level = "deny", priority = 4 }
 maybe_infinite_iter = { level = "deny", priority = 4 }
 mut_mut = { level = "deny", priority = 4 }

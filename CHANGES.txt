@@ -3,6 +3,10 @@ stratisd 3.8.2
 Recommended Rust toolchain version: 1.87.0
 Recommended development platform for Python development: Fedora 41
 
+- Maintain volume key in process keyring for started encrypted pools:
+  https://github.com/stratis-storage/stratisd/issues/3810
+  https://github.com/stratis-storage/stratisd/pull/3841
+
 - Set stratisd version to 3.8.2:
   https://github.com/stratis-storage/stratisd/pull/3863
 
@@ -21,6 +25,7 @@ Recommended development platform for Python development: Fedora 41
   https://github.com/stratis-storage/stratisd/pull/3851
 
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3862
   https://github.com/stratis-storage/stratisd/pull/3860
   https://github.com/stratis-storage/stratisd/pull/3859
   https://github.com/stratis-storage/stratisd/pull/3858

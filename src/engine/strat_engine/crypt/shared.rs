@@ -56,10 +56,10 @@ pub fn set_up_crypt_logging() {
     fn logging_callback(level: CryptLogLevel, msg: &str, _: Option<&mut ()>) {
         match level {
             CryptLogLevel::Verbose | CryptLogLevel::DebugJson | CryptLogLevel::Debug => {
-                trace!("{}", msg)
+                trace!("{msg}")
             }
-            CryptLogLevel::Normal => info!("{}", msg),
-            CryptLogLevel::Error => warn!("{}", msg),
+            CryptLogLevel::Normal => info!("{msg}"),
+            CryptLogLevel::Error => warn!("{msg}"),
         }
     }
 
@@ -443,17 +443,15 @@ fn device_is_active(device: Option<&mut CryptDevice>, device_name: &DmName) -> S
         Ok(CryptStatusInfo::Active) => Ok(()),
         Ok(CryptStatusInfo::Busy) => {
             info!(
-                "Newly device {} reported that it was busy; you may see \
+                "Newly device {device_name} reported that it was busy; you may see \
                 temporary failures due to the device being busy.",
-                device_name,
             );
             Ok(())
         }
         Ok(CryptStatusInfo::Inactive) => {
             warn!(
-                "Newly activated device {} reported that it is inactive; device \
+                "Newly activated device {device_name} reported that it is inactive; device \
                 activation appears to have failed",
-                device_name,
             );
             Err(StratisError::Msg(format!(
                 "Device {device_name} was activated but is reporting that it is inactive"
@@ -461,9 +459,8 @@ fn device_is_active(device: Option<&mut CryptDevice>, device_name: &DmName) -> S
         }
         Ok(CryptStatusInfo::Invalid) => {
             warn!(
-                "Newly activated device {} reported that its status is invalid; \
+                "Newly activated device {device_name} reported that its status is invalid; \
                 device activation appears to have failed",
-                device_name,
             );
             Err(StratisError::Msg(format!(
                 "Device {device_name} was activated but is reporting an invalid status"
@@ -624,10 +621,7 @@ pub fn get_keyslot_number(
         .filter_map(|int_val| {
             let as_str = int_val.as_str();
             if as_str.is_none() {
-                warn!(
-                    "Discarding invalid value in LUKS2 token keyslot array: {}",
-                    int_val
-                );
+                warn!("Discarding invalid value in LUKS2 token keyslot array: {int_val}");
             }
             let s = match as_str {
                 Some(s) => s,
@@ -636,9 +630,8 @@ pub fn get_keyslot_number(
             let as_c_uint = s.parse::<c_uint>();
             if let Err(ref e) = as_c_uint {
                 warn!(
-                    "Discarding invalid value in LUKS2 token keyslot array: {}; \
-                    failed to convert it to an integer: {}",
-                    s, e,
+                    "Discarding invalid value in LUKS2 token keyslot array: {s}; \
+                    failed to convert it to an integer: {e}",
                 );
             }
             as_c_uint.ok()
@@ -731,8 +724,7 @@ pub fn ensure_wiped(
             info!(
                 "Keyslot numbers were not found; skipping explicit \
                 destruction of keyslots; the keyslot area will still \
-                be wiped in the next step: {}",
-                e,
+                be wiped in the next step: {e}",
             );
         }
     }

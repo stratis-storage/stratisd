@@ -102,7 +102,7 @@ fn trylock_pid_file() -> StratisResult<Flock<File>> {
         f.read_to_string(&mut string)?;
         let pid = string
             .parse::<pid_t>()
-            .map_err(|_| StratisError::Msg(format!("Failed to parse {} as PID", string)))?;
+            .map_err(|_| StratisError::Msg(format!("Failed to parse {string} as PID")))?;
         kill(Pid::from_raw(pid), Signal::SIGINT)?;
 
         match Flock::lock(f, FlockArg::LockExclusive) {

@@ -422,10 +422,7 @@ where
             .iter_mut()
             .filter(|b| b.max_stratis_metadata_size().bytes() >= data_size);
 
-        debug!(
-            "Writing {} of pool level metadata to devices in pool",
-            data_size
-        );
+        debug!("Writing {data_size} of pool level metadata to devices in pool");
 
         // TODO: consider making selection not entirely random, i.e, ensuring
         // distribution of metadata over different paths.

@@ -53,9 +53,8 @@ pub async fn udev_thread(
                     if let Some(ref e) = udev.poll() {
                         if let Err(e) = sender.send(UdevEngineEvent::from(e)) {
                             warn!(
-                                "udev event could not be sent to engine thread: {}; the \
+                                "udev event could not be sent to engine thread: {e}; the \
                                 engine was not notified of this udev event",
-                                e,
                             );
                         }
                     }

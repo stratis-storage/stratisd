@@ -343,10 +343,7 @@ impl<B> ThinPool<B> {
     fn set_error_mode(&mut self) -> bool {
         if !self.out_of_alloc_space() {
             if let Err(e) = self.thin_pool.error_if_no_space(get_dm()) {
-                warn!(
-                    "Could not put thin pool into IO error mode on out of space conditions: {}",
-                    e
-                );
+                warn!("Could not put thin pool into IO error mode on out of space conditions: {e}");
                 false
             } else {
                 true
@@ -364,10 +361,7 @@ impl<B> ThinPool<B> {
     pub fn set_queue_mode(&mut self) -> bool {
         if self.out_of_alloc_space() {
             if let Err(e) = self.thin_pool.queue_if_no_space(get_dm()) {
-                warn!(
-                    "Could not put thin pool into IO queue mode on out of space conditions: {}",
-                    e
-                );
+                warn!("Could not put thin pool into IO queue mode on out of space conditions: {e}");
                 false
             } else {
                 true
@@ -456,16 +450,10 @@ impl<B> ThinPool<B> {
         let name = Name::new(name.to_owned());
         if let Err(err) = self.mdv.save_fs(&name, fs_uuid, &new_filesystem) {
             if let Err(err2) = retry_with_index(Fixed::from_millis(100).take(4), |i| {
-                trace!(
-                    "Cleanup new filesystem after failed save_fs() attempt {}",
-                    i
-                );
+                trace!("Cleanup new filesystem after failed save_fs() attempt {i}");
                 new_filesystem.destroy(&self.thin_pool)
             }) {
-                error!(
-                    "When handling failed save_fs(), fs.destroy() failed: {}",
-                    err2
-                )
+                error!("When handling failed save_fs(), fs.destroy() failed: {err2}")
             }
             return Err(err);
         }
@@ -546,11 +534,7 @@ impl<B> ThinPool<B> {
                 Ok(_) => {
                     self.clear_out_of_meta_flag();
                     if let Err(err) = self.mdv.rm_fs(uuid) {
-                        error!("Could not remove metadata for fs with UUID {} and name {} belonging to pool {}, reason: {:?}",
-                               uuid,
-                               fs_name,
-                               pool_name,
-                               err);
+                        error!("Could not remove metadata for fs with UUID {uuid} and name {fs_name} belonging to pool {pool_name}, reason: {err:?}");
                     }
                     Ok(Some(uuid))
                 }
@@ -1287,7 +1271,7 @@ where
                 }
                 (changed, Err(e)) => {
                     should_save |= changed;
-                    warn!("Device extension failed: {}", e);
+                    warn!("Device extension failed: {e}");
                 }
             };
         }
@@ -1303,7 +1287,7 @@ where
                     }
                     (changed, Err(e)) => {
                         should_save |= changed;
-                        warn!("Device extension failed: {}", e);
+                        warn!("Device extension failed: {e}");
                         Sectors(0)
                     }
                 };
@@ -1389,7 +1373,7 @@ where
                             }
                         }
                         Err(e) => {
-                            warn!("Failed to extend filesystem: {}", e);
+                            warn!("Failed to extend filesystem: {e}");
                         }
                     }
                     acc
@@ -1404,8 +1388,7 @@ where
                 .map(|(name, uuid, fs)| {
                     s.spawn(move || {
                         if let Err(e) = mdv.save_fs(name, uuid, fs) {
-                            error!("Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {}, reason: {:?}",
-                                        uuid, name, pool_uuid, e);
+                            error!("Could not save MDV for fs with UUID {uuid} and name {name} belonging to pool with UUID {pool_uuid}, reason: {e:?}");
                         }
                     })
                 })
@@ -1445,8 +1428,7 @@ where
             B: InternalBackstore,
         {
             info!(
-                "Attempting to extend thinpool data sub-device belonging to pool {} by {}",
-                pool_uuid, data_extend_size
+                "Attempting to extend thinpool data sub-device belonging to pool {pool_uuid} by {data_extend_size}"
             );
 
             let device = backstore
@@ -1544,8 +1526,7 @@ where
             B: InternalBackstore,
         {
             info!(
-                "Attempting to extend thinpool meta sub-device belonging to pool {} by {}",
-                pool_uuid, meta_extend_size
+                "Attempting to extend thinpool meta sub-device belonging to pool {pool_uuid} by {meta_extend_size}"
             );
 
             let device = backstore
@@ -1601,9 +1582,7 @@ where
                 Ok(None) => Ok(Sectors(0)),
                 Err(err) => {
                     error!(
-                        "Attempted to extend a thinpool meta sub-device belonging to pool with uuid {} but failed with error: {:?}",
-                        pool_uuid,
-                        err
+                        "Attempted to extend a thinpool meta sub-device belonging to pool with uuid {pool_uuid} but failed with error: {err:?}"
                     );
                     Err(err)
                 }
@@ -2073,7 +2052,7 @@ fn setup_metadev(
         // If, e.g., thin_check is unavailable, that doesn't necessarily
         // mean that data is corrupted.
         if let Err(e) = thin_check(&meta_dev.devnode()) {
-            warn!("Thin check failed: {}", e);
+            warn!("Thin check failed: {e}");
             meta_dev = attempt_thin_repair(pool_uuid, meta_dev, device, &spare_segments)?;
             return Ok((meta_dev, spare_segments, meta_segments));
         }

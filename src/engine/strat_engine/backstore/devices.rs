@@ -539,10 +539,9 @@ pub fn initialize_devices_legacy(
                 let path = handle.luks2_device_path().display().to_string();
                 if let Err(e) = handle.wipe() {
                     warn!(
-                        "Failed to clean up encrypted device {}; cleanup \
+                        "Failed to clean up encrypted device {path}; cleanup \
                         was attempted because initialization of the device \
-                        failed: {}",
-                        path, e
+                        failed: {e}"
                     );
                 }
                 return Err(error);
@@ -599,7 +598,7 @@ pub fn initialize_devices_legacy(
                 "Failed to clean up encrypted device {}; cleanup was attempted because initialization of the device failed",
                 handle.luks2_device_path().display(),
             );
-            warn!("{}; clean up failure cause: {}", msg, e,);
+            warn!("{msg}; clean up failure cause: {e}",);
             StratisError::Chained(
                 msg,
                 Box::new(StratisError::NoActionRollbackError {
@@ -624,7 +623,7 @@ pub fn initialize_devices_legacy(
                 "Failed to clean up unencrypted device {}; cleanup was attempted because initialization of the device failed",
                 path.display(),
             );
-            warn!("{}; clean up failure cause: {}", msg, e,);
+            warn!("{msg}; clean up failure cause: {e}",);
             StratisError::Chained(
                 msg,
                 Box::new(StratisError::NoActionRollbackError {
@@ -852,7 +851,7 @@ pub fn initialize_devices(
                 "Failed to clean up unencrypted device {}; cleanup was attempted because initialization of the device failed",
                 path.display(),
             );
-            warn!("{}; clean up failure cause: {}", msg, e,);
+            warn!("{msg}; clean up failure cause: {e}",);
             StratisError::Chained(
                 msg,
                 Box::new(StratisError::NoActionRollbackError {

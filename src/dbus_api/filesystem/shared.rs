@@ -148,7 +148,7 @@ where
     F: Fn((Name, FilesystemUuid, &mut dyn Pool)) -> Result<R, String>,
     R: ToDisplay,
 {
-    info!("Setting property {}", prop_name);
+    info!("Setting property {prop_name}");
     let res =
         fs_set_operation(p.tree, p.path.get_name(), setter).map_err(|ref e| MethodErr::failed(e));
     let display = res.as_ref().map(|r| r.to_display());

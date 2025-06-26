@@ -59,12 +59,9 @@ impl MemoryFilesystem {
                 let parent_path: PathBuf = [NS_TMPFS_LOCATION, ".."].iter().collect();
                 let parent_stat_info = stat(&parent_path)?;
                 if stat_info.st_dev != parent_stat_info.st_dev {
-                    info!("Mount found at {}; unmounting", NS_TMPFS_LOCATION);
+                    info!("Mount found at {NS_TMPFS_LOCATION}; unmounting");
                     if let Err(e) = umount(NS_TMPFS_LOCATION) {
-                        warn!(
-                            "Failed to unmount filesystem at {}: {}",
-                            NS_TMPFS_LOCATION, e
-                        );
+                        warn!("Failed to unmount filesystem at {NS_TMPFS_LOCATION}: {e}");
                     }
                 }
             }
@@ -93,10 +90,7 @@ impl MemoryFilesystem {
 impl Drop for MemoryFilesystem {
     fn drop(&mut self) {
         if let Err(e) = umount(NS_TMPFS_LOCATION) {
-            warn!(
-                "Could not unmount temporary in memory storage for private mounts: {}",
-                e
-            );
+            warn!("Could not unmount temporary in memory storage for private mounts: {e}");
         }
     }
 }

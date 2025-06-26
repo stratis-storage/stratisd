@@ -243,14 +243,11 @@ impl StratEngine {
                 Ok(Ok(tup)) => Some(tup),
                 Ok(Err(StratisError::ActionDisabled(_))) => None,
                 Ok(Err(e)) => {
-                    warn!("Pool checks failed with error: {}", e);
+                    warn!("Pool checks failed with error: {e}");
                     None
                 }
                 Err(e) => {
-                    warn!(
-                        "Failed to get status for thread handling pool checks: {}",
-                        e
-                    );
+                    warn!("Failed to get status for thread handling pool checks: {e}");
                     None
                 }
             })
@@ -270,14 +267,11 @@ impl StratEngine {
                 }
                 Ok(Err(StratisError::ActionDisabled(_))) => acc,
                 Ok(Err(e)) => {
-                    warn!("Filesystem checks failed with error: {}", e);
+                    warn!("Filesystem checks failed with error: {e}");
                     acc
                 }
                 Err(e) => {
-                    warn!(
-                        "Failed to get status for thread handling filesystem checks: {}",
-                        e
-                    );
+                    warn!("Failed to get status for thread handling filesystem checks: {e}");
                     acc
                 }
             })
@@ -291,8 +285,7 @@ impl StratEngine {
                 Self::spawn_pool_check_handling(&mut joins, guard);
             } else {
                 warn!(
-                    "Pool with UUID {} indicated an event but could not be found when attempting to handle the event; it may have been deleted during the time between detection and handling",
-                    uuid
+                    "Pool with UUID {uuid} indicated an event but could not be found when attempting to handle the event; it may have been deleted during the time between detection and handling"
                 );
             }
         }
@@ -323,8 +316,7 @@ impl StratEngine {
                 Self::spawn_fs_check_handling(&mut joins, guard);
             } else {
                 warn!(
-                    "Pool with UUID {} indicated an event but could not be found when attempting to handle the event; it may have been deleted during the time between detection and handling",
-                    uuid
+                    "Pool with UUID {uuid} indicated an event but could not be found when attempting to handle the event; it may have been deleted during the time between detection and handling"
                 );
             }
         }
@@ -461,7 +453,7 @@ impl Engine for StratEngine {
                         Ok(Some((dev_uuid, diff))) => (uuid, Some((dev_uuid, diff))),
                         Ok(None) => (uuid, None),
                         Err(e) => {
-                            warn!("Ignoring device size change handling due to error: {}", e);
+                            warn!("Ignoring device size change handling due to error: {e}");
                             (uuid, None)
                         }
                     }
@@ -488,7 +480,7 @@ impl Engine for StratEngine {
                 diffs.extend(diffs_thread);
             }
             Err(e) => {
-                warn!("Failed to handle udev events: {}", e);
+                warn!("Failed to handle udev events: {e}");
             }
         };
 
@@ -964,7 +956,7 @@ mod test {
                     format!("/dev/stratis/{name1}/{fs_name2}"),
                 ] {
                     if Path::new(&symlink).exists() {
-                        return Err(StratisError::Msg(format!("{} still exists", symlink)));
+                        return Err(StratisError::Msg(format!("{symlink} still exists")));
                     }
                 }
                 for symlink in [
@@ -972,7 +964,7 @@ mod test {
                     format!("/dev/stratis/{name2}/{fs_name2}"),
                 ] {
                     if !Path::new(&symlink).exists() {
-                        return Err(StratisError::Msg(format!("{} does not exist", symlink)));
+                        return Err(StratisError::Msg(format!("{symlink} does not exist")));
                     }
                 }
                 Ok(())

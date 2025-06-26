@@ -949,10 +949,7 @@ impl DbusTreeHandler {
                 }
             ),
         ) {
-            warn!(
-                "Failed to send a signal over D-Bus indicating pool size change: {}",
-                e
-            );
+            warn!("Failed to send a signal over D-Bus indicating pool size change: {e}");
         }
     }
 
@@ -980,8 +977,7 @@ impl DbusTreeHandler {
             ),
         ) {
             warn!(
-                "Failed to send a signal over D-Bus indicating filesystem size limit change: {}",
-                e
+                "Failed to send a signal over D-Bus indicating filesystem size limit change: {e}"
             );
         }
     }
@@ -1048,10 +1044,7 @@ impl DbusTreeHandler {
                 }
             ),
         ) {
-            warn!(
-                "Failed to send a signal over D-Bus indicating blockdev user info change: {}",
-                e
-            );
+            warn!("Failed to send a signal over D-Bus indicating blockdev user info change: {e}");
         }
     }
 
@@ -1115,8 +1108,7 @@ impl DbusTreeHandler {
             ),
         ) {
             warn!(
-                "Failed to send a signal over D-Bus indicating blockdev total physical size change: {}",
-                e
+                "Failed to send a signal over D-Bus indicating blockdev total physical size change: {e}"
             );
         }
     }
@@ -1169,8 +1161,7 @@ impl DbusTreeHandler {
             ),
         ) {
             warn!(
-                "Failed to send a signal over D-Bus indicating pool overprovisioning mode change: {}",
-                e
+                "Failed to send a signal over D-Bus indicating pool overprovisioning mode change: {e}"
             );
         }
     }
@@ -1189,8 +1180,7 @@ impl DbusTreeHandler {
             ),
         ) {
             warn!(
-                "Failed to send a signal over D-Bus indicating pool free token slots change: {}",
-                e
+                "Failed to send a signal over D-Bus indicating pool free token slots change: {e}"
             );
         }
     }

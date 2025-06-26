@@ -596,8 +596,7 @@ where
     if metadata_version.len() > 1 {
         return Err((
             StratisError::Msg(format!(
-                "Found mismatching metadata versions across block devices: {:?}",
-                metadata_version,
+                "Found mismatching metadata versions across block devices: {metadata_version:?}",
             )),
             bds_to_bdas(devs),
         ));

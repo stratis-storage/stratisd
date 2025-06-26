@@ -39,7 +39,7 @@ use crate::{
 async fn signal_thread() -> StratisResult<()> {
     task::spawn(async {
         if let Err(e) = signal::ctrl_c().await {
-            error!("Failure while listening for signals: {}", e);
+            error!("Failure while listening for signals: {e}");
         }
     })
     .await?;
@@ -84,12 +84,12 @@ pub fn run(sim: bool) -> StratisResult<()> {
         .on_thread_start(|| {
             static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
             let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            trace!("{}: thread started", id)
+            trace!("{id}: thread started")
         })
         .on_thread_stop(|| {
             static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
             let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            trace!("{}: thread finished", id)
+            trace!("{id}: thread finished")
         })
         .build()?;
     runtime.block_on(async move {
@@ -128,7 +128,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
             select! {
                 res = join_udev => {
                     if let Err(e) = res {
-                        error!("The udev thread exited with an error: {}; shutting down stratisd...", e);
+                        error!("The udev thread exited with an error: {e}; shutting down stratisd...");
                         return Err(e);
                     } else {
                         info!("The udev thread exited; shutting down stratisd...");
@@ -136,18 +136,18 @@ pub fn run(sim: bool) -> StratisResult<()> {
                 }
                 res = join_ipc => {
                     if let Err(e) = res {
-                        error!("The IPC thread exited with an error: {}; shutting down stratisd...", e);
+                        error!("The IPC thread exited with an error: {e}; shutting down stratisd...");
                     } else {
                         info!("The IPC thread exited; shutting down stratisd...");
                     }
                 },
                 Err(e) = join_dm => {
-                    error!("The devicemapper thread exited with an error: {}; shutting down stratisd...", e);
+                    error!("The devicemapper thread exited with an error: {e}; shutting down stratisd...");
                     return Err(e);
                 },
                 res = join_timer => {
                     if let Err(e) = res {
-                        error!("The timer thread exited with an error: {}; shutting down stratisd...", e);
+                        error!("The timer thread exited with an error: {e}; shutting down stratisd...");
                         return Err(e);
                     } else {
                         info!("The timer thread exited; shutting down stratisd...");
@@ -167,13 +167,13 @@ pub fn run(sim: bool) -> StratisResult<()> {
             }
 
             if let Err(e) = trigger.send(()) {
-                warn!("Failed to notify blocking stratisd threads to shut down: {}", e);
+                warn!("Failed to notify blocking stratisd threads to shut down: {e}");
             }
 
             Ok(())
         }
 
-        info!("stratis daemon version {} started", VERSION);
+        info!("stratis daemon version {VERSION} started");
         if sim {
             info!("Using SimEngine");
             start_threads(Arc::new(SimEngine::default()), sim, None).await
@@ -184,7 +184,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
                 Arc::new(match StratEngine::initialize(sender) {
                     Ok(engine) => engine,
                     Err(e) => {
-                        error!("Failed to start up stratisd engine: {}; exiting", e);
+                        error!("Failed to start up stratisd engine: {e}; exiting");
                         return Err(e);
                     }
                 }),

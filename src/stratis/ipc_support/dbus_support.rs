@@ -49,9 +49,8 @@ pub async fn setup(
     let mut tree_handle = task::spawn_blocking(move || {
         if let Err(e) = tree.process_dbus_actions() {
             error!(
-                "Failed to process D-Bus object path addition or removal: {}; \
+                "Failed to process D-Bus object path addition or removal: {e}; \
                 exiting D-Bus thread",
-                e,
             );
         }
     });
@@ -61,8 +60,7 @@ pub async fn setup(
             trace!("Starting D-Bus udev event handling");
             if let Err(e) = udev.handle_udev_event().await {
                 error!(
-                    "Failed to process udev event in the D-Bus layer: {}; exiting D-Bus thread",
-                    e,
+                    "Failed to process udev event in the D-Bus layer: {e}; exiting D-Bus thread",
                 );
                 return;
             }

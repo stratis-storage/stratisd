@@ -283,13 +283,13 @@ impl StratisServer {
             let params = match request_handler.await {
                 Ok(p) => p,
                 Err(e) => {
-                    warn!("Failed to receive request from connection: {}", e);
+                    warn!("Failed to receive request from connection: {e}");
                     return;
                 }
             };
             let ret = params.process(engine).await;
             if let Err(e) = StratisUnixResponse::new(fd, ret).await {
-                warn!("Failed to respond to request: {}", e);
+                warn!("Failed to respond to request: {e}");
             }
         });
         Ok(true)
@@ -304,7 +304,7 @@ impl StratisServer {
                     return;
                 }
                 Err(e) => {
-                    warn!("Encountered an error while handling request: {}", e);
+                    warn!("Encountered an error while handling request: {e}");
                 }
             }
         }
@@ -328,8 +328,7 @@ fn handle_cmsgs(cmsgs: Vec<ControlMessageOwned>) -> StratisResult<Option<RawFd>>
         fds.into_iter().for_each(|fd| {
             if let Err(e) = close(fd) {
                 warn!(
-                    "Failed to close file descriptor {}: {}; potential for leaked file descriptor",
-                    fd, e
+                    "Failed to close file descriptor {fd}: {e}; potential for leaked file descriptor"
                 );
             }
         });
@@ -486,7 +485,7 @@ pub fn run_server(engine: Arc<dyn Engine>) -> JoinHandle<()> {
         match StratisServer::new(engine, RPC_SOCKADDR) {
             Ok(server) => server.run().await,
             Err(e) => {
-                error!("Failed to start stratisd-min server: {}", e);
+                error!("Failed to start stratisd-min server: {e}");
             }
         }
     })

@@ -113,8 +113,7 @@ fn is_encrypted_stratis_device(device: &mut CryptDevice) -> bool {
         .map_err(|e| {
             debug!(
                 "Operations querying device to determine if it is a Stratis device \
-                failed with an error: {}; reporting as not a Stratis device.",
-                e
+                failed with an error: {e}; reporting as not a Stratis device."
             );
         })
         .unwrap_or(false)
@@ -301,8 +300,7 @@ impl CryptHandle {
                     Self::rollback(&mut device, physical_path, &activation_name)
                 {
                     warn!(
-                        "Failed to roll back crypt device initialization; you may need to manually wipe this device: {}",
-                        err
+                        "Failed to roll back crypt device initialization; you may need to manually wipe this device: {err}"
                     );
                 }
                 e
@@ -766,8 +764,7 @@ impl CryptHandle {
         let vk_kd = VolumeKeyKeyDescription::new(uuid);
         let (_, vk) = read_key_process(&vk_kd)?.ok_or_else(|| {
             StratisError::Msg(format!(
-                "Failed to get volume key for pool with UUID {}",
-                uuid
+                "Failed to get volume key for pool with UUID {uuid}"
             ))
         })?;
         crypt.activate_handle().activate_by_volume_key(

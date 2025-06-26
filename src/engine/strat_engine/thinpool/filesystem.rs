@@ -92,16 +92,10 @@ impl StratFilesystem {
 
         if let Err(err) = create_fs(&thin_dev.devnode(), Some(StratisUuid::Fs(fs_uuid))) {
             if let Err(err2) = retry_with_index(Fixed::from_millis(100).take(4), |i| {
-                trace!(
-                    "Cleanup new thin device after failed create_fs() attempt {}",
-                    i
-                );
+                trace!("Cleanup new thin device after failed create_fs() attempt {i}");
                 thin_dev.destroy(get_dm(), thinpool_dev)
             }) {
-                error!(
-                    "While handling create_fs error, thin_dev.destroy() failed: {}",
-                    err2
-                );
+                error!("While handling create_fs error, thin_dev.destroy() failed: {err2}");
                 // This will result in a dangling DM device that will prevent
                 // the thinpool from being destroyed, and wasted space in the
                 // thinpool.
@@ -183,7 +177,7 @@ impl StratFilesystem {
         }
 
         if let Err(e) = udev_change_event(&self.thin_dev, pool_name, fs_uuid, fs_name) {
-            warn!("Failed to notify udev to perform symlink operation: {}", e);
+            warn!("Failed to notify udev to perform symlink operation: {e}");
         }
     }
 
@@ -239,10 +233,10 @@ impl StratFilesystem {
                         Some("nouuid"),
                     )?;
                     if let Err(e) = retry_with_index(Fixed::from_millis(100).take(2), |i| {
-                        trace!("Unmount temporary snapshot mount attempt {}", i);
+                        trace!("Unmount temporary snapshot mount attempt {i}");
                         umount(tmp_dir.path())
                     }) {
-                        warn!("Unmounting temporary snapshot mount failed: {}", e);
+                        warn!("Unmounting temporary snapshot mount failed: {e}");
                     }
                 }
 
@@ -309,10 +303,7 @@ impl StratFilesystem {
         match visit_values_fail(self, no_op_remaining_size) {
             Ok(mt_pt) => mt_pt,
             Err(e) => {
-                warn!(
-                    "Checking whether the filesystem should be visited failed: {}; ignoring",
-                    e
-                );
+                warn!("Checking whether the filesystem should be visited failed: {e}; ignoring");
                 None
             }
         }

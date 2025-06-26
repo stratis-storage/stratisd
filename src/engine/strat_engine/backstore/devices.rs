@@ -321,8 +321,8 @@ impl StratisDevices {
             .map(|(pool_uuid, devs)| {
                 format!(
                     "devices ({}) appear to belong to Stratis pool with UUID {}",
-                    devs.iter()
-                        .map(|(_, info)| info.devnode.display().to_string())
+                    devs.values()
+                        .map(|info| info.devnode.display().to_string())
                         .collect::<Vec<_>>()
                         .join(", "),
                     pool_uuid

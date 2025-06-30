@@ -34,8 +34,9 @@ use crate::{
             pool::{v1, v2, AnyPool},
         },
         structures::{
-            AllLockReadGuard, AllLockWriteGuard, AllOrSomeLock, Lockable, SomeLockReadGuard,
-            SomeLockWriteGuard, Table,
+            AllLockReadAvailableGuard, AllLockReadGuard, AllLockWriteAvailableGuard,
+            AllLockWriteGuard, AllOrSomeLock, Lockable, SomeLockReadGuard, SomeLockWriteGuard,
+            Table,
         },
         types::{
             CreateAction, DeleteAction, DevUuid, FilesystemUuid, InputEncryptionInfo,
@@ -202,8 +203,18 @@ impl StratEngine {
         self.pools.read_all().await
     }
 
+    pub async fn available_pools(&self) -> Option<AllLockReadAvailableGuard<PoolUuid, AnyPool>> {
+        self.pools.read_all_available().await
+    }
+
     pub async fn pools_mut(&self) -> AllLockWriteGuard<PoolUuid, AnyPool> {
         self.pools.write_all().await
+    }
+
+    pub async fn available_pools_mut(
+        &self,
+    ) -> Option<AllLockWriteAvailableGuard<PoolUuid, AnyPool>> {
+        self.pools.write_all_available().await
     }
 
     fn spawn_pool_check_handling(
@@ -740,8 +751,16 @@ impl Engine for StratEngine {
         self.pools().await.into_dyn()
     }
 
+    async fn available_pools(&self) -> Option<AllLockReadAvailableGuard<PoolUuid, dyn Pool>> {
+        self.available_pools().await.map(|l| l.into_dyn())
+    }
+
     async fn pools_mut(&self) -> AllLockWriteGuard<PoolUuid, dyn Pool> {
         self.pools_mut().await.into_dyn()
+    }
+
+    async fn available_pools_mut(&self) -> Option<AllLockWriteAvailableGuard<PoolUuid, dyn Pool>> {
+        self.available_pools_mut().await.map(|l| l.into_dyn())
     }
 
     async fn get_events(&self) -> StratisResult<HashSet<PoolUuid>> {

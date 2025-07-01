@@ -53,7 +53,7 @@ pub fn create_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         Some((pin, json_string)) => match serde_json::from_str(json_string.as_str()) {
             Ok(j) => Some((pin, j)),
             Err(e) => {
-                let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::Serde(e));
+                let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::from(e));
                 return Ok(vec![return_message.append3(default_return, rc, rs)]);
             }
         },

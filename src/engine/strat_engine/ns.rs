@@ -50,7 +50,7 @@ impl MemoryFilesystem {
         let tmpfs_path = &Path::new(NS_TMPFS_LOCATION);
         if tmpfs_path.exists() {
             if !tmpfs_path.is_dir() {
-                return Err(StratisError::Io(io::Error::new(
+                return Err(StratisError::from(io::Error::new(
                     io::ErrorKind::AlreadyExists,
                     format!("{} exists and is not a directory", tmpfs_path.display()),
                 )));

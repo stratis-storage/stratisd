@@ -54,7 +54,7 @@ pub fn bind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let json: Value = match serde_json::from_str(&json_string) {
         Ok(j) => j,
         Err(e) => {
-            let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::Serde(e));
+            let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::from(e));
             return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };

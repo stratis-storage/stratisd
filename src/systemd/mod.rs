@@ -28,7 +28,7 @@ pub fn notify(unset_variable: bool, key_value_pairs: HashMap<String, String>) ->
     let cstring = CString::new(serialized_pairs)?;
     let ret = unsafe { bindings::sd_notify(libc::c_int::from(unset_variable), cstring.as_ptr()) };
     if ret < 0 {
-        Err(StratisError::Io(io::Error::from_raw_os_error(-ret)))
+        Err(StratisError::from(io::Error::from_raw_os_error(-ret)))
     } else {
         Ok(())
     }

@@ -387,5 +387,5 @@ jobs:
           --post-test-check=verify-private-symlinks
           --post-test-check=verify-filesystem-symlinks
           --post-test-check=verify-pool-metadata
-          --highest-revision-number=8
+          --highest-revision-number=9
         working-directory: testing

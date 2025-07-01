@@ -775,7 +775,7 @@ impl CryptHandle {
         crypt
             .context_handle()
             .resize(&self.activation_name().to_string(), processed_size)
-            .map_err(StratisError::Crypt)?;
+            .map_err(StratisError::from)?;
         self.size = blkdev_size(&File::open(&self.metadata.activated_path)?)?.sectors();
         Ok(())
     }

@@ -2,13 +2,20 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashSet, error::Error, fmt, io, iter::once, str, sync};
+use std::{
+    collections::HashSet,
+    error::Error,
+    fmt, io,
+    iter::once,
+    str,
+    sync::{self, Arc},
+};
 
 use crate::engine::ActionAvailability;
 
 pub type StratisResult<T> = Result<T, StratisError>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum StratisError {
     Msg(String),
     Chained(String, Box<StratisError>),
@@ -30,22 +37,22 @@ pub enum StratisError {
     },
     ActionDisabled(ActionAvailability),
     OutOfSpaceError(String),
-    Io(io::Error),
+    Io(Arc<io::Error>),
     Nix(nix::Error),
     Uuid(uuid::Error),
     Utf8(str::Utf8Error),
-    Serde(serde_json::error::Error),
+    Serde(Arc<serde_json::error::Error>),
     Decode(data_encoding::DecodeError),
     DM(devicemapper::DmError),
-    Crypt(libcryptsetup_rs::LibcryptErr),
+    Crypt(Arc<libcryptsetup_rs::LibcryptErr>),
     Recv(sync::mpsc::RecvError),
     Null(std::ffi::NulError),
-    Join(tokio::task::JoinError),
-    Blkid(libblkid_rs::BlkidErr),
+    Join(Arc<tokio::task::JoinError>),
+    Blkid(Arc<libblkid_rs::BlkidErr>),
 
     #[cfg(feature = "dbus_enabled")]
-    Dbus(dbus::Error),
-    Udev(libudev::Error),
+    Dbus(Arc<dbus::Error>),
+    Udev(Arc<libudev::Error>),
 }
 
 impl StratisError {
@@ -150,13 +157,13 @@ impl Error for StratisError {}
 
 impl From<libblkid_rs::BlkidErr> for StratisError {
     fn from(err: libblkid_rs::BlkidErr) -> StratisError {
-        StratisError::Blkid(err)
+        StratisError::Blkid(Arc::new(err))
     }
 }
 
 impl From<tokio::task::JoinError> for StratisError {
     fn from(err: tokio::task::JoinError) -> StratisError {
-        StratisError::Join(err)
+        StratisError::Join(Arc::new(err))
     }
 }
 
@@ -168,7 +175,7 @@ impl From<std::ffi::NulError> for StratisError {
 
 impl From<io::Error> for StratisError {
     fn from(err: io::Error) -> StratisError {
-        StratisError::Io(err)
+        StratisError::Io(Arc::new(err))
     }
 }
 
@@ -192,7 +199,7 @@ impl From<str::Utf8Error> for StratisError {
 
 impl From<serde_json::error::Error> for StratisError {
     fn from(err: serde_json::error::Error) -> StratisError {
-        StratisError::Serde(err)
+        StratisError::Serde(Arc::new(err))
     }
 }
 
@@ -210,20 +217,20 @@ impl From<devicemapper::DmError> for StratisError {
 
 impl From<libcryptsetup_rs::LibcryptErr> for StratisError {
     fn from(err: libcryptsetup_rs::LibcryptErr) -> StratisError {
-        StratisError::Crypt(err)
+        StratisError::Crypt(Arc::new(err))
     }
 }
 
 #[cfg(feature = "dbus_enabled")]
 impl From<dbus::Error> for StratisError {
     fn from(err: dbus::Error) -> StratisError {
-        StratisError::Dbus(err)
+        StratisError::Dbus(Arc::new(err))
     }
 }
 
 impl From<libudev::Error> for StratisError {
     fn from(err: libudev::Error) -> StratisError {
-        StratisError::Udev(err)
+        StratisError::Udev(Arc::new(err))
     }
 }
 

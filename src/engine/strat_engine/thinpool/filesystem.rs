@@ -609,3 +609,63 @@ impl Into<Value> for &StratFilesystem {
         Value::from(json)
     }
 }
+
+/// Represents a filesystem in a locked pool.
+#[derive(Debug)]
+pub struct LockedFilesystem {
+    devnode: PathBuf,
+    created: DateTime<Utc>,
+    used: StratisResult<Bytes>,
+    size: Bytes,
+    size_limit: Option<Sectors>,
+    origin: Option<FilesystemUuid>,
+    merge_scheduled: bool,
+}
+
+impl LockedFilesystem {
+    pub fn from_fs(fs: &dyn Filesystem) -> Self {
+        LockedFilesystem {
+            devnode: fs.devnode(),
+            created: fs.created(),
+            used: fs.used(),
+            size: fs.size(),
+            size_limit: fs.size_limit(),
+            origin: fs.origin(),
+            merge_scheduled: fs.merge_scheduled(),
+        }
+    }
+}
+
+impl Filesystem for LockedFilesystem {
+    fn devnode(&self) -> PathBuf {
+        self.devnode.clone()
+    }
+
+    fn created(&self) -> DateTime<Utc> {
+        self.created
+    }
+
+    fn path_to_mount_filesystem(&self, pool_name: &str, fs_name: &str) -> PathBuf {
+        devlinks::filesystem_mount_path(pool_name, fs_name)
+    }
+
+    fn used(&self) -> StratisResult<Bytes> {
+        self.used.clone()
+    }
+
+    fn size(&self) -> Bytes {
+        self.size
+    }
+
+    fn size_limit(&self) -> Option<Sectors> {
+        self.size_limit.clone()
+    }
+
+    fn origin(&self) -> Option<FilesystemUuid> {
+        self.origin.clone()
+    }
+
+    fn merge_scheduled(&self) -> bool {
+        self.merge_scheduled
+    }
+}

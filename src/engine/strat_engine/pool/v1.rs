@@ -572,18 +572,21 @@ impl Pool for StratPool {
         let (in_pool, out_pool): (Vec<_>, Vec<_>) = this_pool
             .keys()
             .map(|dev_uuid| {
-                self.backstore
-                    .get_blockdev_by_uuid(*dev_uuid)
-                    .map(|(tier, _)| (*dev_uuid, tier))
+                (
+                    *dev_uuid,
+                    self.backstore
+                        .get_blockdev_by_uuid(*dev_uuid)
+                        .map(|(tier, _)| tier),
+                )
             })
-            .partition(|v| v.is_some());
+            .partition(|(_, t)| t.is_some());
 
         if !out_pool.is_empty() {
             let error_message = format!(
                     "Devices ({}) appear to be already in use by this pool which has UUID {} but this pool has no record of them",
                     out_pool
                     .iter()
-                    .map(|opt| this_pool.get(&opt.expect("was looked up").0).expect("partitioned from this_pool").devnode.display().to_string())
+                    .map(|(u, _)| this_pool.get(u).expect("partitioned from this_pool").devnode.display().to_string())
                     .collect::<Vec<_>>()
                     .join(", "),
                     pool_uuid
@@ -593,7 +596,7 @@ impl Pool for StratPool {
 
         let (datadevs, cachedevs): (Vec<_>, Vec<_>) = in_pool
             .iter()
-            .map(|opt| opt.expect("in_pool devices are Some"))
+            .map(|(u, t)| (u, t.expect("in_pool devices have Some tier")))
             .partition(|(_, tier)| *tier == BlockDevTier::Data);
 
         if !datadevs.is_empty() {
@@ -890,18 +893,21 @@ impl Pool for StratPool {
             let (in_pool, out_pool): (Vec<_>, Vec<_>) = this_pool
                 .keys()
                 .map(|dev_uuid| {
-                    self.backstore
-                        .get_blockdev_by_uuid(*dev_uuid)
-                        .map(|(tier, _)| (*dev_uuid, tier))
+                    (
+                        *dev_uuid,
+                        self.backstore
+                            .get_blockdev_by_uuid(*dev_uuid)
+                            .map(|(tier, _)| tier),
+                    )
                 })
-                .partition(|v| v.is_some());
+                .partition(|(_, t)| t.is_some());
 
             if !out_pool.is_empty() {
                 let error_message = format!(
                     "Devices ({}) appear to be already in use by this pool which has UUID {} but this pool has no record of them",
                     out_pool
                     .iter()
-                    .map(|opt| this_pool.get(&opt.expect("was looked up").0).expect("partitioned from this_pool").devnode.display().to_string())
+                    .map(|(u, _)| this_pool.get(u).expect("partitioned from this_pool").devnode.display().to_string())
                     .collect::<Vec<_>>()
                     .join(", "),
                     pool_uuid
@@ -911,7 +917,7 @@ impl Pool for StratPool {
 
             let (datadevs, cachedevs): (Vec<_>, Vec<_>) = in_pool
                 .iter()
-                .map(|opt| opt.expect("in_pool devices are Some"))
+                .map(|(u, t)| (u, t.expect("in_pool devices have Some tier")))
                 .partition(|(_, tier)| *tier == BlockDevTier::Data);
 
             if tier == BlockDevTier::Cache {

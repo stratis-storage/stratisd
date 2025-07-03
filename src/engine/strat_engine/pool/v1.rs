@@ -5,7 +5,8 @@
 use std::{
     cmp::max,
     collections::{HashMap, HashSet},
-    path::Path,
+    fs::OpenOptions,
+    path::{Path, PathBuf},
     vec::Vec,
 };
 
@@ -40,7 +41,7 @@ use crate::{
             },
             crypt::{CLEVIS_LUKS_TOKEN_ID, LUKS2_TOKEN_ID},
             liminal::DeviceSet,
-            metadata::BDA,
+            metadata::{disown_device, BDA},
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             shared::tiers_to_bdas,
             thinpool::{StratFilesystem, ThinPool},
@@ -261,12 +262,14 @@ impl StratPool {
     ///   * key_description.is_none() -> no StratBlockDev in datadevs has a
     ///   key description.
     ///   * no StratBlockDev in cachdevs has a key description
+    #[allow(clippy::too_many_arguments)]
     pub fn setup(
         uuid: PoolUuid,
         datadevs: Vec<StratBlockDev>,
         cachedevs: Vec<StratBlockDev>,
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
+        paths_to_wipe: Vec<PathBuf>,
         encryption_info: Option<PoolEncryptionInfo>,
         remove_cache: bool,
     ) -> BDARecordResult<(Name, StratPool)> {
@@ -321,6 +324,18 @@ impl StratPool {
                     warn!("Pool-level metadata could not be written for pool with name {pool_name} and UUID {uuid} because pool is in a limited availability state, {avail},  which prevents any pool actions; pool will remain set up");
                 } else {
                     return Err((err, pool.backstore.into_bdas()));
+                }
+            }
+
+            for path in paths_to_wipe {
+                info!("Wiping cache device {}", path.display());
+                if let Err(e) = OpenOptions::new()
+                    .write(true)
+                    .open(&path)
+                    .map_err(StratisError::from)
+                    .and_then(|mut f| disown_device(&mut f))
+                {
+                    warn!("Failed to wipe cache device {}: {e}", path.display())
                 }
             }
         }

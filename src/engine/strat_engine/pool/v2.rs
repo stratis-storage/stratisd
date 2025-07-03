@@ -4,7 +4,8 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    path::Path,
+    fs::OpenOptions,
+    path::{Path, PathBuf},
     vec::Vec,
 };
 
@@ -29,7 +30,7 @@ use crate::{
                 ProcessedPathInfos, UnownedDevices,
             },
             liminal::DeviceSet,
-            metadata::{MDADataSize, BDA},
+            metadata::{disown_device, MDADataSize, BDA},
             serde_structs::{FlexDevsSave, PoolFeatures, PoolSave, Recordable},
             shared::tiers_to_bdas,
             thinpool::{StratFilesystem, ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
@@ -234,6 +235,7 @@ impl StratPool {
         cachedevs: Vec<StratBlockDev>,
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
+        paths_to_wipe: Vec<PathBuf>,
         token_slot: TokenUnlockMethod,
         passphrase: Option<SizedKeyMemory>,
         remove_cache: bool,
@@ -290,6 +292,18 @@ impl StratPool {
                     warn!("Pool-level metadata could not be written for pool with name {pool_name} and UUID {uuid} because pool is in a limited availability state, {avail},  which prevents any pool actions; pool will remain set up");
                 } else {
                     return Err((err, pool.backstore.into_bdas()));
+                }
+            }
+
+            for path in paths_to_wipe {
+                info!("Wiping cache device {}", path.display());
+                if let Err(e) = OpenOptions::new()
+                    .write(true)
+                    .open(&path)
+                    .map_err(StratisError::from)
+                    .and_then(|mut f| disown_device(&mut f))
+                {
+                    warn!("Failed to wipe cache device {}: {e}", path.display())
                 }
             }
         }

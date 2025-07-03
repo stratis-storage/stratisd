@@ -5,7 +5,8 @@
 use std::{
     cmp::max,
     collections::{HashMap, HashSet},
-    path::Path,
+    fs::OpenOptions,
+    path::{Path, PathBuf},
     vec::Vec,
 };
 
@@ -38,9 +39,9 @@ use crate::{
                 blockdev::{v1::StratBlockDev, InternalBlockDev},
                 ProcessedPathInfos,
             },
-            crypt::{CLEVIS_LUKS_TOKEN_ID, LUKS2_TOKEN_ID},
+            crypt::{handle::v1::CryptHandle, CLEVIS_LUKS_TOKEN_ID, LUKS2_TOKEN_ID},
             liminal::DeviceSet,
-            metadata::BDA,
+            metadata::{disown_device, BDA},
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             shared::tiers_to_bdas,
             thinpool::{StratFilesystem, ThinPool},
@@ -51,6 +52,7 @@ use crate::{
             Diff, FilesystemUuid, GrowAction, Key, KeyDescription, Name, OptionalTokenSlotInput,
             PoolDiff, PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
             SetDeleteAction, StratFilesystemDiff, StratPoolDiff, StratSigblockVersion,
+            TokenUnlockMethod,
         },
         EncryptionInfo, PropChangeAction,
     },
@@ -267,8 +269,8 @@ impl StratPool {
         cachedevs: Vec<StratBlockDev>,
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
+        paths_to_wipe: Option<Vec<Either<PathBuf, PathBuf>>>,
         encryption_info: Option<PoolEncryptionInfo>,
-        remove_cache: bool,
     ) -> BDARecordResult<(Name, StratPool)> {
         if let Err(e) = check_metadata(metadata) {
             return Err((e, tiers_to_bdas(datadevs, cachedevs, None)));
@@ -297,7 +299,7 @@ impl StratPool {
             Err(e) => return Err((e, backstore.into_bdas())),
         };
 
-        let mut needs_save = remove_cache;
+        let mut needs_save = paths_to_wipe.is_some();
         // TODO: Remove in stratisd 4.0
         needs_save |= metadata.thinpool_dev.fs_limit.is_none()
             || metadata.thinpool_dev.feature_args.is_none();
@@ -321,6 +323,42 @@ impl StratPool {
                     warn!("Pool-level metadata could not be written for pool with name {pool_name} and UUID {uuid} because pool is in a limited availability state, {avail},  which prevents any pool actions; pool will remain set up");
                 } else {
                     return Err((err, pool.backstore.into_bdas()));
+                }
+            }
+        }
+
+        fn handle_crypt_wipe(p: &Path) -> StratisResult<()> {
+            let handle =
+                CryptHandle::setup(p, TokenUnlockMethod::None, None)?.ok_or_else(|| {
+                    StratisError::Msg(format!(
+                        "Expected an encrypted device but none was found for path {}",
+                        p.display()
+                    ))
+                })?;
+            handle.wipe()?;
+            Ok(())
+        }
+
+        for path in paths_to_wipe.unwrap_or_default() {
+            info!(
+                "Wiping cache device {}",
+                path.as_ref().either(|l| l.display(), |r| r.display())
+            );
+            match &path {
+                Either::Left(l) => {
+                    if let Err(e) = OpenOptions::new()
+                        .write(true)
+                        .open(l)
+                        .map_err(StratisError::from)
+                        .and_then(|mut f| disown_device(&mut f))
+                    {
+                        warn!("Failed to wipe cache device {}: {e}", l.display())
+                    }
+                }
+                Either::Right(r) => {
+                    if let Err(e) = handle_crypt_wipe(r) {
+                        warn!("Failed to wipe cache device {}: {e}", r.display())
+                    }
                 }
             }
         }

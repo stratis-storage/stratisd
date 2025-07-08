@@ -3,7 +3,10 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    os::unix::io::{AsRawFd, RawFd},
+    os::{
+        fd::BorrowedFd,
+        unix::io::{AsRawFd, RawFd},
+    },
     sync::Arc,
 };
 
@@ -114,10 +117,12 @@ fn setup_dm() -> StratisResult<AsyncFd<RawFd>> {
         Err(StratisError::Msg(err_msg))
     } else {
         let fd = get_dm().as_raw_fd();
+        let borrowed_fd = unsafe { BorrowedFd::borrow_raw(fd) };
         fcntl(
-            fd,
+            borrowed_fd,
             FcntlArg::F_SETFL(
-                OFlag::from_bits_truncate(fcntl(fd, FcntlArg::F_GETFL)?) & !OFlag::O_NONBLOCK,
+                OFlag::from_bits_truncate(fcntl(borrowed_fd, FcntlArg::F_GETFL)?)
+                    & !OFlag::O_NONBLOCK,
             ),
         )?;
 

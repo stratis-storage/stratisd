@@ -54,7 +54,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Check out ci repo
         uses: actions/checkout@v4
         with:

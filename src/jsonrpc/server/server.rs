@@ -8,7 +8,10 @@ use std::{
     fs::{create_dir_all, remove_file},
     future::Future,
     io::{IoSlice, IoSliceMut},
-    os::unix::io::{AsRawFd, OwnedFd, RawFd},
+    os::{
+        fd::{AsFd, FromRawFd},
+        unix::io::{AsRawFd, OwnedFd, RawFd},
+    },
     path::Path,
     pin::Pin,
     sync::Arc,
@@ -372,7 +375,7 @@ where
 }
 
 pub struct StratisUnixRequest {
-    fd: Arc<AsyncFd<RawFd>>,
+    fd: Arc<AsyncFd<OwnedFd>>,
 }
 
 impl Future for StratisUnixRequest {
@@ -391,12 +394,12 @@ impl Future for StratisUnixRequest {
 }
 
 pub struct StratisUnixResponse {
-    fd: Arc<AsyncFd<RawFd>>,
+    fd: Arc<AsyncFd<OwnedFd>>,
     ret: IpcResult<StratisRet>,
 }
 
 impl StratisUnixResponse {
-    pub fn new(fd: Arc<AsyncFd<RawFd>>, ret: IpcResult<StratisRet>) -> StratisUnixResponse {
+    pub fn new(fd: Arc<AsyncFd<OwnedFd>>, ret: IpcResult<StratisRet>) -> StratisUnixResponse {
         StratisUnixResponse { fd, ret }
     }
 }
@@ -437,11 +440,10 @@ impl StratisUnixListener {
             SockFlag::empty(),
             None,
         )?;
-        let flags =
-            OFlag::from_bits(fcntl(fd.as_raw_fd(), FcntlArg::F_GETFL)?).ok_or_else(|| {
-                StratisError::Msg("Unrecognized flag types returned from fcntl".to_string())
-            })?;
-        fcntl(fd.as_raw_fd(), FcntlArg::F_SETFL(flags | OFlag::O_NONBLOCK))?;
+        let flags = OFlag::from_bits(fcntl(fd.as_fd(), FcntlArg::F_GETFL)?).ok_or_else(|| {
+            StratisError::Msg("Unrecognized flag types returned from fcntl".to_string())
+        })?;
+        fcntl(fd.as_fd(), FcntlArg::F_SETFL(flags | OFlag::O_NONBLOCK))?;
         bind(fd.as_raw_fd(), &UnixAddr::new(path.as_ref())?)?;
         listen(&fd, Backlog::new(0).expect("0 is always valid"))?;
         Ok(StratisUnixListener {
@@ -451,11 +453,11 @@ impl StratisUnixListener {
 }
 
 fn try_accept(fd: RawFd) -> StratisResult<StratisUnixRequest> {
-    let fd = accept(fd)?;
-    let flags = OFlag::from_bits(fcntl(fd, FcntlArg::F_GETFL)?).ok_or_else(|| {
+    let fd = unsafe { OwnedFd::from_raw_fd(accept(fd)?) };
+    let flags = OFlag::from_bits(fcntl(&fd, FcntlArg::F_GETFL)?).ok_or_else(|| {
         StratisError::Msg("Unrecognized flag types returned from fcntl".to_string())
     })?;
-    fcntl(fd, FcntlArg::F_SETFL(flags | OFlag::O_NONBLOCK))?;
+    fcntl(&fd, FcntlArg::F_SETFL(flags | OFlag::O_NONBLOCK))?;
     Ok(StratisUnixRequest {
         fd: Arc::new(AsyncFd::new(fd)?),
     })

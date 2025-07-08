@@ -14,7 +14,7 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::{v1, v2, InternalBlockDev},
-                blockdevmgr::BlockDevMgr,
+                blockdevmgr::{BlockDevMgr, BlockDevMgrAvailSpace},
                 devices::UnownedDevices,
                 shared::{metadata_to_segment, AllocatedAbove, BlkDevSegment, BlockDevPartition},
             },
@@ -75,11 +75,11 @@ impl CacheTier<v1::StratBlockDev> {
             .block_mgr
             .add(pool_name, pool_uuid, devices, sector_size)?;
 
-        let avail_space = self.block_mgr.avail_space();
+        let avail_space = self.block_mgr.sizer().avail_space();
 
         // FIXME: This check will become unnecessary when cache metadata device
         // can be increased dynamically.
-        if avail_space + self.cache_segments.size() > MAX_CACHE_SIZE {
+        if avail_space.sectors() + self.cache_segments.size() > MAX_CACHE_SIZE {
             self.block_mgr.remove_blockdevs(&uuids)?;
             return Err(StratisError::Msg(format!(
                 "The size of the cache sub-device may not exceed {MAX_CACHE_SIZE}"
@@ -88,7 +88,7 @@ impl CacheTier<v1::StratBlockDev> {
 
         let segments = self
             .block_mgr
-            .alloc(&[avail_space])
+            .alloc(&[avail_space.sectors()])
             .expect("asked for exactly the space available, must get")
             .iter()
             .flat_map(|s| s.iter())
@@ -151,11 +151,11 @@ impl CacheTier<v2::StratBlockDev> {
     ) -> StratisResult<(Vec<DevUuid>, (bool, bool))> {
         let uuids = self.block_mgr.add(pool_uuid, devices)?;
 
-        let avail_space = self.block_mgr.avail_space();
+        let avail_space = self.block_mgr.sizer().avail_space();
 
         // FIXME: This check will become unnecessary when cache metadata device
         // can be increased dynamically.
-        if avail_space + self.cache_segments.size() > MAX_CACHE_SIZE {
+        if avail_space.sectors() + self.cache_segments.size() > MAX_CACHE_SIZE {
             self.block_mgr.remove_blockdevs(&uuids)?;
             return Err(StratisError::Msg(format!(
                 "The size of the cache sub-device may not exceed {MAX_CACHE_SIZE}"
@@ -164,7 +164,7 @@ impl CacheTier<v2::StratBlockDev> {
 
         let segments = self
             .block_mgr
-            .alloc(&[avail_space])
+            .alloc(&[avail_space.sectors()])
             .expect("asked for exactly the space available, must get")
             .iter()
             .flat_map(|s| s.iter())
@@ -215,10 +215,10 @@ where
         block_mgr: BlockDevMgr<B>,
         cache_tier_save: &CacheTierSave,
     ) -> BDARecordResult<CacheTier<B>> {
-        if block_mgr.avail_space() != Sectors(0) {
+        if block_mgr.sizer().avail_space() != BlockDevMgrAvailSpace(Sectors(0)) {
             let err_msg = format!(
                 "{} unallocated to device; probable metadata corruption",
-                block_mgr.avail_space()
+                block_mgr.sizer().avail_space().sectors()
             );
             return Err((StratisError::Msg(err_msg), block_mgr.into_bdas()));
         }
@@ -260,19 +260,21 @@ where
     ///
     /// WARNING: metadata changing event
     pub fn new(mut block_mgr: BlockDevMgr<B>) -> StratisResult<CacheTier<B>> {
-        let avail_space = block_mgr.avail_space();
+        let avail_space = block_mgr.sizer().avail_space();
 
         // FIXME: Come up with a better way to choose metadata device size
         let meta_space = Sectors(IEC::Mi);
 
         assert!(
-            meta_space < avail_space,
+            meta_space < avail_space.sectors(),
             "every block device must be at least one GiB"
         );
 
+        let cache_data_space = avail_space.sectors() - meta_space;
+
         // FIXME: This check will become unnecessary when cache metadata device
         // can be increased dynamically.
-        if avail_space - meta_space > MAX_CACHE_SIZE {
+        if cache_data_space > MAX_CACHE_SIZE {
             block_mgr.destroy_all()?;
             return Err(StratisError::Msg(format!(
                 "The size of the cache sub-device may not exceed {MAX_CACHE_SIZE}"
@@ -280,7 +282,7 @@ where
         }
 
         let mut segments = block_mgr
-            .alloc(&[meta_space, avail_space - meta_space])
+            .alloc(&[meta_space, cache_data_space])
             .expect("asked for exactly the space available, must get");
         let cache_segments = AllocatedAbove {
             inner: segments.pop().expect("segments.len() == 2"),
@@ -410,12 +412,15 @@ mod tests {
             // the tier.
             let cache_metadata_size = cache_tier.meta_segments.size();
 
-            let metadata_size = cache_tier.block_mgr.metadata_size();
-            let size = cache_tier.block_mgr.size();
+            let metadata_size = cache_tier.block_mgr.sizer().metadata_size();
+            let size = cache_tier.block_mgr.sizer().size();
 
-            assert_eq!(cache_tier.block_mgr.avail_space(), Sectors(0));
             assert_eq!(
-                size - metadata_size,
+                cache_tier.block_mgr.sizer().avail_space(),
+                BlockDevMgrAvailSpace(Sectors(0))
+            );
+            assert_eq!(
+                size.sectors() - metadata_size.sectors(),
                 cache_tier.cache_segments.size() + cache_metadata_size
             );
 
@@ -427,12 +432,18 @@ mod tests {
             assert!(cache);
             assert!(!meta);
 
-            assert_eq!(cache_tier.block_mgr.avail_space(), Sectors(0));
-            assert!(cache_tier.block_mgr.size() > size);
-            assert!(cache_tier.block_mgr.metadata_size() > metadata_size);
+            assert_eq!(
+                cache_tier.block_mgr.sizer().avail_space(),
+                BlockDevMgrAvailSpace(Sectors(0))
+            );
+            assert!(cache_tier.block_mgr.sizer().size().sectors() > size.sectors());
+            assert!(
+                cache_tier.block_mgr.sizer().metadata_size().sectors() > metadata_size.sectors()
+            );
 
             assert_eq!(
-                cache_tier.block_mgr.size() - cache_tier.block_mgr.metadata_size(),
+                cache_tier.block_mgr.sizer().size().sectors()
+                    - cache_tier.block_mgr.sizer().metadata_size().sectors(),
                 cache_tier.cache_segments.size() + cache_metadata_size
             );
 
@@ -483,12 +494,15 @@ mod tests {
             // the tier.
             let cache_metadata_size = cache_tier.meta_segments.size();
 
-            let metadata_size = cache_tier.block_mgr.metadata_size();
-            let size = cache_tier.block_mgr.size();
+            let metadata_size = cache_tier.block_mgr.sizer().metadata_size();
+            let size = cache_tier.block_mgr.sizer().size();
 
-            assert_eq!(cache_tier.block_mgr.avail_space(), Sectors(0));
             assert_eq!(
-                size - metadata_size,
+                cache_tier.block_mgr.sizer().avail_space(),
+                BlockDevMgrAvailSpace(Sectors(0))
+            );
+            assert_eq!(
+                size.sectors() - metadata_size.sectors(),
                 cache_tier.cache_segments.size() + cache_metadata_size
             );
 
@@ -498,12 +512,18 @@ mod tests {
             assert!(cache);
             assert!(!meta);
 
-            assert_eq!(cache_tier.block_mgr.avail_space(), Sectors(0));
-            assert!(cache_tier.block_mgr.size() > size);
-            assert!(cache_tier.block_mgr.metadata_size() > metadata_size);
+            assert_eq!(
+                cache_tier.block_mgr.sizer().avail_space(),
+                BlockDevMgrAvailSpace(Sectors(0))
+            );
+            assert!(cache_tier.block_mgr.sizer().size().sectors() > size.sectors());
+            assert!(
+                cache_tier.block_mgr.sizer().metadata_size().sectors() > metadata_size.sectors()
+            );
 
             assert_eq!(
-                cache_tier.block_mgr.size() - cache_tier.block_mgr.metadata_size(),
+                cache_tier.block_mgr.sizer().size().sectors()
+                    - cache_tier.block_mgr.sizer().metadata_size().sectors(),
                 cache_tier.cache_segments.size() + cache_metadata_size
             );
 

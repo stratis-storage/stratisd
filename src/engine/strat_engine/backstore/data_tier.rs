@@ -18,7 +18,9 @@ use crate::{
                     v2::{self, integrity_meta_space},
                     InternalBlockDev,
                 },
-                blockdevmgr::BlockDevMgr,
+                blockdevmgr::{
+                    BlockDevMgr, BlockDevMgrMetaSize, BlockDevMgrSize, BlockDevMgrUsableSpace,
+                },
                 devices::UnownedDevices,
                 shared::{metadata_to_segment, AllocatedAbove, BlkDevSegment, BlockDevPartition},
             },
@@ -254,18 +256,18 @@ where
     }
 
     /// The total size of all the blockdevs combined
-    pub fn size(&self) -> Sectors {
-        self.block_mgr.size()
+    pub fn size(&self) -> BlockDevMgrSize {
+        self.block_mgr.sizer().size()
     }
 
     /// The number of sectors used for metadata by all the blockdevs
-    pub fn metadata_size(&self) -> Sectors {
-        self.block_mgr.metadata_size()
+    pub fn metadata_size(&self) -> BlockDevMgrMetaSize {
+        self.block_mgr.sizer().metadata_size()
     }
 
     /// The total usable size of all the blockdevs combined
-    pub fn usable_size(&self) -> Sectors {
-        self.size() - self.metadata_size()
+    pub fn usable_size(&self) -> BlockDevMgrUsableSpace {
+        self.block_mgr.sizer().usable_size()
     }
 
     /// Destroy the store. Wipe its blockdevs.
@@ -378,11 +380,11 @@ mod tests {
             // A data_tier w/ some devices but nothing allocated
             let size = data_tier.size();
             assert_eq!(data_tier.allocated(), Sectors(0));
-            assert!(size != Sectors(0));
+            assert!(size != BlockDevMgrSize(Sectors(0)));
 
             let last_request_amount = size;
 
-            let request_amount = data_tier.block_mgr.avail_space() / 2usize;
+            let request_amount = data_tier.block_mgr.sizer().avail_space().sectors() / 2usize;
             assert!(request_amount != Sectors(0));
 
             assert!(data_tier.alloc(&[request_amount]));
@@ -398,17 +400,17 @@ mod tests {
             data_tier.invariant();
 
             // A data tier w/ additional blockdevs added
-            assert!(data_tier.size() > size);
+            assert!(data_tier.size().sectors() > size.sectors());
             assert_eq!(data_tier.allocated(), allocated);
             assert_eq!(paths.len(), data_tier.blockdevs().len());
 
             let size = data_tier.size();
 
             // Allocate enough to get into the newly added block devices
-            assert!(data_tier.alloc(&[last_request_amount]));
+            assert!(data_tier.alloc(&[last_request_amount.sectors()]));
             data_tier.invariant();
 
-            assert!(data_tier.allocated() >= request_amount + last_request_amount);
+            assert!(data_tier.allocated() >= request_amount + last_request_amount.sectors());
             assert_eq!(data_tier.size(), size);
 
             data_tier.destroy().unwrap();
@@ -463,11 +465,11 @@ mod tests {
             // A data_tier w/ some devices but nothing allocated
             let size = data_tier.size();
             assert_eq!(data_tier.allocated(), Sectors(0));
-            assert!(size != Sectors(0));
+            assert!(size != BlockDevMgrSize(Sectors(0)));
 
             let last_request_amount = size;
 
-            let request_amount = data_tier.block_mgr.avail_space() / 2usize;
+            let request_amount = data_tier.block_mgr.sizer().avail_space().sectors() / 2usize;
             assert!(request_amount != Sectors(0));
 
             assert!(data_tier.alloc(&[request_amount]));
@@ -483,17 +485,17 @@ mod tests {
             data_tier.invariant();
 
             // A data tier w/ additional blockdevs added
-            assert!(data_tier.size() > size);
+            assert!(data_tier.size().sectors() > size.sectors());
             assert_eq!(data_tier.allocated(), allocated);
             assert_eq!(paths.len(), data_tier.blockdevs().len());
 
             let size = data_tier.size();
 
             // Allocate enough to get into the newly added block devices
-            assert!(data_tier.alloc(&[last_request_amount]));
+            assert!(data_tier.alloc(&[last_request_amount.sectors()]));
             data_tier.invariant();
 
-            assert!(data_tier.allocated() >= request_amount + last_request_amount);
+            assert!(data_tier.allocated() >= request_amount + last_request_amount.sectors());
             assert_eq!(data_tier.size(), size);
 
             data_tier.destroy().unwrap();

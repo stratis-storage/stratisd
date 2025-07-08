@@ -237,7 +237,7 @@ impl StratPool {
             }
         };
 
-        let metadata_size = backstore.datatier_metadata_size();
+        let metadata_size = backstore.datatier_metadata_size().sectors();
         let mut pool = StratPool {
             backstore,
             thin_pool: thinpool,
@@ -300,7 +300,7 @@ impl StratPool {
         let mut needs_save = metadata.thinpool_dev.fs_limit.is_none()
             || metadata.thinpool_dev.feature_args.is_none();
 
-        let metadata_size = backstore.datatier_metadata_size();
+        let metadata_size = backstore.datatier_metadata_size().sectors();
         let mut pool = StratPool {
             backstore,
             thin_pool: thinpool,
@@ -1130,7 +1130,7 @@ impl Pool for StratPool {
     }
 
     fn total_physical_size(&self) -> Sectors {
-        self.backstore.datatier_size()
+        self.backstore.datatier_size().sectors()
     }
 
     fn total_allocated_size(&self) -> Sectors {
@@ -1395,7 +1395,7 @@ impl DumpState<'_> for StratPool {
     }
 
     fn dump(&mut self, _: Self::DumpInput) -> Self::State {
-        self.metadata_size = self.backstore.datatier_metadata_size();
+        self.metadata_size = self.backstore.datatier_metadata_size().sectors();
         StratPoolState {
             metadata_size: self.metadata_size.bytes(),
             out_of_alloc_space: self.thin_pool.out_of_alloc_space(),

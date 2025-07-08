@@ -1023,7 +1023,7 @@ impl Pool for StratPool {
     }
 
     fn total_physical_size(&self) -> Sectors {
-        self.backstore.datatier_size()
+        self.backstore.datatier_size().sectors()
     }
 
     fn total_allocated_size(&self) -> Sectors {

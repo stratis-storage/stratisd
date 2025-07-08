@@ -19,9 +19,13 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{
-                backstore::InternalBackstore, blockdev::v2::StratBlockDev,
-                blockdevmgr::BlockDevMgr, cache_tier::CacheTier, data_tier::DataTier,
-                devices::UnownedDevices, shared::BlockSizeSummary,
+                backstore::InternalBackstore,
+                blockdev::v2::StratBlockDev,
+                blockdevmgr::{BlockDevMgr, BlockDevMgrSize},
+                cache_tier::CacheTier,
+                data_tier::DataTier,
+                devices::UnownedDevices,
+                shared::BlockSizeSummary,
             },
             crypt::{handle::v2::CryptHandle, manual_wipe, DEFAULT_CRYPT_DATA_OFFSET_V2},
             dm::{get_dm, list_of_backstore_devices, remove_optional_devices, DEVICEMAPPER_PATH},
@@ -172,7 +176,7 @@ impl InternalBackstore for Backstore {
     }
 
     fn datatier_usable_size(&self) -> Sectors {
-        self.datatier_size() - self.datatier_metadata_size()
+        self.datatier_size().sectors() - self.datatier_metadata_size()
     }
 
     fn available_in_backstore(&self) -> Sectors {
@@ -841,7 +845,7 @@ impl Backstore {
     }
 
     /// The current size of all the blockdevs in the data tier.
-    pub fn datatier_size(&self) -> Sectors {
+    pub fn datatier_size(&self) -> BlockDevMgrSize {
         self.data_tier.size()
     }
 
@@ -950,7 +954,7 @@ impl Backstore {
 
     /// Metadata size on the data tier, including crypt metadata space.
     pub fn datatier_metadata_size(&self) -> Sectors {
-        self.datatier_crypt_meta_size() + self.data_tier.metadata_size()
+        self.datatier_crypt_meta_size() + self.data_tier.metadata_size().sectors()
     }
 
     /// Write the given data to the data tier's devices.

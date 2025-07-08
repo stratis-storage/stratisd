@@ -20,12 +20,12 @@ jobs:
       matrix:
         include:
           - task: make -f Makefile test-valgrind
-            toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: >-
               TANG_URL=localhost
               make -f Makefile test-clevis-loop-should-fail-valgrind
-            toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-24.04
     container:
@@ -60,7 +60,7 @@ jobs:
       matrix:
         include:
           - task: RUST_LOG=stratisd=debug make -f Makefile test-loop-valgrind
-            toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-24.04
     container:
@@ -104,7 +104,7 @@ jobs:
       matrix:
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT ENVIRONMENT
-          - toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          - toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           # MANDATORY CHECKS USING LOWEST SUPPORTED ENVIRONMENT PROXY
           - toolchain: 1.77.0  # LOWEST SUPPORTED RUST TOOLCHAIN
     runs-on: ubuntu-24.04
@@ -205,7 +205,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd

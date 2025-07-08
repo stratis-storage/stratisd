@@ -15,7 +15,7 @@ jobs:
       matrix:
         include:
           - task: cargo package
-            toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-24.04
     container:
@@ -67,7 +67,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-audit
@@ -147,7 +147,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-audit
@@ -185,7 +185,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Check out ci repo
         uses: actions/checkout@v4
         with:
@@ -212,7 +212,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          - toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

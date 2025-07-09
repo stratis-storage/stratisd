@@ -26,7 +26,7 @@ pub async fn pool_start(
     prompt: Option<RawFd>,
 ) -> StratisResult<bool> {
     Ok(engine
-        .start_pool(id, unlock_method, prompt)
+        .start_pool(id, unlock_method, prompt, false)
         .await?
         .is_changed())
 }

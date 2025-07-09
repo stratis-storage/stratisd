@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::{Message, Path};
+use dbus::{arg::OwnedFd, Message};
 use dbus_tree::{MTSync, MethodInfo, MethodResult};
 use futures::executor::block_on;
 
@@ -14,7 +14,7 @@ use crate::{
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
-    engine::{Name, PoolIdentifier, PoolUuid, StartAction, TokenUnlockMethod, UnlockMethod},
+    engine::{Name, PoolIdentifier, PoolUuid, StartAction, TokenUnlockMethod},
     stratis::StratisError,
 };
 
@@ -25,8 +25,12 @@ pub fn start_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let dbus_context = m.tree.get_data();
     let default_return: (
         bool,
-        (Path<'static>, Vec<Path<'static>>, Vec<Path<'static>>),
-    ) = (false, (Path::default(), Vec::new(), Vec::new()));
+        (
+            dbus::Path<'static>,
+            Vec<dbus::Path<'static>>,
+            Vec<dbus::Path<'static>>,
+        ),
+    ) = (false, (dbus::Path::default(), Vec::new(), Vec::new()));
     let return_message = message.method_return();
 
     let id_str: &str = get_next_arg(&mut iter, 0)?;
@@ -49,29 +53,18 @@ pub fn start_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
             }
         }
     };
-    let unlock_method = {
-        let unlock_method_tup: (bool, &str) = get_next_arg(&mut iter, 2)?;
-        match tuple_to_option(unlock_method_tup) {
-            Some(unlock_method_str) => {
-                match UnlockMethod::try_from(unlock_method_str).map_err(|_| {
-                    StratisError::Msg(format!("{unlock_method_str} is an invalid unlock method"))
-                }) {
-                    Ok(um) => Some(um),
-                    Err(e) => {
-                        let (rc, rs) = engine_to_dbus_err_tuple(&e);
-                        return Ok(vec![return_message.append3(default_return, rc, rs)]);
-                    }
-                }
-            }
-            None => None,
-        }
-    };
+    let unlock_method_tup: (bool, (bool, u32)) = get_next_arg(&mut iter, 2)?;
+    let unlock_method =
+        TokenUnlockMethod::from_options(tuple_to_option(unlock_method_tup).map(tuple_to_option));
+    let fd_opt: (bool, OwnedFd) = get_next_arg(&mut iter, 3)?;
+    let fd = tuple_to_option(fd_opt);
+    let remove_cache: bool = get_next_arg(&mut iter, 4)?;
 
     let ret = match handle_action!(block_on(dbus_context.engine.start_pool(
         id.clone(),
-        TokenUnlockMethod::from(unlock_method),
-        None,
-        false,
+        unlock_method,
+        fd.map(|f| f.into_fd()),
+        remove_cache,
     ))) {
         Ok(StartAction::Started(_)) => {
             let guard = match block_on(dbus_context.engine.get_pool(id.clone())) {

@@ -686,6 +686,7 @@ impl Engine for StratEngine {
                     PoolIdentifier::Uuid(pool_uuid),
                     TokenUnlockMethod::from(Some(unlock_method)),
                     None,
+                    false,
                 )?;
                 pools.insert(name, pool_uuid, pool);
                 StratisResult::Ok(unlocked_uuids)
@@ -791,6 +792,7 @@ impl Engine for StratEngine {
         id: PoolIdentifier<PoolUuid>,
         token_slot: TokenUnlockMethod,
         passphrase_fd: Option<RawFd>,
+        remove_cache: bool,
     ) -> StratisResult<StartAction<PoolUuid>> {
         if let Some(lock) = self.pools.read(id.clone()).await {
             let (_, pool_uuid, pool) = lock.as_tuple();
@@ -810,7 +812,7 @@ impl Engine for StratEngine {
             let mut liminal = self.liminal_devices.write().await;
             let pool_uuid = spawn_blocking!({
                 let (name, pool_uuid, pool, _) =
-                    liminal.start_pool(&pools, id, token_slot, passphrase_fd)?;
+                    liminal.start_pool(&pools, id, token_slot, passphrase_fd, remove_cache)?;
                 pools.insert(name, pool_uuid, pool);
                 StratisResult::Ok(pool_uuid)
             })??;
@@ -1127,7 +1129,8 @@ mod test {
 
         test_async!(engine.stop_pool(PoolIdentifier::Uuid(uuid), true)).unwrap();
 
-        test_async!(engine.start_pool(PoolIdentifier::Uuid(uuid), unlock_method, None)).unwrap();
+        test_async!(engine.start_pool(PoolIdentifier::Uuid(uuid), unlock_method, None, false))
+            .unwrap();
         test_async!(engine.destroy_pool(uuid)).unwrap();
         cmd::udev_settle().unwrap();
         engine.teardown().unwrap();
@@ -1559,7 +1562,8 @@ mod test {
         assert!(test_async!(engine.start_pool(
             PoolIdentifier::Uuid(uuid),
             TokenUnlockMethod::None,
-            None
+            None,
+            false
         ))
         .unwrap()
         .is_changed());

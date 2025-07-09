@@ -4,7 +4,8 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    path::Path,
+    fs::OpenOptions,
+    path::{Path, PathBuf},
     vec::Vec,
 };
 
@@ -29,7 +30,7 @@ use crate::{
                 ProcessedPathInfos, UnownedDevices,
             },
             liminal::DeviceSet,
-            metadata::{MDADataSize, BDA},
+            metadata::{disown_device, MDADataSize, BDA},
             serde_structs::{FlexDevsSave, PoolFeatures, PoolSave, Recordable},
             shared::tiers_to_bdas,
             thinpool::{StratFilesystem, ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
@@ -227,12 +228,14 @@ impl StratPool {
     ///   * key_description.is_none() -> no StratBlockDev in datadevs has a
     ///   key description.
     ///   * no StratBlockDev in cachdevs has a key description
+    #[allow(clippy::too_many_arguments)]
     pub fn setup(
         uuid: PoolUuid,
         datadevs: Vec<StratBlockDev>,
         cachedevs: Vec<StratBlockDev>,
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
+        paths_to_wipe: Option<Vec<PathBuf>>,
         token_slot: TokenUnlockMethod,
         passphrase: Option<SizedKeyMemory>,
     ) -> BDARecordResult<(Name, StratPool)> {
@@ -264,8 +267,9 @@ impl StratPool {
             Err(e) => return Err((e, backstore.into_bdas())),
         };
 
+        let mut needs_save = paths_to_wipe.is_some();
         // TODO: Remove in stratisd 4.0
-        let mut needs_save = metadata.thinpool_dev.fs_limit.is_none()
+        needs_save |= metadata.thinpool_dev.fs_limit.is_none()
             || metadata.thinpool_dev.feature_args.is_none();
 
         let metadata_size = backstore.datatier_metadata_size();
@@ -288,6 +292,18 @@ impl StratPool {
                 } else {
                     return Err((err, pool.backstore.into_bdas()));
                 }
+            }
+        }
+
+        for path in paths_to_wipe.unwrap_or_default() {
+            info!("Wiping cache device {}", path.display());
+            if let Err(e) = OpenOptions::new()
+                .write(true)
+                .open(&path)
+                .map_err(StratisError::from)
+                .and_then(|mut f| disown_device(&mut f))
+            {
+                warn!("Failed to wipe cache device {}: {e}", path.display())
             }
         }
 
@@ -2022,6 +2038,51 @@ mod tests {
         real::test_with_spec(
             &real::DeviceLimits::Exactly(3, None, None),
             clevis_test_multiple_token_slots,
+        );
+    }
+
+    /// Test creating a pool, adding a cache and then starting it without the cache.
+    /// Check that the pool starts with a cache and ends without one.
+    fn test_remove_cache(paths: &[&Path]) {
+        let (send, _recv) = unbounded_channel();
+        let engine = StratEngine::initialize(send).unwrap();
+        let name = "pool_name";
+        let uuid =
+            test_async!(engine.create_pool(name, &[paths[0]], None, IntegritySpec::default()))
+                .unwrap()
+                .changed()
+                .unwrap();
+        {
+            let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
+            pool.init_cache(uuid, name, &[paths[1]], true).unwrap();
+            assert!(pool.has_cache());
+        }
+
+        test_async!(engine.stop_pool(PoolIdentifier::Uuid(uuid), true)).unwrap();
+        test_async!(engine.start_pool(
+            PoolIdentifier::Uuid(uuid),
+            TokenUnlockMethod::None,
+            None,
+            true,
+        ))
+        .unwrap();
+        let pool = test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid))).unwrap();
+        assert!(!pool.has_cache());
+    }
+
+    #[test]
+    fn loop_test_remove_cache() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(2, None),
+            test_remove_cache,
+        );
+    }
+
+    #[test]
+    fn real_test_start_stop() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(2, None, None),
+            test_remove_cache,
         );
     }
 }

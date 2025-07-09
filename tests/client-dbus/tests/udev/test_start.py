@@ -91,6 +91,7 @@ class TestFailedStart(UdevTest):
                     "id_type": "name",
                     "unlock_method": (True, (False, 0)),
                     "key_fd": (False, 0),
+                    "remove_cache": False,
                 },
             )
             self.assertNotEqual(rc, 0)
@@ -113,6 +114,76 @@ class TestFailedStart(UdevTest):
                     "id_type": "name",
                     "unlock_method": (True, (False, 0)),
                     "key_fd": (False, 0),
+                    "remove_cache": False,
                 },
             )
             self.assertEqual(rc, 0)
+
+
+class TestRemoveCache(UdevTest):
+    """
+    Test creating a pool with a cache and then removing it on start.
+    """
+
+    def cache_removal(self, key_spec=None):
+        """
+        * Create pool
+        * Add cache
+        * Stop pool
+        * Start pool with flag
+        * Cache should be removed
+        * Readd the cache device that should have been wiped in the last step
+        """
+
+        device_tokens = self._lb_mgr.create_devices(3)
+        devnodes = self._lb_mgr.device_files(device_tokens)
+
+        with OptionalKeyServiceContextManager(key_spec=key_spec):
+            (_, (pool_object_path, _)) = create_pool("testpool", devnodes[:2])
+            (_, rc, _) = Pool.Methods.InitCache(
+                get_object(pool_object_path), {"devices": [devnodes[2]]}
+            )
+            self.assertEqual(rc, 0)
+
+            assert bool(Pool.Properties.HasCache.Get(get_object(pool_object_path)))
+
+            ((b, _), rc, _) = Manager.Methods.StopPool(
+                get_object(TOP_OBJECT),
+                {
+                    "id": "testpool",
+                    "id_type": "name",
+                },
+            )
+            self.assertEqual(b, True)
+            self.assertEqual(rc, 0)
+
+            ((b, (pool_object_path, _, _)), rc, _) = Manager.Methods.StartPool(
+                get_object(TOP_OBJECT),
+                {
+                    "id": "testpool",
+                    "id_type": "name",
+                    "unlock_method": (False, (False, 0)),
+                    "key_fd": (False, 0),
+                    "remove_cache": True,
+                },
+            )
+            self.assertEqual(rc, 0)
+
+            assert not bool(Pool.Properties.HasCache.Get(get_object(pool_object_path)))
+
+            (_, rc, _) = Pool.Methods.InitCache(
+                get_object(pool_object_path), {"devices": [devnodes[2]]}
+            )
+            self.assertEqual(rc, 0)
+
+    def test_unencrypted_cache_removal(self):
+        """
+        Test removing a cache from an unencrypted pool.
+        """
+        self.cache_removal()
+
+    def test_encrypted_cache_removal(self):
+        """
+        Test removing a cache from an encrypted pool.
+        """
+        self.cache_removal(key_spec=[("testkey", "testkey")])

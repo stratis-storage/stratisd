@@ -15,6 +15,7 @@ mod manager_3_4;
 mod manager_3_5;
 mod manager_3_6;
 mod manager_3_8;
+mod manager_3_9;
 pub mod prop_conv;
 mod report_3_0;
 mod shared;
@@ -172,7 +173,7 @@ pub fn get_base_tree<'a>(
                 .add_m(manager_3_0::list_keys_method(&f))
                 .add_m(manager_3_0::destroy_pool_method(&f))
                 .add_m(manager_3_0::engine_state_report_method(&f))
-                .add_m(manager_3_8::start_pool_method(&f))
+                .add_m(manager_3_9::start_pool_method(&f))
                 .add_m(manager_3_6::stop_pool_method(&f))
                 .add_m(manager_3_2::refresh_state_method(&f))
                 .add_p(manager_3_0::version_property(&f))

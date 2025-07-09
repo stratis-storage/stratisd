@@ -79,6 +79,7 @@ pub fn start_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         id.clone(),
         unlock_method,
         fd.map(|f| f.into_fd()),
+        false,
     ))) {
         Ok(StartAction::Started(_)) => {
             let guard = match block_on(dbus_context.engine.get_pool(id.clone())) {

@@ -25,9 +25,8 @@ use crate::{
                 shared::{BlkDevSegment, Segment},
             },
             crypt::handle::v1::CryptHandle,
-            metadata::{MDADataSize, BDA},
+            metadata::MDADataSize,
             serde_structs::{BaseBlockDevSave, Recordable},
-            shared::bds_to_bdas,
         },
         types::{
             DevUuid, InputEncryptionInfo, Name, PoolEncryptionInfo, PoolUuid,
@@ -286,11 +285,6 @@ where
         }
     }
 
-    /// Convert the BlockDevMgr into a collection of BDAs.
-    pub fn into_bdas(self) -> HashMap<DevUuid, BDA> {
-        bds_to_bdas(self.block_devs)
-    }
-
     /// Get a hashmap that maps UUIDs to Devices.
     pub fn uuid_to_devno(&self) -> HashMap<DevUuid, Device> {
         self.block_devs
@@ -301,11 +295,6 @@ where
 
     pub fn destroy_all(&mut self) -> StratisResult<()> {
         wipe_blockdevs(&mut self.block_devs)
-    }
-
-    /// Drain the BlockDevMgr block devices into a collection of block devices.
-    pub fn drain_bds(&mut self) -> Vec<B> {
-        self.block_devs.drain(..).collect::<Vec<_>>()
     }
 
     /// Get references to managed blockdevs.

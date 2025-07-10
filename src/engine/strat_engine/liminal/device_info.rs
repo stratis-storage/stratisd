@@ -111,57 +111,6 @@ pub fn stratis_infos_ref(
         .collect::<HashMap<_, _>>()
 }
 
-/// Split a `Vec<LStratisInfo>` into a `Vec` of BDAs and a `Vec` of the remaining
-/// information contained by `Vec<LStratisInfo>`.
-pub fn split_stratis_infos(
-    infos: HashMap<DevUuid, Box<LStratisInfo>>,
-) -> (
-    HashMap<DevUuid, Box<LStratisDevInfo>>,
-    HashMap<DevUuid, BDA>,
-) {
-    infos.into_iter().fold(
-        (HashMap::new(), HashMap::new()),
-        |(mut new_infos, mut bdas), (dev_uuid, info)| {
-            new_infos.insert(
-                dev_uuid,
-                Box::new(LStratisDevInfo {
-                    dev_info: info.dev_info,
-                    luks: info.luks,
-                }),
-            );
-            bdas.insert(dev_uuid, info.bda);
-            (new_infos, bdas)
-        },
-    )
-}
-
-/// Merge BDAs with the rest of the device information.
-///
-/// Precondition: infos.keys() == bdas.keys()
-pub fn reconstruct_stratis_infos(
-    mut infos: HashMap<DevUuid, Box<LStratisDevInfo>>,
-    mut bdas: HashMap<DevUuid, BDA>,
-) -> DeviceSet {
-    let uuids = infos.keys().copied().collect::<HashSet<_>>();
-    assert_eq!(uuids, bdas.keys().copied().collect::<HashSet<_>>());
-
-    uuids
-        .into_iter()
-        .map(|uuid| {
-            let info = infos.remove(&uuid).expect("infos.keys() == bdas.keys()");
-            let bda = bdas.remove(&uuid).expect("infos.keys() == bdas.keys()");
-            (
-                uuid,
-                LInfo::Stratis(Box::new(LStratisInfo {
-                    dev_info: info.dev_info,
-                    luks: info.luks,
-                    bda,
-                })),
-            )
-        })
-        .collect::<DeviceSet>()
-}
-
 /// Info for a Stratis device.
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct LStratisDevInfo {
@@ -519,8 +468,8 @@ impl IntoIterator for DeviceSet {
     }
 }
 
-impl From<Vec<v1::StratBlockDev>> for DeviceSet {
-    fn from(vec: Vec<v1::StratBlockDev>) -> Self {
+impl From<Vec<&v1::StratBlockDev>> for DeviceSet {
+    fn from(vec: Vec<&v1::StratBlockDev>) -> Self {
         vec.into_iter()
             .fold(DeviceSet::default(), |mut device_set, bd| {
                 for info in Vec::<DeviceInfo>::from(bd) {
@@ -531,8 +480,8 @@ impl From<Vec<v1::StratBlockDev>> for DeviceSet {
     }
 }
 
-impl From<Vec<v2::StratBlockDev>> for DeviceSet {
-    fn from(vec: Vec<v2::StratBlockDev>) -> Self {
+impl From<Vec<&v2::StratBlockDev>> for DeviceSet {
+    fn from(vec: Vec<&v2::StratBlockDev>) -> Self {
         vec.into_iter()
             .fold(DeviceSet::default(), |mut device_set, bd| {
                 for info in Vec::<DeviceInfo>::from(bd) {

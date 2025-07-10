@@ -25,7 +25,6 @@ use crate::{
             serde_structs::{
                 BaseBlockDevSave, BaseDevSave, BlockDevSave, DataTierSave, Recordable,
             },
-            types::BDARecordResult,
         },
         types::{BlockDevTier, DevUuid, Name, PoolUuid, ValidatedIntegritySpec},
     },
@@ -207,7 +206,7 @@ where
     pub fn setup(
         block_mgr: BlockDevMgr<B>,
         data_tier_save: &DataTierSave,
-    ) -> BDARecordResult<DataTier<B>> {
+    ) -> StratisResult<DataTier<B>> {
         let uuid_to_devno = block_mgr.uuid_to_devno();
         let mapper = |ld: &BaseDevSave| -> StratisResult<BlkDevSegment> {
             metadata_to_segment(&uuid_to_devno, ld)
@@ -218,7 +217,7 @@ where
             .collect::<StratisResult<Vec<_>>>()
         {
             Ok(s) => AllocatedAbove { inner: s },
-            Err(e) => return Err((e, block_mgr.into_bdas())),
+            Err(e) => return Err(e),
         };
 
         Ok(DataTier {

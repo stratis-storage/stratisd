@@ -24,11 +24,8 @@ use crate::{
             },
             crypt::handle::v1::CryptHandle,
             device::blkdev_size,
-            liminal::device_info::{LStratisDevInfo, LStratisInfo},
-            metadata::BDA,
+            liminal::device_info::LStratisInfo,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolFeatures, PoolSave},
-            shared::{bds_to_bdas, tiers_to_bdas},
-            types::{BDARecordResult, BDAResult},
         },
         types::{BlockDevTier, DevUuid, DevicePath, Name, TokenUnlockMethod},
     },
@@ -189,9 +186,8 @@ pub fn get_feature_set(
 /// infos and bdas are identical.
 pub fn get_blockdevs_legacy(
     backstore_save: &BackstoreSave,
-    infos: &HashMap<DevUuid, Box<LStratisDevInfo>>,
-    mut bdas: HashMap<DevUuid, BDA>,
-) -> BDARecordResult<(Vec<v1::StratBlockDev>, Vec<v1::StratBlockDev>)> {
+    infos: &HashMap<DevUuid, Box<LStratisInfo>>,
+) -> StratisResult<(Vec<v1::StratBlockDev>, Vec<v1::StratBlockDev>)> {
     let recorded_data_map: HashMap<DevUuid, (usize, &BaseBlockDevSave)> = backstore_save
         .data_tier
         .blockdev
@@ -232,11 +228,9 @@ pub fn get_blockdevs_legacy(
 
     let (mut datadevs, mut cachedevs): (Vec<v1::StratBlockDev>, Vec<v1::StratBlockDev>) =
         (vec![], vec![]);
-    let dev_uuids = infos.keys().collect::<HashSet<_>>();
-    for dev_uuid in dev_uuids {
+    for (_, info) in infos.iter() {
         match get_blockdev_legacy(
-            infos.get(dev_uuid).expect("bdas.keys() == infos.keys()"),
-            bdas.remove(dev_uuid).expect("bdas.keys() == infos.keys()"),
+            info,
             &recorded_data_map,
             &recorded_cache_map,
             &segment_table,
@@ -246,33 +240,25 @@ pub fn get_blockdevs_legacy(
                 BlockDevTier::Cache => &mut cachedevs,
             }
             .push(blockdev),
-            Err((e, bda)) => return Err((e, tiers_to_bdas(datadevs, cachedevs, Some(*bda)))),
+            Err(e) => return Err(e),
         }
     }
 
     let datadevs = match check_and_sort_devs(datadevs, &recorded_data_map) {
         Ok(dd) => dd,
-        Err((err, mut bdas)) => {
-            bdas.extend(bds_to_bdas(cachedevs));
-            return Err((
-                StratisError::Msg(format!(
-                    "Data devices did not appear consistent with metadata: {err}"
-                )),
-                bdas,
-            ));
+        Err(err) => {
+            return Err(StratisError::Msg(format!(
+                "Data devices did not appear consistent with metadata: {err}"
+            )));
         }
     };
 
     let cachedevs = match check_and_sort_devs(cachedevs, &recorded_cache_map) {
         Ok(cd) => cd,
-        Err((err, mut bdas)) => {
-            bdas.extend(bds_to_bdas(datadevs));
-            return Err((
-                StratisError::Msg(format!(
-                    "Cache devices did not appear consistent with metadata: {err}"
-                )),
-                bdas,
-            ));
+        Err(err) => {
+            return Err(StratisError::Msg(format!(
+                "Cache devices did not appear consistent with metadata: {err}"
+            )));
         }
     };
 
@@ -290,9 +276,8 @@ pub fn get_blockdevs_legacy(
 /// infos and bdas are identical.
 pub fn get_blockdevs(
     backstore_save: &BackstoreSave,
-    infos: &HashMap<DevUuid, Box<LStratisDevInfo>>,
-    mut bdas: HashMap<DevUuid, BDA>,
-) -> BDARecordResult<(Vec<v2::StratBlockDev>, Vec<v2::StratBlockDev>)> {
+    infos: &HashMap<DevUuid, Box<LStratisInfo>>,
+) -> StratisResult<(Vec<v2::StratBlockDev>, Vec<v2::StratBlockDev>)> {
     let recorded_data_map: HashMap<DevUuid, (usize, &BaseBlockDevSave)> = backstore_save
         .data_tier
         .blockdev
@@ -333,11 +318,9 @@ pub fn get_blockdevs(
 
     let (mut datadevs, mut cachedevs): (Vec<v2::StratBlockDev>, Vec<v2::StratBlockDev>) =
         (vec![], vec![]);
-    let dev_uuids = infos.keys().collect::<HashSet<_>>();
-    for dev_uuid in dev_uuids {
+    for (_, info) in infos.iter() {
         match get_blockdev(
-            infos.get(dev_uuid).expect("bdas.keys() == infos.keys()"),
-            bdas.remove(dev_uuid).expect("bdas.keys() == infos.keys()"),
+            info,
             &recorded_data_map,
             &recorded_cache_map,
             &segment_table,
@@ -347,33 +330,25 @@ pub fn get_blockdevs(
                 BlockDevTier::Cache => &mut cachedevs,
             }
             .push(blockdev),
-            Err((e, bda)) => return Err((e, tiers_to_bdas(datadevs, cachedevs, Some(*bda)))),
+            Err(e) => return Err(e),
         }
     }
 
     let datadevs = match check_and_sort_devs(datadevs, &recorded_data_map) {
         Ok(dd) => dd,
-        Err((err, mut bdas)) => {
-            bdas.extend(bds_to_bdas(cachedevs));
-            return Err((
-                StratisError::Msg(format!(
-                    "Data devices did not appear consistent with metadata: {err}"
-                )),
-                bdas,
-            ));
+        Err(err) => {
+            return Err(StratisError::Msg(format!(
+                "Data devices did not appear consistent with metadata: {err}"
+            )));
         }
     };
 
     let cachedevs = match check_and_sort_devs(cachedevs, &recorded_cache_map) {
         Ok(cd) => cd,
-        Err((err, mut bdas)) => {
-            bdas.extend(bds_to_bdas(datadevs));
-            return Err((
-                StratisError::Msg(format!(
-                    "Cache devices did not appear consistent with metadata: {err}"
-                )),
-                bdas,
-            ));
+        Err(err) => {
+            return Err(StratisError::Msg(format!(
+                "Cache devices did not appear consistent with metadata: {err}"
+            )));
         }
     };
 
@@ -386,21 +361,18 @@ pub fn get_blockdevs(
 // or it is impossible to set up the device because the recorded
 // allocation information is impossible.
 fn get_blockdev_legacy(
-    info: &LStratisDevInfo,
-    bda: BDA,
+    info: &LStratisInfo,
     data_map: &HashMap<DevUuid, (usize, &BaseBlockDevSave)>,
     cache_map: &HashMap<DevUuid, (usize, &BaseBlockDevSave)>,
     segment_table: &HashMap<DevUuid, Vec<(Sectors, Sectors)>>,
-) -> BDAResult<(BlockDevTier, v1::StratBlockDev)> {
-    let actual_size = match OpenOptions::new()
+) -> StratisResult<(BlockDevTier, v1::StratBlockDev)> {
+    let bda = info.bda.clone();
+
+    let actual_size = OpenOptions::new()
         .read(true)
         .open(&info.dev_info.devnode)
         .map_err(StratisError::from)
-        .and_then(|f| blkdev_size(&f))
-    {
-        Ok(actual_size) => actual_size,
-        Err(err) => return Err((err, Box::new(bda))),
-    };
+        .and_then(|f| blkdev_size(&f))?;
 
     // Return an error if apparent size of Stratis block device appears to
     // have decreased since metadata was recorded or if size of block
@@ -415,7 +387,7 @@ fn get_blockdev_legacy(
             recorded_size,
             actual_size_sectors
         );
-        return Err((StratisError::Msg(err_msg), Box::new(bda)));
+        return Err(StratisError::Msg(err_msg));
     }
 
     let dev_uuid = bda.dev_uuid();
@@ -437,7 +409,7 @@ fn get_blockdev_legacy(
                 bda.identifiers(),
                 info.dev_info
             );
-            return Err((StratisError::Msg(err_msg), Box::new(bda)));
+            return Err(StratisError::Msg(err_msg));
         }
     };
 
@@ -451,16 +423,10 @@ fn get_blockdev_legacy(
         Some(luks) => &luks.dev_info.devnode,
         None => &info.dev_info.devnode,
     };
-    let handle = match CryptHandle::setup(physical_path, TokenUnlockMethod::None, None) {
-        Ok(h) => h,
-        Err(e) => return Err((e, Box::new(bda))),
-    };
+    let handle = CryptHandle::setup(physical_path, TokenUnlockMethod::None, None)?;
     let underlying_device = match handle {
         Some(handle) => UnderlyingDevice::Encrypted(handle),
-        None => UnderlyingDevice::Unencrypted(match DevicePath::new(physical_path) {
-            Ok(d) => d,
-            Err(e) => return Err((e, Box::new(bda))),
-        }),
+        None => UnderlyingDevice::Unencrypted(DevicePath::new(physical_path)?),
     };
     Ok((
         tier,
@@ -481,21 +447,17 @@ fn get_blockdev_legacy(
 // or it is impossible to set up the device because the recorded
 // allocation information is impossible.
 fn get_blockdev(
-    info: &LStratisDevInfo,
-    bda: BDA,
+    info: &LStratisInfo,
     data_map: &HashMap<DevUuid, (usize, &BaseBlockDevSave)>,
     cache_map: &HashMap<DevUuid, (usize, &BaseBlockDevSave)>,
     segment_table: &HashMap<DevUuid, Vec<(Sectors, Sectors)>>,
-) -> BDAResult<(BlockDevTier, v2::StratBlockDev)> {
-    let actual_size = match OpenOptions::new()
+) -> StratisResult<(BlockDevTier, v2::StratBlockDev)> {
+    let bda = info.bda.clone();
+    let actual_size = OpenOptions::new()
         .read(true)
         .open(&info.dev_info.devnode)
         .map_err(StratisError::from)
-        .and_then(|f| blkdev_size(&f))
-    {
-        Ok(actual_size) => actual_size,
-        Err(err) => return Err((err, Box::new(bda))),
-    };
+        .and_then(|f| blkdev_size(&f))?;
 
     // Return an error if apparent size of Stratis block device appears to
     // have decreased since metadata was recorded or if size of block
@@ -510,7 +472,7 @@ fn get_blockdev(
             recorded_size,
             actual_size_sectors
         );
-        return Err((StratisError::Msg(err_msg), Box::new(bda)));
+        return Err(StratisError::Msg(err_msg));
     }
 
     let dev_uuid = bda.dev_uuid();
@@ -532,14 +494,11 @@ fn get_blockdev(
                 bda.identifiers(),
                 info.dev_info
             );
-            return Err((StratisError::Msg(err_msg), Box::new(bda)));
+            return Err(StratisError::Msg(err_msg));
         }
     };
 
-    let devnode = match DevicePath::new(&info.dev_info.devnode) {
-        Ok(d) => d,
-        Err(e) => return Err((e, Box::new(bda))),
-    };
+    let devnode = DevicePath::new(&info.dev_info.devnode)?;
 
     // This should always succeed since the actual size is at
     // least the recorded size, so all segments should be
@@ -570,7 +529,7 @@ fn get_blockdev(
 fn check_and_sort_devs<B>(
     mut devs: Vec<B>,
     dev_map: &HashMap<DevUuid, (usize, &BaseBlockDevSave)>,
-) -> BDARecordResult<Vec<B>>
+) -> StratisResult<Vec<B>>
 where
     B: InternalBlockDev,
 {
@@ -590,16 +549,13 @@ where
                 "The following list of Stratis UUIDs were each claimed by more than one Stratis device: {}",
                 duplicate_uuids.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(", ")
             );
-        return Err((StratisError::Msg(err_msg), bds_to_bdas(devs)));
+        return Err(StratisError::Msg(err_msg));
     }
 
     if metadata_version.len() > 1 {
-        return Err((
-            StratisError::Msg(format!(
-                "Found mismatching metadata versions across block devices: {metadata_version:?}",
-            )),
-            bds_to_bdas(devs),
-        ));
+        return Err(StratisError::Msg(format!(
+            "Found mismatching metadata versions across block devices: {metadata_version:?}",
+        )));
     }
 
     let recorded_uuids: HashSet<_> = dev_map.keys().cloned().collect();
@@ -609,7 +565,7 @@ where
                 uuids.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(", "),
                 recorded_uuids.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(", "),
             );
-        return Err((StratisError::Msg(err_msg), bds_to_bdas(devs)));
+        return Err(StratisError::Msg(err_msg));
     }
 
     // Sort the devices according to their original location in the

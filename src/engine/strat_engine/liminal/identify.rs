@@ -172,8 +172,8 @@ impl DeviceInfo {
     }
 }
 
-impl From<v1::StratBlockDev> for Vec<DeviceInfo> {
-    fn from(bd: v1::StratBlockDev) -> Self {
+impl From<&v1::StratBlockDev> for Vec<DeviceInfo> {
+    fn from(bd: &v1::StratBlockDev) -> Self {
         let mut device_infos = Vec::new();
         match (bd.encryption_info(), bd.pool_name(), bd.luks_device()) {
             (Some(ei), Some(pname), Some(dev)) => {
@@ -196,7 +196,7 @@ impl From<v1::StratBlockDev> for Vec<DeviceInfo> {
                                 device_number: *bd.device(),
                                 devnode: bd.metadata_path().to_owned(),
                             },
-                            bda: bd.into_bda(),
+                            bda: bd.bda().clone(),
                         }));
                     }
                 }
@@ -206,7 +206,7 @@ impl From<v1::StratBlockDev> for Vec<DeviceInfo> {
                     device_number: *bd.device(),
                     devnode: bd.physical_path().to_owned(),
                 },
-                bda: bd.into_bda(),
+                bda: bd.bda().clone(),
             })),
             (_, _, _) => unreachable!("If bd.is_encrypted(), all are Some(_)"),
         }
@@ -214,14 +214,14 @@ impl From<v1::StratBlockDev> for Vec<DeviceInfo> {
     }
 }
 
-impl From<v2::StratBlockDev> for Vec<DeviceInfo> {
-    fn from(bd: v2::StratBlockDev) -> Self {
+impl From<&v2::StratBlockDev> for Vec<DeviceInfo> {
+    fn from(bd: &v2::StratBlockDev) -> Self {
         vec![DeviceInfo::Stratis(StratisInfo {
             dev_info: StratisDevInfo {
                 device_number: *bd.device(),
                 devnode: bd.physical_path().to_owned(),
             },
-            bda: bd.into_bda(),
+            bda: bd.bda().clone(),
         })]
     }
 }

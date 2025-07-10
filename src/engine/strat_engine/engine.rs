@@ -606,8 +606,18 @@ impl Engine for StratEngine {
             // cached data structures alone could result in phantom devices that have already
             // been destroyed but are still recorded in the stopped pool.
             let device_set = match pool {
-                AnyPool::V1(ref mut p) => DeviceSet::from(p.drain_bds()),
-                AnyPool::V2(ref mut p) => DeviceSet::from(p.drain_bds()),
+                AnyPool::V1(ref mut p) => DeviceSet::from(
+                    p.blockdevs()
+                        .into_iter()
+                        .map(|(_, _, bd)| bd)
+                        .collect::<Vec<_>>(),
+                ),
+                AnyPool::V2(ref mut p) => DeviceSet::from(
+                    p.blockdevs()
+                        .into_iter()
+                        .map(|(_, _, bd)| bd)
+                        .collect::<Vec<_>>(),
+                ),
             };
             self.liminal_devices
                 .write()

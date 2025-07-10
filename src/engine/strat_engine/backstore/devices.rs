@@ -588,7 +588,7 @@ pub fn initialize_devices_legacy(
 
         bda.initialize(&mut f)?;
 
-        v1::StratBlockDev::new(devno, bda, &[], None, hw_id, underlying_device).map_err(|(e, _)| e)
+        v1::StratBlockDev::new(devno, bda, &[], None, hw_id, underlying_device)
     }
 
     /// Clean up an encrypted device after initialization failure.
@@ -836,7 +836,7 @@ pub fn initialize_devices(
 
         bda.initialize(&mut f)?;
 
-        v2::StratBlockDev::new(devno, bda, &[], &[], None, hw_id, devnode).map_err(|(e, _)| e)
+        v2::StratBlockDev::new(devno, bda, &[], &[], None, hw_id, devnode)
     }
 
     /// Clean up an unencrypted device after initialization failure.

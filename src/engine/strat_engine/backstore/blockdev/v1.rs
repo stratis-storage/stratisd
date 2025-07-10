@@ -32,7 +32,6 @@ use crate::{
                 StaticHeader, BDA,
             },
             serde_structs::{BaseBlockDevSave, Recordable},
-            types::BDAResult,
         },
         types::{
             Compare, DevUuid, DevicePath, Diff, EncryptionInfo, KeyDescription, Name, PoolUuid,
@@ -120,37 +119,26 @@ impl StratBlockDev {
         user_info: Option<String>,
         hardware_info: Option<String>,
         underlying_device: UnderlyingDevice,
-    ) -> BDAResult<StratBlockDev> {
+    ) -> StratisResult<StratBlockDev> {
         let mut segments = vec![(Sectors(0), bda.extended_size().sectors())];
         segments.extend(other_segments);
 
-        let allocator = match RangeAllocator::new(bda.dev_size(), &segments) {
-            Ok(a) => a,
-            Err(e) => return Err((e, Box::new(bda))),
-        };
+        let allocator = RangeAllocator::new(bda.dev_size(), &segments)?;
 
-        let base_blksizes = match OpenOptions::new()
+        let base_blksizes = OpenOptions::new()
             .read(true)
             .open(underlying_device.physical_path())
             .map_err(StratisError::from)
-            .and_then(|f| BlockSizes::read(&f))
-        {
-            Ok(blksizes) => blksizes,
-            Err(e) => return Err((e, Box::new(bda))),
-        };
+            .and_then(|f| BlockSizes::read(&f))?;
 
         let blksizes = match underlying_device {
             UnderlyingDevice::Encrypted(_) => {
                 let metadata_path = underlying_device.metadata_path();
-                let crypt_blksizes = match OpenOptions::new()
+                let crypt_blksizes = OpenOptions::new()
                     .read(true)
                     .open(metadata_path)
                     .map_err(StratisError::from)
-                    .and_then(|f| BlockSizes::read(&f))
-                {
-                    Ok(blksizes) => blksizes,
-                    Err(e) => return Err((e, Box::new(bda))),
-                };
+                    .and_then(|f| BlockSizes::read(&f))?;
 
                 StratSectorSizes {
                     base: base_blksizes,
@@ -422,6 +410,10 @@ impl StratBlockDev {
 }
 
 impl InternalBlockDev for StratBlockDev {
+    fn bda(&self) -> &BDA {
+        &self.bda
+    }
+
     fn uuid(&self) -> DevUuid {
         self.bda.dev_uuid()
     }
@@ -533,10 +525,6 @@ impl InternalBlockDev for StratBlockDev {
             )?;
         }
         Ok(())
-    }
-
-    fn into_bda(self) -> BDA {
-        self.bda
     }
 }
 

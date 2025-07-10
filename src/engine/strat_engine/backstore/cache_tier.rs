@@ -21,7 +21,6 @@ use crate::{
             serde_structs::{
                 BaseBlockDevSave, BaseDevSave, BlockDevSave, CacheTierSave, Recordable,
             },
-            types::BDARecordResult,
         },
         types::{BlockDevTier, DevUuid, Name, PoolUuid},
     },
@@ -214,13 +213,13 @@ where
     pub fn setup(
         block_mgr: BlockDevMgr<B>,
         cache_tier_save: &CacheTierSave,
-    ) -> BDARecordResult<CacheTier<B>> {
+    ) -> StratisResult<CacheTier<B>> {
         if block_mgr.avail_space() != Sectors(0) {
             let err_msg = format!(
                 "{} unallocated to device; probable metadata corruption",
                 block_mgr.avail_space()
             );
-            return Err((StratisError::Msg(err_msg), block_mgr.into_bdas()));
+            return Err(StratisError::Msg(err_msg));
         }
 
         let uuid_to_devno = block_mgr.uuid_to_devno();
@@ -234,7 +233,7 @@ where
             .collect::<StratisResult<Vec<_>>>()
         {
             Ok(ms) => AllocatedAbove { inner: ms },
-            Err(e) => return Err((e, block_mgr.into_bdas())),
+            Err(e) => return Err(e),
         };
 
         let cache_segments = match cache_tier_save.blockdev.allocs[0]
@@ -243,7 +242,7 @@ where
             .collect::<StratisResult<Vec<_>>>()
         {
             Ok(cs) => AllocatedAbove { inner: cs },
-            Err(e) => return Err((e, block_mgr.into_bdas())),
+            Err(e) => return Err(e),
         };
 
         Ok(CacheTier {

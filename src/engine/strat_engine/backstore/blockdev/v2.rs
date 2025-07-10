@@ -31,7 +31,6 @@ use crate::{
                 StaticHeader, BDA,
             },
             serde_structs::{BaseBlockDevSave, Recordable},
-            types::BDAResult,
         },
         types::{
             Compare, DevUuid, DevicePath, Diff, PoolUuid, StateDiff, StratBlockDevDiff,
@@ -112,25 +111,18 @@ impl StratBlockDev {
         user_info: Option<String>,
         hardware_info: Option<String>,
         devnode: DevicePath,
-    ) -> BDAResult<StratBlockDev> {
+    ) -> StratisResult<StratBlockDev> {
         let mut segments = vec![(Sectors(0), bda.extended_size().sectors())];
         segments.extend(other_segments);
         segments.extend(integrity_meta_allocs);
 
-        let allocator = match RangeAllocator::new(bda.dev_size(), &segments) {
-            Ok(a) => a,
-            Err(e) => return Err((e, Box::new(bda))),
-        };
+        let allocator = RangeAllocator::new(bda.dev_size(), &segments)?;
 
-        let base_blksizes = match OpenOptions::new()
+        let base_blksizes = OpenOptions::new()
             .read(true)
             .open(&*devnode)
             .map_err(StratisError::from)
-            .and_then(|f| BlockSizes::read(&f))
-        {
-            Ok(blksizes) => blksizes,
-            Err(e) => return Err((e, Box::new(bda))),
-        };
+            .and_then(|f| BlockSizes::read(&f))?;
 
         let blksizes = StratSectorSizes {
             base: base_blksizes,
@@ -273,6 +265,10 @@ impl StratBlockDev {
 }
 
 impl InternalBlockDev for StratBlockDev {
+    fn bda(&self) -> &BDA {
+        &self.bda
+    }
+
     fn uuid(&self) -> DevUuid {
         self.bda.dev_uuid()
     }
@@ -364,10 +360,6 @@ impl InternalBlockDev for StratBlockDev {
     fn disown(&mut self) -> StratisResult<()> {
         disown_device(&mut OpenOptions::new().write(true).open(self.devnode())?)?;
         Ok(())
-    }
-
-    fn into_bda(self) -> BDA {
-        self.bda
     }
 }
 

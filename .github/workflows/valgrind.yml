@@ -32,7 +32,6 @@ jobs:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev
     steps:
-      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -41,6 +40,7 @@ jobs:
           cryptsetup-devel
           dbus-devel
           device-mapper-persistent-data
+          git
           jq
           libblkid-devel
           make
@@ -51,6 +51,7 @@ jobs:
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
+      - uses: actions/checkout@v4
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -67,7 +68,6 @@ jobs:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev --ipc=host
     steps:
-      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -77,6 +77,7 @@ jobs:
           curl
           device-mapper-persistent-data
           dbus-devel
+          git
           glibc-static
           jq
           libblkid-devel
@@ -90,6 +91,7 @@ jobs:
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
+      - uses: actions/checkout@v4
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd
@@ -109,7 +111,6 @@ jobs:
           - toolchain: 1.77.0  # LOWEST SUPPORTED RUST TOOLCHAIN
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
       - name: Install dependencies for Ubuntu
         run: sudo apt-get -q update
       - name: Install dependencies for Ubuntu
@@ -119,6 +120,7 @@ jobs:
           asciidoc
           clang
           curl
+          git
           libblkid-dev
           libcryptsetup-dev
           libdbus-1-dev
@@ -143,6 +145,7 @@ jobs:
         with:
           components: cargo
           toolchain: ${{ matrix.toolchain }}
+      - uses: actions/checkout@v4
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd
@@ -175,7 +178,6 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
         options: --privileged -p 80:80
     steps:
-      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -188,6 +190,7 @@ jobs:
           curl
           dbus-devel
           device-mapper-persistent-data
+          git
           glibc-static
           libblkid-devel
           make
@@ -206,6 +209,7 @@ jobs:
         with:
           components: cargo
           toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+      - uses: actions/checkout@v4
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd

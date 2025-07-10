@@ -80,7 +80,6 @@ jobs:
       image: ubuntu:noble
       options: --privileged -v /dev:/dev
     steps:
-      - uses: actions/checkout@v4
       - name: Install dependencies for Ubuntu
         run: apt-get -q update
       - name: Install dependencies for Ubuntu
@@ -89,6 +88,7 @@ jobs:
           apt-get install -y
           clang
           curl
+          git
           libblkid-dev
           libcryptsetup-dev
           libdbus-1-dev
@@ -102,6 +102,9 @@ jobs:
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
+      - uses: actions/checkout@v4
+      - name: Overwrite stratisd dependencies as necessary
+        uses: ./.github/actions/stratisd-modify-action
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -118,7 +121,6 @@ jobs:
       image: ubuntu:noble
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev --ipc=host
     steps:
-      - uses: actions/checkout@v4
       - name: Install dependencies for Ubuntu
         run: apt-get -q update
       - name: Install dependencies for Ubuntu
@@ -128,6 +130,7 @@ jobs:
           asciidoc
           clang
           curl
+          git
           libblkid-dev
           libcryptsetup-dev
           libdbus-1-dev
@@ -144,6 +147,9 @@ jobs:
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
+      - uses: actions/checkout@v4
+      - name: Overwrite stratisd dependencies as necessary
+        uses: ./.github/actions/stratisd-modify-action
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd

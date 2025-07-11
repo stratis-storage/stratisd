@@ -114,7 +114,7 @@ jobs:
         with:
           path: stratisd
       - name: Overwrite stratisd dependencies as necessary
-        uses: stratis-storage/github-action/stratisd-modify@bba6ae4f5d6487201193ee6bee75efb2bc994e43
+        uses: stratis-storage/github-actions/stratisd-modify
         working-directory: stratisd
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all

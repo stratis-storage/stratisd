@@ -4,7 +4,7 @@
 
 // Code to handle the backing store of a pool.
 
-use std::{cmp, collections::HashMap, fs, path::PathBuf};
+use std::{cmp, fs, path::PathBuf};
 
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -27,11 +27,9 @@ use crate::{
             },
             crypt::{back_up_luks_header, handle::v1::CryptHandle, restore_luks_header},
             dm::{get_dm, list_of_backstore_devices, remove_optional_devices},
-            metadata::{MDADataSize, BDA},
+            metadata::MDADataSize,
             names::{format_backstore_ids, CacheRole},
             serde_structs::{BackstoreSave, CapSave, Recordable},
-            shared::bds_to_bdas,
-            types::BDARecordResult,
             writing::wipe_sectors,
         },
         types::{
@@ -194,7 +192,7 @@ impl Backstore {
         datadevs: Vec<StratBlockDev>,
         cachedevs: Vec<StratBlockDev>,
         last_update_time: DateTime<Utc>,
-    ) -> BDARecordResult<Backstore> {
+    ) -> StratisResult<Backstore> {
         let block_mgr = BlockDevMgr::new(datadevs, Some(last_update_time));
         let data_tier = DataTier::setup(block_mgr, &backstore_save.data_tier)?;
         let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
@@ -206,15 +204,7 @@ impl Backstore {
         ) {
             Ok(origin) => origin,
             Err(e) => {
-                return Err((
-                    StratisError::from(e),
-                    data_tier
-                        .block_mgr
-                        .into_bdas()
-                        .into_iter()
-                        .chain(bds_to_bdas(cachedevs))
-                        .collect::<HashMap<_, _>>(),
-                ));
+                return Err(StratisError::from(e));
             }
         };
 
@@ -222,41 +212,14 @@ impl Backstore {
             let block_mgr = BlockDevMgr::new(cachedevs, Some(last_update_time));
             match backstore_save.cache_tier {
                 Some(ref cache_tier_save) => {
-                    let cache_tier = match CacheTier::setup(block_mgr, cache_tier_save) {
-                        Ok(ct) => ct,
-                        Err((e, mut bdas)) => {
-                            bdas.extend(data_tier.block_mgr.into_bdas());
-                            return Err((e, bdas));
-                        }
-                    };
+                    let cache_tier = CacheTier::setup(block_mgr, cache_tier_save)?;
 
-                    let cache_device = match make_cache(pool_uuid, &cache_tier, origin, false) {
-                        Ok(cd) => cd,
-                        Err(e) => {
-                            return Err((
-                                e,
-                                data_tier
-                                    .block_mgr
-                                    .into_bdas()
-                                    .into_iter()
-                                    .chain(cache_tier.block_mgr.into_bdas())
-                                    .collect::<HashMap<_, _>>(),
-                            ));
-                        }
-                    };
+                    let cache_device = make_cache(pool_uuid, &cache_tier, origin, false)?;
                     (Some(cache_tier), Some(cache_device), None)
                 }
                 None => {
                     let err_msg = "Cachedevs exist, but cache metadata does not exist";
-                    return Err((
-                        StratisError::Msg(err_msg.into()),
-                        data_tier
-                            .block_mgr
-                            .into_bdas()
-                            .into_iter()
-                            .chain(block_mgr.into_bdas())
-                            .collect::<HashMap<_, _>>(),
-                    ));
+                    return Err(StratisError::Msg(err_msg.into()));
                 }
             }
         } else {
@@ -548,33 +511,6 @@ impl Backstore {
             cache_tier.block_mgr.teardown()?;
         }
         self.data_tier.block_mgr.teardown()
-    }
-
-    /// Consume the backstore and convert it into a set of BDAs representing
-    /// all data and cache devices.
-    pub fn into_bdas(self) -> HashMap<DevUuid, BDA> {
-        self.data_tier
-            .block_mgr
-            .into_bdas()
-            .into_iter()
-            .chain(
-                self.cache_tier
-                    .map(|ct| ct.block_mgr.into_bdas())
-                    .unwrap_or_default(),
-            )
-            .collect::<HashMap<_, _>>()
-    }
-
-    /// Drain the backstore devices into a set of all data and cache devices.
-    pub fn drain_bds(&mut self) -> Vec<StratBlockDev> {
-        let mut bds = self.data_tier.block_mgr.drain_bds();
-        bds.extend(
-            self.cache_tier
-                .as_mut()
-                .map(|ct| ct.block_mgr.drain_bds())
-                .unwrap_or_default(),
-        );
-        bds
     }
 
     /// Lookup an immutable blockdev by its Stratis UUID.

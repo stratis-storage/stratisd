@@ -39,7 +39,7 @@ const CASTAGNOLI: Crc<u32> = Crc::<u32>::new(&CRC_32_ISCSI);
 /// Data structure to hold results of reading and parsing a signature buffer.
 /// Invariant: bytes is Err <-> header == None, because if there was an error
 /// reading the data then there is no point in parsing.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StaticHeaderResult {
     /// The bytes read
     pub bytes: StratisResult<Box<[u8; bytes!(static_header_size::SIGBLOCK_SECTORS)]>>,
@@ -128,7 +128,7 @@ where
     StaticHeader::wipe(f)
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct StaticHeader {
     pub blkdev_size: BlockdevSize,
     pub sigblock_version: StratSigblockVersion,

@@ -101,7 +101,7 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
       - uses: actions/checkout@v4
       - name: Overwrite stratisd dependencies as necessary
-        uses: ./.github/actions/stratisd-modify-action
+        uses: stratis-storage/github-actions/stratisd-modify@HEAD
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -143,7 +143,7 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
       - uses: actions/checkout@v4
       - name: Overwrite stratisd dependencies as necessary
-        uses: ./.github/actions/stratisd-modify-action
+        uses: stratis-storage/github-actions/stratisd-modify@HEAD
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd
@@ -194,7 +194,7 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
       - uses: actions/checkout@v4
       - name: Overwrite stratisd dependencies as necessary
-        uses: ./.github/actions/stratisd-modify-action
+        uses: stratis-storage/github-actions/stratisd-modify@HEAD
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd

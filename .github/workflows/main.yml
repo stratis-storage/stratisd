@@ -114,7 +114,7 @@ jobs:
         with:
           path: stratisd
       - name: Overwrite stratisd dependencies as necessary
-        uses: ./stratisd/.github/actions/stratisd-modify-action
+        uses: stratis-storage/github-actions/stratisd-modify@HEAD
         with:
           working-directory: stratisd
       - name: Build stratisd
@@ -208,7 +208,7 @@ jobs:
           toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - uses: actions/checkout@v4
       - name: Overwrite stratisd dependencies as necessary
-        uses: ./.github/actions/stratisd-modify-action
+        uses: stratis-storage/github-actions/stratisd-modify@HEAD
       - name: Run stratisd-min cli tests
         run: make test-stratisd-min-root
       - name: Run stratis-min cli tests
@@ -286,7 +286,7 @@ jobs:
           toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - uses: actions/checkout@v4
       - name: Overwrite stratisd dependencies as necessary
-        uses: ./.github/actions/stratisd-modify-action
+        uses: stratis-storage/github-actions/stratisd-modify@HEAD
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd
@@ -340,7 +340,7 @@ jobs:
         with:
           path: stratisd
       - name: Overwrite stratisd dependencies as necessary
-        uses: ./stratisd/.github/actions/stratisd-modify-action
+        uses: stratis-storage/github-actions/stratisd-modify@HEAD
         with:
           working-directory: stratisd
       - name: Build stratisd

@@ -12,6 +12,6 @@ mod thinpool;
 #[cfg(test)]
 pub use self::dm_structs::ThinPoolStatusDigest;
 pub use self::{
-    filesystem::StratFilesystem,
+    filesystem::{LockedFilesystem, StratFilesystem},
     thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
 };

@@ -2,6 +2,12 @@
 # yamllint disable rule:line-length
 name: 'Modify stratisd checkout'
 description: "Modify stratisd checked out files as necessary"
+inputs:
+  working-directory:
+    description: "The working directory for this action"
+    required: false
+    default: '.'
+    type: string
 runs:
   using: "composite"
   steps:
@@ -25,3 +31,4 @@ runs:
           TREE_ARGS+=(--invert=$dependency)
         done
         cargo tree ${TREE_ARGS[@]}
+      working-directory: ${{ inputs.working-directory }}

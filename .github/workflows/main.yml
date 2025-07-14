@@ -126,42 +126,12 @@ jobs:
       - name: Workaround for dbus inotify
         run: cp stratisd.conf /usr/share/dbus-1/system.d
         working-directory: stratisd
-      - name: Check out jbaublitz/stratis-cli
-        if: github.event_name == 'pull_request'
-        id: jbaublitz
-        continue-on-error: true
-        uses: actions/checkout@v4
+      - uses: stratis-storage/github-actions/github-modify@HEAD
         with:
-          repository: jbaublitz/stratis-cli
-          path: jbaublitz
-          ref: ${{ github.head_ref }}
-      - name: Check out mulkieran/stratis-cli
-        if: github.event_name == 'pull_request'
-        id: mulkieran
-        continue-on-error: true
-        uses: actions/checkout@v4
-        with:
-          repository: mulkieran/stratis-cli
-          path: mulkieran
-          ref: ${{ github.head_ref }}
-      - name: Check if both checkouts succeeded
-        if: github.event_name == 'pull_request' && steps.jbaublitz.outcome == 'success' && steps.mulkieran.outcome == 'success'
-        run: |
-          echo "Branch conflict!"
-          exit 1
-      - name: Conditionally make jbaublitz checkout branch the chosen one
-        if: github.event_name == 'pull_request' && steps.jbaublitz.outcome == 'success'
-        run: mv jbaublitz stratis-cli
-      - name: Conditionally make mulkieran checkout branch the chosen one
-        if: github.event_name == 'pull_request' && steps.mulkieran.outcome == 'success'
-        run: mv mulkieran stratis-cli
-      - name: Check out stratis-cli if no alternative branch was checked out
-        if: github.event_name != 'pull_request' || (github.event_name == 'pull_request' && steps.mulkieran.outcome == 'failure' && steps.jbaublitz.outcome == 'failure')
-        uses: actions/checkout@v4
-        with:
-          repository: stratis-storage/stratis-cli
-          path: stratis-cli
-          ref: master
+          repo: stratis-cli
+      - name: Print head commit
+        run: git log --oneline -1
+        working-directory: stratis-cli
       - name: Run stratis-cli tests
         run: >
           RUST_LOG=stratisd=debug
@@ -354,42 +324,9 @@ jobs:
         working-directory: stratisd
       - name: Reload udev
         run: sudo udevadm control --reload
-      - name: Check out jbaublitz/testing
-        if: github.event_name == 'pull_request'
-        id: jbaublitz
-        continue-on-error: true
-        uses: actions/checkout@v4
+      - uses: stratis-storage/github-actions/github-modify@HEAD
         with:
-          repository: jbaublitz/testing
-          path: jbaublitz
-          ref: ${{ github.head_ref }}
-      - name: Check out mulkieran/testing
-        if: github.event_name == 'pull_request'
-        id: mulkieran
-        continue-on-error: true
-        uses: actions/checkout@v4
-        with:
-          repository: mulkieran/testing
-          path: mulkieran
-          ref: ${{ github.head_ref }}
-      - name: Check if both checkouts succeeded
-        if: github.event_name == 'pull_request' && steps.jbaublitz.outcome == 'success' && steps.mulkieran.outcome == 'success'
-        run: |
-          echo "Branch conflict!"
-          exit 1
-      - name: Conditionally make jbaublitz checkout branch the chosen one
-        if: github.event_name == 'pull_request' && steps.jbaublitz.outcome == 'success'
-        run: mv jbaublitz testing
-      - name: Conditionally make mulkieran checkout branch the chosen one
-        if: github.event_name == 'pull_request' && steps.mulkieran.outcome == 'success'
-        run: mv mulkieran testing
-      - name: Check out testing if no alternative branch was checked out
-        if: github.event_name != 'pull_request' || (github.event_name == 'pull_request' && steps.mulkieran.outcome == 'failure' && steps.jbaublitz.outcome == 'failure')
-        uses: actions/checkout@v4
-        with:
-          repository: stratis-storage/testing
-          path: testing
-          ref: master
+          repo: testing
       - name: Run stratisd_cert.py
         run: >
           sudo

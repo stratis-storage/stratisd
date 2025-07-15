@@ -29,21 +29,16 @@ use crate::{
                 stop_partially_constructed_pool_legacy,
             },
             liminal::{
-                device_info::{
-                    reconstruct_stratis_infos, split_stratis_infos, stratis_infos_ref, DeviceSet,
-                    LInfo, LLuksInfo, LStratisDevInfo, LStratisInfo,
-                },
+                device_info::{stratis_infos_ref, DeviceSet, LInfo, LLuksInfo, LStratisInfo},
                 identify::{
                     bda_wrapper, identify_block_device, DeviceInfo, LuksInfo, StratisDevInfo,
                     StratisInfo,
                 },
                 setup::{get_blockdevs, get_blockdevs_legacy, get_metadata},
             },
-            metadata::{StratisIdentifiers, BDA},
+            metadata::StratisIdentifiers,
             pool::{v1, v2, AnyPool},
             serde_structs::{PoolFeatures, PoolSave},
-            shared::tiers_to_bdas,
-            types::BDARecordResult,
         },
         structures::Table,
         types::{
@@ -195,21 +190,16 @@ impl LiminalDevices {
             pools: &Table<PoolUuid, AnyPool>,
             pool_uuid: PoolUuid,
             luks_info: StratisResult<Option<PoolEncryptionInfo>>,
-            infos: &HashMap<DevUuid, Box<LStratisDevInfo>>,
-            bdas: HashMap<DevUuid, BDA>,
+            infos: &HashMap<DevUuid, Box<LStratisInfo>>,
             meta_res: MetadataResult,
-        ) -> BDARecordResult<(Name, AnyPool)> {
-            let (timestamp, metadata, paths_to_wipe) = match meta_res {
-                Ok(o) => o,
-                Err(e) => return Err((e, bdas)),
-            };
+        ) -> StratisResult<(Name, AnyPool)> {
+            let (timestamp, metadata, paths_to_wipe) = meta_res?;
 
             setup_pool_legacy(
                 pools,
                 pool_uuid,
                 luks_info,
                 infos,
-                bdas,
                 timestamp,
                 metadata,
                 paths_to_wipe,
@@ -301,9 +291,8 @@ impl LiminalDevices {
         };
 
         let res = load_stratis_metadata(pool_uuid, &mut infos, remove_cache);
-        let (infos, bdas) = split_stratis_infos(infos);
 
-        match start_pool_failure(pools, pool_uuid, luks_info, &infos, bdas, res) {
+        match start_pool_failure(pools, pool_uuid, luks_info, &infos, res) {
             Ok((name, pool)) => {
                 self.uuid_lookup = self
                     .uuid_lookup
@@ -324,10 +313,15 @@ impl LiminalDevices {
                 info!("Pool with name \"{name}\" and UUID \"{pool_uuid}\" set up");
                 Ok((name, pool_uuid, pool, uuids))
             }
-            Err((err, bdas)) => {
+            Err(err) => {
                 info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {err}");
-                let device_set = reconstruct_stratis_infos(infos, bdas);
-                self.handle_stopped_pool(pool_uuid, device_set);
+                self.handle_stopped_pool(
+                    pool_uuid,
+                    infos
+                        .into_iter()
+                        .map(|(uuid, info)| (uuid, LInfo::Stratis(info)))
+                        .collect::<DeviceSet>(),
+                );
                 Err(err)
             }
         }
@@ -348,16 +342,12 @@ impl LiminalDevices {
         fn start_pool_failure(
             pools: &Table<PoolUuid, AnyPool>,
             pool_uuid: PoolUuid,
-            infos: &HashMap<DevUuid, Box<LStratisDevInfo>>,
-            bdas: HashMap<DevUuid, BDA>,
+            infos: &HashMap<DevUuid, Box<LStratisInfo>>,
             meta_res: MetadataResult,
             token_slot: TokenUnlockMethod,
             passphrase_fd: Option<RawFd>,
-        ) -> BDARecordResult<(Name, AnyPool)> {
-            let (timestamp, metadata, paths_to_wipe) = match meta_res {
-                Ok(o) => o,
-                Err(e) => return Err((e, bdas)),
-            };
+        ) -> StratisResult<(Name, AnyPool)> {
+            let (timestamp, metadata, paths_to_wipe) = meta_res?;
             let processed_paths_to_wipe = paths_to_wipe.map(|v| {
                 v.into_iter()
                     .map(|e| {
@@ -374,29 +364,20 @@ impl LiminalDevices {
             ) {
                 (_, _, None) => None,
                 (false, _, _) => {
-                    return Err((
-                        StratisError::Msg(format!(
-                            "Pool with UUID {pool_uuid} is not encrypted but an unlock method or passphrase was provided"
-                        )),
-                        bdas,
-                    ));
+                    return Err(StratisError::Msg(format!(
+                        "Pool with UUID {pool_uuid} is not encrypted but an unlock method or passphrase was provided"
+                    )));
                 }
-                (true, TokenUnlockMethod::None, _) => return Err((
-                    StratisError::Msg(
-                        "Metadata reported that encryption enabled but no unlock method was provided"
-                            .to_string()
-                    ),
-                    bdas,
+                (true, TokenUnlockMethod::None, _) => return Err(StratisError::Msg(
+                    "Metadata reported that encryption enabled but no unlock method was provided"
+                        .to_string(),
                 )),
                 (true, _, Some(fd)) => {
                     let mut memory = match SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE) {
                         Ok(m) => m,
-                        Err(e) => return Err((StratisError::from(e), bdas)),
+                        Err(e) => return Err(StratisError::from(e)),
                     };
-                    let len = match read_key_shared(fd, memory.as_mut()) {
-                        Ok(l) => l,
-                        Err(e) => return Err((e, bdas)),
-                    };
+                    let len = read_key_shared(fd, memory.as_mut())?;
                     Some(SizedKeyMemory::new(memory, len))
                 }
             };
@@ -405,7 +386,6 @@ impl LiminalDevices {
                 pools,
                 pool_uuid,
                 infos,
-                bdas,
                 timestamp,
                 metadata,
                 processed_paths_to_wipe,
@@ -428,17 +408,8 @@ impl LiminalDevices {
             .expect_left("Cannot fail in V2 of metadata");
 
         let res = load_stratis_metadata(pool_uuid, &mut infos, remove_cache);
-        let (infos, bdas) = split_stratis_infos(infos);
 
-        match start_pool_failure(
-            pools,
-            pool_uuid,
-            &infos,
-            bdas,
-            res,
-            token_slot,
-            passphrase_fd,
-        ) {
+        match start_pool_failure(pools, pool_uuid, &infos, res, token_slot, passphrase_fd) {
             Ok((name, pool)) => {
                 self.uuid_lookup = self
                     .uuid_lookup
@@ -459,10 +430,15 @@ impl LiminalDevices {
                 info!("Pool with name \"{name}\" and UUID \"{pool_uuid}\" set up");
                 Ok((name, pool_uuid, pool, Vec::new()))
             }
-            Err((err, bdas)) => {
+            Err(err) => {
                 info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {err}");
-                let device_set = reconstruct_stratis_infos(infos, bdas);
-                self.handle_stopped_pool(pool_uuid, device_set);
+                self.handle_stopped_pool(
+                    pool_uuid,
+                    infos
+                        .into_iter()
+                        .map(|(uuid, info)| (uuid, LInfo::Stratis(info)))
+                        .collect::<DeviceSet>(),
+                );
                 Err(err)
             }
         }
@@ -533,8 +509,18 @@ impl LiminalDevices {
                 warn!("Failed to stop pool; placing in partially constructed pools");
                 (
                     match pool {
-                        AnyPool::V1(ref mut p) => DeviceSet::from(p.drain_bds()),
-                        AnyPool::V2(ref mut p) => DeviceSet::from(p.drain_bds()),
+                        AnyPool::V1(ref mut p) => DeviceSet::from(
+                            p.blockdevs()
+                                .into_iter()
+                                .map(|(_, _, bd)| bd)
+                                .collect::<Vec<_>>(),
+                        ),
+                        AnyPool::V2(ref mut p) => DeviceSet::from(
+                            p.blockdevs()
+                                .into_iter()
+                                .map(|(_, _, bd)| bd)
+                                .collect::<Vec<_>>(),
+                        ),
                     },
                     Some(e),
                 )
@@ -862,40 +848,32 @@ impl LiminalDevices {
             pools: &Table<PoolUuid, AnyPool>,
             pool_uuid: PoolUuid,
             luks_info: StratisResult<Option<PoolEncryptionInfo>>,
-            infos: &HashMap<DevUuid, Box<LStratisDevInfo>>,
-            bdas: HashMap<DevUuid, BDA>,
+            infos: &HashMap<DevUuid, Box<LStratisInfo>>,
             metadata_version: StratisResult<StratSigblockVersion>,
             meta_res: StratisResult<(DateTime<Utc>, PoolSave)>,
-        ) -> BDARecordResult<Either<(Name, AnyPool), HashMap<DevUuid, BDA>>> {
-            let metadata_version = match metadata_version {
-                Ok(mv) => mv,
-                Err(e) => return Err((e, bdas)),
-            };
-            let (timestamp, metadata) = match meta_res {
-                Ok(o) => o,
-                Err(e) => return Err((e, bdas)),
-            };
+        ) -> StratisResult<Option<(Name, AnyPool)>> {
+            let metadata_version = metadata_version?;
+            let (timestamp, metadata) = meta_res?;
             if let Some(true) | None = metadata.started {
                 match metadata_version {
                     StratSigblockVersion::V1 => setup_pool_legacy(
-                        pools, pool_uuid, luks_info, infos, bdas, timestamp, metadata, None,
+                        pools, pool_uuid, luks_info, infos, timestamp, metadata, None,
                     )
-                    .map(Either::Left),
+                    .map(Some),
                     StratSigblockVersion::V2 => setup_pool(
                         pools,
                         pool_uuid,
                         infos,
-                        bdas,
                         timestamp,
                         metadata,
                         None,
                         TokenUnlockMethod::None,
                         None,
                     )
-                    .map(Either::Left),
+                    .map(Some),
                 }
             } else {
-                Ok(Either::Right(bdas))
+                Ok(None)
             }
         }
 
@@ -922,17 +900,15 @@ impl LiminalDevices {
                 (timestamp, metadata)
             },
         );
-        let (infos, bdas) = split_stratis_infos(infos);
         match try_setup_started_pool_failure(
             pools,
             pool_uuid,
             luks_info,
             &infos,
-            bdas,
             metadata_version,
             res,
         ) {
-            Ok(Either::Left((name, pool))) => {
+            Ok(Some((name, pool))) => {
                 self.uuid_lookup = self
                     .uuid_lookup
                     .drain()
@@ -952,15 +928,25 @@ impl LiminalDevices {
                 info!("Pool with name \"{name}\" and UUID \"{pool_uuid}\" set up");
                 Some((name, pool))
             }
-            Ok(Either::Right(bdas)) => {
-                let device_set = reconstruct_stratis_infos(infos, bdas);
-                self.handle_stopped_pool(pool_uuid, device_set);
+            Ok(None) => {
+                self.handle_stopped_pool(
+                    pool_uuid,
+                    infos
+                        .into_iter()
+                        .map(|(uuid, info)| (uuid, LInfo::Stratis(info)))
+                        .collect::<DeviceSet>(),
+                );
                 None
             }
-            Err((err, bdas)) => {
+            Err(err) => {
                 info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {err}");
-                let device_set = reconstruct_stratis_infos(infos, bdas);
-                self.handle_stopped_pool(pool_uuid, device_set);
+                self.handle_stopped_pool(
+                    pool_uuid,
+                    infos
+                        .into_iter()
+                        .map(|(uuid, info)| (uuid, LInfo::Stratis(info)))
+                        .collect::<DeviceSet>(),
+                );
                 None
             }
         }
@@ -1323,37 +1309,36 @@ fn load_stratis_metadata(
 ///
 /// If there is a name conflict between the set of devices in devices
 /// and some existing pool, return an error.
-#[allow(clippy::too_many_arguments)]
 fn setup_pool_legacy(
     pools: &Table<PoolUuid, AnyPool>,
     pool_uuid: PoolUuid,
     luks_info: StratisResult<Option<PoolEncryptionInfo>>,
-    infos: &HashMap<DevUuid, Box<LStratisDevInfo>>,
-    bdas: HashMap<DevUuid, BDA>,
+    infos: &HashMap<DevUuid, Box<LStratisInfo>>,
     timestamp: DateTime<Utc>,
     metadata: PoolSave,
     paths_to_wipe: Option<Vec<Either<PathBuf, PathBuf>>>,
-) -> BDARecordResult<(Name, AnyPool)> {
+) -> StratisResult<(Name, AnyPool)> {
     if let Some((uuid, _)) = pools.get_by_name(&metadata.name) {
-        return Err((
+        return Err(
             StratisError::Msg(format!(
                 "There is a pool name conflict. The devices currently being processed have been identified as belonging to the pool with UUID {} and name {}, but a pool with the same name and UUID {} is already active",
                 pool_uuid,
                 &metadata.name,
                 uuid
-            )), bdas));
+            ))
+        );
     }
 
-    let (datadevs, cachedevs) = match get_blockdevs_legacy(&metadata.backstore, infos, bdas) {
-        Err((err, bdas)) => return Err(
-            (StratisError::Chained(
+    let (datadevs, cachedevs) = match get_blockdevs_legacy(&metadata.backstore, infos) {
+        Err(err) => return Err(
+            StratisError::Chained(
                 format!(
                     "There was an error encountered when calculating the block devices for pool with UUID {} and name {}",
                     pool_uuid,
                     &metadata.name,
                 ),
                 Box::new(err)
-            ), bdas)),
+            )),
         Ok((datadevs, cachedevs)) => (datadevs, cachedevs),
     };
 
@@ -1365,12 +1350,13 @@ fn setup_pool_legacy(
             // Stratis device has just not been discovered yet. If it
             // is, the appropriate info will be updated, and setup may
             // yet succeed.
-            return Err((
+            return Err(
                 StratisError::Msg(format!(
                         "Some data devices in the set belonging to pool with UUID {} and name {} appear to be encrypted devices managed by Stratis, and some do not",
                         pool_uuid,
                         &metadata.name
-                )), tiers_to_bdas(datadevs, cachedevs, None)));
+                ))
+            );
         }
     };
 
@@ -1385,13 +1371,13 @@ fn setup_pool_legacy(
             }
             (name, AnyPool::V1(Box::new(pool)))
         })
-        .map_err(|(err, bdas)| {
-            (StratisError::Chained(
+        .map_err(|err| {
+            StratisError::Chained(
                 format!(
                     "An attempt to set up pool with UUID {pool_uuid} from the assembled devices failed"
                 ),
                 Box::new(err),
-            ), bdas)
+            )
         })
 }
 
@@ -1406,57 +1392,60 @@ fn setup_pool_legacy(
 fn setup_pool(
     pools: &Table<PoolUuid, AnyPool>,
     pool_uuid: PoolUuid,
-    infos: &HashMap<DevUuid, Box<LStratisDevInfo>>,
-    bdas: HashMap<DevUuid, BDA>,
+    infos: &HashMap<DevUuid, Box<LStratisInfo>>,
     timestamp: DateTime<Utc>,
     metadata: PoolSave,
     paths_to_wipe: Option<Vec<PathBuf>>,
     token_slot: TokenUnlockMethod,
     passphrase: Option<SizedKeyMemory>,
-) -> BDARecordResult<(Name, AnyPool)> {
+) -> StratisResult<(Name, AnyPool)> {
     if let Some((uuid, _)) = pools.get_by_name(&metadata.name) {
-        return Err((
+        return Err(
                 StratisError::Msg(format!(
                     "There is a pool name conflict. The devices currently being processed have been identified as belonging to the pool with UUID {} and name {}, but a pool with the same name and UUID {} is already active",
                     pool_uuid,
                     &metadata.name,
                     uuid
-                )), bdas));
+                )));
     }
 
-    let (datadevs, cachedevs) = match get_blockdevs(&metadata.backstore, infos, bdas) {
-            Err((err, bdas)) => return Err(
-                (StratisError::Chained(
+    let (datadevs, cachedevs) = match get_blockdevs(&metadata.backstore, infos) {
+            Err(err) => return Err(
+                StratisError::Chained(
                     format!(
                         "There was an error encountered when calculating the block devices for pool with UUID {} and name {}",
                         pool_uuid,
                         &metadata.name,
                     ),
                     Box::new(err)
-                ), bdas)),
+                )),
             Ok((datadevs, cachedevs)) => (datadevs, cachedevs),
         };
 
     let dev = datadevs.first();
     if dev.is_none() {
-        return Err((
-            StratisError::Msg(format!(
-                "There do not appear to be any data devices in the set with pool UUID {pool_uuid}"
-            )),
-            tiers_to_bdas(datadevs, cachedevs, None),
-        ));
+        return Err(StratisError::Msg(format!(
+            "There do not appear to be any data devices in the set with pool UUID {pool_uuid}"
+        )));
     }
 
-    v2::StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata, paths_to_wipe, token_slot, passphrase)
-            .map(|(name, pool)| {
-                (name, AnyPool::V2(Box::new(pool)))
-            })
-            .map_err(|(err, bdas)| {
-                (StratisError::Chained(
-                    format!(
-                        "An attempt to set up pool with UUID {pool_uuid} from the assembled devices failed"
-                    ),
-                    Box::new(err),
-                ), bdas)
-            })
+    v2::StratPool::setup(
+        pool_uuid,
+        datadevs,
+        cachedevs,
+        timestamp,
+        &metadata,
+        paths_to_wipe,
+        token_slot,
+        passphrase,
+    )
+    .map(|(name, pool)| (name, AnyPool::V2(Box::new(pool))))
+    .map_err(|err| {
+        StratisError::Chained(
+            format!(
+                "An attempt to set up pool with UUID {pool_uuid} from the assembled devices failed"
+            ),
+            Box::new(err),
+        )
+    })
 }

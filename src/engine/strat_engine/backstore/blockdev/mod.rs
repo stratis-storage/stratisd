@@ -2,7 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{fmt, path::Path};
+use std::{
+    fmt,
+    path::{Path, PathBuf},
+};
 
 use chrono::{DateTime, Utc};
 
@@ -15,6 +18,7 @@ use crate::{
             metadata::{BlockdevSize, MDADataSize, BDA},
         },
         types::{DevUuid, StratSigblockVersion},
+        BlockDev,
     },
     stratis::StratisResult,
 };
@@ -122,4 +126,66 @@ pub trait InternalBlockDev {
     ///               self.devnode.physical_path() has been encrypted with
     ///               aes-xts-plain64 encryption.
     fn disown(&mut self) -> StratisResult<()>;
+}
+
+/// Represents a blockdev in a locked pool.
+#[derive(Debug)]
+pub struct LockedBlockdev {
+    devnode: PathBuf,
+    metadata_path: PathBuf,
+    user_info: Option<String>,
+    hardware_info: Option<String>,
+    initialization_time: DateTime<Utc>,
+    size: Sectors,
+    new_size: Option<Sectors>,
+    metadata_version: StratSigblockVersion,
+}
+
+impl LockedBlockdev {
+    pub fn from_bd(bd: &dyn BlockDev) -> Self {
+        LockedBlockdev {
+            devnode: bd.devnode().to_owned(),
+            metadata_path: bd.metadata_path().to_owned(),
+            user_info: bd.user_info().map(|s| s.to_owned()),
+            hardware_info: bd.hardware_info().map(|s| s.to_owned()),
+            initialization_time: bd.initialization_time(),
+            size: bd.size(),
+            new_size: bd.new_size(),
+            metadata_version: bd.metadata_version(),
+        }
+    }
+}
+
+impl BlockDev for LockedBlockdev {
+    fn devnode(&self) -> &Path {
+        &self.devnode
+    }
+
+    fn metadata_path(&self) -> &Path {
+        &self.metadata_path
+    }
+
+    fn user_info(&self) -> Option<&str> {
+        self.user_info.as_ref().map(|s| s.as_str())
+    }
+
+    fn hardware_info(&self) -> Option<&str> {
+        self.hardware_info.as_ref().map(|s| s.as_str())
+    }
+
+    fn initialization_time(&self) -> DateTime<Utc> {
+        self.initialization_time
+    }
+
+    fn size(&self) -> Sectors {
+        self.size
+    }
+
+    fn new_size(&self) -> Option<Sectors> {
+        self.new_size.clone()
+    }
+
+    fn metadata_version(&self) -> StratSigblockVersion {
+        self.metadata_version
+    }
 }

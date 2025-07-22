@@ -29,7 +29,7 @@ const STRAT_METADATA_VERSION: u8 = 1;
 const CASTAGNOLI: Crc<u32> = Crc::<u32>::new(&CRC_32_ISCSI);
 
 /// Manages the MDA regions which hold the variable length metadata.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MDARegions {
     /// The size of a single MDA region. The MDAHeader occupies the
     /// first few bytes of its region, the rest is available for the
@@ -293,7 +293,7 @@ impl MetaDataSize {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MDAHeader {
     last_updated: DateTime<Utc>,
 

@@ -43,6 +43,9 @@ impl fmt::Display for StratSectorSizes {
 }
 
 pub trait InternalBlockDev {
+    /// The BDA.
+    fn bda(&self) -> &BDA;
+
     /// The device's UUID.
     fn uuid(&self) -> DevUuid;
 
@@ -119,7 +122,4 @@ pub trait InternalBlockDev {
     ///               self.devnode.physical_path() has been encrypted with
     ///               aes-xts-plain64 encryption.
     fn disown(&mut self) -> StratisResult<()>;
-
-    /// Consume block device returning BDA.
-    fn into_bda(self) -> BDA;
 }

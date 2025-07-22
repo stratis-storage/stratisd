@@ -41,11 +41,9 @@ use crate::{
             },
             crypt::{handle::v1::CryptHandle, CLEVIS_LUKS_TOKEN_ID, LUKS2_TOKEN_ID},
             liminal::DeviceSet,
-            metadata::{disown_device, BDA},
+            metadata::disown_device,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
-            shared::tiers_to_bdas,
             thinpool::{StratFilesystem, ThinPool},
-            types::BDARecordResult,
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
@@ -271,10 +269,8 @@ impl StratPool {
         metadata: &PoolSave,
         paths_to_wipe: Option<Vec<Either<PathBuf, PathBuf>>>,
         encryption_info: Option<PoolEncryptionInfo>,
-    ) -> BDARecordResult<(Name, StratPool)> {
-        if let Err(e) = check_metadata(metadata) {
-            return Err((e, tiers_to_bdas(datadevs, cachedevs, None)));
-        }
+    ) -> StratisResult<(Name, StratPool)> {
+        check_metadata(metadata)?;
 
         let backstore =
             Backstore::setup(uuid, &metadata.backstore, datadevs, cachedevs, timestamp)?;
@@ -288,16 +284,13 @@ impl StratPool {
             );
         }
 
-        let thinpool = match ThinPool::setup(
+        let thinpool = ThinPool::setup(
             pool_name,
             uuid,
             &metadata.thinpool_dev,
             &metadata.flex_devs,
             &backstore,
-        ) {
-            Ok(tp) => tp,
-            Err(e) => return Err((e, backstore.into_bdas())),
-        };
+        )?;
 
         let mut needs_save = paths_to_wipe.is_some();
         // TODO: Remove in stratisd 4.0
@@ -322,7 +315,7 @@ impl StratPool {
                 if let StratisError::ActionDisabled(avail) = err {
                     warn!("Pool-level metadata could not be written for pool with name {pool_name} and UUID {uuid} because pool is in a limited availability state, {avail},  which prevents any pool actions; pool will remain set up");
                 } else {
-                    return Err((err, pool.backstore.into_bdas()));
+                    return Err(err);
                 }
             }
         }
@@ -497,18 +490,12 @@ impl StratPool {
         let json = serde_json::to_vec(&data).map_err(|e| (StratisError::from(e), false))?;
         self.backstore.save_state(&json).map_err(|e| (e, false))?;
         self.backstore.teardown(pool_uuid).map_err(|e| (e, false))?;
-        let bds = self.backstore.drain_bds();
-        Ok(DeviceSet::from(bds))
-    }
-
-    /// Convert a pool into a record of BDAs for the given block devices in the pool.
-    pub fn into_bdas(self) -> HashMap<DevUuid, BDA> {
-        self.backstore.into_bdas()
-    }
-
-    /// Drain pool block devices into a record of block devices in the pool.
-    pub fn drain_bds(&mut self) -> Vec<StratBlockDev> {
-        self.backstore.drain_bds()
+        Ok(DeviceSet::from(
+            self.blockdevs()
+                .into_iter()
+                .map(|(_, _, bd)| bd)
+                .collect::<Vec<_>>(),
+        ))
     }
 
     #[cfg(test)]

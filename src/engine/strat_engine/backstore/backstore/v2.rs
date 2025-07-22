@@ -4,7 +4,7 @@
 
 // Code to handle the backing store of a pool.
 
-use std::{cmp, collections::HashMap, iter::once, path::PathBuf};
+use std::{cmp, iter::once, path::PathBuf};
 
 use chrono::{DateTime, Utc};
 use either::Either;
@@ -26,11 +26,9 @@ use crate::{
             crypt::{handle::v2::CryptHandle, manual_wipe, DEFAULT_CRYPT_DATA_OFFSET_V2},
             dm::{get_dm, list_of_backstore_devices, remove_optional_devices, DEVICEMAPPER_PATH},
             keys::{search_key_process, unset_key_process},
-            metadata::{MDADataSize, BDA},
+            metadata::MDADataSize,
             names::{format_backstore_ids, CacheRole},
             serde_structs::{BackstoreSave, CapSave, PoolFeatures, PoolSave, Recordable},
-            shared::bds_to_bdas,
-            types::BDARecordResult,
             writing::wipe_sectors,
         },
         types::{
@@ -302,17 +300,12 @@ impl Backstore {
         last_update_time: DateTime<Utc>,
         token_slot: TokenUnlockMethod,
         passphrase: Option<SizedKeyMemory>,
-    ) -> BDARecordResult<Backstore> {
+    ) -> StratisResult<Backstore> {
         let block_mgr = BlockDevMgr::new(datadevs, Some(last_update_time));
         let data_tier = match DataTier::setup(block_mgr, &pool_save.backstore.data_tier) {
             Ok(dt) => dt,
-            Err((e, data)) => {
-                return Err((
-                    e,
-                    data.into_iter()
-                        .chain(bds_to_bdas(cachedevs))
-                        .collect::<HashMap<_, _>>(),
-                ));
+            Err(e) => {
+                return Err(e);
             }
         };
         let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
@@ -324,15 +317,7 @@ impl Backstore {
         ) {
             Ok(origin) => origin,
             Err(e) => {
-                return Err((
-                    StratisError::from(e),
-                    data_tier
-                        .block_mgr
-                        .into_bdas()
-                        .into_iter()
-                        .chain(bds_to_bdas(cachedevs))
-                        .collect::<HashMap<_, _>>(),
-                ));
+                return Err(StratisError::from(e));
             }
         };
 
@@ -342,9 +327,8 @@ impl Backstore {
                 Some(ref cache_tier_save) => {
                     let cache_tier = match CacheTier::setup(block_mgr, cache_tier_save) {
                         Ok(ct) => ct,
-                        Err((e, mut bdas)) => {
-                            bdas.extend(data_tier.block_mgr.into_bdas());
-                            return Err((e, bdas));
+                        Err(e) => {
+                            return Err(e);
                         }
                     };
 
@@ -352,37 +336,18 @@ impl Backstore {
                     {
                         Ok(cd) => cd,
                         Err(e) => {
-                            return Err((
-                                e,
-                                data_tier
-                                    .block_mgr
-                                    .into_bdas()
-                                    .into_iter()
-                                    .chain(cache_tier.block_mgr.into_bdas())
-                                    .collect::<HashMap<_, _>>(),
-                            ));
+                            return Err(e);
                         }
                     };
                     (None, Some(cache_device), Some(cache_tier), None)
                 }
                 None => {
                     let err_msg = "Cachedevs exist, but cache metadata does not exist";
-                    return Err((
-                        StratisError::Msg(err_msg.into()),
-                        data_tier
-                            .block_mgr
-                            .into_bdas()
-                            .into_iter()
-                            .chain(block_mgr.into_bdas())
-                            .collect::<HashMap<_, _>>(),
-                    ));
+                    return Err(StratisError::Msg(err_msg.into()));
                 }
             }
         } else {
-            let placeholder = match make_placeholder_dev(pool_uuid, &origin) {
-                Ok(pl) => pl,
-                Err(e) => return Err((e, data_tier.block_mgr.into_bdas())),
-            };
+            let placeholder = make_placeholder_dev(pool_uuid, &origin)?;
             (Some(placeholder), None, None, Some(origin))
         };
 
@@ -398,19 +363,7 @@ impl Backstore {
         let has_header = match CryptHandle::load_metadata(crypt_physical_path, pool_uuid) {
             Ok(opt) => opt.is_some(),
             Err(e) => {
-                return Err((
-                    e,
-                    data_tier
-                        .block_mgr
-                        .into_bdas()
-                        .into_iter()
-                        .chain(
-                            cache_tier
-                                .map(|ct| ct.block_mgr.into_bdas())
-                                .unwrap_or_default(),
-                        )
-                        .collect::<HashMap<_, _>>(),
-                ));
+                return Err(e);
             }
         };
         let enc = match (metadata_enc_enabled, has_header, passphrase.as_ref()) {
@@ -420,76 +373,24 @@ impl Backstore {
                         if let Some(h) = opt {
                             Some(Either::Right(h))
                         } else {
-                            return Err(
-                                (
-                                    StratisError::Msg(
-                                        "Metadata reported that encryption is enabled but no crypt header was found".to_string()
-                                    ),
-                                    data_tier
-                                        .block_mgr
-                                        .into_bdas()
-                                        .into_iter()
-                                        .chain(
-                                            cache_tier
-                                                .map(|ct| ct.block_mgr.into_bdas())
-                                                .unwrap_or_default(),
-                                        )
-                                        .collect::<HashMap<_, _>>(),
-                                )
-                            );
+                            return Err(StratisError::Msg(
+                                "Metadata reported that encryption is enabled but no crypt header was found".to_string()
+                            ));
                         }
                     }
-                    Err(e) => {
-                        return Err((
-                            e,
-                            data_tier
-                                .block_mgr
-                                .into_bdas()
-                                .into_iter()
-                                .chain(
-                                    cache_tier
-                                        .map(|ct| ct.block_mgr.into_bdas())
-                                        .unwrap_or_default(),
-                                )
-                                .collect::<HashMap<_, _>>(),
-                        ))
-                    }
+                    Err(e) => return Err(e),
                 }
             }
             (true, _, _) => {
-                return Err((
-                    StratisError::Msg(
-                        "Metadata reported that encryption is enabled but no header was found"
-                            .to_string(),
-                    ),
-                    data_tier
-                        .block_mgr
-                        .into_bdas()
-                        .into_iter()
-                        .chain(
-                            cache_tier
-                                .map(|ct| ct.block_mgr.into_bdas())
-                                .unwrap_or_default(),
-                        )
-                        .collect::<HashMap<_, _>>(),
+                return Err(StratisError::Msg(
+                    "Metadata reported that encryption is enabled but no header was found"
+                        .to_string(),
                 ));
             }
             (false, true, _) => {
-                return Err((
-                    StratisError::Msg(
-                        "Metadata reported that encryption is disabled but header was found"
-                            .to_string(),
-                    ),
-                    data_tier
-                        .block_mgr
-                        .into_bdas()
-                        .into_iter()
-                        .chain(
-                            cache_tier
-                                .map(|ct| ct.block_mgr.into_bdas())
-                                .unwrap_or_default(),
-                        )
-                        .collect::<HashMap<_, _>>(),
+                return Err(StratisError::Msg(
+                    "Metadata reported that encryption is disabled but header was found"
+                        .to_string(),
                 ));
             }
             (false, _, _) => None,
@@ -884,33 +785,6 @@ impl Backstore {
         }
         self.data_tier.block_mgr.teardown()?;
         unset_key_process(&VolumeKeyKeyDescription::new(pool_uuid)).map(|_| ())
-    }
-
-    /// Consume the backstore and convert it into a set of BDAs representing
-    /// all data and cache devices.
-    pub fn into_bdas(self) -> HashMap<DevUuid, BDA> {
-        self.data_tier
-            .block_mgr
-            .into_bdas()
-            .into_iter()
-            .chain(
-                self.cache_tier
-                    .map(|ct| ct.block_mgr.into_bdas())
-                    .unwrap_or_default(),
-            )
-            .collect::<HashMap<_, _>>()
-    }
-
-    /// Drain the backstore devices into a set of all data and cache devices.
-    pub fn drain_bds(&mut self) -> Vec<StratBlockDev> {
-        let mut bds = self.data_tier.block_mgr.drain_bds();
-        bds.extend(
-            self.cache_tier
-                .as_mut()
-                .map(|ct| ct.block_mgr.drain_bds())
-                .unwrap_or_default(),
-        );
-        bds
     }
 
     /// Lookup an immutable blockdev by its Stratis UUID.

@@ -21,7 +21,7 @@ use crate::{
     stratis::StratisResult,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BDA {
     pub(in super::super) header: StaticHeader,
     regions: mda::MDARegions,

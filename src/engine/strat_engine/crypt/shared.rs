@@ -17,7 +17,7 @@ use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 
-use devicemapper::{DevId, DmName, DmOptions, Sectors, SECTOR_SIZE};
+use devicemapper::{Bytes, DevId, DmName, DmOptions, Sectors, IEC, SECTOR_SIZE};
 use libcryptsetup_rs::{
     c_uint,
     consts::{
@@ -1174,10 +1174,10 @@ pub fn handle_do_reencrypt(
             resilience: "checksum".to_string(),
             hash: "sha256".to_string(),
             data_shift: 0,
-            max_hotzone_size: 0,
+            max_hotzone_size: 64 * IEC::Mi,
             device_size: 0,
             luks2: CryptParamsLuks2 {
-                data_alignment: 0,
+                data_alignment: convert_int!(*Bytes::from(sector_size).sectors(), u64, usize)?,
                 data_device: None,
                 integrity: None,
                 integrity_params: None,

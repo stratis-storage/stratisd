@@ -48,6 +48,11 @@ execute:
   how: tmt
   exit-first: false
 
+provision:
+  hardware:
+    memory: 3072
+    disk: 30
+
 /python:
   prepare+:
     - name: Make link for legacy pool utility

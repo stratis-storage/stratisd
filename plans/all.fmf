@@ -49,9 +49,8 @@ execute:
   exit-first: false
 
 provision:
-  hardware:
-    memory: 3072
-    disk: 30
+  memory: 3072
+  disk: 30
 
 /python:
   prepare+:

@@ -18,7 +18,7 @@ use crate::{
             EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo, Key,
             KeyDescription, Name, OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolUuid,
             PropChangeAction, ReencryptedDevice, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction, StratSigblockVersion,
+            SetDeleteAction, SizedKeyMemory, StratSigblockVersion,
         },
     },
     stratis::StratisResult,
@@ -363,14 +363,32 @@ impl Pool for AnyPool {
         }
     }
 
-    fn reencrypt_pool(
+    fn start_reencrypt_pool(&mut self) -> StratisResult<Vec<(u32, SizedKeyMemory, u32)>> {
+        match self {
+            AnyPool::V1(p) => p.start_reencrypt_pool(),
+            AnyPool::V2(p) => p.start_reencrypt_pool(),
+        }
+    }
+
+    fn do_reencrypt_pool(
+        &self,
+        pool_uuid: PoolUuid,
+        key_info: Vec<(u32, SizedKeyMemory, u32)>,
+    ) -> StratisResult<()> {
+        match self {
+            AnyPool::V1(p) => p.do_reencrypt_pool(pool_uuid, key_info),
+            AnyPool::V2(p) => p.do_reencrypt_pool(pool_uuid, key_info),
+        }
+    }
+
+    fn finish_reencrypt_pool(
         &mut self,
         name: &Name,
         pool_uuid: PoolUuid,
     ) -> StratisResult<ReencryptedDevice> {
         match self {
-            AnyPool::V1(p) => p.reencrypt_pool(name, pool_uuid),
-            AnyPool::V2(p) => p.reencrypt_pool(name, pool_uuid),
+            AnyPool::V1(p) => p.finish_reencrypt_pool(name, pool_uuid),
+            AnyPool::V2(p) => p.finish_reencrypt_pool(name, pool_uuid),
         }
     }
 

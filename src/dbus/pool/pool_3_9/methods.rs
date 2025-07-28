@@ -136,7 +136,10 @@ pub async fn reencrypt_pool_method(
 
         let (name, _, pool) = guard.as_mut_tuple();
 
-        handle_action!(pool.reencrypt_pool(&name, pool_uuid))
+        handle_action!(pool
+            .start_reencrypt_pool()
+            .and_then(|key_info| pool.do_reencrypt_pool(pool_uuid, key_info))
+            .and_then(|_| pool.finish_reencrypt_pool(&name, pool_uuid)))
     })
     .await
     {

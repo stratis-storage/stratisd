@@ -1326,7 +1326,7 @@ impl Backstore {
         Ok(())
     }
 
-    pub fn reencrypt(&self, pool_uuid: PoolUuid) -> StratisResult<()> {
+    pub fn prepare_reencrypt(&self) -> StratisResult<Vec<(u32, SizedKeyMemory, u32)>> {
         match self.cap_device.enc {
             Some(Either::Left(_)) => {
                 Err(StratisError::Msg("Encrypted pool where the encrypted device has not yet been created cannot be reencrypted".to_string()))
@@ -1334,27 +1334,42 @@ impl Backstore {
             Some(Either::Right(ref handle)) => {
                 let tmp_dir = TempDir::new()?;
                 let h = back_up_luks_header(handle.luks2_device_path(), &tmp_dir)?;
-                let (slot, key, new_slot) = match handle.setup_reencrypt() {
-                    Ok(tup) => tup,
+                match handle.setup_reencrypt() {
+                    Ok(tup) => Ok(vec![tup]),
                     Err(causal_e) => {
                         if let Err(rollback_e) = restore_luks_header(handle.luks2_device_path(), &h) {
-                            return Err(StratisError::RollbackError {
+                            Err(StratisError::RollbackError {
                                 causal_error: Box::new(causal_e),
                                 rollback_error: Box::new(rollback_e),
                                 level: ActionAvailability::Full,
-                            });
+                            })
                         } else {
-                            return Err(causal_e)
+                            Err(causal_e)
                         }
                     }
-                };
-                handle.do_reencrypt(pool_uuid, slot, key, new_slot)?;
-                Ok(())
+                }
             }
             None => {
                 Err(StratisError::Msg("Unencrypted device cannot be reencrypted".to_string()))
             }
         }
+    }
+
+    /// Precondition: key_info contains exactly one entry.
+    pub fn reencrypt(
+        &self,
+        pool_uuid: PoolUuid,
+        mut key_info: Vec<(u32, SizedKeyMemory, u32)>,
+    ) -> StratisResult<()> {
+        assert!(key_info.len() == 1);
+        let (slot, key, new_slot) = key_info.remove(0);
+        match self.cap_device.enc {
+            Some(Either::Right(ref handle)) => {
+                handle.do_reencrypt(pool_uuid, slot, key, new_slot)?;
+            }
+            _ => unreachable!("Should have called prepare_reencrypt"),
+        }
+        Ok(())
     }
 
     pub fn decrypt(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {

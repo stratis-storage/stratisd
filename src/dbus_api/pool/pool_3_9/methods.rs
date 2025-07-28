@@ -151,7 +151,9 @@ pub fn reencrypt_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult 
     let (name, _, pool) = guard.as_mut_tuple();
 
     let result = handle_action!(
-        pool.reencrypt_pool(&name, pool_uuid),
+        pool.start_reencrypt_pool()
+            .and_then(|key_info| pool.do_reencrypt_pool(pool_uuid, key_info))
+            .and_then(|_| pool.finish_reencrypt_pool(&name, pool_uuid)),
         dbus_context,
         pool_path.get_name()
     );

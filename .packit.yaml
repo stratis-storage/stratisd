@@ -30,15 +30,11 @@ srpm_build_deps:
 jobs:
     - job: copr_build
       trigger: pull_request
-      additional_repos:
-          - copr://packit/stratis-storage-libcryptsetup-rs-master
       targets:
           - fedora-all
 
     - job: copr_build
       trigger: commit
-      additional_repos:
-          - copr://packit/stratis-storage-libcryptsetup-rs-master
       targets:
           - fedora-all
 

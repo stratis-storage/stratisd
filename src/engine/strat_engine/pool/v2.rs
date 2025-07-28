@@ -1236,14 +1236,18 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action("NoRequests")]
-    fn reencrypt_pool(&mut self, name: &Name) -> StratisResult<ReencryptedDevice> {
-        self.backstore
-            .reencrypt()
-            .and_then(|_| {
-                self.last_reencrypt = Some(Utc::now());
-                self.write_metadata(name)
-            })
-            .map(|_| ReencryptedDevice)
+    fn start_reencrypt_pool(&mut self) -> StratisResult<Vec<(u32, SizedKeyMemory, u32)>> {
+        self.backstore.prepare_reencrypt()
+    }
+
+    fn do_reencrypt_pool(&self, key_info: Vec<(u32, SizedKeyMemory, u32)>) -> StratisResult<()> {
+        self.backstore.reencrypt(key_info)
+    }
+
+    fn finish_reencrypt_pool(&mut self, name: &Name) -> StratisResult<ReencryptedDevice> {
+        self.last_reencrypt = Some(Utc::now());
+        self.write_metadata(name)?;
+        Ok(ReencryptedDevice)
     }
 
     #[pool_mutating_action("NoRequests")]
@@ -2269,7 +2273,9 @@ mod tests {
                     test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid))).unwrap();
                 let (_, _, pool) = handle.as_mut_tuple();
                 assert!(pool.is_encrypted());
-                pool.reencrypt_pool(&Name::new("encrypt_with_both".to_string()))
+                let key_info = pool.start_reencrypt_pool().unwrap();
+                pool.do_reencrypt_pool(key_info).unwrap();
+                pool.finish_reencrypt_pool(&Name::new("encrypt_with_both".to_string()))
                     .unwrap();
                 assert!(pool.is_encrypted());
             }

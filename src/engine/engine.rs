@@ -27,8 +27,9 @@ use crate::{
             MappingDeleteAction, Name, OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo,
             PoolIdentifier, PoolUuid, PropChangeAction, ReencryptedDevice, RegenAction,
             RenameAction, ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction,
-            StartAction, StopAction, StoppedPoolsInfo, StratBlockDevDiff, StratFilesystemDiff,
-            StratSigblockVersion, TokenUnlockMethod, UdevEngineEvent, UnlockMethod,
+            SizedKeyMemory, StartAction, StopAction, StoppedPoolsInfo, StratBlockDevDiff,
+            StratFilesystemDiff, StratSigblockVersion, TokenUnlockMethod, UdevEngineEvent,
+            UnlockMethod,
         },
     },
     stratis::StratisResult,
@@ -406,8 +407,18 @@ pub trait Pool: Debug + Send + Sync {
         encryption_info: &InputEncryptionInfo,
     ) -> StratisResult<CreateAction<EncryptedDevice>>;
 
-    /// Reencrypt an encrypted pool.
-    fn reencrypt_pool(&mut self, name: &Name) -> StratisResult<ReencryptedDevice>;
+    /// Start reencryption of an encrypted pool.
+    ///
+    /// Sets up the reencryption process.
+    fn start_reencrypt_pool(&mut self) -> StratisResult<Vec<(u32, SizedKeyMemory, u32)>>;
+
+    /// Perform reencryption of an encrypted pool.
+    ///
+    /// Acquires a read lock during the duration of the reencryption.
+    fn do_reencrypt_pool(&self, key_info: Vec<(u32, SizedKeyMemory, u32)>) -> StratisResult<()>;
+
+    /// Finish reencryption of an encrypted pool.
+    fn finish_reencrypt_pool(&mut self, name: &Name) -> StratisResult<ReencryptedDevice>;
 
     /// Decrypt an encrypted pool.
     fn decrypt_pool(

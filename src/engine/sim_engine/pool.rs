@@ -31,7 +31,8 @@ use crate::{
             EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo, Key,
             KeyDescription, Name, OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolUuid,
             PropChangeAction, ReencryptedDevice, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction, StratSigblockVersion, UnlockMechanism, ValidatedIntegritySpec,
+            SetDeleteAction, SizedKeyMemory, StratSigblockVersion, UnlockMechanism,
+            ValidatedIntegritySpec,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -979,19 +980,31 @@ impl Pool for SimPool {
         }
     }
 
-    fn reencrypt_pool(
-        &mut self,
-        _: &Name,
-        pool_uuid: PoolUuid,
-    ) -> StratisResult<ReencryptedDevice> {
+    fn start_reencrypt_pool(&mut self) -> StratisResult<Vec<(u32, SizedKeyMemory, u32)>> {
         if self.encryption_info.is_none() {
             Err(StratisError::Msg(
                 "Cannot reencrypt unencrypted pool".to_string(),
             ))
         } else {
-            self.last_reencrypt = Some(Utc::now());
-            Ok(ReencryptedDevice(pool_uuid))
+            Ok(vec![])
         }
+    }
+
+    fn do_reencrypt_pool(
+        &self,
+        _: PoolUuid,
+        _: Vec<(u32, SizedKeyMemory, u32)>,
+    ) -> StratisResult<()> {
+        Ok(())
+    }
+
+    fn finish_reencrypt_pool(
+        &mut self,
+        _: &Name,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<ReencryptedDevice> {
+        self.last_reencrypt = Some(Utc::now());
+        Ok(ReencryptedDevice(pool_uuid))
     }
 
     fn decrypt_pool(

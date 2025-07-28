@@ -21,6 +21,8 @@ use crate::{
     stratis::StratisResult,
 };
 
+pub use cleanup_errors::{Error, Result};
+
 mod cleanup_errors {
     use std::fmt;
 
@@ -83,8 +85,6 @@ mod cleanup_errors {
 
     impl std::error::Error for Error {}
 }
-
-use self::cleanup_errors::{Error, Result};
 
 /// Attempt to remove all device mapper devices which match the stratis naming convention.
 /// FIXME: Current implementation complicated by https://bugzilla.redhat.com/show_bug.cgi?id=1506287

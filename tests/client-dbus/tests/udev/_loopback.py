@@ -18,7 +18,6 @@ Class to handle loop back devices.
 # isort: STDLIB
 import os
 import subprocess
-import tempfile
 import time
 import uuid
 
@@ -59,7 +58,8 @@ class LoopBackDevices:
         Class constructor which creates a temporary directory to store backing
         file in.
         """
-        self.dir = tempfile.mkdtemp("_stratis_loop_back")
+        self.dir = os.path.join(os.environ["HOME"], ".stratis_loopback")
+        os.makedirs(self.dir, exist_ok=True)
         self.count = 0
         self.devices = {}
 

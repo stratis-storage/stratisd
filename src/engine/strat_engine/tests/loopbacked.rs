@@ -4,7 +4,7 @@
 
 use std::{
     env,
-    fs::{File, OpenOptions},
+    fs::{self, File, OpenOptions},
     mem::forget,
     panic,
     path::{Path, PathBuf},
@@ -18,7 +18,10 @@ use devicemapper::{Bytes, Sectors, IEC};
 use crate::{
     engine::strat_engine::{
         crypt::register_clevis_token,
-        tests::{logger::init_logger, util::clean_up},
+        tests::{
+            logger::init_logger,
+            util::{clean_up, Error},
+        },
     },
     stratis::StratisResult,
 };
@@ -97,12 +100,12 @@ fn get_device_counts(limits: &DeviceLimits) -> Vec<(usize, Option<Sectors>)> {
 }
 
 /// Setup count loop backed devices in dir of specified size.
-fn get_devices(count: usize, size: Option<Sectors>, dir: &tempfile::TempDir) -> Vec<LoopTestDev> {
+fn get_devices(count: usize, size: Option<Sectors>, dir: &Path) -> Vec<LoopTestDev> {
     let lc = LoopControl::open().unwrap();
     let mut loop_devices = Vec::new();
 
     for index in 0..count {
-        let path = dir.path().join(format!("store{}", &index));
+        let path = dir.join(format!("store{}", &index));
         loop_devices.push(LoopTestDev::new(&lc, &path, size));
     }
     loop_devices
@@ -119,10 +122,9 @@ where
     CLEVIS_TOKEN_HANDLER.call_once(|| register_clevis_token().unwrap());
 
     for (count, size) in counts {
-        let tmpdir = tempfile::Builder::new()
-            .prefix("stratis")
-            .tempdir()
-            .unwrap();
+        let tmpdir = PathBuf::from(env::var("HOME").expect("$HOME env var not present"))
+            .join(".stratis_loopback");
+        fs::create_dir_all(&tmpdir).unwrap();
         let loop_devices: Vec<LoopTestDev> = get_devices(count, size, &tmpdir);
         let device_paths: Vec<PathBuf> =
             loop_devices.iter().map(|x| x.ld.path().unwrap()).collect();
@@ -135,9 +137,8 @@ where
         });
 
         let tear_down = if env::var("NO_TEST_CLEAN_UP") != Ok("1".to_string()) {
-            Some(clean_up())
+            Some(clean_up().and_then(|_| fs::remove_dir_all(&tmpdir).map_err(Error::from)))
         } else {
-            forget(tmpdir);
             loop_devices.into_iter().for_each(forget);
             None
         };
@@ -163,10 +164,9 @@ where
     CLEVIS_TOKEN_HANDLER.call_once(|| register_clevis_token().unwrap());
 
     for (count, size) in counts {
-        let tmpdir = tempfile::Builder::new()
-            .prefix("stratis")
-            .tempdir()
-            .unwrap();
+        let tmpdir = PathBuf::from(env::var("HOME").expect("$HOME env var not present"))
+            .join(".stratis_loopback");
+        fs::create_dir_all(&tmpdir).unwrap();
         let loop_devices: Vec<LoopTestDev> = get_devices(count, size, &tmpdir);
         let device_paths: Vec<PathBuf> =
             loop_devices.iter().map(|x| x.ld.path().unwrap()).collect();
@@ -187,9 +187,8 @@ where
         };
 
         let tear_down = if env::var("NO_TEST_CLEAN_UP") != Ok("1".to_string()) {
-            Some(clean_up())
+            Some(clean_up().and_then(|_| fs::remove_dir_all(&tmpdir).map_err(Error::from)))
         } else {
-            forget(tmpdir);
             loop_devices.into_iter().for_each(forget);
             None
         };

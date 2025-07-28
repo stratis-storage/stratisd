@@ -29,11 +29,13 @@ srpm_build_deps:
 
 jobs:
     - job: copr_build
+      identifier: copr_pull
       trigger: pull_request
       targets:
           - fedora-all
 
     - job: copr_build
+      identifier: copr_commit
       trigger: commit
       targets:
           - fedora-all

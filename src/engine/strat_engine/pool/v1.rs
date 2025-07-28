@@ -47,8 +47,8 @@ use crate::{
             Diff, EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo,
             Key, KeyDescription, Name, OffsetDirection, OptionalTokenSlotInput, PoolDiff,
             PoolEncryptionInfo, PoolUuid, PropChangeAction, ReencryptedDevice, RegenAction,
-            RenameAction, SetCreateAction, SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
-            StratSigblockVersion, TokenUnlockMethod,
+            RenameAction, SetCreateAction, SetDeleteAction, SizedKeyMemory, StratFilesystemDiff,
+            StratPoolDiff, StratSigblockVersion, TokenUnlockMethod,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -1352,18 +1352,27 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action("NoRequests")]
-    fn reencrypt_pool(
+    fn start_reencrypt_pool(&mut self) -> StratisResult<Vec<(u32, SizedKeyMemory, u32)>> {
+        self.backstore.prepare_reencrypt()
+    }
+
+    fn do_reencrypt_pool(
+        &self,
+        pool_uuid: PoolUuid,
+        key_info: Vec<(u32, SizedKeyMemory, u32)>,
+    ) -> StratisResult<()> {
+        self.backstore.reencrypt(pool_uuid, key_info)
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn finish_reencrypt_pool(
         &mut self,
         name: &Name,
         pool_uuid: PoolUuid,
     ) -> StratisResult<ReencryptedDevice> {
-        self.backstore
-            .reencrypt(pool_uuid)
-            .and_then(|_| {
-                self.last_reencrypt = Some(Utc::now());
-                self.write_metadata(name)
-            })
-            .map(|_| ReencryptedDevice(pool_uuid))
+        self.last_reencrypt = Some(Utc::now());
+        self.write_metadata(name)?;
+        Ok(ReencryptedDevice(pool_uuid))
     }
 
     fn decrypt_pool(
@@ -2091,7 +2100,9 @@ mod tests {
                     test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid))).unwrap();
                 let (_, _, pool) = handle.as_mut_tuple();
                 assert!(pool.is_encrypted());
-                pool.reencrypt_pool(&Name::new("encrypt_with_both".to_string()), pool_uuid)
+                let key_info = pool.start_reencrypt_pool().unwrap();
+                pool.do_reencrypt_pool(pool_uuid, key_info).unwrap();
+                pool.finish_reencrypt_pool(&Name::new("encrypt_with_both".to_string()), pool_uuid)
                     .unwrap();
                 assert!(pool.is_encrypted());
             }

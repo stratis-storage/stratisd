@@ -34,7 +34,7 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, DevUuid, EncryptionInfo, InputEncryptionInfo,
-            KeyDescription, Name, PoolEncryptionInfo, PoolUuid,
+            KeyDescription, Name, PoolEncryptionInfo, PoolUuid, SizedKeyMemory,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -798,27 +798,38 @@ impl Backstore {
         }
     }
 
-    /// Reencrypt all encrypted devices in the pool.
+    /// Setup reencryption for all encrypted devices in the pool.
     ///
     /// Returns:
     /// * Ok(()) if successful
-    /// * Err(_) if an operation fails while reencrypting the devices.
+    /// * Err(_) if an operation fails while setting up reencryption on the devices.
     ///
-    /// Precondition: blockdevs_mut() must always return the block devices in the
+    /// Precondition: blockdevs() must always return the block devices in the
     /// same order.
-    pub fn reencrypt(&mut self) -> StratisResult<()> {
+    pub fn prepare_reencrypt(&mut self) -> StratisResult<Vec<(u32, SizedKeyMemory, u32)>> {
         if self.encryption_info().is_none() {
             return Err(StratisError::Msg(
                 "Requested pool does not appear to be encrypted".to_string(),
             ));
         };
 
-        let key_info = operation_loop(
+        operation_loop(
             self.blockdevs_mut().into_iter().map(|(_, _, bd)| bd),
             |blockdev| blockdev.setup_reencrypt(),
-        )?;
+        )
+    }
+
+    /// Reencrypt all encrypted devices in the pool.
+    ///
+    /// Returns:
+    /// * Ok(()) if successful
+    /// * Err(_) if an operation fails while reencrypting the devices.
+    ///
+    /// Precondition: blockdevs() must always return the block devices in the
+    /// same order.
+    pub fn reencrypt(&self, key_info: Vec<(u32, SizedKeyMemory, u32)>) -> StratisResult<()> {
         for (bd, (slot, key, new_slot)) in self
-            .blockdevs_mut()
+            .blockdevs()
             .into_iter()
             .map(|(_, _, bd)| bd)
             .zip(key_info)

@@ -37,6 +37,7 @@ jobs:
     - job: copr_build
       identifier: copr_commit
       trigger: commit
+      preserve_project: true
       targets:
           - fedora-all
 

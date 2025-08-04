@@ -6,6 +6,9 @@ adjust:
   enabled: false
 
 prepare:
+  - name: Remount tpmfs with size 60G
+    how: shell
+    script: mount -o remount,size=60G /tmp
   - name: Start TPM2 emulation kernel module
     how: shell
     script: modprobe tpm_vtpm_proxy
@@ -47,6 +50,10 @@ discover:
 execute:
   how: tmt
   exit-first: false
+
+provision:
+  hardware:
+    memory: ">= 60GB"
 
 /python:
   prepare+:

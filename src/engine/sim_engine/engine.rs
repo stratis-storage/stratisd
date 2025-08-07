@@ -218,6 +218,13 @@ impl Engine for SimEngine {
         Ok(SetUnlockAction::empty())
     }
 
+    async fn upgrade_pool(
+        &self,
+        lock: SomeLockReadGuard<PoolUuid, dyn Pool>,
+    ) -> SomeLockWriteGuard<PoolUuid, dyn Pool> {
+        self.pools.upgrade(lock).await.into_dyn()
+    }
+
     async fn get_pool(
         &self,
         key: PoolIdentifier<PoolUuid>,

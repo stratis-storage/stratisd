@@ -4,11 +4,7 @@
 
 // Code to handle the backing store of a pool.
 
-use std::{
-    cmp,
-    iter::once,
-    path::{Path, PathBuf},
-};
+use std::{cmp, iter::once, path::PathBuf};
 
 use chrono::{DateTime, Utc};
 use either::Either;
@@ -1293,37 +1289,46 @@ impl Backstore {
         self.data_tier.grow(dev)
     }
 
-    pub fn encrypt(
+    pub fn prepare_encrypt(
         &mut self,
         pool_uuid: PoolUuid,
         thinpool: &mut ThinPool<Self>,
         offset: Sectors,
         offset_direction: OffsetDirection,
         encryption_info: &InputEncryptionInfo,
-    ) -> StratisResult<()> {
+    ) -> StratisResult<(u32, (u32, SizedKeyMemory))> {
         let (dm_name, _) = format_backstore_ids(pool_uuid, CacheRole::Cache);
-        let unencrypted_path = PathBuf::from(format!("/dev/mapper/{}", &dm_name.to_string()));
-        let (mut device, sector_size, key_info) =
+        let unencrypted_path = PathBuf::from(DEVICEMAPPER_PATH).join(dm_name.to_string());
+        let (sector_size, key_info) =
             CryptHandle::setup_encrypt(pool_uuid, thinpool, &unencrypted_path, encryption_info)?;
 
         thinpool.suspend()?;
         self.shift_alloc_offset(offset, offset_direction);
-        let set_device_res = get_devno_from_path(Path::new(&format!(
-            "/dev/mapper/{}",
-            &*format_crypt_backstore_name(&pool_uuid)
-        )))
+        let set_device_res = get_devno_from_path(
+            &PathBuf::from(DEVICEMAPPER_PATH)
+                .join(format_crypt_backstore_name(&pool_uuid).to_string()),
+        )
         .and_then(|devno| thinpool.set_device(devno, offset, offset_direction));
         thinpool.resume()?;
         set_device_res?;
 
-        let handle = CryptHandle::do_encrypt(
-            &mut device,
-            &unencrypted_path,
-            pool_uuid,
-            sector_size,
-            key_info,
-        )?;
+        Ok((sector_size, key_info))
+    }
 
+    pub fn do_encrypt(
+        pool_uuid: PoolUuid,
+        sector_size: u32,
+        key_info: (u32, SizedKeyMemory),
+    ) -> StratisResult<()> {
+        let (dm_name, _) = format_backstore_ids(pool_uuid, CacheRole::Cache);
+        let unencrypted_path = PathBuf::from(DEVICEMAPPER_PATH).join(dm_name.to_string());
+        CryptHandle::do_encrypt(&unencrypted_path, pool_uuid, sector_size, key_info)
+    }
+
+    pub fn finish_encrypt(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        let (dm_name, _) = format_backstore_ids(pool_uuid, CacheRole::Cache);
+        let unencrypted_path = PathBuf::from(DEVICEMAPPER_PATH).join(dm_name.to_string());
+        let handle = CryptHandle::finish_encrypt(&unencrypted_path, pool_uuid)?;
         self.cap_device.enc = Some(Either::Right(handle));
         Ok(())
     }

@@ -86,17 +86,35 @@ pub fn encrypt_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
-    let (name, _, pool) = guard.as_mut_tuple();
+    let mut read_guard = get_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
 
-    let result = handle_action!(
-        pool.encrypt_pool(&name, pool_uuid, &ei),
+    let result = match handle_action!(
+        read_guard.encrypt_pool_idem_check(),
         dbus_context,
         pool_path.get_name()
-    );
+    ) {
+        Ok(CreateAction::Identity) => Ok(CreateAction::Identity),
+        Ok(CreateAction::Created(d)) => {
+            let mut guard = block_on(dbus_context.engine.upgrade_pool(read_guard));
+            let result = guard.start_encrypt_pool(pool_uuid, &ei);
+            let guard = guard.downgrade();
+            let result = result.and_then(|(sector_size, key_info)| {
+                guard.do_encrypt_pool(pool_uuid, sector_size, key_info)
+            });
+            let mut guard = block_on(dbus_context.engine.upgrade_pool(guard));
+            let (name, _, _) = guard.as_mut_tuple();
+            let result = result.and_then(|_| guard.finish_encrypt_pool(&name, pool_uuid));
+            read_guard = guard.downgrade();
+            match result {
+                Ok(_) => Ok(CreateAction::Created(d)),
+                Err(e) => Err(e),
+            }
+        }
+        Err(e) => Err(e),
+    };
     let msg = match result {
         Ok(CreateAction::Created(_)) => {
-            let encryption_info = match pool.encryption_info().clone() {
+            let encryption_info = match read_guard.encryption_info().clone() {
                 Some(Either::Left(ei)) => ei,
                 Some(Either::Right(_)) => {
                     unreachable!("online reencryption disabled on metadata V1")

@@ -20,8 +20,8 @@ use crate::{
         },
     },
     engine::{
-        CreateAction, DeleteAction, Engine, InputEncryptionInfo, KeyDescription, Lockable,
-        PoolIdentifier, PoolUuid,
+        CreateAction, DeleteAction, EncryptedDevice, Engine, InputEncryptionInfo, KeyDescription,
+        Lockable, PoolIdentifier, PoolUuid,
     },
     stratis::StratisError,
 };
@@ -86,12 +86,27 @@ pub async fn encrypt_pool_method(
         .get_mut_pool(PoolIdentifier::Uuid(pool_uuid))
         .await
         .ok_or_else(|| StratisError::Msg(format!("No pool associated with uuid {pool_uuid}")));
+    let cloned_engine = Arc::clone(engine);
     match tokio::task::spawn_blocking(move || {
         let mut guard = guard_res?;
 
-        let (name, _, pool) = guard.as_mut_tuple();
-
-        handle_action!(pool.encrypt_pool(&name, pool_uuid, &iei))
+        handle_action!(guard
+            .start_encrypt_pool(pool_uuid, &iei)
+            .and_then(|action| match action {
+                CreateAction::Identity => Ok(CreateAction::Identity),
+                CreateAction::Created((sector_size, key_info)) => {
+                    let guard = guard.downgrade();
+                    guard
+                        .do_encrypt_pool(pool_uuid, sector_size, key_info)
+                        .map(|_| guard)
+                        .and_then(|guard| {
+                            let mut guard = block_on(cloned_engine.upgrade_pool(guard));
+                            let (name, _, _) = guard.as_mut_tuple();
+                            guard.finish_encrypt_pool(&name, pool_uuid)
+                        })
+                        .map(|_| CreateAction::Created(EncryptedDevice(pool_uuid)))
+                }
+            }))
     })
     .await
     {

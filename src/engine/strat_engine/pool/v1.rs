@@ -1340,12 +1340,26 @@ impl Pool for StratPool {
         }
     }
 
-    fn encrypt_pool(
+    #[pool_mutating_action("NoRequests")]
+    fn start_encrypt_pool(
         &mut self,
-        _: &Name,
         _: PoolUuid,
         _: &InputEncryptionInfo,
-    ) -> StratisResult<CreateAction<EncryptedDevice>> {
+    ) -> StratisResult<CreateAction<(u32, (u32, SizedKeyMemory))>> {
+        Err(StratisError::Msg(
+            "Encrypting an unencrypted device is only supported in V2 of the metadata".to_string(),
+        ))
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn do_encrypt_pool(&self, _: PoolUuid, _: u32, _: (u32, SizedKeyMemory)) -> StratisResult<()> {
+        Err(StratisError::Msg(
+            "Encrypting an unencrypted device is only supported in V2 of the metadata".to_string(),
+        ))
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn finish_encrypt_pool(&mut self, _: &Name, _: PoolUuid) -> StratisResult<()> {
         Err(StratisError::Msg(
             "Encrypting an unencrypted device is only supported in V2 of the metadata".to_string(),
         ))

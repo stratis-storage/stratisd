@@ -351,15 +351,33 @@ impl Pool for AnyPool {
         }
     }
 
-    fn encrypt_pool(
+    fn start_encrypt_pool(
         &mut self,
-        name: &Name,
         pool_uuid: PoolUuid,
         encryption_info: &InputEncryptionInfo,
-    ) -> StratisResult<CreateAction<EncryptedDevice>> {
+    ) -> StratisResult<CreateAction<(u32, (u32, SizedKeyMemory))>> {
         match self {
-            AnyPool::V1(p) => p.encrypt_pool(name, pool_uuid, encryption_info),
-            AnyPool::V2(p) => p.encrypt_pool(name, pool_uuid, encryption_info),
+            AnyPool::V1(p) => p.start_encrypt_pool(pool_uuid, encryption_info),
+            AnyPool::V2(p) => p.start_encrypt_pool(pool_uuid, encryption_info),
+        }
+    }
+
+    fn do_encrypt_pool(
+        &self,
+        pool_uuid: PoolUuid,
+        sector_size: u32,
+        key_info: (u32, SizedKeyMemory),
+    ) -> StratisResult<()> {
+        match self {
+            AnyPool::V1(p) => p.do_encrypt_pool(pool_uuid, sector_size, key_info),
+            AnyPool::V2(p) => p.do_encrypt_pool(pool_uuid, sector_size, key_info),
+        }
+    }
+
+    fn finish_encrypt_pool(&mut self, name: &Name, pool_uuid: PoolUuid) -> StratisResult<()> {
+        match self {
+            AnyPool::V1(p) => p.finish_encrypt_pool(name, pool_uuid),
+            AnyPool::V2(p) => p.finish_encrypt_pool(name, pool_uuid),
         }
     }
 

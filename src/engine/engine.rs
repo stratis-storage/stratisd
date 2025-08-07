@@ -516,6 +516,12 @@ pub trait Engine: Debug + Report + Send + Sync {
     ) -> StratisResult<SetUnlockAction<DevUuid>>;
 
     /// Find the pool designated by name or UUID.
+    async fn upgrade_pool(
+        &self,
+        lock: SomeLockReadGuard<PoolUuid, dyn Pool>,
+    ) -> SomeLockWriteGuard<PoolUuid, dyn Pool>;
+
+    /// Find the pool designated by name or UUID.
     async fn get_pool(
         &self,
         key: PoolIdentifier<PoolUuid>,

@@ -1240,10 +1240,12 @@ impl Pool for StratPool {
         self.backstore.prepare_reencrypt()
     }
 
+    #[pool_mutating_action("NoRequests")]
     fn do_reencrypt_pool(&self, key_info: Vec<(u32, SizedKeyMemory, u32)>) -> StratisResult<()> {
         self.backstore.reencrypt(key_info)
     }
 
+    #[pool_mutating_action("NoRequests")]
     fn finish_reencrypt_pool(&mut self, name: &Name) -> StratisResult<ReencryptedDevice> {
         self.last_reencrypt = Some(Utc::now());
         self.write_metadata(name)?;

@@ -5,6 +5,7 @@
 use dbus::Message;
 use dbus_tree::{MTSync, MethodInfo, MethodResult};
 use either::Either;
+use futures::executor::block_on;
 use serde_json::from_str;
 
 use crate::{
@@ -148,18 +149,23 @@ pub fn reencrypt_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult 
     );
 
     let mut guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
-    let (name, _, pool) = guard.as_mut_tuple();
+    let (name, _, _) = guard.as_mut_tuple();
 
-    let result = handle_action!(
-        pool.start_reencrypt_pool()
-            .and_then(|key_info| pool.do_reencrypt_pool(pool_uuid, key_info))
-            .and_then(|_| pool.finish_reencrypt_pool(&name, pool_uuid)),
-        dbus_context,
-        pool_path.get_name()
-    );
+    let result = guard.start_reencrypt_pool();
+    let result = result.and_then(|key_info| {
+        let guard = guard.downgrade();
+        let result = guard.do_reencrypt_pool(pool_uuid, key_info);
+        result.map(|inner| (guard, inner))
+    });
+    let result = result.and_then(|(guard, _)| {
+        let mut guard = block_on(dbus_context.engine.upgrade_pool(guard));
+        guard.finish_reencrypt_pool(&name, pool_uuid)
+    });
+    let result = handle_action!(result, dbus_context, pool_path.get_name());
     let msg = match result {
         Ok(_) => {
-            dbus_context.push_pool_last_reencrypt_timestamp(object_path, pool.last_reencrypt());
+            let guard = get_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+            dbus_context.push_pool_last_reencrypt_timestamp(object_path, guard.last_reencrypt());
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(err) => {

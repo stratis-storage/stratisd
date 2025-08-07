@@ -1356,6 +1356,7 @@ impl Pool for StratPool {
         self.backstore.prepare_reencrypt()
     }
 
+    #[pool_mutating_action("NoRequests")]
     fn do_reencrypt_pool(
         &self,
         pool_uuid: PoolUuid,

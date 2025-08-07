@@ -526,6 +526,15 @@ pub trait Engine: Debug + Report + Send + Sync {
         token_slot: UnlockMethod,
     ) -> StratisResult<SetUnlockAction<DevUuid>>;
 
+    /// Upgrade the read lock on a given pool to a write lock.
+    ///
+    /// This method will prioritize the given lock over all other queued operations to preserve
+    /// atomic operations that need to switch between read and write locks.
+    async fn upgrade_pool(
+        &self,
+        lock: SomeLockReadGuard<PoolUuid, dyn Pool>,
+    ) -> SomeLockWriteGuard<PoolUuid, dyn Pool>;
+
     /// Find the pool designated by name or UUID.
     async fn get_pool(
         &self,

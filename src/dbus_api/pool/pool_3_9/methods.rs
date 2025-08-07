@@ -13,7 +13,7 @@ use crate::{
         types::{DbusErrorEnum, EncryptionInfos, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
-    engine::{CreateAction, InputEncryptionInfo, KeyDescription},
+    engine::{CreateAction, EncryptedDevice, InputEncryptionInfo, KeyDescription},
     stratis::StratisError,
 };
 
@@ -87,16 +87,38 @@ pub fn encrypt_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     );
 
     let mut guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
-    let (name, _, pool) = guard.as_mut_tuple();
 
-    let result = handle_action!(
-        pool.encrypt_pool(&name, pool_uuid, &ei),
+    let create_result = handle_action!(
+        guard
+            .start_encrypt_pool(pool_uuid, &ei)
+            .and_then(|action| match action {
+                CreateAction::Identity => Ok(CreateAction::Identity),
+                CreateAction::Created((sector_size, key_info)) => {
+                    let guard = guard.downgrade();
+                    guard
+                        .do_encrypt_pool(pool_uuid, sector_size, key_info)
+                        .map(|_| guard)
+                        .and_then(|guard| {
+                            let mut guard = block_on(dbus_context.engine.upgrade_pool(guard));
+                            let (name, _, _) = guard.as_mut_tuple();
+                            guard.finish_encrypt_pool(&name, pool_uuid)
+                        })
+                        .map(|_| CreateAction::Created(EncryptedDevice(pool_uuid)))
+                }
+            }),
         dbus_context,
         pool_path.get_name()
     );
-    let msg = match result {
+
+    let msg = match create_result {
+        Ok(CreateAction::Identity) => return_message.append3(
+            default_return,
+            DbusErrorEnum::OK as u16,
+            OK_STRING.to_string(),
+        ),
         Ok(CreateAction::Created(_)) => {
-            let encryption_info = match pool.encryption_info().clone() {
+            let guard = get_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+            let encryption_info = match guard.encryption_info().clone() {
                 Some(Either::Left(ei)) => ei,
                 Some(Either::Right(_)) => {
                     unreachable!("online reencryption disabled on metadata V1")
@@ -117,9 +139,6 @@ pub fn encrypt_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
             }
             dbus_context.push_pool_encryption_status_change(pool_path.get_name(), true);
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
-        }
-        Ok(CreateAction::Identity) => {
-            return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);

@@ -14,6 +14,7 @@ use itertools::Itertools;
 use serde_json::{Map, Value};
 
 use devicemapper::{Bytes, Sectors, IEC};
+use libcryptsetup_rs::SafeMemHandle;
 
 use crate::{
     engine::{
@@ -930,18 +931,28 @@ impl Pool for SimPool {
         }
     }
 
-    fn encrypt_pool(
+    fn start_encrypt_pool(
         &mut self,
-        _: &Name,
-        pool_uuid: PoolUuid,
+        _: PoolUuid,
         enc: &InputEncryptionInfo,
-    ) -> StratisResult<CreateAction<EncryptedDevice>> {
+    ) -> StratisResult<CreateAction<(u32, (u32, SizedKeyMemory))>> {
         if self.encryption_info.is_some() {
             Ok(CreateAction::Identity)
         } else {
             self.encryption_info = convert_encryption_info(Some(enc), None)?;
-            Ok(CreateAction::Created(EncryptedDevice(pool_uuid)))
+            Ok(CreateAction::Created((
+                0,
+                (0, SizedKeyMemory::new(SafeMemHandle::alloc(1)?, 0)),
+            )))
         }
+    }
+
+    fn do_encrypt_pool(&self, _: PoolUuid, _: u32, _: (u32, SizedKeyMemory)) -> StratisResult<()> {
+        Ok(())
+    }
+
+    fn finish_encrypt_pool(&mut self, _: &Name, _: PoolUuid) -> StratisResult<()> {
+        Ok(())
     }
 
     fn start_reencrypt_pool(&mut self) -> StratisResult<Vec<(u32, SizedKeyMemory, u32)>> {

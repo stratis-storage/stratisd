@@ -726,7 +726,7 @@ impl CryptHandle {
         thinpool: &ThinPool<v2::Backstore>,
         unencrypted_path: &Path,
         encryption_info: &InputEncryptionInfo,
-    ) -> StratisResult<(CryptDevice, u32, (u32, SizedKeyMemory))> {
+    ) -> StratisResult<(u32, (u32, SizedKeyMemory))> {
         let mut tmp_file = tempfile::NamedTempFile::new()?;
         tmp_file
             .as_file_mut()
@@ -804,7 +804,7 @@ impl CryptHandle {
             CryptActivate::SHARED,
         )?;
 
-        Ok((device, sector_size, (keyslot, key)))
+        Ok((sector_size, (keyslot, key)))
     }
 
     /// Perform the online encryption operation that was set up.
@@ -813,12 +813,12 @@ impl CryptHandle {
     /// Precondition: crypt device was already added as the backing device for the thin pool
     ///               failure to do so will result in corruption
     pub fn do_encrypt(
-        device: &mut CryptDevice,
         unencrypted_path: &Path,
         pool_uuid: PoolUuid,
         sector_size: u32,
         key_info: (u32, SizedKeyMemory),
-    ) -> StratisResult<Self> {
+    ) -> StratisResult<()> {
+        let mut device = acquire_crypt_device(unencrypted_path)?;
         let activation_name = &format_crypt_backstore_name(&pool_uuid).to_string();
         let (keyslot, key) = key_info;
         device.reencrypt_handle().reencrypt_init_by_passphrase(
@@ -849,7 +849,16 @@ impl CryptHandle {
             },
         )?;
         device.reencrypt_handle().reencrypt2::<()>(None, None)?;
+        Ok(())
+    }
 
+    /// Generate the CryptHandle from the LUKS2 device path.
+    ///
+    /// Precondition: LUKS2 device path was fully encrypted successfully
+    pub fn finish_encrypt(
+        unencrypted_path: &Path,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<CryptHandle> {
         CryptHandle::setup(unencrypted_path, pool_uuid, TokenUnlockMethod::Any, None)
             .map(|h| h.expect("should have crypt device after online encrypt"))
     }

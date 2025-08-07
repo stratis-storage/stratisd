@@ -4,6 +4,7 @@
 
 use std::sync::Arc;
 
+use futures::executor::block_on;
 use serde_json::from_str;
 use tokio::sync::RwLock;
 use zbus::Connection;
@@ -131,15 +132,23 @@ pub async fn reencrypt_pool_method(
         .get_mut_pool(PoolIdentifier::Uuid(pool_uuid))
         .await
         .ok_or_else(|| StratisError::Msg(format!("No pool associated with uuid {pool_uuid}")));
+    let cloned_engine = Arc::clone(engine);
     match tokio::task::spawn_blocking(move || {
         let mut guard = guard_res?;
 
-        let (name, _, pool) = guard.as_mut_tuple();
+        let (name, _, _) = guard.as_mut_tuple();
 
-        handle_action!(pool
-            .start_reencrypt_pool()
-            .and_then(|key_info| pool.do_reencrypt_pool(pool_uuid, key_info))
-            .and_then(|_| pool.finish_reencrypt_pool(&name, pool_uuid)))
+        let result = guard.start_reencrypt_pool();
+        let result = result.and_then(|key_info| {
+            let guard = guard.downgrade();
+            let result = guard.do_reencrypt_pool(pool_uuid, key_info);
+            result.map(|inner| (guard, inner))
+        });
+        let result = result.and_then(|(guard, _)| {
+            let mut guard = block_on(cloned_engine.upgrade_pool(guard));
+            guard.finish_reencrypt_pool(&name, pool_uuid)
+        });
+        handle_action!(result)
     })
     .await
     {

@@ -22,13 +22,14 @@ use crate::{
         structures::{AllLockReadGuard, AllLockWriteGuard, SomeLockReadGuard, SomeLockWriteGuard},
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo, IntegritySpec, Key,
-            KeyDescription, LockedPoolsInfo, MappingCreateAction, MappingDeleteAction, Name,
-            OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolIdentifier, PoolUuid,
-            PropChangeAction, RegenAction, RenameAction, ReportType, SetCreateAction,
-            SetDeleteAction, SetUnlockAction, StartAction, StopAction, StoppedPoolsInfo,
-            StratBlockDevDiff, StratFilesystemDiff, StratSigblockVersion, TokenUnlockMethod,
-            UdevEngineEvent, UnlockMethod,
+            EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo,
+            IntegritySpec, Key, KeyDescription, LockedPoolsInfo, MappingCreateAction,
+            MappingDeleteAction, Name, OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo,
+            PoolIdentifier, PoolUuid, PropChangeAction, ReencryptedDevice, RegenAction,
+            RenameAction, ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction,
+            SizedKeyMemory, StartAction, StopAction, StoppedPoolsInfo, StratBlockDevDiff,
+            StratFilesystemDiff, StratSigblockVersion, TokenUnlockMethod, UdevEngineEvent,
+            UnlockMethod,
         },
     },
     stratis::StratisResult,
@@ -398,6 +399,34 @@ pub trait Pool: Debug + Send + Sync {
         limit: Option<Bytes>,
     ) -> StratisResult<PropChangeAction<Option<Sectors>>>;
 
+    /// Encrypted an unencrypted pool.
+    fn encrypt_pool(
+        &mut self,
+        name: &Name,
+        pool_uuid: PoolUuid,
+        encryption_info: &InputEncryptionInfo,
+    ) -> StratisResult<CreateAction<EncryptedDevice>>;
+
+    /// Start reencryption of an encrypted pool.
+    ///
+    /// Sets up the reencryption process.
+    fn start_reencrypt_pool(&mut self) -> StratisResult<Vec<(u32, SizedKeyMemory, u32)>>;
+
+    /// Perform reencryption of an encrypted pool.
+    ///
+    /// Acquires a read lock during the duration of the reencryption.
+    fn do_reencrypt_pool(&self, key_info: Vec<(u32, SizedKeyMemory, u32)>) -> StratisResult<()>;
+
+    /// Finish reencryption of an encrypted pool.
+    fn finish_reencrypt_pool(&mut self, name: &Name) -> StratisResult<ReencryptedDevice>;
+
+    /// Decrypt an encrypted pool.
+    fn decrypt_pool(
+        &mut self,
+        name: &Name,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<DeleteAction<EncryptedDevice>>;
+
     /// Return the metadata that would be written if metadata were written.
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String>;
 
@@ -430,6 +459,9 @@ pub trait Pool: Debug + Send + Sync {
     ///
     /// Returns true if the key was newly loaded and false if the key was already loaded.
     fn load_volume_key(&mut self, uuid: PoolUuid) -> StratisResult<bool>;
+
+    /// Get the timestamp of the last online reencryption operation.
+    fn last_reencrypt(&self) -> Option<DateTime<Utc>>;
 }
 
 pub type HandleEvents<P> = (
@@ -482,6 +514,12 @@ pub trait Engine: Debug + Report + Send + Sync {
         uuid: PoolUuid,
         token_slot: UnlockMethod,
     ) -> StratisResult<SetUnlockAction<DevUuid>>;
+
+    /// Find the pool designated by name or UUID.
+    async fn upgrade_pool(
+        &self,
+        lock: SomeLockReadGuard<PoolUuid, dyn Pool>,
+    ) -> SomeLockWriteGuard<PoolUuid, dyn Pool>;
 
     /// Find the pool designated by name or UUID.
     async fn get_pool(

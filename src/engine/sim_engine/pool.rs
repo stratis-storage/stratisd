@@ -8,6 +8,7 @@ use std::{
     vec::Vec,
 };
 
+use chrono::{DateTime, Utc};
 use either::Either;
 use itertools::Itertools;
 use serde_json::{Map, Value};
@@ -21,16 +22,18 @@ use crate::{
             init_cache_idempotent_or_err, validate_filesystem_size, validate_filesystem_size_specs,
             validate_name, validate_paths,
         },
-        sim_engine::{blockdev::SimDev, filesystem::SimFilesystem},
+        sim_engine::{
+            blockdev::SimDev, filesystem::SimFilesystem, shared::convert_encryption_info,
+        },
         structures::Table,
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name,
-            OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolUuid, RegenAction,
-            RenameAction, SetCreateAction, SetDeleteAction, StratSigblockVersion, UnlockMechanism,
+            EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo, Key,
+            KeyDescription, Name, OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolUuid,
+            PropChangeAction, ReencryptedDevice, RegenAction, RenameAction, SetCreateAction,
+            SetDeleteAction, SizedKeyMemory, StratSigblockVersion, UnlockMechanism,
             ValidatedIntegritySpec,
         },
-        PropChangeAction,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -44,6 +47,7 @@ pub struct SimPool {
     enable_overprov: bool,
     encryption_info: Option<EncryptionInfo>,
     integrity_spec: ValidatedIntegritySpec,
+    last_reencrypt: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
@@ -72,6 +76,7 @@ impl SimPool {
                 enable_overprov: true,
                 encryption_info: enc_info.cloned(),
                 integrity_spec,
+                last_reencrypt: None,
             },
         )
     }
@@ -925,6 +930,53 @@ impl Pool for SimPool {
         }
     }
 
+    fn encrypt_pool(
+        &mut self,
+        _: &Name,
+        _: PoolUuid,
+        enc: &InputEncryptionInfo,
+    ) -> StratisResult<CreateAction<EncryptedDevice>> {
+        if self.encryption_info.is_some() {
+            Ok(CreateAction::Identity)
+        } else {
+            self.encryption_info = convert_encryption_info(Some(enc), None)?;
+            Ok(CreateAction::Created(EncryptedDevice))
+        }
+    }
+
+    fn start_reencrypt_pool(&mut self) -> StratisResult<Vec<(u32, SizedKeyMemory, u32)>> {
+        if self.encryption_info.is_none() {
+            Err(StratisError::Msg(
+                "Cannot reencrypt unencrypted pool".to_string(),
+            ))
+        } else {
+            Ok(vec![])
+        }
+    }
+
+    fn do_reencrypt_pool(&self, _: Vec<(u32, SizedKeyMemory, u32)>) -> StratisResult<()> {
+        Ok(())
+    }
+
+    fn finish_reencrypt_pool(&mut self, _: &Name) -> StratisResult<ReencryptedDevice> {
+        self.last_reencrypt = Some(Utc::now());
+        Ok(ReencryptedDevice)
+    }
+
+    fn decrypt_pool(
+        &mut self,
+        _: &Name,
+        _: PoolUuid,
+    ) -> StratisResult<DeleteAction<EncryptedDevice>> {
+        if self.encryption_info.is_none() {
+            Ok(DeleteAction::Identity)
+        } else {
+            self.encryption_info = None;
+            self.last_reencrypt = None;
+            Ok(DeleteAction::Deleted(EncryptedDevice))
+        }
+    }
+
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {
         serde_json::to_string(&self.record(pool_name)).map_err(|e| e.into())
     }
@@ -1044,6 +1096,10 @@ impl Pool for SimPool {
 
     fn load_volume_key(&mut self, _: PoolUuid) -> StratisResult<bool> {
         Ok(false)
+    }
+
+    fn last_reencrypt(&self) -> Option<DateTime<Utc>> {
+        self.last_reencrypt
     }
 }
 

@@ -1211,28 +1211,45 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action("NoRequests")]
-    fn encrypt_pool(
-        &mut self,
-        name: &Name,
-        pool_uuid: PoolUuid,
-        encryption_info: &InputEncryptionInfo,
-    ) -> StratisResult<CreateAction<EncryptedDevice>> {
-        let offset = DEFAULT_CRYPT_DATA_OFFSET_V2;
-        let direction = OffsetDirection::Backwards;
+    fn encrypt_pool_idem_check(&self) -> StratisResult<CreateAction<EncryptedDevice>> {
         match self.backstore.encryption_info() {
             Some(_) => Ok(CreateAction::Identity),
-            None => {
-                self.backstore.encrypt(
-                    pool_uuid,
-                    &mut self.thin_pool,
-                    offset,
-                    direction,
-                    encryption_info,
-                )?;
-                self.write_metadata(name)?;
-                Ok(CreateAction::Created(EncryptedDevice))
-            }
+            None => Ok(CreateAction::Created(EncryptedDevice)),
         }
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn start_encrypt_pool(
+        &mut self,
+        pool_uuid: PoolUuid,
+        encryption_info: &InputEncryptionInfo,
+    ) -> StratisResult<(u32, (u32, SizedKeyMemory))> {
+        let offset = DEFAULT_CRYPT_DATA_OFFSET_V2;
+        let direction = OffsetDirection::Backwards;
+        self.backstore.prepare_encrypt(
+            pool_uuid,
+            &mut self.thin_pool,
+            offset,
+            direction,
+            encryption_info,
+        )
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn do_encrypt_pool(
+        &self,
+        pool_uuid: PoolUuid,
+        sector_size: u32,
+        key_info: (u32, SizedKeyMemory),
+    ) -> StratisResult<()> {
+        Backstore::do_encrypt(pool_uuid, sector_size, key_info)
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn finish_encrypt_pool(&mut self, name: &Name, pool_uuid: PoolUuid) -> StratisResult<()> {
+        self.backstore.finish_encrypt(pool_uuid)?;
+        self.write_metadata(name)?;
+        Ok(())
     }
 
     #[pool_mutating_action("NoRequests")]
@@ -2182,10 +2199,8 @@ mod tests {
             {
                 let mut handle =
                     test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid))).unwrap();
-                let (name, _, pool) = handle.as_mut_tuple();
-                assert!(!pool.is_encrypted());
-                pool.encrypt_pool(
-                    &name,
+                assert!(!handle.is_encrypted());
+                let (sector_size, key_info) = handle.start_encrypt_pool(
                     pool_uuid,
                     &InputEncryptionInfo::new(
                         vec![(None, key_desc.to_owned())],
@@ -2204,7 +2219,14 @@ mod tests {
                     .unwrap(),
                 )
                 .unwrap();
-                assert!(pool.is_encrypted());
+                let handle = handle.downgrade();
+                handle
+                    .do_encrypt_pool(pool_uuid, sector_size, key_info)
+                    .unwrap();
+                let mut handle = test_async!(engine.upgrade_pool(handle.into_dyn()));
+                let (name, _, _) = handle.as_mut_tuple();
+                handle.finish_encrypt_pool(&name, pool_uuid).unwrap();
+                assert!(handle.is_encrypted());
             }
 
             test_async!(engine.stop_pool(PoolIdentifier::Uuid(pool_uuid), true)).unwrap();

@@ -402,13 +402,23 @@ pub trait Pool: Debug + Send + Sync {
         limit: Option<Bytes>,
     ) -> StratisResult<PropChangeAction<Option<Sectors>>>;
 
-    /// Encrypted an unencrypted pool.
-    fn encrypt_pool(
+    /// Setup pool encryption operation and check for idempotence.
+    fn start_encrypt_pool(
         &mut self,
-        name: &Name,
         pool_uuid: PoolUuid,
         encryption_info: &InputEncryptionInfo,
-    ) -> StratisResult<CreateAction<EncryptedDevice>>;
+    ) -> StratisResult<CreateAction<(u32, (u32, SizedKeyMemory))>>;
+
+    /// Encrypt an unencrypted pool.
+    fn do_encrypt_pool(
+        &self,
+        pool_uuid: PoolUuid,
+        sector_size: u32,
+        key_info: (u32, SizedKeyMemory),
+    ) -> StratisResult<()>;
+
+    /// Update internal data structures with the result of the encryption operation.
+    fn finish_encrypt_pool(&mut self, name: &Name, pool_uuid: PoolUuid) -> StratisResult<()>;
 
     /// Start reencryption of an encrypted pool.
     ///

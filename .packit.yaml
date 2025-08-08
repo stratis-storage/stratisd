@@ -11,7 +11,7 @@ downstream_package_name: stratisd
 actions:
     post-upstream-clone:
         - "git clone https://github.com/stratis-storage/ci --depth=1 ../distro"
-        - "mv ../distro/mockbuild_test/stratisd.spec ../distro/stratisd.spec"
+        - "bash -c '(cd ../distro; wget https://src.fedoraproject.org/rpms/stratisd/raw/rawhide/f/stratisd.spec)'"
         - "cargo install cargo-get"
         - "cargo install cargo-vendor-filterer"
     create-archive:
@@ -22,10 +22,12 @@ actions:
         - "cargo get package.version"
 
 srpm_build_deps:
-    - git
     - cargo
+    - git
     - openssl-devel
     - python3-semantic_version
+    - wget2
+    - wget2-wget
 
 jobs:
     - job: copr_build

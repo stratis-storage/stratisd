@@ -40,10 +40,10 @@ jobs:
       matrix:
         include:
           - task: make -f Makefile fmt-ci
-            toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.89.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: rustfmt
           - task: make -f Makefile check-typos
-            toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.89.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-24.04
     container:
@@ -176,7 +176,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.89.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - uses: actions/checkout@v4
       - name: Overwrite stratisd dependencies as necessary
         uses: stratis-storage/github-actions/stratisd-modify@HEAD
@@ -254,7 +254,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.89.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - uses: actions/checkout@v4
       - name: Overwrite stratisd dependencies as necessary
         uses: stratis-storage/github-actions/stratisd-modify@HEAD

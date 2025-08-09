@@ -15,7 +15,7 @@ jobs:
       matrix:
         include:
           - task: cargo package
-            toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.89.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-24.04
     container:
@@ -68,7 +68,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.89.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-audit
@@ -110,7 +110,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.89.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-audit
@@ -145,7 +145,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.89.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - uses: actions/checkout@v4
         with:
           path: stratisd
@@ -207,7 +207,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.89.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - uses: actions/checkout@v4
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all

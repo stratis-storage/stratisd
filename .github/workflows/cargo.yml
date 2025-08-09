@@ -50,7 +50,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.88.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.89.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - uses: actions/checkout@v4
         with:
           path: stratisd

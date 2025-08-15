@@ -1381,12 +1381,13 @@ impl Backstore {
         Ok(())
     }
 
-    pub fn decrypt(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
+    pub fn do_decrypt(&self, pool_uuid: PoolUuid) -> StratisResult<()> {
         let handle = self
             .cap_device
             .enc
-            .take()
+            .as_ref()
             .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?
+            .as_ref()
             .right()
             .ok_or_else(|| {
                 StratisError::Msg("No space has been allocated from the backstore".to_string())
@@ -1395,6 +1396,25 @@ impl Backstore {
 
         handle.decrypt(pool_uuid)?;
         manual_wipe(&luks2_path, Sectors(0), DEFAULT_CRYPT_DATA_OFFSET_V2)?;
+        Ok(())
+    }
+
+    pub fn finish_decrypt(
+        &mut self,
+        pool_uuid: PoolUuid,
+        thinpool: &mut ThinPool<Self>,
+        offset: Sectors,
+        direction: OffsetDirection,
+    ) -> StratisResult<()> {
+        thinpool.suspend()?;
+        let (dm_name, _) = format_backstore_ids(pool_uuid, CacheRole::Cache);
+        let set_device_res =
+            get_devno_from_path(&PathBuf::from(DEVICEMAPPER_PATH).join(dm_name.to_string()))
+                .and_then(|devno| thinpool.set_device(devno, offset, direction));
+        thinpool.resume()?;
+        self.shift_alloc_offset(offset, direction);
+        set_device_res?;
+        self.cap_device.enc = None;
         Ok(())
     }
 

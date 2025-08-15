@@ -13,7 +13,7 @@ use crate::{
         types::{DbusErrorEnum, EncryptionInfos, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
-    engine::{CreateAction, EncryptedDevice, InputEncryptionInfo, KeyDescription},
+    engine::{CreateAction, DeleteAction, EncryptedDevice, InputEncryptionInfo, KeyDescription},
     stratis::StratisError,
 };
 
@@ -215,21 +215,40 @@ pub fn decrypt_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     );
 
     let mut guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
-    let (name, uuid, pool) = guard.as_mut_tuple();
 
     let result = handle_action!(
-        pool.decrypt_pool(&name, uuid),
+        match guard.decrypt_pool_idem_check(pool_uuid) {
+            Ok(DeleteAction::Identity) => Ok(DeleteAction::Identity),
+            Ok(DeleteAction::Deleted(d)) => {
+                let guard = guard.downgrade();
+                guard
+                    .do_decrypt_pool(pool_uuid)
+                    .and_then(|_| {
+                        let mut guard = block_on(dbus_context.engine.upgrade_pool(guard));
+                        let (name, _, _) = guard.as_mut_tuple();
+                        guard.finish_decrypt_pool(pool_uuid, &name)
+                    })
+                    .map(|_| DeleteAction::Deleted(d))
+            }
+            Err(e) => Err(e),
+        },
         dbus_context,
         pool_path.get_name()
     );
     let msg = match result {
-        Ok(_) => {
+        Ok(DeleteAction::Deleted(_)) => {
+            let guard = get_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
             dbus_context.push_pool_key_desc_change(pool_path.get_name(), None);
             dbus_context.push_pool_clevis_info_change(pool_path.get_name(), None);
             dbus_context.push_pool_encryption_status_change(pool_path.get_name(), false);
-            dbus_context.push_pool_last_reencrypt_timestamp(object_path, pool.last_reencrypt());
+            dbus_context.push_pool_last_reencrypt_timestamp(object_path, guard.last_reencrypt());
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
+        Ok(DeleteAction::Identity) => return_message.append3(
+            default_return,
+            DbusErrorEnum::OK as u16,
+            OK_STRING.to_string(),
+        ),
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)

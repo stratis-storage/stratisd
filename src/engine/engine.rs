@@ -441,12 +441,20 @@ pub trait Pool: Debug + Send + Sync {
         pool_uuid: PoolUuid,
     ) -> StratisResult<ReencryptedDevice>;
 
-    /// Decrypt an encrypted pool.
-    fn decrypt_pool(
+    /// Check idempotence of a pool decrypt command.
+    ///
+    /// This method does not require interior mutability, but a write lock is required
+    /// to ensure that no other decryption operations have already started.
+    fn decrypt_pool_idem_check(
         &mut self,
-        name: &Name,
         pool_uuid: PoolUuid,
     ) -> StratisResult<DeleteAction<EncryptedDevice>>;
+
+    /// Decrypt an encrypted pool.
+    fn do_decrypt_pool(&self, pool_uuid: PoolUuid) -> StratisResult<()>;
+
+    /// Finish pool decryption operation.
+    fn finish_decrypt_pool(&mut self, pool_uuid: PoolUuid, name: &Name) -> StratisResult<()>;
 
     /// Return the metadata that would be written if metadata were written.
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String>;

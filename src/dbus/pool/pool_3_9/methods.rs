@@ -201,12 +201,25 @@ pub async fn decrypt_pool_method(
         .get_mut_pool(PoolIdentifier::Uuid(pool_uuid))
         .await
         .ok_or_else(|| StratisError::Msg(format!("No pool associated with uuid {pool_uuid}")));
+    let cloned_engine = Arc::clone(engine);
     match tokio::task::spawn_blocking(move || {
         let mut guard = guard_res?;
 
-        let (name, _, pool) = guard.as_mut_tuple();
-
-        handle_action!(pool.decrypt_pool(&name, pool_uuid))
+        handle_action!(match guard.decrypt_pool_idem_check(pool_uuid) {
+            Ok(DeleteAction::Identity) => Ok(DeleteAction::Identity),
+            Ok(DeleteAction::Deleted(d)) => {
+                let guard = guard.downgrade();
+                guard
+                    .do_decrypt_pool(pool_uuid)
+                    .and_then(|_| {
+                        let mut guard = block_on(cloned_engine.upgrade_pool(guard));
+                        let (name, _, _) = guard.as_mut_tuple();
+                        guard.finish_decrypt_pool(pool_uuid, &name)
+                    })
+                    .map(|_| DeleteAction::Deleted(d))
+            }
+            Err(e) => Err(e),
+        })
     })
     .await
     {

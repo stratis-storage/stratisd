@@ -13,7 +13,7 @@ use crate::{
         types::{DbusErrorEnum, EncryptionInfos, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
-    engine::{CreateAction, InputEncryptionInfo, KeyDescription},
+    engine::{CreateAction, DeleteAction, InputEncryptionInfo, KeyDescription},
     stratis::StratisError,
 };
 
@@ -90,7 +90,8 @@ pub fn encrypt_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
 
     // Check if operation is idempotent and complete all operations before handling result
     let create_result = handle_action!(
-        read_guard.encrypt_pool_idem_check()
+        read_guard
+            .encrypt_pool_idem_check()
             .and_then(|action| match action {
                 CreateAction::Identity => Ok(action),
                 CreateAction::Created(_) => {
@@ -117,9 +118,11 @@ pub fn encrypt_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     );
 
     let msg = match create_result {
-        Ok(CreateAction::Identity) => {
-            return_message.append3(default_return, DbusErrorEnum::OK as u16, OK_STRING.to_string())
-        }
+        Ok(CreateAction::Identity) => return_message.append3(
+            default_return,
+            DbusErrorEnum::OK as u16,
+            OK_STRING.to_string(),
+        ),
         Ok(CreateAction::Created(_)) => {
             let guard = get_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
             let encryption_info = match guard.encryption_info().clone() {
@@ -218,19 +221,34 @@ pub fn decrypt_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
-    let (name, uuid, pool) = guard.as_mut_tuple();
+    let guard = get_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
 
-    let result = handle_action!(
-        pool.decrypt_pool(&name, uuid),
+    let result = match handle_action!(
+        guard.decrypt_pool_idem_check(),
         dbus_context,
         pool_path.get_name()
-    );
+    ) {
+        Ok(DeleteAction::Identity) => Ok(DeleteAction::Identity),
+        Ok(DeleteAction::Deleted(d)) => {
+            match guard.do_decrypt_pool(pool_uuid).and_then(|_| {
+                let mut guard = block_on(dbus_context.engine.upgrade_pool(guard));
+                let (name, _, _) = guard.as_mut_tuple();
+                guard.finish_decrypt_pool(pool_uuid, &name)
+            }) {
+                Ok(_) => Ok(DeleteAction::Deleted(d)),
+                Err(e) => Err(e),
+            }
+        }
+        Err(e) => Err(e),
+    };
     let msg = match result {
-        Ok(_) => {
+        Ok(DeleteAction::Deleted(_)) => {
             dbus_context.push_pool_key_desc_change(pool_path.get_name(), None);
             dbus_context.push_pool_clevis_info_change(pool_path.get_name(), None);
             dbus_context.push_pool_encryption_status_change(pool_path.get_name(), false);
+            return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
+        Ok(DeleteAction::Identity) => {
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(err) => {

@@ -885,7 +885,7 @@ impl CryptHandle {
     }
 
     /// Encrypt an unencrypted pool.
-    pub fn decrypt(self, pool_uuid: PoolUuid) -> StratisResult<()> {
+    pub fn decrypt(&self, pool_uuid: PoolUuid) -> StratisResult<()> {
         let activation_name = format_crypt_backstore_name(&pool_uuid);
         let sector_size = convert_int!(
             *get_logical_sector_size(self.luks2_device_path())?,
@@ -895,6 +895,7 @@ impl CryptHandle {
         let mut device = acquire_crypt_device(self.luks2_device_path())?;
         let (keyslot, key) = get_passphrase(&mut device, self.encryption_info())?
             .either(|(keyslot, _, key)| (keyslot, key), |tup| tup);
+
         device.reencrypt_handle().reencrypt_init_by_passphrase(
             Some(&activation_name.to_string()),
             key.as_ref(),

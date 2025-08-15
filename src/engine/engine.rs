@@ -433,12 +433,14 @@ pub trait Pool: Debug + Send + Sync {
     /// Finish reencryption of an encrypted pool.
     fn finish_reencrypt_pool(&mut self, name: &Name) -> StratisResult<ReencryptedDevice>;
 
+    /// Check idempotence of a pool decrypt command.
+    fn decrypt_pool_idem_check(&self) -> StratisResult<DeleteAction<EncryptedDevice>>;
+
     /// Decrypt an encrypted pool.
-    fn decrypt_pool(
-        &mut self,
-        name: &Name,
-        pool_uuid: PoolUuid,
-    ) -> StratisResult<DeleteAction<EncryptedDevice>>;
+    fn do_decrypt_pool(&self, pool_uuid: PoolUuid) -> StratisResult<()>;
+
+    /// Finish pool decryption operation.
+    fn finish_decrypt_pool(&mut self, pool_uuid: PoolUuid, name: &Name) -> StratisResult<()>;
 
     /// Return the metadata that would be written if metadata were written.
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String>;

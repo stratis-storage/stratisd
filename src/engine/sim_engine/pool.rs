@@ -982,18 +982,25 @@ impl Pool for SimPool {
         Ok(ReencryptedDevice(pool_uuid))
     }
 
-    fn decrypt_pool(
+    fn decrypt_pool_idem_check(
         &mut self,
-        _: &Name,
         pool_uuid: PoolUuid,
     ) -> StratisResult<DeleteAction<EncryptedDevice>> {
         if self.encryption_info.is_none() {
             Ok(DeleteAction::Identity)
         } else {
-            self.encryption_info = None;
-            self.last_reencrypt = None;
             Ok(DeleteAction::Deleted(EncryptedDevice(pool_uuid)))
         }
+    }
+
+    fn do_decrypt_pool(&self, _: PoolUuid) -> StratisResult<()> {
+        Ok(())
+    }
+
+    fn finish_decrypt_pool(&mut self, _: PoolUuid, _: &Name) -> StratisResult<()> {
+        self.encryption_info = None;
+        self.last_reencrypt = None;
+        Ok(())
     }
 
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {

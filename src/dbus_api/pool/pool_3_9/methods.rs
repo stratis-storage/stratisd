@@ -13,7 +13,7 @@ use crate::{
         types::{DbusErrorEnum, EncryptionInfos, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
-    engine::{CreateAction, InputEncryptionInfo, KeyDescription},
+    engine::{CreateAction, DeleteAction, InputEncryptionInfo, KeyDescription},
     stratis::StratisError,
 };
 
@@ -207,14 +207,26 @@ pub fn decrypt_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
-    let (name, uuid, pool) = guard.as_mut_tuple();
+    let read_guard = get_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
 
-    let result = handle_action!(
-        pool.decrypt_pool(&name, uuid),
+    let result = match handle_action!(
+        read_guard.decrypt_pool_idem_check(),
         dbus_context,
         pool_path.get_name()
-    );
+    ) {
+        Ok(DeleteAction::Identity) => Ok(DeleteAction::Identity),
+        Ok(DeleteAction::Deleted(d)) => {
+            let result = read_guard.do_decrypt_pool(pool_uuid);
+            let mut guard = block_on(dbus_context.engine.upgrade_pool(read_guard));
+            let (name, _, _) = guard.as_mut_tuple();
+            let result = result.and_then(|_| guard.finish_decrypt_pool(&name));
+            match result {
+                Ok(_) => Ok(DeleteAction::Deleted(d)),
+                Err(e) => Err(e),
+            }
+        }
+        Err(e) => Err(e),
+    };
     let msg = match result {
         Ok(_) => {
             dbus_context.push_pool_key_desc_change(pool_path.get_name(), None);

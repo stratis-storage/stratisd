@@ -1389,11 +1389,19 @@ impl Pool for StratPool {
         Ok(ReencryptedDevice)
     }
 
-    fn decrypt_pool(
-        &mut self,
-        _: &Name,
-        _: PoolUuid,
-    ) -> StratisResult<DeleteAction<EncryptedDevice>> {
+    fn decrypt_pool_idem_check(&self) -> StratisResult<DeleteAction<EncryptedDevice>> {
+        Err(StratisError::Msg(
+            "Decrypting an encrypted device is only supported in V2 of the metadata".to_string(),
+        ))
+    }
+
+    fn do_decrypt_pool(&self, _: PoolUuid) -> StratisResult<()> {
+        Err(StratisError::Msg(
+            "Decrypting an encrypted device is only supported in V2 of the metadata".to_string(),
+        ))
+    }
+
+    fn finish_decrypt_pool(&mut self, _: PoolUuid, _: &Name) -> StratisResult<()> {
         Err(StratisError::Msg(
             "Decrypting an encrypted device is only supported in V2 of the metadata".to_string(),
         ))

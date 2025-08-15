@@ -410,14 +410,27 @@ impl Pool for AnyPool {
         }
     }
 
-    fn decrypt_pool(
+    fn decrypt_pool_idem_check(
         &mut self,
-        name: &Name,
         pool_uuid: PoolUuid,
     ) -> StratisResult<DeleteAction<EncryptedDevice>> {
         match self {
-            AnyPool::V1(p) => p.decrypt_pool(name, pool_uuid),
-            AnyPool::V2(p) => p.decrypt_pool(name, pool_uuid),
+            AnyPool::V1(p) => p.decrypt_pool_idem_check(pool_uuid),
+            AnyPool::V2(p) => p.decrypt_pool_idem_check(pool_uuid),
+        }
+    }
+
+    fn do_decrypt_pool(&self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        match self {
+            AnyPool::V1(p) => p.do_decrypt_pool(pool_uuid),
+            AnyPool::V2(p) => p.do_decrypt_pool(pool_uuid),
+        }
+    }
+
+    fn finish_decrypt_pool(&mut self, pool_uuid: PoolUuid, name: &Name) -> StratisResult<()> {
+        match self {
+            AnyPool::V1(p) => p.finish_decrypt_pool(pool_uuid, name),
+            AnyPool::V2(p) => p.finish_decrypt_pool(pool_uuid, name),
         }
     }
 

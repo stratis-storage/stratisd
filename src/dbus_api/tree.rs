@@ -483,7 +483,7 @@ impl DbusTreeHandler {
                     consts::POOL_INTERFACE_NAME_3_8 => {
                         Vec::new(),
                         consts::POOL_KEY_DESCS_PROP.to_string() =>
-                        key_descs_to_prop(ei.clone().map(|either| either.map_left(|(_, ei)| ei)))
+                        box_variant!(key_descs_to_prop(ei.clone().map(|either| either.map_left(|(_, ei)| ei))))
                     }
                 },
             )

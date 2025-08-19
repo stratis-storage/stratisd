@@ -298,6 +298,7 @@ jobs:
       - name: Install Python dependencies
         run: >
           sudo python -m pip install
+          deepdiff
           dbus-python
           dbus-python-client-gen
           justbytes
@@ -324,9 +325,11 @@ jobs:
         working-directory: stratisd
       - name: Reload udev
         run: sudo udevadm control --reload
-      - uses: stratis-storage/github-actions/github-modify@HEAD
+      - uses: actions/checkout@v4
         with:
-          repo: testing
+          repository: stratis-storage/testing
+          path: testing
+          ref: refs/pull/328/head
       - name: Run stratisd_cert.py
         run: >
           sudo

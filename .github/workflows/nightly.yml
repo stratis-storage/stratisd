@@ -41,7 +41,7 @@ jobs:
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -72,7 +72,7 @@ jobs:
       - uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-audit
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run cargo-update
         run: cargo update
       - name: Build all targets
@@ -117,7 +117,7 @@ jobs:
       - uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-auditable
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run matrix task
         run: ${{ matrix.task }}
 
@@ -146,11 +146,11 @@ jobs:
         with:
           components: cargo
           toolchain: 1.89.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           path: stratisd
       - name: Check out ci repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: ci
           repository: stratis-storage/ci
@@ -208,7 +208,7 @@ jobs:
         with:
           components: cargo
           toolchain: 1.89.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd

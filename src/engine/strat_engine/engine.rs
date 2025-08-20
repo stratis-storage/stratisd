@@ -308,7 +308,10 @@ impl StratEngine {
     async fn pool_evented_timer(&self) -> HashMap<PoolUuid, PoolDiff> {
         let mut joins = Vec::new();
         let guards: Vec<SomeLockWriteGuard<PoolUuid, AnyPool>> =
-            self.pools.write_all().await.into();
+            match self.pools.write_all_available().await {
+                Some(g) => g.into(),
+                None => return HashMap::default(),
+            };
         for guard in guards {
             Self::spawn_pool_check_handling(&mut joins, guard);
         }
@@ -339,7 +342,10 @@ impl StratEngine {
     async fn fs_evented_timer(&self) -> HashMap<FilesystemUuid, StratFilesystemDiff> {
         let mut joins = Vec::new();
         let guards: Vec<SomeLockWriteGuard<PoolUuid, AnyPool>> =
-            self.pools.write_all().await.into();
+            match self.pools.write_all_available().await {
+                Some(g) => g.into(),
+                None => return HashMap::default(),
+            };
         for guard in guards {
             Self::spawn_fs_check_handling(&mut joins, guard);
         }

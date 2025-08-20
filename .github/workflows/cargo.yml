@@ -51,11 +51,11 @@ jobs:
         with:
           components: cargo
           toolchain: 1.89.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           path: stratisd
       - name: Check out ci repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: ci
           repository: stratis-storage/ci

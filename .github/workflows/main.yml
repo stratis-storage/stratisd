@@ -72,7 +72,7 @@ jobs:
       - uses: baptiste0928/cargo-install@v3
         with:
           crate: typos-cli
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -110,7 +110,7 @@ jobs:
         with:
           components: cargo
           toolchain: 1.77.0  # LOWEST SUPPORTED RUST TOOLCHAIN
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           path: stratisd
       - name: Overwrite stratisd dependencies as necessary
@@ -177,7 +177,7 @@ jobs:
         with:
           components: cargo
           toolchain: 1.89.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Overwrite stratisd dependencies as necessary
         uses: stratis-storage/github-actions/stratisd-modify@HEAD
       - name: Run stratisd-min cli tests
@@ -199,7 +199,7 @@ jobs:
           make
           ncurses
           shfmt
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run shell check
         run: make -f Makefile fmt-shell-ci
 
@@ -219,7 +219,7 @@ jobs:
           python3-dbus
       - name: Install pyright
         run: pip install --user pyright
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run lint
         run: >
           PATH=${PATH}:/github/home/.local/bin
@@ -255,7 +255,7 @@ jobs:
         with:
           components: cargo
           toolchain: 1.89.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Overwrite stratisd dependencies as necessary
         uses: stratis-storage/github-actions/stratisd-modify@HEAD
       - name: Build stratisd
@@ -307,7 +307,7 @@ jobs:
         with:
           components: cargo
           toolchain: 1.77.0  # LOWEST SUPPORTED RUST TOOLCHAIN
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           path: stratisd
       - name: Overwrite stratisd dependencies as necessary

@@ -72,6 +72,8 @@ jobs:
       - name: Install pyright
         run: pip install --user pyright
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Run test
         run: ${{ matrix.task }}
         working-directory: ${{ matrix.working-directory }}

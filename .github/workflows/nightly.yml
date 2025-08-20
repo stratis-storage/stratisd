@@ -42,6 +42,8 @@ jobs:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -73,6 +75,8 @@ jobs:
         with:
           crate: cargo-audit
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Run cargo-update
         run: cargo update
       - name: Build all targets
@@ -118,6 +122,8 @@ jobs:
         with:
           crate: cargo-auditable
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Run matrix task
         run: ${{ matrix.task }}
 
@@ -149,11 +155,13 @@ jobs:
       - uses: actions/checkout@v5
         with:
           path: stratisd
+          persist-credentials: false
       - name: Check out ci repo
         uses: actions/checkout@v5
         with:
           path: ci
           repository: stratis-storage/ci
+          persist-credentials: false
       - name: Run comparisons of macro version specs with Fedora packages
         # yamllint disable rule:line-length
         run: |
@@ -209,6 +217,8 @@ jobs:
           components: cargo
           toolchain: 1.89.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd

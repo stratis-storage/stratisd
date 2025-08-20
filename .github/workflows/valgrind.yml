@@ -52,6 +52,8 @@ jobs:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -92,6 +94,8 @@ jobs:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd
@@ -146,6 +150,8 @@ jobs:
           components: cargo
           toolchain: ${{ matrix.toolchain }}
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd
@@ -210,6 +216,8 @@ jobs:
           components: cargo
           toolchain: 1.89.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd

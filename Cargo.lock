@@ -430,11 +430,11 @@ dependencies = [
 
 [[package]]
 name = "devicemapper-sys"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2edf94f6d3ca216380413446f38d1aa3035ac2c503a21b6929ead7e32f66a0b9"
+checksum = "893c021558a1dc78c60171bb832e52340e7006ce0e05e6127df73de8825d0a09"
 dependencies = [
- "bindgen 0.69.4",
+ "bindgen 0.71.1",
  "pkg-config",
 ]
 

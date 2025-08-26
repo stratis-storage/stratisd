@@ -34,7 +34,7 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, DevUuid, EncryptionInfo, InputEncryptionInfo,
-            KeyDescription, Name, PoolEncryptionInfo, PoolUuid,
+            KeyDescription, Name, PoolEncryptionInfo, PoolUuid, SizedKeyMemory,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -437,8 +437,7 @@ impl Backstore {
     }
 
     /// Return a reference to all the blockdevs that this pool has ownership
-    /// of. The blockdevs may be returned in any order. It is unsafe to assume
-    /// that they are grouped by tier or any other organization.
+    /// of.
     pub fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &StratBlockDev)> {
         self.datadevs()
             .into_iter()
@@ -451,17 +450,20 @@ impl Backstore {
             .collect()
     }
 
+    /// Return a mutable reference to all the blockdevs that this pool has ownership
+    /// of.
     pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, BlockDevTier, &mut StratBlockDev)> {
         match self.cache_tier {
-            Some(ref mut cache) => cache
+            Some(ref mut cache) => self
+                .data_tier
                 .blockdevs_mut()
                 .into_iter()
-                .map(|(uuid, dev)| (uuid, BlockDevTier::Cache, dev))
+                .map(|(uuid, dev)| (uuid, BlockDevTier::Data, dev))
                 .chain(
-                    self.data_tier
+                    cache
                         .blockdevs_mut()
                         .into_iter()
-                        .map(|(uuid, dev)| (uuid, BlockDevTier::Data, dev)),
+                        .map(|(uuid, dev)| (uuid, BlockDevTier::Cache, dev)),
                 )
                 .collect(),
             None => self
@@ -798,6 +800,47 @@ impl Backstore {
         }
     }
 
+    /// Setup reencryption for all encrypted devices in the pool.
+    ///
+    /// Returns:
+    /// * Ok(()) if successful
+    /// * Err(_) if an operation fails while setting up reencryption on the devices.
+    ///
+    /// Precondition: blockdevs() must always return the block devices in the
+    /// same order.
+    pub fn prepare_reencrypt(&mut self) -> StratisResult<Vec<(u32, SizedKeyMemory, u32)>> {
+        if self.encryption_info().is_none() {
+            return Err(StratisError::Msg(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ));
+        };
+
+        operation_loop(
+            self.blockdevs_mut().into_iter().map(|(_, _, bd)| bd),
+            |blockdev| blockdev.setup_reencrypt(),
+        )
+    }
+
+    /// Reencrypt all encrypted devices in the pool.
+    ///
+    /// Returns:
+    /// * Ok(()) if successful
+    /// * Err(_) if an operation fails while reencrypting the devices.
+    ///
+    /// Precondition: blockdevs() must always return the block devices in the
+    /// same order.
+    pub fn reencrypt(&self, key_info: Vec<(u32, SizedKeyMemory, u32)>) -> StratisResult<()> {
+        for (bd, (slot, key, new_slot)) in self
+            .blockdevs()
+            .into_iter()
+            .map(|(_, _, bd)| bd)
+            .zip(key_info)
+        {
+            bd.do_reencrypt(slot, key, new_slot)?;
+        }
+        Ok(())
+    }
+
     /// Regenerate the Clevis bindings with the block devices in this pool using
     /// the same configuration.
     ///
@@ -915,10 +958,10 @@ impl Recordable<BackstoreSave> for Backstore {
     }
 }
 
-fn operation_loop<'a, I, A>(blockdevs: I, action: A) -> StratisResult<()>
+fn operation_loop<'a, I, A, R>(blockdevs: I, action: A) -> StratisResult<Vec<R>>
 where
     I: IntoIterator<Item = &'a mut StratBlockDev>,
-    A: Fn(&mut StratBlockDev) -> StratisResult<()>,
+    A: Fn(&mut StratBlockDev) -> StratisResult<R>,
 {
     fn rollback_loop(
         rollback_record: Vec<&mut StratBlockDev>,
@@ -959,13 +1002,18 @@ where
         causal_error
     }
 
-    fn perform_operation<'a, I, A>(tmp_dir: &TempDir, blockdevs: I, action: A) -> StratisResult<()>
+    fn perform_operation<'a, I, A, R>(
+        tmp_dir: &TempDir,
+        blockdevs: I,
+        action: A,
+    ) -> StratisResult<Vec<R>>
     where
         I: IntoIterator<Item = &'a mut StratBlockDev>,
-        A: Fn(&mut StratBlockDev) -> StratisResult<()>,
+        A: Fn(&mut StratBlockDev) -> StratisResult<R>,
     {
         let mut original_headers = Vec::new();
         let mut rollback_record = Vec::new();
+        let mut results = Vec::new();
         for blockdev in blockdevs {
             match back_up_luks_header(blockdev.physical_path(), tmp_dir) {
                 Ok(h) => original_headers.push(h),
@@ -973,12 +1021,15 @@ where
             };
             let res = action(blockdev);
             rollback_record.push(blockdev);
-            if let Err(error) = res {
-                return Err(rollback_loop(rollback_record, original_headers, error));
+            match res {
+                Ok(r) => results.push(r),
+                Err(e) => {
+                    return Err(rollback_loop(rollback_record, original_headers, e));
+                }
             }
         }
 
-        Ok(())
+        Ok(results)
     }
 
     let tmp_dir = TempDir::new()?;

@@ -1,0 +1,264 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+use dbus::Message;
+use dbus_tree::{MTSync, MethodInfo, MethodResult};
+use either::Either;
+use futures::executor::block_on;
+use serde_json::from_str;
+
+use crate::{
+    dbus_api::{
+        types::{DbusErrorEnum, EncryptionInfos, TData, OK_STRING},
+        util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
+    },
+    engine::{CreateAction, DeleteAction, InputEncryptionInfo, KeyDescription},
+    stratis::StratisError,
+};
+
+pub fn encrypt_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+
+    let (key_desc_array, clevis_array): EncryptionInfos<'_> =
+        (get_next_arg(&mut iter, 0)?, get_next_arg(&mut iter, 1)?);
+
+    let dbus_context = m.tree.get_data();
+    let object_path = m.path.get_name();
+    let return_message = message.method_return();
+    let default_return = false;
+
+    let key_descs =
+        match key_desc_array
+            .into_iter()
+            .try_fold(Vec::new(), |mut vec, (ts_opt, kd_str)| {
+                let token_slot = tuple_to_option(ts_opt);
+                let kd = KeyDescription::try_from(kd_str.to_string())?;
+                vec.push((token_slot, kd));
+                Ok(vec)
+            }) {
+            Ok(kds) => kds,
+            Err(e) => {
+                let (rc, rs) = engine_to_dbus_err_tuple(&e);
+                return Ok(vec![return_message.append3(default_return, rc, rs)]);
+            }
+        };
+
+    let clevis_infos =
+        match clevis_array
+            .into_iter()
+            .try_fold(Vec::new(), |mut vec, (ts_opt, pin, json_str)| {
+                let token_slot = tuple_to_option(ts_opt);
+                let json = from_str(json_str)?;
+                vec.push((token_slot, (pin.to_owned(), json)));
+                Ok(vec)
+            }) {
+            Ok(cis) => cis,
+            Err(e) => {
+                let (rc, rs) = engine_to_dbus_err_tuple(&e);
+                return Ok(vec![return_message.append3(default_return, rc, rs)]);
+            }
+        };
+
+    let ei = match InputEncryptionInfo::new(key_descs, clevis_infos) {
+        Ok(Some(opt)) => opt,
+        Ok(None) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::Msg(
+                "Need at least one unlock method to encrypt pool".to_string(),
+            ));
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
+        }
+        Err(e) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&e);
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
+        }
+    };
+
+    let pool_path = m
+        .tree
+        .get(object_path)
+        .expect("implicit argument must be in tree");
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
+
+    let read_guard = get_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+
+    // Check if operation is idempotent and complete all operations before handling result
+    let create_result = handle_action!(
+        read_guard
+            .encrypt_pool_idem_check()
+            .and_then(|action| match action {
+                CreateAction::Identity => Ok(action),
+                CreateAction::Created(_) => {
+                    let mut guard = block_on(dbus_context.engine.upgrade_pool(read_guard));
+                    let result = guard.start_encrypt_pool(pool_uuid, &ei);
+                    let result = result.and_then(|(sector_size, key_info)| {
+                        let guard = guard.downgrade();
+                        guard
+                            .do_encrypt_pool(pool_uuid, sector_size, key_info)
+                            .map(|_| guard)
+                    });
+                    let result = result.and_then(|guard| {
+                        let mut guard = block_on(dbus_context.engine.upgrade_pool(guard));
+                        let (name, _, _) = guard.as_mut_tuple();
+                        guard
+                            .finish_encrypt_pool(&name, pool_uuid)
+                            .map(|_| (guard, action))
+                    });
+                    result.map(|(_, action)| action)
+                }
+            }),
+        dbus_context,
+        pool_path.get_name()
+    );
+
+    let msg = match create_result {
+        Ok(CreateAction::Identity) => return_message.append3(
+            default_return,
+            DbusErrorEnum::OK as u16,
+            OK_STRING.to_string(),
+        ),
+        Ok(CreateAction::Created(_)) => {
+            let guard = get_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+            let encryption_info = match guard.encryption_info().clone() {
+                Some(Either::Left(ei)) => ei,
+                Some(Either::Right(_)) => {
+                    unreachable!("online reencryption disabled on metadata V1")
+                }
+                None => unreachable!("Must have succeeded"),
+            };
+            if encryption_info.all_key_descriptions().count() > 0 {
+                dbus_context.push_pool_key_desc_change(
+                    pool_path.get_name(),
+                    Some(Either::Left((true, encryption_info.clone()))),
+                );
+            }
+            if encryption_info.all_clevis_infos().count() > 0 {
+                dbus_context.push_pool_clevis_info_change(
+                    pool_path.get_name(),
+                    Some(Either::Left((true, encryption_info.clone()))),
+                );
+            }
+            dbus_context.push_pool_encryption_status_change(pool_path.get_name(), true);
+            return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
+        Err(err) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&err);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
+}
+
+pub fn reencrypt_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+
+    let dbus_context = m.tree.get_data();
+    let object_path = m.path.get_name();
+    let return_message = message.method_return();
+    let default_return = false;
+
+    let pool_path = m
+        .tree
+        .get(object_path)
+        .expect("implicit argument must be in tree");
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
+
+    let mut guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let (name, _, _) = guard.as_mut_tuple();
+
+    let result = guard.start_reencrypt_pool();
+    let result = result.and_then(|key_info| {
+        let guard = guard.downgrade();
+        let result = guard.do_reencrypt_pool(key_info);
+        result.map(|inner| (guard, inner))
+    });
+    let result = result.and_then(|(guard, _)| {
+        let mut guard = block_on(dbus_context.engine.upgrade_pool(guard));
+        guard.finish_reencrypt_pool(&name)
+    });
+    let result = handle_action!(result, dbus_context, pool_path.get_name());
+    let msg = match result {
+        Ok(_) => {
+            let guard = get_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+            dbus_context.push_pool_last_reencrypt_timestamp(object_path, guard.last_reencrypt());
+            return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
+        Err(err) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&err);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
+}
+
+pub fn decrypt_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+
+    let dbus_context = m.tree.get_data();
+    let object_path = m.path.get_name();
+    let return_message = message.method_return();
+    let default_return = false;
+
+    let pool_path = m
+        .tree
+        .get(object_path)
+        .expect("implicit argument must be in tree");
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
+
+    let guard = get_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+
+    let result = match handle_action!(
+        guard.decrypt_pool_idem_check(),
+        dbus_context,
+        pool_path.get_name()
+    ) {
+        Ok(DeleteAction::Identity) => Ok(DeleteAction::Identity),
+        Ok(DeleteAction::Deleted(d)) => {
+            match guard.do_decrypt_pool(pool_uuid).and_then(|_| {
+                let mut guard = block_on(dbus_context.engine.upgrade_pool(guard));
+                let (name, _, _) = guard.as_mut_tuple();
+                guard.finish_decrypt_pool(pool_uuid, &name)
+            }) {
+                Ok(_) => Ok(DeleteAction::Deleted(d)),
+                Err(e) => Err(e),
+            }
+        }
+        Err(e) => Err(e),
+    };
+    let msg = match result {
+        Ok(DeleteAction::Deleted(_)) => {
+            let guard = get_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+            dbus_context.push_pool_key_desc_change(pool_path.get_name(), None);
+            dbus_context.push_pool_clevis_info_change(pool_path.get_name(), None);
+            dbus_context.push_pool_encryption_status_change(pool_path.get_name(), false);
+            dbus_context.push_pool_last_reencrypt_timestamp(object_path, guard.last_reencrypt());
+            return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
+        Ok(DeleteAction::Identity) => return_message.append3(
+            default_return,
+            DbusErrorEnum::OK as u16,
+            OK_STRING.to_string(),
+        ),
+        Err(err) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&err);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
+}

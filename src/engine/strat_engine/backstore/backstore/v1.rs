@@ -437,8 +437,7 @@ impl Backstore {
     }
 
     /// Return a reference to all the blockdevs that this pool has ownership
-    /// of. The blockdevs may be returned in any order. It is unsafe to assume
-    /// that they are grouped by tier or any other organization.
+    /// of.
     pub fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &StratBlockDev)> {
         self.datadevs()
             .into_iter()
@@ -451,17 +450,20 @@ impl Backstore {
             .collect()
     }
 
+    /// Return a mutable reference to all the blockdevs that this pool has ownership
+    /// of.
     pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, BlockDevTier, &mut StratBlockDev)> {
         match self.cache_tier {
-            Some(ref mut cache) => cache
+            Some(ref mut cache) => self
+                .data_tier
                 .blockdevs_mut()
                 .into_iter()
-                .map(|(uuid, dev)| (uuid, BlockDevTier::Cache, dev))
+                .map(|(uuid, dev)| (uuid, BlockDevTier::Data, dev))
                 .chain(
-                    self.data_tier
+                    cache
                         .blockdevs_mut()
                         .into_iter()
-                        .map(|(uuid, dev)| (uuid, BlockDevTier::Data, dev)),
+                        .map(|(uuid, dev)| (uuid, BlockDevTier::Cache, dev)),
                 )
                 .collect(),
             None => self

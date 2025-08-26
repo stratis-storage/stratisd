@@ -15,7 +15,7 @@ actions:
         - "cargo install cargo-get"
         - "cargo install cargo-vendor-filterer"
     create-archive:
-        - "sh -c 'python3 ../distro/release_management/create_artifacts.py ../distro/ --pre-release --specfile-path=../distro/stratisd.spec stratisd --vendor-method=filtered'"
+        - "sh -c 'python3 ../distro/release_management/create_artifacts.py ../distro/ --specfile-path=../distro/stratisd.spec stratisd --vendor-method=filtered'"
     fix-spec-file:
         - "echo 'skipping automatic fix-spec-file actions'"
     get-current-version:

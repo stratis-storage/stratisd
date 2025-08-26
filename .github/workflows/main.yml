@@ -5,7 +5,7 @@ name: stratisd CI
 on:
   push:
     branches:
-      - master
+      - patch-3.8.2
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
@@ -16,7 +16,7 @@ on:
       - 'tests-fmf/**'
   pull_request:
     branches:
-      - master
+      - patch-3.8.2
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
@@ -157,7 +157,7 @@ jobs:
         with:
           repository: stratis-storage/stratis-cli
           path: stratis-cli
-          ref: master
+          ref: v3.8.2
       - name: Run stratis-cli tests
         run: >
           RUST_LOG=stratisd=debug
@@ -375,7 +375,7 @@ jobs:
         with:
           repository: stratis-storage/testing
           path: testing
-          ref: master
+          ref: v3.8.1
       - name: Run stratisd_cert.py
         run: >
           sudo

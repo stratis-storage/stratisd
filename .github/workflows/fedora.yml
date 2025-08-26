@@ -5,7 +5,7 @@ name: stratisd CI on fedora
 on:
   push:
     branches:
-      - master
+      - patch-3.8.2
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
@@ -16,7 +16,7 @@ on:
       - 'tests-fmf/**'
   pull_request:
     branches:
-      - master
+      - patch-3.8.2
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'

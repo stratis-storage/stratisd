@@ -6,7 +6,7 @@ name: stratisd support CI
 on:
   push:
     branches:
-      - master
+      - patch-3.8.2
     paths:
       - ".packit.yaml"
       - "plans/**"
@@ -16,7 +16,7 @@ on:
       - "!tests/**/README.*"
   pull_request:
     branches:
-      - master
+      - patch-3.8.2
     paths:
       - ".packit.yaml"
       - "plans/**"

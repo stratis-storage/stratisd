@@ -157,7 +157,7 @@ jobs:
         with:
           repository: stratis-storage/stratis-cli
           path: stratis-cli
-          ref: master
+          ref: v3.8.2
       - name: Run stratis-cli tests
         run: >
           RUST_LOG=stratisd=debug

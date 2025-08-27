@@ -1,3 +1,42 @@
+stratisd 3.8.3
+==============
+Recommended Rust toolchain version: 1.89.0
+Recommended development platform for Python development: Fedora 41
+
+* Cherry-picked commits:
+  * Remove an obsolete lint
+  * stratisd_proc_macros: fix uninlined-format-args lint
+  * Fix iter-kv-map lint
+  * Fix uninlined-format-args lint
+  * Fix assertion error when calculating error message
+  * github actions: Update recommended Rust to 1.88.0
+  * Remove large_enum_variant allow
+  * Bump nix version to 0.30.0
+  * Use procfs instead of libmount to read mountinfo
+  * Use a separate GitHub Action to modify Rust dependencies
+  * Fix stratisd-modify-action for working-directory input
+  * Use external action for modifying stratisd dependencies
+  * Use external action for modifying external GitHub repo
+  * Remove additional_repo spec from Packit
+  * packit: use identifiers to distinguish copr_build jobs
+  * packit: preserve copr_build job triggered by commit
+  * Add memory requirements for TMT tests
+  * Move location of loopback devices
+  * Revert "Add memory requirements for TMT tests"
+  * Use Fedora specfile for Packit builds
+  * github actions: Update recommended Rust to 1.89.0
+  * Add missing box_variant! macro for PropertiesChangedSignal
+  * Increase GitHub Action checkout version to v5
+  * Set checkout actions persist-credentials value to false
+  * Increase real devicemapper dependency version to 0.34.5
+  * Increase real devicemapper-sys dependency to 0.3.2
+  * Increase real loopdev-3 dependency version to 0.5.2
+  * Increase real libcryptsetup-rs dependency version to 0.13.2
+  * Increase real libblkid-rs-sys dependency version to 0.3.2
+  * Increase real proptest dependency version to 1.7.0
+  * Increase libc dependency lower bound to 0.2.171
+
+
 stratisd 3.8.2
 ==============
 Recommended Rust toolchain version: 1.87.0

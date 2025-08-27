@@ -176,7 +176,7 @@ impl StratPool {
                 Ok(ref params) => params,
                 Err(causal_error) => {
                     if let Err(cleanup_err) = backstore.destroy(pool_uuid) {
-                        warn!("Failed to clean up Stratis metadata for incompletely set up pool with UUID {}: {}.", pool_uuid, cleanup_err);
+                        warn!("Failed to clean up Stratis metadata for incompletely set up pool with UUID {pool_uuid}: {cleanup_err}.");
                         return Err(StratisError::NoActionRollbackError {
                             causal_error: Box::new(causal_error),
                             rollback_error: Box::new(cleanup_err),
@@ -193,7 +193,7 @@ impl StratPool {
             Ok(thinpool) => thinpool,
             Err(causal_error) => {
                 if let Err(cleanup_err) = backstore.destroy(pool_uuid) {
-                    warn!("Failed to clean up Stratis metadata for incompletely set up pool with UUID {}: {}.", pool_uuid, cleanup_err);
+                    warn!("Failed to clean up Stratis metadata for incompletely set up pool with UUID {pool_uuid}: {cleanup_err}.");
                     return Err(StratisError::NoActionRollbackError {
                         causal_error: Box::new(causal_error),
                         rollback_error: Box::new(cleanup_err),
@@ -249,8 +249,7 @@ impl StratPool {
 
         if action_avail != ActionAvailability::Full {
             warn!(
-                "Disabling some actions for pool {} with UUID {}; pool is designated {}",
-                pool_name, uuid, action_avail
+                "Disabling some actions for pool {pool_name} with UUID {uuid}; pool is designated {action_avail}"
             );
         }
 
@@ -285,7 +284,7 @@ impl StratPool {
         if needs_save {
             if let Err(err) = pool.write_metadata(pool_name) {
                 if let StratisError::ActionDisabled(avail) = err {
-                    warn!("Pool-level metadata could not be written for pool with name {} and UUID {} because pool is in a limited availability state, {},  which prevents any pool actions; pool will remain set up", pool_name, uuid, avail);
+                    warn!("Pool-level metadata could not be written for pool with name {pool_name} and UUID {uuid} because pool is in a limited availability state, {avail},  which prevents any pool actions; pool will remain set up");
                 } else {
                     return Err((err, pool.backstore.into_bdas()));
                 }
@@ -556,18 +555,21 @@ impl Pool for StratPool {
         let (in_pool, out_pool): (Vec<_>, Vec<_>) = this_pool
             .keys()
             .map(|dev_uuid| {
-                self.backstore
-                    .get_blockdev_by_uuid(*dev_uuid)
-                    .map(|(tier, _)| (*dev_uuid, tier))
+                (
+                    *dev_uuid,
+                    self.backstore
+                        .get_blockdev_by_uuid(*dev_uuid)
+                        .map(|(tier, _)| tier),
+                )
             })
-            .partition(|v| v.is_some());
+            .partition(|(_, t)| t.is_some());
 
         if !out_pool.is_empty() {
             let error_message = format!(
                     "Devices ({}) appear to be already in use by this pool which has UUID {} but this pool has no record of them",
                     out_pool
                     .iter()
-                    .map(|opt| this_pool.get(&opt.expect("was looked up").0).expect("partitioned from this_pool").devnode.display().to_string())
+                    .map(|(u, _)| this_pool.get(u).expect("partitioned from this_pool").devnode.display().to_string())
                     .collect::<Vec<_>>()
                     .join(", "),
                     pool_uuid
@@ -577,7 +579,7 @@ impl Pool for StratPool {
 
         let (datadevs, cachedevs): (Vec<_>, Vec<_>) = in_pool
             .iter()
-            .map(|opt| opt.expect("in_pool devices are Some"))
+            .map(|(u, t)| (u, t.expect("in pool devices have Some tier")))
             .partition(|(_, tier)| *tier == BlockDevTier::Data);
 
         if !datadevs.is_empty() {
@@ -820,18 +822,21 @@ impl Pool for StratPool {
             let (in_pool, out_pool): (Vec<_>, Vec<_>) = this_pool
                 .keys()
                 .map(|dev_uuid| {
-                    self.backstore
-                        .get_blockdev_by_uuid(*dev_uuid)
-                        .map(|(tier, _)| (*dev_uuid, tier))
+                    (
+                        *dev_uuid,
+                        self.backstore
+                            .get_blockdev_by_uuid(*dev_uuid)
+                            .map(|(tier, _)| tier),
+                    )
                 })
-                .partition(|v| v.is_some());
+                .partition(|(_, t)| t.is_some());
 
             if !out_pool.is_empty() {
                 let error_message = format!(
                     "Devices ({}) appear to be already in use by this pool which has UUID {} but this pool has no record of them",
                     out_pool
                     .iter()
-                    .map(|opt| this_pool.get(&opt.expect("was looked up").0).expect("partitioned from this_pool").devnode.display().to_string())
+                    .map(|(u,_)| this_pool.get(u).expect("partitioned from this_pool").devnode.display().to_string())
                     .collect::<Vec<_>>()
                     .join(", "),
                     pool_uuid
@@ -841,7 +846,7 @@ impl Pool for StratPool {
 
             let (datadevs, cachedevs): (Vec<_>, Vec<_>) = in_pool
                 .iter()
-                .map(|opt| opt.expect("in_pool devices are Some"))
+                .map(|(u, t)| (u, t.expect("in_pool devices have Some tier")))
                 .partition(|(_, tier)| *tier == BlockDevTier::Data);
 
             if tier == BlockDevTier::Cache {

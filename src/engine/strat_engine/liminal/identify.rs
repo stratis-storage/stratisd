@@ -151,7 +151,6 @@ impl fmt::Display for StratisInfo {
 /// An enum type to distinguish between LUKS devices belong to Stratis and
 /// Stratis devices.
 #[derive(Debug, Eq, Hash, PartialEq)]
-#[allow(clippy::large_enum_variant)]
 pub enum DeviceInfo {
     Luks(LuksInfo),
     Stratis(StratisInfo),
@@ -386,23 +385,20 @@ fn identify_luks_device(dev: &UdevEngineDevice) -> Option<LuksInfo> {
 
     match decide_ownership(dev) {
         Err(err) => {
-            warn!("Could not determine ownership of a block device identified as a LUKS device by udev, disregarding the device: {}",
-                  err);
+            warn!("Could not determine ownership of a block device identified as a LUKS device by udev, disregarding the device: {err}");
             None
         }
         Ok(ownership) => match ownership {
             UdevOwnership::Luks => process_luks_device(dev),
             UdevOwnership::MultipathMember => None,
             _ => {
-                warn!("udev enumeration identified this device as a LUKS block device but on further examination udev identifies it as a {}",
-                      ownership);
+                warn!("udev enumeration identified this device as a LUKS block device but on further examination udev identifies it as a {ownership}");
                 None
             }
         },
     }
     .map(|info| {
-        info!("LUKS block device belonging to Stratis with {} discovered during initial search",
-              info,
+        info!("LUKS block device belonging to Stratis with {info} discovered during initial search",
         );
         info
     })
@@ -420,23 +416,20 @@ fn identify_stratis_device(dev: &UdevEngineDevice) -> Option<StratisInfo> {
 
     match decide_ownership(dev) {
         Err(err) => {
-            warn!("Could not determine ownership of a block device identified as a Stratis device by udev, disregarding the device: {}",
-                  err);
+            warn!("Could not determine ownership of a block device identified as a Stratis device by udev, disregarding the device: {err}");
             None
         }
         Ok(ownership) => match ownership {
             UdevOwnership::Stratis => process_stratis_device(dev),
             UdevOwnership::MultipathMember => None,
             _ => {
-                warn!("udev enumeration identified this device as a Stratis block device but on further examination udev identifies it as a {}",
-                      ownership);
+                warn!("udev enumeration identified this device as a Stratis block device but on further examination udev identifies it as a {ownership}");
                 None
             }
         },
     }
     .map(|info| {
-        info!("Stratis block device with {} discovered during initial search",
-              info,
+        info!("Stratis block device with {info} discovered during initial search",
         );
         info
     })
@@ -455,8 +448,7 @@ pub fn identify_block_device(event: &UdevEngineEvent) -> Option<DeviceInfo> {
     match decide_ownership(event.device()) {
         Err(err) => {
             warn!(
-                "Could not determine ownership of a udev block device, disregarding the device: {}",
-                err
+                "Could not determine ownership of a udev block device, disregarding the device: {err}"
             );
             None
         }
@@ -469,7 +461,7 @@ pub fn identify_block_device(event: &UdevEngineEvent) -> Option<DeviceInfo> {
         },
     }
     .map(|info| {
-        debug!("Stratis block device with {} identified", info);
+        debug!("Stratis block device with {info} identified");
         info
     })
 }

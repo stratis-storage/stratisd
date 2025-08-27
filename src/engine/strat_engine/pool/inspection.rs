@@ -740,7 +740,7 @@ pub mod inspectors {
         println!("    Data block size: {}", thinpool_dev.data_block_size);
         println!("    Feature Args:");
         for arg in thinpool_dev.feature_args.iter().flatten() {
-            println!("        {}", arg);
+            println!("        {arg}");
         }
         println!(
             "    Filesystem limit: {}",
@@ -771,7 +771,7 @@ pub mod inspectors {
         println!("Allocations from each data device:");
         for (uuid, bd) in data_devices.iter() {
             println!("Data device: {uuid}");
-            println!("{}", bd);
+            println!("{bd}");
         }
 
         println!();
@@ -779,23 +779,23 @@ pub mod inspectors {
         println!("Allocations from each cache device:");
         for (uuid, bd) in cache_devices.iter() {
             println!("Cache device: {uuid}");
-            println!("{}", bd);
+            println!("{bd}");
         }
 
         println!();
 
         println!("Allocations for crypt metadata:");
-        print!("{}", crypt_allocs);
+        print!("{crypt_allocs}");
 
         println!();
 
         println!("Allocations from cap device:");
-        println!("{}", cap_device);
+        println!("{cap_device}");
 
         println!();
 
         println!("Allocations from flex device:");
-        print!("{}", flex_device);
+        print!("{flex_device}");
         Ok(())
     }
 }

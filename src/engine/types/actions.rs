@@ -802,9 +802,7 @@ impl ToDisplay for PropChangeAction<bool> {
     fn to_display(&self) -> PropChangeAction<String> {
         match self {
             PropChangeAction::Identity => PropChangeAction::Identity,
-            PropChangeAction::NewValue(v) => {
-                PropChangeAction::NewValue(format!("a value of {}", v))
-            }
+            PropChangeAction::NewValue(v) => PropChangeAction::NewValue(format!("a value of {v}")),
         }
     }
 }

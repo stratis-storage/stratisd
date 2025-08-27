@@ -483,7 +483,7 @@ impl DbusTreeHandler {
                     consts::POOL_INTERFACE_NAME_3_8 => {
                         Vec::new(),
                         consts::POOL_KEY_DESCS_PROP.to_string() =>
-                        key_descs_to_prop(ei.clone().map(|either| either.map_left(|(_, ei)| ei)))
+                        box_variant!(key_descs_to_prop(ei.clone().map(|either| either.map_left(|(_, ei)| ei))))
                     }
                 },
             )
@@ -949,10 +949,7 @@ impl DbusTreeHandler {
                 }
             ),
         ) {
-            warn!(
-                "Failed to send a signal over D-Bus indicating pool size change: {}",
-                e
-            );
+            warn!("Failed to send a signal over D-Bus indicating pool size change: {e}");
         }
     }
 
@@ -980,8 +977,7 @@ impl DbusTreeHandler {
             ),
         ) {
             warn!(
-                "Failed to send a signal over D-Bus indicating filesystem size limit change: {}",
-                e
+                "Failed to send a signal over D-Bus indicating filesystem size limit change: {e}"
             );
         }
     }
@@ -1048,10 +1044,7 @@ impl DbusTreeHandler {
                 }
             ),
         ) {
-            warn!(
-                "Failed to send a signal over D-Bus indicating blockdev user info change: {}",
-                e
-            );
+            warn!("Failed to send a signal over D-Bus indicating blockdev user info change: {e}");
         }
     }
 
@@ -1115,8 +1108,7 @@ impl DbusTreeHandler {
             ),
         ) {
             warn!(
-                "Failed to send a signal over D-Bus indicating blockdev total physical size change: {}",
-                e
+                "Failed to send a signal over D-Bus indicating blockdev total physical size change: {e}"
             );
         }
     }
@@ -1169,8 +1161,7 @@ impl DbusTreeHandler {
             ),
         ) {
             warn!(
-                "Failed to send a signal over D-Bus indicating pool overprovisioning mode change: {}",
-                e
+                "Failed to send a signal over D-Bus indicating pool overprovisioning mode change: {e}"
             );
         }
     }
@@ -1189,8 +1180,7 @@ impl DbusTreeHandler {
             ),
         ) {
             warn!(
-                "Failed to send a signal over D-Bus indicating pool free token slots change: {}",
-                e
+                "Failed to send a signal over D-Bus indicating pool free token slots change: {e}"
             );
         }
     }

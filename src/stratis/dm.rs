@@ -3,7 +3,10 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    os::unix::io::{AsRawFd, RawFd},
+    os::{
+        fd::BorrowedFd,
+        unix::io::{AsRawFd, RawFd},
+    },
     sync::Arc,
 };
 
@@ -55,19 +58,13 @@ pub async fn dm_event_thread(
             let pool_diffs = engine.pool_evented(Some(&evented)).await;
             for action in DbusAction::from_pool_diffs(pool_diffs) {
                 if let Err(e) = sender.send(action) {
-                    warn!(
-                        "Failed to update D-Bus layer with changed engine properties: {}",
-                        e
-                    );
+                    warn!("Failed to update D-Bus layer with changed engine properties: {e}");
                 }
             }
             let fs_diffs = engine.fs_evented(Some(&evented)).await;
             for action in DbusAction::from_fs_diffs(fs_diffs) {
                 if let Err(e) = sender.send(action) {
-                    warn!(
-                        "Failed to update D-Bus layer with changed engine properties: {}",
-                        e
-                    );
+                    warn!("Failed to update D-Bus layer with changed engine properties: {e}");
                 }
             }
         }
@@ -89,7 +86,7 @@ pub async fn dm_event_thread(
                     )
                     .await
                     {
-                        warn!("Failed to process devicemapper event: {}", e);
+                        warn!("Failed to process devicemapper event: {e}");
                     }
                     trace!("Finished handling of devicemapper event");
                 }
@@ -120,10 +117,12 @@ fn setup_dm() -> StratisResult<AsyncFd<RawFd>> {
         Err(StratisError::Msg(err_msg))
     } else {
         let fd = get_dm().as_raw_fd();
+        let borrowed_fd = unsafe { BorrowedFd::borrow_raw(fd) };
         fcntl(
-            fd,
+            borrowed_fd,
             FcntlArg::F_SETFL(
-                OFlag::from_bits_truncate(fcntl(fd, FcntlArg::F_GETFL)?) & !OFlag::O_NONBLOCK,
+                OFlag::from_bits_truncate(fcntl(borrowed_fd, FcntlArg::F_GETFL)?)
+                    & !OFlag::O_NONBLOCK,
             ),
         )?;
 

@@ -234,10 +234,7 @@ fn has_attribute(attrs: &mut Vec<Attribute>, attribute: &str) -> bool {
             attrs.remove(index);
             true
         }
-        _ => panic!(
-            "More than 1 {} attribute specified for the same syntactic entity.",
-            attribute
-        ),
+        _ => panic!("More than 1 {attribute} attribute specified for the same syntactic entity."),
     }
 }
 

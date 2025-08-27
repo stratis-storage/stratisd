@@ -222,7 +222,7 @@ fn get_pass(prompt: &str) -> StratisResult<Option<String>> {
     stdout().flush()?;
 
     let stdin = stdin();
-    let istty = isatty(stdin.as_raw_fd()).unwrap_or(false);
+    let istty = isatty(&stdin).unwrap_or(false);
 
     let mut password = String::new();
     if istty {
@@ -235,10 +235,7 @@ fn get_pass(prompt: &str) -> StratisResult<Option<String>> {
         let res = stdin.read_line(&mut password);
 
         if let Err(e) = tcsetattr(stdin.as_raw_fd(), TCSADRAIN, &current) {
-            eprintln!(
-                "Failed to set terminal settings back to original state: {}",
-                e
-            );
+            eprintln!("Failed to set terminal settings back to original state: {e}");
         }
         res?;
     } else {

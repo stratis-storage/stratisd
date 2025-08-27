@@ -270,8 +270,7 @@ impl DbusContext {
         if let Err(e) = self.sender.send(DbusAction::Add(object_path, interfaces)) {
             warn!(
                 "D-Bus add event could not be sent to the processing thread; the D-Bus \
-                server will not be aware of the D-Bus object with path {}: {}",
-                object_path_name, e,
+                server will not be aware of the D-Bus object with path {object_path_name}: {e}",
             )
         }
     }
@@ -283,8 +282,7 @@ impl DbusContext {
         {
             warn!(
                 "D-Bus remove event could not be sent to the processing thread; the D-Bus \
-                server will still expect the D-Bus object with path {} to be present: {}",
-                item, e,
+                server will still expect the D-Bus object with path {item} to be present: {e}",
             )
         }
     }
@@ -298,8 +296,7 @@ impl DbusContext {
         {
             warn!(
                 "D-Bus filesystem name change event could not be sent to the processing thread; \
-                no signal will be sent out for pool with path {}: {}",
-                item, e,
+                no signal will be sent out for pool with path {item}: {e}",
             )
         }
     }
@@ -315,8 +312,7 @@ impl DbusContext {
             .send(DbusAction::PoolKeyDescChange(item.clone(), ei))
         {
             warn!(
-                "D-Bus pool key description change event could not be sent to the processing thread; no signal will be sent out for pool with path {}: {}",
-                item, e,
+                "D-Bus pool key description change event could not be sent to the processing thread; no signal will be sent out for pool with path {item}: {e}",
             )
         }
     }
@@ -332,8 +328,7 @@ impl DbusContext {
             .send(DbusAction::PoolClevisInfoChange(item.clone(), ei))
         {
             warn!(
-                "D-Bus pool Clevis info change event could not be sent to the processing thread; no signal will be sent out for pool with path {}: {}",
-                item, e,
+                "D-Bus pool Clevis info change event could not be sent to the processing thread; no signal will be sent out for pool with path {item}: {e}",
             )
         }
     }
@@ -345,8 +340,7 @@ impl DbusContext {
             .send(DbusAction::PoolCacheChange(item.clone(), has_cache))
         {
             warn!(
-                "D-Bus pool cache status change event could not be sent to the processing thread; no signal will be sent out for pool with path {}: {}",
-                item, e,
+                "D-Bus pool cache status change event could not be sent to the processing thread; no signal will be sent out for pool with path {item}: {e}",
             )
         }
     }
@@ -360,9 +354,8 @@ impl DbusContext {
         )) {
             warn!(
                 "D-Bus pool name change event could not be sent to the processing thread; \
-                no signal will be sent out for the name change of pool with path {} or any \
-                of its child filesystems: {}",
-                item, e,
+                no signal will be sent out for the name change of pool with path {item} or any \
+                of its child filesystems: {e}",
             )
         }
     }
@@ -374,8 +367,7 @@ impl DbusContext {
             .send(DbusAction::PoolFsLimitChange(item.clone(), new_fs_limit))
         {
             warn!(
-                "D-Bus pool filesystem limit change event could not be sent to the processing thread; no signal will be sent out for the filesystem limit change of pool with path {}: {}",
-                item, e,
+                "D-Bus pool filesystem limit change event could not be sent to the processing thread; no signal will be sent out for the filesystem limit change of pool with path {item}: {e}",
             )
         }
     }
@@ -387,8 +379,7 @@ impl DbusContext {
             .send(DbusAction::FsSizeLimitChange(item.clone(), new_size_limit))
         {
             warn!(
-                "D-Bus filesystem size limit change event could not be sent to the processing thread; no signal will be sent out for the size limit change of filesystem with path {}: {}",
-                item, e,
+                "D-Bus filesystem size limit change event could not be sent to the processing thread; no signal will be sent out for the size limit change of filesystem with path {item}: {e}",
             )
         }
     }
@@ -400,8 +391,7 @@ impl DbusContext {
             .send(DbusAction::PoolOverprovModeChange(item.clone(), new_mode))
         {
             warn!(
-                "D-Bus pool overprovisioning mode change event could not be sent to the processing thread; no signal will be sent out for the filesystem overprovisioning mode of pool with path {}: {}",
-                item, e,
+                "D-Bus pool overprovisioning mode change event could not be sent to the processing thread; no signal will be sent out for the filesystem overprovisioning mode of pool with path {item}: {e}",
             )
         }
     }
@@ -413,8 +403,7 @@ impl DbusContext {
             .send(DbusAction::PoolFreeTokenSlots(item.clone(), new_ts))
         {
             warn!(
-                "D-Bus pool free token slots event could not be sent to the processing thread; no signal will be sent out for the free token slots event of pool with path {}: {}",
-                item, e,
+                "D-Bus pool free token slots event could not be sent to the processing thread; no signal will be sent out for the free token slots event of pool with path {item}: {e}",
             )
         }
     }
@@ -426,8 +415,7 @@ impl DbusContext {
             .send(DbusAction::PoolAvailActions(item.clone(), avail_actions))
         {
             warn!(
-                "D-Bus pool available actions status change event could not be sent to the processing thread; no signal will be sent out for the pool available actions status change of pool with path {}: {}",
-                item, e,
+                "D-Bus pool available actions status change event could not be sent to the processing thread; no signal will be sent out for the pool available actions status change of pool with path {item}: {e}",
             )
         }
     }
@@ -439,8 +427,7 @@ impl DbusContext {
             .send(DbusAction::LockedPoolsChange(locked_pools))
         {
             warn!(
-                "Locked pool change event could not be sent to the processing thread; no signal will be sent out for the locked pool state change: {}",
-                e,
+                "Locked pool change event could not be sent to the processing thread; no signal will be sent out for the locked pool state change: {e}",
             )
         }
     }
@@ -452,8 +439,7 @@ impl DbusContext {
             .send(DbusAction::StoppedPoolsChange(stopped_pools))
         {
             warn!(
-                "Stopped pool change event could not be sent to the processing thread; no signal will be sent out for the stopped pool state change: {}",
-                e,
+                "Stopped pool change event could not be sent to the processing thread; no signal will be sent out for the stopped pool state change: {e}",
             )
         }
     }
@@ -465,8 +451,7 @@ impl DbusContext {
             .send(DbusAction::BlockdevUserInfoChange(path.clone(), user_info))
         {
             warn!(
-                "Block device User info change event could not be sent to the processing thread; no signal will be sent out for the block device user info state change: {}",
-                e,
+                "Block device User info change event could not be sent to the processing thread; no signal will be sent out for the block device user info state change: {e}",
             )
         }
     }
@@ -485,8 +470,7 @@ impl DbusContext {
             ))
         {
             warn!(
-                "Block device total physical size change event could not be sent to the processing thread; no signal will be sent out for the block device total physical size state change: {}",
-                e,
+                "Block device total physical size change event could not be sent to the processing thread; no signal will be sent out for the block device total physical size state change: {e}",
             )
         }
     }
@@ -509,8 +493,7 @@ impl DbusContext {
             SignalChange::from(out_of_alloc_space),
         )) {
             warn!(
-                "Pool foreground change event could not be sent to the processing thread; no signal will be sent out for the pool allocated size state change: {}",
-                e,
+                "Pool foreground change event could not be sent to the processing thread; no signal will be sent out for the pool allocated size state change: {e}",
             )
         }
     }
@@ -526,8 +509,7 @@ impl DbusContext {
             .send(DbusAction::FsOriginChange(path.clone(), origin))
         {
             warn!(
-                "Filesystem origin change event could not be sent to the processing thread; no signal will be sent out for the filesystem origin state change: {}",
-                e,
+                "Filesystem origin change event could not be sent to the processing thread; no signal will be sent out for the filesystem origin state change: {e}",
             )
         }
     }

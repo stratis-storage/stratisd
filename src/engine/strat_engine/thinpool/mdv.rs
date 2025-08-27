@@ -210,7 +210,7 @@ impl MetadataVol {
         if mtpt_stat.st_dev != parent_stat.st_dev {
             if let Err(retry::Error { error, .. }) =
                 retry_with_index(Fixed::from_millis(100).take(2), |i| {
-                    trace!("MDV unmount attempt {}", i);
+                    trace!("MDV unmount attempt {i}");
                     umount(&self.mount_pt)
                 })
             {
@@ -222,7 +222,7 @@ impl MetadataVol {
         }
 
         if let Err(err) = remove_dir(&self.mount_pt) {
-            warn!("Could not remove MDV mount point: {}", err);
+            warn!("Could not remove MDV mount point: {err}");
         }
 
         let dev = mdv_device(pool_uuid);
@@ -285,7 +285,7 @@ impl Drop for MetadataVol {
             if mtpt_stat.st_dev != parent_stat.st_dev {
                 if let Err(retry::Error { error, .. }) =
                     retry_with_index(Fixed::from_millis(100).take(2), |i| {
-                        trace!("MDV unmount attempt {}", i);
+                        trace!("MDV unmount attempt {i}");
                         umount(mount_pt)
                     })
                 {
@@ -302,10 +302,7 @@ impl Drop for MetadataVol {
         }
 
         if let Err(e) = drop_failure(&self.mount_pt) {
-            warn!(
-                "Failed to unmount MDV; some cleanup may not be able to be done: {}",
-                e
-            );
+            warn!("Failed to unmount MDV; some cleanup may not be able to be done: {e}");
         }
     }
 }

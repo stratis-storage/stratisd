@@ -84,10 +84,7 @@ impl DbusUdevHandler {
 
         for action in DbusAction::from_bd_diffs(dev_infos) {
             if let Err(e) = self.dbus_context.sender.send(action) {
-                warn!(
-                    "Failed to update D-Bus layer with block device event changes: {}",
-                    e
-                );
+                warn!("Failed to update D-Bus layer with block device event changes: {e}");
             }
         }
 

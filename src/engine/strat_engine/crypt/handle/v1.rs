@@ -315,14 +315,13 @@ pub fn load_crypt_metadata(
 
 /// Validate that the Stratis token is present and valid
 fn stratis_token_is_valid(json: Value) -> bool {
-    debug!("Stratis LUKS2 token: {}", json);
+    debug!("Stratis LUKS2 token: {json}");
 
     let result = from_value::<StratisLuks2Token>(json);
     if let Err(ref e) = result {
         debug!(
             "LUKS2 token in the Stratis token slot does not appear \
-            to be a Stratis token: {}.",
-            e,
+            to be a Stratis token: {e}.",
         );
     }
     result.is_ok()
@@ -366,8 +365,7 @@ fn is_encrypted_stratis_device(device: &mut CryptDevice) -> bool {
         .map_err(|e| {
             debug!(
                 "Operations querying device to determine if it is a Stratis device \
-                failed with an error: {}; reporting as not a Stratis device.",
-                e
+                failed with an error: {e}; reporting as not a Stratis device."
             );
         })
         .unwrap_or(false)
@@ -522,8 +520,7 @@ impl CryptHandle {
             .map_err(|e| {
                 warn!(
                     "stratisd was unable to simulate opening the given device \
-                    in the current environment: {}",
-                    e,
+                    in the current environment: {e}",
                 );
             })
             .unwrap_or(false)
@@ -580,8 +577,7 @@ impl CryptHandle {
                     Self::rollback(&mut device, physical_path, &activation_name)
                 {
                     warn!(
-                        "Failed to roll back crypt device initialization; you may need to manually wipe this device: {}",
-                        err
+                        "Failed to roll back crypt device initialization; you may need to manually wipe this device: {err}"
                     );
                 }
             })

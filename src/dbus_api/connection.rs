@@ -76,7 +76,7 @@ impl DbusConnectionHandler {
         );
         loop {
             if let Err(e) = self.connection.process(Duration::from_millis(100)) {
-                warn!("Failed to process D-Bus request: {}", e);
+                warn!("Failed to process D-Bus request: {e}");
             }
             match self.should_exit.try_recv() {
                 Ok(()) => {

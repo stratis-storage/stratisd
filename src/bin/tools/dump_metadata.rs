@@ -24,11 +24,11 @@ fn fmt_metadata(shr: &StaticHeaderResult, print_bytes: bool) -> String {
             .as_ref()
             .map_or(String::from("Unreadable\n"), |h| {
                 h.as_ref().map_or_else(
-                    |e| format!("Error: {}\n", e),
+                    |e| format!("Error: {e}\n"),
                     |s| {
                         s.as_ref()
                             .map_or(String::from("No signature buffer\n"), |sh| {
-                                format!("{:#?}\n", sh)
+                                format!("{sh:#?}\n")
                             })
                     },
                 )
@@ -85,7 +85,7 @@ fn print_bda(bda: &BDA, only_pool: bool) {
         return;
     }
 
-    println!("\n{:#?}", bda);
+    println!("\n{bda:#?}");
 }
 
 /// Prints the pool level metadata.
@@ -96,10 +96,10 @@ fn print_pool_metadata(pool_metadata: &Option<Vec<u8>>, only_pool: bool) -> Resu
     }
     if let Some(loaded_state) = pool_metadata {
         let state_json: Value = serde_json::from_slice(loaded_state)
-            .map_err(|extract_err| format!("Error during state JSON extract: {}", extract_err))?;
+            .map_err(|extract_err| format!("Error during state JSON extract: {extract_err}"))?;
         let state_json_pretty: String = serde_json::to_string_pretty(&state_json)
-            .map_err(|parse_err| format!("Error during state JSON parse: {}", parse_err))?;
-        println!("{}", state_json_pretty);
+            .map_err(|parse_err| format!("Error during state JSON parse: {parse_err}"))?;
+        println!("{state_json_pretty}");
     } else if !only_pool {
         println!("None found");
     }
@@ -116,29 +116,29 @@ pub fn run(devpath: &PathBuf, print_bytes: bool, pool_only: bool) -> Result<(), 
     let mut devfile = OpenOptions::new()
         .read(true)
         .open(devpath)
-        .map_err(|the_io_error| format!("Error opening device: {}", the_io_error))?;
+        .map_err(|the_io_error| format!("Error opening device: {the_io_error}"))?;
 
     let read_results = StaticHeader::read_sigblocks(&mut devfile);
     print_signature_block(&read_results, print_bytes, pool_only);
 
     let header =
         StaticHeader::repair_sigblocks(&mut devfile, read_results, StaticHeader::do_nothing)
-            .map_err(|repair_error| format!("No valid StaticHeader found: {}", repair_error))?
+            .map_err(|repair_error| format!("No valid StaticHeader found: {repair_error}"))?
             .ok_or_else(|| "No valid Stratis signature found".to_string())?;
 
     let bda = BDA::load(header, &mut devfile)
-        .map_err(|bda_load_error| format!("BDA detected but error found: {}", bda_load_error))?
+        .map_err(|bda_load_error| format!("BDA detected but error found: {bda_load_error}"))?
         .ok_or_else(|| "No Stratis BDA metadata found".to_string())?;
 
     print_bda(&bda, pool_only);
 
     devfile
         .seek(SeekFrom::Start(0))
-        .map_err(|seek_err| format!("Error during seek: {}", seek_err))?;
+        .map_err(|seek_err| format!("Error during seek: {seek_err}"))?;
 
     let loaded_state = bda
         .load_state(&mut devfile)
-        .map_err(|stateload_err| format!("Error during load state: {}", stateload_err))?;
+        .map_err(|stateload_err| format!("Error during load state: {stateload_err}"))?;
 
     print_pool_metadata(&loaded_state, pool_only)?;
 

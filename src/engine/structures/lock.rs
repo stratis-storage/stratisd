@@ -185,7 +185,7 @@ where
             self.pre_acquire_assertion(&WaitType::SomeRead(uuid), i);
         }
 
-        trace!("Lock record after acquisition: {}", self);
+        trace!("Lock record after acquisition: {self}");
     }
 
     /// Remove a record for a single element indicating a read lock acquisition.
@@ -199,7 +199,7 @@ where
             }
             None => panic!("Must have acquired lock and incremented lock count"),
         }
-        trace!("Lock record after removal: {}", self);
+        trace!("Lock record after removal: {self}");
     }
 
     /// Add a record for a single element indicating a write lock acquisition.
@@ -210,14 +210,14 @@ where
             self.pre_acquire_assertion(&WaitType::SomeWrite(uuid), i);
         }
 
-        trace!("Lock record after acquisition: {}", self);
+        trace!("Lock record after acquisition: {self}");
     }
 
     /// Remove a record for a single element indicating a write lock acquisition.
     /// Precondition: Exactly one write lock must be acquired on the given element.
     fn remove_write_lock(&mut self, uuid: &U) {
         assert!(self.write_locked.remove(uuid));
-        trace!("Lock record after removal: {}", self);
+        trace!("Lock record after removal: {self}");
     }
 
     /// Add a record for all elements indicating a read lock acquisition.
@@ -226,7 +226,7 @@ where
 
         self.pre_acquire_assertion(&WaitType::AllRead, idx);
 
-        trace!("Lock record after acquisition: {}", self);
+        trace!("Lock record after acquisition: {self}");
     }
 
     /// Remove a record for all elements indicating a read lock acquisition.
@@ -236,7 +236,7 @@ where
             .all_read_locked
             .checked_sub(1)
             .expect("Cannot drop below 0");
-        trace!("Lock record after removal: {}", self);
+        trace!("Lock record after removal: {self}");
     }
 
     /// Add a record for all elements indicating a write lock acquisition.
@@ -245,7 +245,7 @@ where
 
         self.pre_acquire_assertion(&WaitType::AllWrite, idx);
 
-        trace!("Lock record after acquisition: {}", self);
+        trace!("Lock record after acquisition: {self}");
     }
 
     /// Remove a record for all elements indicating a write lock acquisition.
@@ -253,7 +253,7 @@ where
     fn remove_write_all_lock(&mut self) {
         assert!(self.all_write_locked);
         self.all_write_locked = false;
-        trace!("Lock record after removal: {}", self);
+        trace!("Lock record after removal: {self}");
     }
 
     /// Add a lock request to the queue of waiting tasks to be woken up once the lock is
@@ -286,7 +286,7 @@ where
             });
             has_waited.store(true, Ordering::SeqCst);
         }
-        trace!("Lock record after sleep: {}", self);
+        trace!("Lock record after sleep: {self}");
     }
 
     /// Returns true if the current request should be put in the wait queue.
@@ -297,26 +297,14 @@ where
     ///   * The request conflicts with any tasks that have already been woken up.
     fn should_wait(&self, ty: &WaitType<U>, idx: u64) -> bool {
         if self.woken.contains_key(&idx) {
-            trace!(
-                "Task with index {}, wait type {:?} was woken and can acquire lock",
-                idx,
-                ty
-            );
+            trace!("Task with index {idx}, wait type {ty:?} was woken and can acquire lock");
             false
         } else {
             let should_wait = self.already_acquired(ty) || self.conflicts_with_woken(ty);
             if should_wait {
-                trace!(
-                    "Putting task with index {}, wait type {:?} to sleep",
-                    idx,
-                    ty
-                );
+                trace!("Putting task with index {idx}, wait type {ty:?} to sleep");
             } else {
-                trace!(
-                    "Task with index {}, wait type {:?} can acquire lock",
-                    idx,
-                    ty
-                );
+                trace!("Task with index {idx}, wait type {ty:?} can acquire lock");
             }
             should_wait
         }
@@ -538,7 +526,7 @@ where
 {
     /// Issue a read on a single element identified by a name or UUID.
     pub async fn read(&self, key: PoolIdentifier<U>) -> Option<SomeLockReadGuard<U, T>> {
-        trace!("Acquiring read lock on pool {:?}", key);
+        trace!("Acquiring read lock on pool {key:?}");
         let idx = self.next_idx();
         let guard = SomeRead(self.clone(), key, AtomicBool::new(false), idx).await;
         if guard.is_some() {
@@ -560,7 +548,7 @@ where
 
     /// Issue a write on a single element identified by a name or UUID.
     pub async fn write(&self, key: PoolIdentifier<U>) -> Option<SomeLockWriteGuard<U, T>> {
-        trace!("Acquiring write lock on pool {:?}", key);
+        trace!("Acquiring write lock on pool {key:?}");
         let idx = self.next_idx();
         let guard = SomeWrite(self.clone(), key, AtomicBool::new(false), idx).await;
         if guard.is_some() {

@@ -31,11 +31,6 @@ jobs:
     container:
       image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
-      - name: Install git for checkout action
-        run: dnf install -y git
-      - uses: actions/checkout@v4
-        with:
-          path: stratisd
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -44,6 +39,7 @@ jobs:
           cryptsetup-devel
           dbus-devel
           device-mapper-devel
+          git
           libblkid-devel
           make
           ncurses
@@ -54,12 +50,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.87.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.89.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+      - uses: actions/checkout@v5
+        with:
+          path: stratisd
+          persist-credentials: false
       - name: Check out ci repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: ci
           repository: stratis-storage/ci
+          persist-credentials: false
       - name: Run comparisons of macro version specs with Fedora packages
         # yamllint disable rule:line-length
         run: |

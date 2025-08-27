@@ -1,6 +1,6 @@
 [package]
 name = "stratisd"
-version = "3.8.2"
+version = "3.8.3"
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -137,7 +137,7 @@ version = "0.4.0"
 optional = true
 
 [dependencies.libc]
-version = "0.2.168"
+version = "0.2.171"
 optional = true
 
 [dependencies.libcryptsetup-rs]
@@ -149,10 +149,6 @@ optional = true
 version = "0.6.0"
 optional = true
 
-[dependencies.libmount]
-version = "0.1.9"
-optional = true
-
 [dependencies.libudev]
 version = "0.3.0"
 optional = true
@@ -162,7 +158,7 @@ version = "0.4.20"
 optional = true
 
 [dependencies.nix]
-version = "0.29.0"
+version = "0.30.0"
 optional = true
 features = ["fs", "ioctl", "mount", "poll", "process", "sched", "signal", "socket"]
 
@@ -172,6 +168,10 @@ optional = true
 
 [dependencies.pretty-hex]
 version = "0.4.1"
+optional = true
+
+[dependencies.procfs]
+version = "0.17.0"
 optional = true
 
 [dependencies.rand]
@@ -271,11 +271,11 @@ engine = [
     "dep:libc",
     "dep:libcryptsetup-rs",
     "dep:libcryptsetup-rs-sys",
-    "dep:libmount",
     "dep:libudev",
     "dep:log",
     "dep:nix",
     "dep:once_cell",
+    "dep:procfs",
     "dep:rand",
     "dep:regex",
     "dep:retry",
@@ -338,7 +338,6 @@ linkedlist = { level = "deny", priority = 4 }
 macro_use_imports = { level = "deny", priority = 4 }
 manual_ok_or = { level = "deny", priority = 4 }
 match_bool = { level = "deny", priority = 4 }
-match_on_vec_items = { level = "deny", priority = 4 }
 match_wild_err_arm = { level = "deny", priority = 4 }
 maybe_infinite_iter = { level = "deny", priority = 4 }
 mut_mut = { level = "deny", priority = 4 }

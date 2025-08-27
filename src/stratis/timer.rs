@@ -32,19 +32,13 @@ async fn check_pool_and_fs(
             let pool_diffs = engine.pool_evented(None).await;
             for action in DbusAction::from_pool_diffs(pool_diffs) {
                 if let Err(e) = sender.send(action) {
-                    warn!(
-                        "Failed to update D-Bus API with information on changed properties: {}",
-                        e
-                    );
+                    warn!("Failed to update D-Bus API with information on changed properties: {e}");
                 }
             }
             let fs_diffs = engine.fs_evented(None).await;
             for action in DbusAction::from_fs_diffs(fs_diffs) {
                 if let Err(e) = sender.send(action) {
-                    warn!(
-                        "Failed to update D-Bus API with information on changed properties: {}",
-                        e
-                    );
+                    warn!("Failed to update D-Bus API with information on changed properties: {e}");
                 }
             }
         }
@@ -60,7 +54,7 @@ async fn check_pool_and_fs(
         )
         .await
         {
-            warn!("Failed to handle timed pool and filesystem checks: {}", e);
+            warn!("Failed to handle timed pool and filesystem checks: {e}");
         }
         trace!("Timed pool and filesystem checks finished");
         sleep(Duration::from_secs(10)).await;

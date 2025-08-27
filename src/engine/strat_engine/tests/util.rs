@@ -4,7 +4,6 @@
 
 use std::{
     fs::File,
-    io::Read,
     path::{Path, PathBuf},
 };
 
@@ -22,6 +21,8 @@ use crate::{
     stratis::StratisResult,
 };
 
+pub use cleanup_errors::{Error, Result};
+
 mod cleanup_errors {
     use std::fmt;
 
@@ -34,6 +35,7 @@ mod cleanup_errors {
         Msg(String),
         Chained(String, Box<Error>),
         Dm(DmError),
+        Procfs(procfs::ProcError),
     }
 
     pub type Result<T> = std::result::Result<T, Error>;
@@ -62,6 +64,12 @@ mod cleanup_errors {
         }
     }
 
+    impl From<procfs::ProcError> for Error {
+        fn from(err: procfs::ProcError) -> Error {
+            Error::Procfs(err)
+        }
+    }
+
     impl fmt::Display for Error {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             match self {
@@ -70,14 +78,13 @@ mod cleanup_errors {
                 Error::Msg(err) => write!(f, "{err}"),
                 Error::Chained(msg, err) => write!(f, "{msg}: {err}"),
                 Error::Dm(err) => write!(f, "DM error: {err}"),
+                Error::Procfs(err) => write!(f, "Procfs error: {err}"),
             }
         }
     }
 
     impl std::error::Error for Error {}
 }
-
-use self::cleanup_errors::{Error, Result};
 
 /// Attempt to remove all device mapper devices which match the stratis naming convention.
 /// FIXME: Current implementation complicated by https://bugzilla.redhat.com/show_bug.cgi?id=1506287
@@ -156,18 +163,14 @@ pub fn dm_stratis_devices_remove() -> Result<()> {
 /// immediately on the first one we are unable to unmount.
 fn stratis_filesystems_unmount() -> Result<()> {
     || -> Result<()> {
-        let mut mount_data = String::new();
-        File::open("/proc/self/mountinfo")?.read_to_string(&mut mount_data)?;
-        let parser = libmount::mountinfo::Parser::new(mount_data.as_bytes());
-
-        for mount_point in parser
-            .filter_map(|x| x.ok())
-            .filter_map(|m| m.mount_point.into_owned().into_string().ok())
-            .filter(|mp| mp.contains("stratis"))
+        for mount_point in procfs::process::Process::myself()?
+            .mountinfo()?
+            .into_iter()
+            .map(|i| i.mount_point)
+            .filter(|mp| mp.as_path().to_string_lossy().contains("stratis"))
         {
-            umount2(&PathBuf::from(mount_point), MntFlags::MNT_DETACH)?;
+            umount2(&mount_point, MntFlags::MNT_DETACH)?;
         }
-
         Ok(())
     }()
     .map_err(|e| {

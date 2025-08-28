@@ -1,3 +1,12 @@
+stratisd 3.8.4
+==============
+Recommended Rust toolchain version: 1.89.0
+Recommended development platform for Python development: Fedora 41
+
+* Cherry-picked commits:
+  * Prohibit definition of max_align_t when generating systemd binding
+
+
 stratisd 3.8.3
 ==============
 Recommended Rust toolchain version: 1.89.0

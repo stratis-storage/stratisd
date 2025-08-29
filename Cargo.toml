@@ -365,5 +365,4 @@ wildcard_imports = { level = "deny", priority = 4 }
 platforms = ["*-unknown-linux-gnu"]
 tier = "2"
 all-features = true
-exclude-crate-paths = [ { name = "libm", exclude = "ci" },
-                        { name = "libdbus-sys", exclude = "vendor" } ]
+exclude-crate-paths = [ { name = "libdbus-sys", exclude = "vendor" } ]

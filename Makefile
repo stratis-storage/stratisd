@@ -244,14 +244,14 @@ install-dbus-cfg:
 ## Install dracut modules
 install-dracut-cfg:
 	mkdir -p $(DESTDIR)$(DRACUTDIR)/modules.d
-	$(INSTALL) -Dpm0755 -d $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis
-	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|' dracut/90stratis/stratisd-min.service.in > $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis/stratisd-min.service
-	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|' dracut/90stratis/module-setup.sh.in > $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis/module-setup.sh
-	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/stratis-rootfs-setup
-	$(INSTALL) -Dpm0644 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/61-stratisd.rules
-	$(INSTALL) -Dpm0755 -d $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis-clevis
-	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis-clevis dracut/90stratis-clevis/module-setup.sh
-	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis-clevis dracut/90stratis-clevis/stratis-clevis-rootfs-setup
+	$(INSTALL) -Dpm0755 -d $(DESTDIR)$(DRACUTDIR)/modules.d/50stratis
+	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|' dracut/50stratis/stratisd-min.service.in > $(DESTDIR)$(DRACUTDIR)/modules.d/50stratis/stratisd-min.service
+	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|' dracut/50stratis/module-setup.sh.in > $(DESTDIR)$(DRACUTDIR)/modules.d/50stratis/module-setup.sh
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/50stratis dracut/50stratis/stratis-rootfs-setup
+	$(INSTALL) -Dpm0644 -t $(DESTDIR)$(DRACUTDIR)/modules.d/50stratis dracut/50stratis/61-stratisd.rules
+	$(INSTALL) -Dpm0755 -d $(DESTDIR)$(DRACUTDIR)/modules.d/50stratis-clevis
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/50stratis-clevis dracut/50stratis-clevis/module-setup.sh
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/50stratis-clevis dracut/50stratis-clevis/stratis-clevis-rootfs-setup
 
 ## Install systemd configuration
 install-systemd-cfg:
@@ -316,8 +316,8 @@ clean-cfg:
 	rm -fv $(DESTDIR)$(MANDIR)/man8/stratis-dumpmetadata.8
 	rm -fv $(DESTDIR)$(UDEVDIR)/rules.d/*-stratisd.rules
 	rm -fv $(DESTDIR)$(UNITDIR)/stratisd.service
-	rm -rfv $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis
-	rm -rfv $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis-clevis
+	rm -rfv $(DESTDIR)$(DRACUTDIR)/modules.d/50stratis
+	rm -rfv $(DESTDIR)$(DRACUTDIR)/modules.d/50stratis-clevis
 	rm -fv $(DESTDIR)$(UNITDIR)/stratisd-min-postinitrd.service
 	rm -fv $(DESTDIR)$(UNITDIR)/stratis-fstab-setup@.service
 	rm -fv $(DESTDIR)$(UNITDIR)/stratis-fstab-setup-with-network@.service

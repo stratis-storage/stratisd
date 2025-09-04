@@ -2,11 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-pub use self::engine::SimEngine;
+mod api;
+mod methods;
+mod props;
 
-mod blockdev;
-mod engine;
-mod filesystem;
-mod keys;
-mod pool;
-mod shared;
+pub use api::{
+    decrypt_pool_method, encrypt_pool_method, last_reencrypted_timestamp_property,
+    reencrypt_pool_method,
+};

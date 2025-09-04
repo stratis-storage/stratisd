@@ -184,6 +184,13 @@ impl StratEngine {
         }
     }
 
+    async fn upgrade_pool(
+        &self,
+        lock: SomeLockReadGuard<PoolUuid, dyn Pool>,
+    ) -> SomeLockWriteGuard<PoolUuid, AnyPool> {
+        self.pools.upgrade(lock).await
+    }
+
     pub async fn get_pool(
         &self,
         key: PoolIdentifier<PoolUuid>,
@@ -703,6 +710,13 @@ impl Engine for StratEngine {
             })??;
             Ok(SetUnlockAction::new(unlocked_uuids))
         }
+    }
+
+    async fn upgrade_pool(
+        &self,
+        lock: SomeLockReadGuard<PoolUuid, dyn Pool>,
+    ) -> SomeLockWriteGuard<PoolUuid, dyn Pool> {
+        self.upgrade_pool(lock).await.into_dyn()
     }
 
     async fn get_pool(

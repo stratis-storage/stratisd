@@ -1,3 +1,73 @@
+stratisd 3.9.0
+==============
+Recommended Rust toolchain version: 1.89.0
+Recommended development platform for Python development: Fedora 41
+
+* Indicates new for minor version 9
+
+* Allow starting pool without cache:
+  https://github.com/stratis-storage/stratisd/issues/3796
+  https://github.com/stratis-storage/stratisd/pull/3864
+
+- Add missing box_variant! macro for PropertiesChangedSignal:
+  https://github.com/stratis-storage/stratisd/issues/3895
+  https://github.com/stratis-storage/stratisd/pull/3896
+
+* Derive BDA::clone and simplify error handling:
+  https://github.com/stratis-storage/stratisd/pull/3885
+
+* Make StratisError clonable:
+  https://github.com/stratis-storage/stratisd/pull/3872
+
+* Make ordering consistent for blockdevs and blockdevs_mut call:
+  https://github.com/stratis-storage/stratisd/pull/3900
+
+* Increase DBus revision number to 9:
+  https://github.com/stratis-storage/stratisd/pull/3873
+  https://github.com/stratis-storage/stratisd/pull/3854
+
+- Fix assertion error when calculating error message:
+  https://github.com/stratis-storage/stratisd/pull/3874
+
+- Use procfs instead of libmount to read mountinfo:
+  https://github.com/stratis-storage/stratisd/issues/3878
+  https://github.com/stratis-storage/stratisd/pull/3879
+
+- Prohibit definition of max_align_t when generating systemd bindings:
+  https://github.com/stratis-storage/stratisd/issues/3904
+  https://github.com/stratis-storage/stratisd/pull/3905
+
+* Increase libcryptsetup-rs dependency lower bound to 0.14.0:
+  https://github.com/stratis-storage/stratisd/pull/3903
+
+- Increase nix dependency version lower bound to 0.30.0:
+  https://github.com/stratis-storage/stratisd/pull/3877
+
+- Update real versions of Stratis dependencies:
+  https://github.com/stratis-storage/stratisd/pull/3899
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3910
+  https://github.com/stratis-storage/stratisd/pull/3909
+  https://github.com/stratis-storage/stratisd/pull/3897
+  https://github.com/stratis-storage/stratisd/pull/3894
+  https://github.com/stratis-storage/stratisd/pull/3893
+  https://github.com/stratis-storage/stratisd/pull/3892
+  https://github.com/stratis-storage/stratisd/pull/3891
+  https://github.com/stratis-storage/stratisd/pull/3889
+  https://github.com/stratis-storage/stratisd/pull/3888
+  https://github.com/stratis-storage/stratisd/pull/3887
+  https://github.com/stratis-storage/stratisd/pull/3886
+  https://github.com/stratis-storage/stratisd/pull/3884
+  https://github.com/stratis-storage/stratisd/pull/3883
+  https://github.com/stratis-storage/stratisd/pull/3881
+  https://github.com/stratis-storage/stratisd/pull/3880
+  https://github.com/stratis-storage/stratisd/pull/3876
+  https://github.com/stratis-storage/stratisd/pull/3875
+  https://github.com/stratis-storage/stratisd/pull/3869
+  https://github.com/stratis-storage/stratisd/pull/3861
+
+
 stratisd 3.8.2
 ==============
 Recommended Rust toolchain version: 1.87.0

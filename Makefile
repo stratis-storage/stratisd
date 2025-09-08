@@ -245,8 +245,8 @@ install-dbus-cfg:
 install-dracut-cfg:
 	mkdir -p $(DESTDIR)$(DRACUTDIR)/modules.d
 	$(INSTALL) -Dpm0755 -d $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis
-	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|' dracut/90stratis/stratisd-min.service.in > $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis/stratisd-min.service
-	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|' dracut/90stratis/module-setup.sh.in > $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis/module-setup.sh
+	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|' dracut/90stratis/stratisd-min.service.in | $(INSTALL) -Dpm0644 /dev/stdin $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis/stratisd-min.service
+	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|' dracut/90stratis/module-setup.sh.in | $(INSTALL) -Dpm0755 /dev/stdin $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis/module-setup.sh
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/stratis-rootfs-setup
 	$(INSTALL) -Dpm0644 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/61-stratisd.rules
 	$(INSTALL) -Dpm0755 -d $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis-clevis
@@ -256,10 +256,10 @@ install-dracut-cfg:
 ## Install systemd configuration
 install-systemd-cfg:
 	mkdir -p $(DESTDIR)$(UNITDIR)
-	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|' systemd/stratisd.service.in > $(DESTDIR)$(UNITDIR)/stratisd.service
-	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|' systemd/stratisd-min-postinitrd.service.in > $(DESTDIR)$(UNITDIR)/stratisd-min-postinitrd.service
-	sed 's|@UNITEXECDIR@|$(UNITEXECDIR)|' systemd/stratis-fstab-setup@.service.in > $(DESTDIR)$(UNITDIR)/stratis-fstab-setup@.service
-	sed 's|@UNITEXECDIR@|$(UNITEXECDIR)|' systemd/stratis-fstab-setup-with-network@.service.in > $(DESTDIR)$(UNITDIR)/stratis-fstab-setup-with-network@.service
+	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|' systemd/stratisd.service.in | $(INSTALL) -Dpm0644 /dev/stdin $(DESTDIR)$(UNITDIR)/stratisd.service
+	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|' systemd/stratisd-min-postinitrd.service.in | $(INSTALL) -Dpm0644 /dev/stdin $(DESTDIR)$(UNITDIR)/stratisd-min-postinitrd.service
+	sed 's|@UNITEXECDIR@|$(UNITEXECDIR)|' systemd/stratis-fstab-setup@.service.in | $(INSTALL) -Dpm0644 /dev/stdin $(DESTDIR)$(UNITDIR)/stratis-fstab-setup@.service
+	sed 's|@UNITEXECDIR@|$(UNITEXECDIR)|' systemd/stratis-fstab-setup-with-network@.service.in | $(INSTALL) -Dpm0644 /dev/stdin $(DESTDIR)$(UNITDIR)/stratis-fstab-setup-with-network@.service
 
 ## Install scripts
 install-scripts:

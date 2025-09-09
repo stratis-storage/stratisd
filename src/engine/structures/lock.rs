@@ -891,7 +891,6 @@ where
                     .iter()
                     .map(|(n, u, t)| (n.clone(), *u, t as *const _))
                     .collect::<Table<_, _>>(),
-                true,
             ))
         };
 
@@ -914,11 +913,7 @@ where
 }
 
 /// Guard returned by AllRead future.
-pub struct AllLockReadGuard<U: AsUuid, T: ?Sized>(
-    Arc<Mutex<LockRecord<U>>>,
-    Table<U, *const T>,
-    bool,
-);
+pub struct AllLockReadGuard<U: AsUuid, T: ?Sized>(Arc<Mutex<LockRecord<U>>>, Table<U, *const T>);
 
 impl<U, T> Into<Vec<SomeLockReadGuard<U, T>>> for AllLockReadGuard<U, T>
 where
@@ -950,16 +945,16 @@ where
     U: AsUuid,
     T: 'static + Pool,
 {
-    pub fn into_dyn(mut self) -> AllLockReadGuard<U, dyn Pool> {
-        self.2 = false;
-        AllLockReadGuard(
+    pub fn into_dyn(self) -> AllLockReadGuard<U, dyn Pool> {
+        let (lock_record, table) = (
             Arc::clone(&self.0),
             self.1
                 .iter()
                 .map(|(n, u, t)| (n.clone(), *u, *t as *const dyn Pool))
                 .collect::<Table<_, _>>(),
-            true,
-        )
+        );
+        std::mem::forget(self);
+        AllLockReadGuard(lock_record, table)
     }
 }
 
@@ -1028,11 +1023,9 @@ where
 {
     fn drop(&mut self) {
         trace!("Dropping all read lock");
-        if self.2 {
-            let mut lock_record = self.0.lock().expect("Mutex only locked internally");
-            lock_record.remove_read_all_lock();
-            lock_record.wake();
-        }
+        let mut lock_record = self.0.lock().expect("Mutex only locked internally");
+        lock_record.remove_read_all_lock();
+        lock_record.wake();
         trace!("All read lock dropped");
     }
 }

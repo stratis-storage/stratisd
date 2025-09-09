@@ -622,7 +622,6 @@ where
                 uuid,
                 name,
                 rf as *const _,
-                true,
             )))
         };
 
@@ -645,13 +644,7 @@ where
 }
 
 /// Guard returned by SomeRead future.
-pub struct SomeLockReadGuard<U: AsUuid, T: ?Sized>(
-    Arc<Mutex<LockRecord<U>>>,
-    U,
-    Name,
-    *const T,
-    bool,
-);
+pub struct SomeLockReadGuard<U: AsUuid, T: ?Sized>(Arc<Mutex<LockRecord<U>>>, U, Name, *const T);
 
 impl<U, T> SomeLockReadGuard<U, T>
 where
@@ -672,15 +665,15 @@ where
     U: AsUuid,
     T: 'static + Pool,
 {
-    pub fn into_dyn(mut self) -> SomeLockReadGuard<U, dyn Pool> {
-        self.4 = false;
-        SomeLockReadGuard(
+    pub fn into_dyn(self) -> SomeLockReadGuard<U, dyn Pool> {
+        let (lock_record, uuid, name, ptr) = (
             Arc::clone(&self.0),
             self.1,
             self.2.clone(),
             self.3 as *const dyn Pool,
-            true,
-        )
+        );
+        std::mem::forget(self);
+        SomeLockReadGuard(lock_record, uuid, name, ptr)
     }
 }
 
@@ -717,11 +710,9 @@ where
 {
     fn drop(&mut self) {
         trace!("Dropping read lock on pool with UUID {}", self.1);
-        if self.4 {
-            let mut lock_record = self.0.lock().expect("Mutex only locked internally");
-            lock_record.remove_read_lock(self.1);
-            lock_record.wake();
-        }
+        let mut lock_record = self.0.lock().expect("Mutex only locked internally");
+        lock_record.remove_read_lock(self.1);
+        lock_record.wake();
         trace!("Read lock on pool with UUID {} dropped", self.1);
     }
 }
@@ -943,7 +934,7 @@ where
             .map(|(n, u, t)| {
                 (
                     *u,
-                    SomeLockReadGuard(Arc::clone(&self.0), *u, n.clone(), *t as *const _, true),
+                    SomeLockReadGuard(Arc::clone(&self.0), *u, n.clone(), *t as *const _),
                 )
             })
             .map(|(u, guard)| {

@@ -752,7 +752,6 @@ where
                 uuid,
                 name,
                 rf as *mut _,
-                true,
             )))
         };
 
@@ -775,13 +774,7 @@ where
 }
 
 /// Guard returned by SomeWrite future.
-pub struct SomeLockWriteGuard<U: AsUuid, T: ?Sized>(
-    Arc<Mutex<LockRecord<U>>>,
-    U,
-    Name,
-    *mut T,
-    bool,
-);
+pub struct SomeLockWriteGuard<U: AsUuid, T: ?Sized>(Arc<Mutex<LockRecord<U>>>, U, Name, *mut T);
 
 impl<U, T> SomeLockWriteGuard<U, T>
 where
@@ -802,15 +795,15 @@ where
     U: AsUuid,
     T: 'static + Pool,
 {
-    pub fn into_dyn(mut self) -> SomeLockWriteGuard<U, dyn Pool> {
-        self.4 = false;
-        SomeLockWriteGuard(
+    pub fn into_dyn(self) -> SomeLockWriteGuard<U, dyn Pool> {
+        let (lock_record, uuid, name, ptr) = (
             Arc::clone(&self.0),
             self.1,
             self.2.clone(),
             self.3 as *mut dyn Pool,
-            true,
-        )
+        );
+        std::mem::forget(self);
+        SomeLockWriteGuard(lock_record, uuid, name, ptr)
     }
 }
 
@@ -857,11 +850,9 @@ where
 {
     fn drop(&mut self) {
         trace!("Dropping write lock on pool with UUID {}", self.1);
-        if self.4 {
-            let mut lock_record = self.0.lock().expect("Mutex only locked internally");
-            lock_record.remove_write_lock(&self.1);
-            lock_record.wake();
-        }
+        let mut lock_record = self.0.lock().expect("Mutex only locked internally");
+        lock_record.remove_write_lock(&self.1);
+        lock_record.wake();
         trace!("Write lock on pool with UUID {} dropped", self.1);
     }
 }
@@ -1099,7 +1090,7 @@ where
             .map(|(n, u, t)| {
                 (
                     *u,
-                    SomeLockWriteGuard(Arc::clone(&self.0), *u, n.clone(), *t, true),
+                    SomeLockWriteGuard(Arc::clone(&self.0), *u, n.clone(), *t),
                 )
             })
             .map(|(u, guard)| {

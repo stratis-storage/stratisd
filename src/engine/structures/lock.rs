@@ -1046,7 +1046,6 @@ where
                     .iter_mut()
                     .map(|(n, u, t)| (n.clone(), *u, t as *mut _))
                     .collect::<Table<_, _>>(),
-                true,
             ))
         };
 
@@ -1069,11 +1068,7 @@ where
 }
 
 /// Guard returned by AllWrite future.
-pub struct AllLockWriteGuard<U: AsUuid, T: ?Sized>(
-    Arc<Mutex<LockRecord<U>>>,
-    Table<U, *mut T>,
-    bool,
-);
+pub struct AllLockWriteGuard<U: AsUuid, T: ?Sized>(Arc<Mutex<LockRecord<U>>>, Table<U, *mut T>);
 
 impl<U, T> Into<Vec<SomeLockWriteGuard<U, T>>> for AllLockWriteGuard<U, T>
 where
@@ -1106,16 +1101,16 @@ where
     U: AsUuid,
     T: 'static + Pool,
 {
-    pub fn into_dyn(mut self) -> AllLockWriteGuard<U, dyn Pool> {
-        self.2 = false;
-        AllLockWriteGuard(
+    pub fn into_dyn(self) -> AllLockWriteGuard<U, dyn Pool> {
+        let (lock_record, table) = (
             Arc::clone(&self.0),
             self.1
                 .iter()
                 .map(|(n, u, t)| (n.clone(), *u, *t as *mut dyn Pool))
                 .collect::<Table<_, _>>(),
-            true,
-        )
+        );
+        std::mem::forget(self);
+        AllLockWriteGuard(lock_record, table)
     }
 }
 
@@ -1215,11 +1210,9 @@ where
 {
     fn drop(&mut self) {
         trace!("Dropping all write lock");
-        if self.2 {
-            let mut lock_record = self.0.lock().expect("Mutex only locked internally");
-            lock_record.remove_write_all_lock();
-            lock_record.wake();
-        }
+        let mut lock_record = self.0.lock().expect("Mutex only locked internally");
+        lock_record.remove_write_all_lock();
+        lock_record.wake();
         trace!("All write lock dropped");
     }
 }

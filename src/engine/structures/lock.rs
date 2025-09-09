@@ -1238,7 +1238,6 @@ where
             Poll::Ready(AllLockModifyGuard(
                 Arc::clone(&self.0.lock_record),
                 inner.get(),
-                true,
             ))
         };
 
@@ -1260,7 +1259,7 @@ where
     }
 }
 
-pub struct AllLockModifyGuard<U: AsUuid, T>(Arc<Mutex<LockRecord<U>>>, *mut Table<U, T>, bool);
+pub struct AllLockModifyGuard<U: AsUuid, T>(Arc<Mutex<LockRecord<U>>>, *mut Table<U, T>);
 
 unsafe impl<U, T> Send for AllLockModifyGuard<U, T>
 where
@@ -1302,11 +1301,9 @@ where
 {
     fn drop(&mut self) {
         trace!("Dropping all write lock");
-        if self.2 {
-            let mut lock_record = self.0.lock().expect("Mutex only locked internally");
-            lock_record.remove_write_all_lock();
-            lock_record.wake();
-        }
+        let mut lock_record = self.0.lock().expect("Mutex only locked internally");
+        lock_record.remove_write_all_lock();
+        lock_record.wake();
         trace!("All write lock dropped");
     }
 }

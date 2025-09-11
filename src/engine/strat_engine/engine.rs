@@ -362,42 +362,50 @@ impl Into<Value> for &StratEngine {
     // Precondition: (&StratPool).into() pattern matches Value::Object(_)
     // Precondition: (&LiminalDevices).into() pattern matches Value::Object(_)
     fn into(self) -> Value {
-        let json = json!({
-            "pools": Value::Array(
-                block_on(self.pools.read_all()).iter()
-                    .map(|(name, uuid, pool)| {
-                        let mut json = json!({
-                            "uuid": Value::from(uuid.to_string()),
-                            "name": Value::from(name.to_string()),
-                        });
-                        if let Value::Object(ref mut map) = json {
-                            match pool {
-                                AnyPool::V1(p) => {
-                                    map.extend(
-                                        if let Value::Object(map) = <&v1::StratPool as Into<Value>>::into(p) {
-                                            map.into_iter()
-                                        } else {
-                                            unreachable!("StratPool conversion returns a JSON object");
-                                        }
-                                    );
-                                }
-                                AnyPool::V2(p) => {
-                                    map.extend(
-                                        if let Value::Object(map) = <&v2::StratPool as Into<Value>>::into(p) {
-                                            map.into_iter()
-                                        } else {
-                                            unreachable!("StratPool conversion returns a JSON object");
-                                        }
-                                    );
-                                }
-                            }
-                        } else {
-                            unreachable!("json!() always creates a JSON object")
+        let mut pools: Vec<Value> = block_on(self.pools.read_all())
+            .iter()
+            .map(|(name, uuid, pool)| {
+                let mut json = json!({
+                    "uuid": Value::from(uuid.to_string()),
+                    "name": Value::from(name.to_string()),
+                });
+                if let Value::Object(ref mut map) = json {
+                    match pool {
+                        AnyPool::V1(p) => {
+                            map.extend(
+                                if let Value::Object(map) = <&v1::StratPool as Into<Value>>::into(p)
+                                {
+                                    map.into_iter()
+                                } else {
+                                    unreachable!("StratPool conversion returns a JSON object");
+                                },
+                            );
                         }
-                        json
-                    })
-                    .collect()
-            ),
+                        AnyPool::V2(p) => {
+                            map.extend(
+                                if let Value::Object(map) = <&v2::StratPool as Into<Value>>::into(p)
+                                {
+                                    map.into_iter()
+                                } else {
+                                    unreachable!("StratPool conversion returns a JSON object");
+                                },
+                            );
+                        }
+                    }
+                } else {
+                    unreachable!("json!() always creates a JSON object")
+                }
+                json
+            })
+            .collect();
+        pools.sort_unstable_by_key(|p| {
+            p["uuid"]
+                .as_str()
+                .expect("inserted as string in previous line")
+                .to_string()
+        });
+        let json = json!({
+            "pools": Value::Array(pools),
         });
         if let (Value::Object(mut j), Value::Object(map)) = (
             json,

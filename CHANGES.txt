@@ -1,3 +1,17 @@
+stratisd 3.8.5
+==============
+Recommended Rust toolchain version: 1.89.0
+Recommended development platform for Python development: Fedora 41
+
+* Cherry-picked commits:
+  * Remove mention of IRC channel
+  * Remove the cargo-vendor-filterer config for num_cpus crate
+  * Remove the cargo-vendor-filterer config for the libm crate
+  * Revert "Use Fedora specfile for Packit builds"
+  * Follow the recommended dracut module ordering for out-of-tree modules
+  * Increase tokio dependency lower bound to 1.45.1
+
+
 stratisd 3.8.4
 ==============
 Recommended Rust toolchain version: 1.89.0

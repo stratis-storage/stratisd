@@ -16,21 +16,9 @@ with `stratisd`.
 
 See [https://stratis-storage.github.io/](https://stratis-storage.github.io/).
 
-## Getting involved
+## Mailing list
 
-### Communication channels
-
-If you have questions, please don't hesitate to ask them, either on the mailing list or
-IRC.
-
-#### Mailing list
-
-Development mailing list: stratis-devel@lists.fedorahosted.org, -- subscribe
-[here](https://lists.fedoraproject.org/admin/lists/stratis-devel.lists.fedorahosted.org/).
-
-#### IRC
-
-irc.libera.chat #stratis-storage.
+Mailing list: stratis-devel@lists.fedorahosted.org — [subscribe or manage your subscription](https://lists.fedoraproject.org/admin/lists/stratis-devel.lists.fedorahosted.org/).
 
 ## For Developers
 

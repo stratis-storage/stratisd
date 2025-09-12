@@ -26,6 +26,9 @@ Recommended development platform for Python development: Fedora 41
   https://github.com/stratis-storage/stratisd/pull/3873
   https://github.com/stratis-storage/stratisd/pull/3854
 
+- Follow the recommmended dracut module ordering for out of tree modules:
+  https://github.com/stratis-storage/stratisd/pull/3908
+
 - Fix assertion error when calculating error message:
   https://github.com/stratis-storage/stratisd/pull/3874
 
@@ -47,6 +50,7 @@ Recommended development platform for Python development: Fedora 41
   https://github.com/stratis-storage/stratisd/pull/3899
 
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3911
   https://github.com/stratis-storage/stratisd/pull/3910
   https://github.com/stratis-storage/stratisd/pull/3909
   https://github.com/stratis-storage/stratisd/pull/3897

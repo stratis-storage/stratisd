@@ -27,5 +27,5 @@ pub fn fs_size_limit_to_prop(limit: Option<Sectors>) -> (bool, String) {
 /// Generate D-Bus representation of filesystem origin property.
 #[inline]
 pub fn fs_origin_to_prop(origin: Option<FilesystemUuid>) -> (bool, String) {
-    option_to_tuple(origin.map(|u| (uuid_to_string!(u))), String::new())
+    option_to_tuple(origin.map(|u| uuid_to_string!(u)), String::new())
 }

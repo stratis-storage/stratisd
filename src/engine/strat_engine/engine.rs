@@ -594,9 +594,10 @@ impl Engine for StratEngine {
         }
 
         let mut guard = self.pools.modify_all().await;
-        let (pool_name, mut pool) = guard
-            .remove_by_uuid(uuid)
-            .expect("Must succeed since self.pools.get_by_uuid() returned a value");
+        let (pool_name, mut pool) = match guard.remove_by_uuid(uuid) {
+            Some(value) => value,
+            None => return Ok(DeleteAction::Identity),
+        };
 
         let (res, mut pool) = spawn_blocking!((
             match pool {

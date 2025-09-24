@@ -594,9 +594,10 @@ impl Engine for StratEngine {
         }
 
         let mut guard = self.pools.modify_all().await;
-        let (pool_name, mut pool) = guard
-            .remove_by_uuid(uuid)
-            .expect("Must succeed since self.pools.get_by_uuid() returned a value");
+        let (pool_name, mut pool) = match guard.remove_by_uuid(uuid) {
+            Some(value) => value,
+            None => return Ok(DeleteAction::Identity),
+        };
 
         let (res, mut pool) = spawn_blocking!((
             match pool {
@@ -647,10 +648,10 @@ impl Engine for StratEngine {
         let old_name = rename_pool_pre_idem!(self; uuid; new_name.clone());
 
         let mut guard = self.pools.modify_all().await;
-
-        let (_, mut pool) = guard
-            .remove_by_uuid(uuid)
-            .expect("Must succeed since self.pools.get_by_uuid() returned a value");
+        let mut pool = match guard.remove_by_uuid(uuid) {
+            Some((_, pool)) => pool,
+            None => return Ok(RenameAction::NoSource),
+        };
 
         let cloned_new_name = new_name.clone();
         let (res, pool) = spawn_blocking!({

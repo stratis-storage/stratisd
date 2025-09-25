@@ -53,7 +53,7 @@ impl DbusConnectionHandler {
                 let cloned_tree = tree.clone();
                 let cloned_connection = Arc::clone(&connection);
                 spawn_blocking(move || {
-                    trace!("Starting D-Bus request handling");
+                    trace!("Starting D-Bus request handling: {msg:?}");
                     let lock = cloned_tree.blocking_read();
                     if let Some(msgs) = lock.handle(&msg) {
                         for msg in msgs {
@@ -69,7 +69,7 @@ impl DbusConnectionHandler {
                             }
                         }
                     }
-                    trace!("Finished D-Bus request handling");
+                    trace!("Finished D-Bus request handling: {msg:?}");
                 });
                 true
             }),

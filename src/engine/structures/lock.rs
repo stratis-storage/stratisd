@@ -18,7 +18,7 @@ use std::{
 };
 
 use futures::executor::block_on;
-use tokio::sync::{OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock};
+use tokio::sync::{OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock, TryLockError};
 
 use crate::engine::{
     engine::Pool,
@@ -97,6 +97,16 @@ where
         lock
     }
 
+    pub fn try_read(&self) -> Result<SharedGuard<OwnedRwLockReadGuard<T>>, TryLockError> {
+        trace!("Acquiring shared lock on {}", type_name::<Self>());
+        let lock = Arc::clone(&self.0).try_read_owned().map(SharedGuard);
+        match lock {
+            Ok(_) => trace!("Acquired shared lock on {}", type_name::<Self>()),
+            Err(_) => trace!("Could not acquire shared lock on {}", type_name::<Self>()),
+        }
+        lock
+    }
+
     pub fn blocking_read(&self) -> SharedGuard<OwnedRwLockReadGuard<T>> {
         block_on(self.read())
     }
@@ -105,6 +115,19 @@ where
         trace!("Acquiring exclusive lock on {}", type_name::<Self>());
         let lock = ExclusiveGuard(Arc::clone(&self.0).write_owned().await);
         trace!("Acquired exclusive lock on {}", type_name::<Self>());
+        lock
+    }
+
+    pub fn try_write(&self) -> Result<ExclusiveGuard<OwnedRwLockWriteGuard<T>>, TryLockError> {
+        trace!("Acquiring exclusive lock on {}", type_name::<Self>());
+        let lock = Arc::clone(&self.0).try_write_owned().map(ExclusiveGuard);
+        match lock {
+            Ok(_) => trace!("Acquired exclusive lock on {}", type_name::<Self>()),
+            Err(_) => trace!(
+                "Could not acquire exclusive lock on {}",
+                type_name::<Self>()
+            ),
+        }
         lock
     }
 

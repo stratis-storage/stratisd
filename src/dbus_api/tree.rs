@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, thread::sleep, time::Duration};
 
 use chrono::{DateTime, Utc};
 use dbus::{
@@ -1574,26 +1574,26 @@ impl DbusTreeHandler {
     /// handle.
     fn handle_dbus_action(&mut self, action: DbusAction) -> StratisResult<bool> {
         match action {
-            DbusAction::Add(path, interfaces) => {
-                if let Some(write_lock) =
-                    poll_exit_and_future(self.should_exit.recv(), self.tree.write())?
-                {
+            DbusAction::Add(path, interfaces) => loop {
+                if let Ok(write_lock) = self.tree.try_write() {
                     self.handle_add_action(write_lock, path, interfaces);
-                    Ok(true)
-                } else {
-                    Ok(false)
+                    return Ok(true);
                 }
-            }
-            DbusAction::Remove(path, interfaces) => {
-                if let Some(write_lock) =
-                    poll_exit_and_future(self.should_exit.recv(), self.tree.write())?
-                {
+                if let Ok(_) = self.should_exit.try_recv() {
+                    return Ok(false);
+                }
+                sleep(Duration::from_secs(1));
+            },
+            DbusAction::Remove(path, interfaces) => loop {
+                if let Ok(write_lock) = self.tree.try_write() {
                     self.handle_remove_action(write_lock, path, interfaces);
-                    Ok(true)
-                } else {
-                    Ok(false)
+                    return Ok(true);
                 }
-            }
+                if let Ok(_) = self.should_exit.try_recv() {
+                    return Ok(false);
+                }
+                sleep(Duration::from_secs(1));
+            },
             DbusAction::FsNameChange(item, new_name) => {
                 self.handle_fs_name_change(item, new_name);
                 Ok(true)

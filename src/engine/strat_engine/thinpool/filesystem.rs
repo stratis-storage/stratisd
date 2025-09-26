@@ -29,6 +29,7 @@ use crate::{
         engine::{DumpState, Filesystem, StateDiff},
         shared::unsigned_to_timestamp,
         strat_engine::{
+            backstore::get_logical_sector_size,
             cmd::{create_fs, set_uuid, xfs_growfs},
             devlinks,
             dm::{get_dm, thin_device},
@@ -452,6 +453,11 @@ impl StratFilesystem {
 
     pub fn thin_id(&self) -> ThinDevId {
         self.thin_dev.id()
+    }
+
+    /// Get the sector size reported by libblkid for this filesystem.
+    pub fn logical_sector_size(&self) -> StratisResult<Bytes> {
+        get_logical_sector_size(&self.devnode())
     }
 }
 

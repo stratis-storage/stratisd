@@ -7,9 +7,9 @@ mod macros;
 
 mod api;
 mod blockdev;
-mod connection;
 mod consts;
 mod filesystem;
+mod message;
 mod pool;
 mod tree;
 mod types;
@@ -17,6 +17,6 @@ mod udev;
 mod util;
 
 pub use self::{
-    connection::DbusConnectionHandler, tree::DbusTreeHandler, types::DbusAction,
-    udev::DbusUdevHandler, util::create_dbus_handlers,
+    message::DbusMessageHandler, tree::DbusTreeHandler, types::DbusAction, udev::DbusUdevHandler,
+    util::create_dbus_handlers,
 };

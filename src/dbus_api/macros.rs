@@ -213,7 +213,7 @@ macro_rules! handle_signal_change {
             if let Err(e) = $self.property_changed_invalidated_signal(
                 $path,
                 props,
-            ) {
+            ).await {
                 warn!(
                     "Failed to send a signal over D-Bus indicating {} property change: {}",
                     $type, e
@@ -246,9 +246,9 @@ macro_rules! handle_background_change {
 
 macro_rules! background_arm {
     ($self:expr, $uuid:expr, $handle:ident, $( $new:expr ),+) => {{
-        if let Some(read_lock) = $crate::dbus_api::util::poll_exit_and_future($self.should_exit.recv(), $self.tree.read())?
+        if let Some(read_lock) = $crate::dbus_api::util::poll_exit_and_future($self.should_exit.recv(), $self.tree.read()).await?
         {
-            $self.$handle(read_lock, $uuid, $( $new ),+);
+            $self.$handle(read_lock, $uuid, $( $new ),+).await;
             Ok(true)
         } else {
             Ok(false)

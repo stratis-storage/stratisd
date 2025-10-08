@@ -2,56 +2,44 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use dbus::{
-    blocking::SyncConnection,
     channel::{default_reply, MatchingReceiver, Sender},
     message::MatchRule,
+    nonblock::SyncConnection,
 };
-use tokio::{
-    sync::broadcast::{error::TryRecvError, Receiver},
-    task::spawn_blocking,
-};
+use tokio::{task::spawn_blocking};
 
-use crate::{
-    dbus_api::types::LockableTree,
-    stratis::{StratisError, StratisResult},
-};
+use crate::{dbus_api::types::LockableTree, stratis::StratisResult};
 
-/// Handler for a D-Bus receiving connection.
-/// stratisd has exactly one connection handler, but this handler spawns
+/// Handler for D-Bus messages sent to the daemon.
+/// stratisd has exactly one message handler, but this handler spawns
 /// a thread for every D-Bus method.
-pub struct DbusConnectionHandler {
+pub struct DbusMessageHandler {
     connection: Arc<SyncConnection>,
     tree: LockableTree,
-    should_exit: Receiver<()>,
 }
 
-impl DbusConnectionHandler {
+impl DbusMessageHandler {
     pub(super) fn new(
         connection: Arc<SyncConnection>,
         tree: LockableTree,
-        should_exit: Receiver<()>,
-    ) -> DbusConnectionHandler {
-        DbusConnectionHandler {
-            connection,
-            tree,
-            should_exit,
-        }
+    ) -> DbusMessageHandler {
+        DbusMessageHandler { connection, tree }
     }
 
     /// Handle a D-Bus action passed from a D-Bus connection.
     /// Spawn a new thread for every D-Bus method call.
     /// Every method call requires a read lock on the D-Bus tree.
-    pub fn process_dbus_requests(&mut self) -> StratisResult<()> {
+    pub async fn process_dbus_requests(&self) -> StratisResult<()> {
         let tree = self.tree.clone();
-        let connection = Arc::clone(&self.connection);
+        let connection = self.connection.clone();
         let _ = self.connection.start_receive(
             MatchRule::new_method_call(),
             Box::new(move |msg, _| {
                 let cloned_tree = tree.clone();
-                let cloned_connection = Arc::clone(&connection);
+                let cloned_connection = connection.clone();
                 spawn_blocking(move || {
                     trace!("Starting D-Bus request handling");
                     let lock = cloned_tree.blocking_read();
@@ -74,25 +62,6 @@ impl DbusConnectionHandler {
                 true
             }),
         );
-        loop {
-            if let Err(e) = self.connection.process(Duration::from_millis(100)) {
-                warn!("Failed to process D-Bus request: {e}");
-            }
-            match self.should_exit.try_recv() {
-                Ok(()) => {
-                    info!("D-Bus connection handler thread notified to exit");
-                    break;
-                }
-                Err(TryRecvError::Lagged(_) | TryRecvError::Closed) => {
-                    return Err(StratisError::Msg(
-                        "D-Bus connection handler can't be notified to exit; shutting down..."
-                            .to_string(),
-                    ));
-                }
-                _ => (),
-            }
-        }
-
         Ok(())
     }
 }

@@ -6,15 +6,12 @@ use std::{collections::HashMap, sync::Arc};
 
 use dbus::{
     arg::{RefArg, Variant},
-    blocking::{
-        stdintf::org_freedesktop_dbus::{
-            ObjectManagerInterfacesAdded, ObjectManagerInterfacesRemoved,
-            PropertiesPropertiesChanged,
-        },
-        SyncConnection,
+    blocking::stdintf::org_freedesktop_dbus::{
+        ObjectManagerInterfacesAdded, ObjectManagerInterfacesRemoved, PropertiesPropertiesChanged,
     },
     channel::Sender,
     message::SignalArgs,
+    nonblock::SyncConnection,
     Path,
 };
 use dbus_tree::{MTSync, ObjectPath};
@@ -79,9 +76,9 @@ impl DbusTreeHandler {
     }
 
     /// Process a D-Bus action (add/remove) request.
-    pub fn process_dbus_actions(&mut self) -> StratisResult<()> {
+    pub async fn process_dbus_actions(&mut self) -> StratisResult<()> {
         while let Some(output) =
-            poll_exit_and_future(self.should_exit.recv(), self.receiver.recv())?
+            poll_exit_and_future(self.should_exit.recv(), self.receiver.recv()).await?
         {
             let action = output.ok_or_else(|| {
                 StratisError::Msg(
@@ -89,7 +86,7 @@ impl DbusTreeHandler {
                 )
             })?;
 
-            if !self.handle_dbus_action(action)? {
+            if !self.handle_dbus_action(action).await? {
                 break;
             }
         }
@@ -97,7 +94,7 @@ impl DbusTreeHandler {
     }
 
     /// Handle an object path being added to the tree of D-Bus objects.
-    fn handle_add_action(
+    async fn handle_add_action(
         &self,
         mut write_lock: TreeWriteLock,
         path: ObjectPath<MTSync<TData>, TData>,
@@ -105,13 +102,17 @@ impl DbusTreeHandler {
     ) {
         let path_name = path.get_name().clone();
         write_lock.insert(path);
-        if self.added_object_signal(path_name, interfaces).is_err() {
+        if self
+            .added_object_signal(path_name, interfaces)
+            .await
+            .is_err()
+        {
             warn!("Signal on object add was not sent to the D-Bus client");
         }
     }
 
     /// Handle an object path being removed from the tree of D-Bus objects.
-    fn handle_remove_action(
+    async fn handle_remove_action(
         &self,
         mut write_lock: TreeWriteLock,
         path: Path<'static>,
@@ -138,13 +139,14 @@ impl DbusTreeHandler {
             .collect::<Vec<_>>();
         for (path, interfaces) in paths {
             write_lock.remove(&path);
-            if self.removed_object_signal(path, interfaces).is_err() {
+            if self.removed_object_signal(path, interfaces).await.is_err() {
                 warn!("Signal on object removal was not sent to the D-Bus client");
             };
         }
         write_lock.remove(&path);
         if self
             .removed_object_signal(path.clone(), interfaces)
+            .await
             .is_err()
         {
             warn!("Signal on object removal was not sent to the D-Bus client");
@@ -152,7 +154,7 @@ impl DbusTreeHandler {
     }
 
     /// Handle a filesystem name change in the engine.
-    fn handle_fs_name_change(&self, item: Path<'static>, new_name: String) {
+    async fn handle_fs_name_change(&self, item: Path<'static>, new_name: String) {
         if self
             .property_changed_invalidated_signal(
                 &item,
@@ -209,13 +211,18 @@ impl DbusTreeHandler {
                     }
                 },
             )
+            .await
             .is_err()
         {
             warn!("Signal on filesystem name change was not sent to the D-Bus client");
         }
     }
 
-    fn handle_fs_origin_change(&self, item: Path<'static>, new_origin: Option<FilesystemUuid>) {
+    async fn handle_fs_origin_change(
+        &self,
+        item: Path<'static>,
+        new_origin: Option<FilesystemUuid>,
+    ) {
         if self
             .property_changed_invalidated_signal(
                 &item,
@@ -237,6 +244,7 @@ impl DbusTreeHandler {
                     }
                 },
             )
+            .await
             .is_err()
         {
             warn!("Signal on filesystem origin change was not sent to the D-Bus client");
@@ -244,7 +252,7 @@ impl DbusTreeHandler {
     }
 
     /// Handle a pool name change in the engine.
-    fn handle_pool_name_change(
+    async fn handle_pool_name_change(
         &self,
         read_lock: TreeReadLock,
         item: Path<'static>,
@@ -306,6 +314,7 @@ impl DbusTreeHandler {
                     }
                 },
             )
+            .await
             .is_err()
         {
             warn!("Signal on pool name change was not sent to the D-Bus client");
@@ -359,6 +368,7 @@ impl DbusTreeHandler {
                             }
                         },
                     )
+                    .await
                     .is_err()
                 {
                     warn!("Signal on filesystem devnode change was not sent to the D-Bus client");
@@ -368,7 +378,7 @@ impl DbusTreeHandler {
     }
 
     /// Handle a change of available actions for a pool in the engine.
-    fn handle_pool_avail_actions_change(
+    async fn handle_pool_avail_actions_change(
         &self,
         item: Path<'static>,
         new_avail_actions: ActionAvailability,
@@ -430,6 +440,7 @@ impl DbusTreeHandler {
                     }
                 },
             )
+            .await
             .is_err()
         {
             warn!("Signal on pool available actions mode change was not sent to the D-Bus client");
@@ -437,7 +448,7 @@ impl DbusTreeHandler {
     }
 
     /// Handle a change of the key description for a pool in the engine.
-    fn handle_pool_key_desc_change(
+    async fn handle_pool_key_desc_change(
         &self,
         item: Path<'static>,
         ei: Option<Either<(bool, EncryptionInfo), PoolEncryptionInfo>>,
@@ -495,6 +506,7 @@ impl DbusTreeHandler {
                         }
                     },
                 )
+                .await
                 .is_err()
         {
             warn!("Signal on pool key description change was not sent to the D-Bus client");
@@ -515,6 +527,7 @@ impl DbusTreeHandler {
                     }
                 },
             )
+            .await
             .is_err()
         {
             warn!("Signal on pool key description change was not sent to the D-Bus client");
@@ -522,7 +535,7 @@ impl DbusTreeHandler {
     }
 
     /// Handle a change of the Clevis info for a pool in the engine.
-    fn handle_pool_clevis_info_change(
+    async fn handle_pool_clevis_info_change(
         &self,
         item: Path<'static>,
         ei: Option<Either<(bool, EncryptionInfo), PoolEncryptionInfo>>,
@@ -581,6 +594,7 @@ impl DbusTreeHandler {
                         }
                     },
                 )
+                .await
                 .is_err()
         {
             warn!("Signal on pool Clevis information change was not sent to the D-Bus client");
@@ -601,6 +615,7 @@ impl DbusTreeHandler {
                     }
                 },
             )
+            .await
             .is_err()
         {
             warn!("Signal on pool Clevis information change was not sent to the D-Bus client");
@@ -608,7 +623,7 @@ impl DbusTreeHandler {
     }
 
     /// Handle a change of available actions for a pool in the engine.
-    fn handle_pool_cache_change(&self, item: Path<'static>, b: bool) {
+    async fn handle_pool_cache_change(&self, item: Path<'static>, b: bool) {
         if self
             .property_changed_invalidated_signal(
                 &item,
@@ -655,6 +670,7 @@ impl DbusTreeHandler {
                     }
                 },
             )
+            .await
             .is_err()
         {
             warn!("Signal on pool available actions mode change was not sent to the D-Bus client");
@@ -662,7 +678,7 @@ impl DbusTreeHandler {
     }
 
     /// Handle a change of locked pools registered in the engine.
-    fn handle_locked_pools_change(&self, locked_pools: LockedPoolsInfo) {
+    async fn handle_locked_pools_change(&self, locked_pools: LockedPoolsInfo) {
         if self
             .property_changed_invalidated_signal(
                 &Path::new(consts::STRATIS_BASE_PATH).expect("Valid path"),
@@ -679,6 +695,7 @@ impl DbusTreeHandler {
                     }
                 },
             )
+            .await
             .is_err()
         {
             warn!("Signal on locked pools change was not sent to the D-Bus client");
@@ -686,7 +703,7 @@ impl DbusTreeHandler {
     }
 
     /// Handle a change of stopped pools registered in the engine.
-    fn handle_stopped_pools_change(&self, stopped_pools: StoppedPoolsInfo) {
+    async fn handle_stopped_pools_change(&self, stopped_pools: StoppedPoolsInfo) {
         if self
             .property_changed_invalidated_signal(
                 &Path::new(consts::STRATIS_BASE_PATH).expect("Valid path"),
@@ -733,6 +750,7 @@ impl DbusTreeHandler {
                     }
                 },
             )
+            .await
             .is_err()
         {
             warn!("Signal on stopped pools change was not sent to the D-Bus client");
@@ -741,7 +759,7 @@ impl DbusTreeHandler {
 
     /// Look up the filesystem path of the filesystem and notify clients of any
     /// changes to properties that change in the background.
-    fn handle_fs_background_change(
+    async fn handle_fs_background_change(
         &self,
         read_lock: TreeReadLock,
         uuid: FilesystemUuid,
@@ -839,7 +857,7 @@ impl DbusTreeHandler {
 
     /// Look up the pool path of the pool and notify clients of any changes to
     /// properties that change in the background.
-    fn handle_pool_background_change(
+    async fn handle_pool_background_change(
         &self,
         read_lock: TreeReadLock,
         uuid: PoolUuid,
@@ -964,89 +982,99 @@ impl DbusTreeHandler {
     }
 
     /// Send a signal indicating that the pool filesystem limit has changed.
-    fn handle_pool_fs_limit_change(&self, path: Path<'static>, new_fs_limit: u64) {
-        if let Err(e) = self.property_changed_invalidated_signal(
-            &path,
-            prop_hashmap!(
-                consts::POOL_INTERFACE_NAME_3_1 => {
-                    Vec::new(),
-                    consts::POOL_FS_LIMIT_PROP.to_string() =>
-                    box_variant!(new_fs_limit)
-                },
-                consts::POOL_INTERFACE_NAME_3_2 => {
-                    Vec::new(),
-                    consts::POOL_FS_LIMIT_PROP.to_string() =>
-                    box_variant!(new_fs_limit)
-                },
-                consts::POOL_INTERFACE_NAME_3_3 => {
-                    Vec::new(),
-                    consts::POOL_FS_LIMIT_PROP.to_string() =>
-                    box_variant!(new_fs_limit)
-                },
-                consts::POOL_INTERFACE_NAME_3_4 => {
-                    Vec::new(),
-                    consts::POOL_FS_LIMIT_PROP.to_string() =>
-                    box_variant!(new_fs_limit)
-                },
-                consts::POOL_INTERFACE_NAME_3_5 => {
-                    Vec::new(),
-                    consts::POOL_FS_LIMIT_PROP.to_string() =>
-                    box_variant!(new_fs_limit)
-                },
-                consts::POOL_INTERFACE_NAME_3_6 => {
-                    Vec::new(),
-                    consts::POOL_FS_LIMIT_PROP.to_string() =>
-                    box_variant!(new_fs_limit)
-                },
-                consts::POOL_INTERFACE_NAME_3_7 => {
-                    Vec::new(),
-                    consts::POOL_FS_LIMIT_PROP.to_string() =>
-                    box_variant!(new_fs_limit)
-                },
-                consts::POOL_INTERFACE_NAME_3_8 => {
-                    Vec::new(),
-                    consts::POOL_FS_LIMIT_PROP.to_string() =>
-                    box_variant!(new_fs_limit)
-                },
-                consts::POOL_INTERFACE_NAME_3_9 => {
-                    Vec::new(),
-                    consts::POOL_FS_LIMIT_PROP.to_string() =>
-                    box_variant!(new_fs_limit)
-                }
-            ),
-        ) {
+    async fn handle_pool_fs_limit_change(&self, path: Path<'static>, new_fs_limit: u64) {
+        if let Err(e) = self
+            .property_changed_invalidated_signal(
+                &path,
+                prop_hashmap!(
+                    consts::POOL_INTERFACE_NAME_3_1 => {
+                        Vec::new(),
+                        consts::POOL_FS_LIMIT_PROP.to_string() =>
+                        box_variant!(new_fs_limit)
+                    },
+                    consts::POOL_INTERFACE_NAME_3_2 => {
+                        Vec::new(),
+                        consts::POOL_FS_LIMIT_PROP.to_string() =>
+                        box_variant!(new_fs_limit)
+                    },
+                    consts::POOL_INTERFACE_NAME_3_3 => {
+                        Vec::new(),
+                        consts::POOL_FS_LIMIT_PROP.to_string() =>
+                        box_variant!(new_fs_limit)
+                    },
+                    consts::POOL_INTERFACE_NAME_3_4 => {
+                        Vec::new(),
+                        consts::POOL_FS_LIMIT_PROP.to_string() =>
+                        box_variant!(new_fs_limit)
+                    },
+                    consts::POOL_INTERFACE_NAME_3_5 => {
+                        Vec::new(),
+                        consts::POOL_FS_LIMIT_PROP.to_string() =>
+                        box_variant!(new_fs_limit)
+                    },
+                    consts::POOL_INTERFACE_NAME_3_6 => {
+                        Vec::new(),
+                        consts::POOL_FS_LIMIT_PROP.to_string() =>
+                        box_variant!(new_fs_limit)
+                    },
+                    consts::POOL_INTERFACE_NAME_3_7 => {
+                        Vec::new(),
+                        consts::POOL_FS_LIMIT_PROP.to_string() =>
+                        box_variant!(new_fs_limit)
+                    },
+                    consts::POOL_INTERFACE_NAME_3_8 => {
+                        Vec::new(),
+                        consts::POOL_FS_LIMIT_PROP.to_string() =>
+                        box_variant!(new_fs_limit)
+                    },
+                    consts::POOL_INTERFACE_NAME_3_9 => {
+                        Vec::new(),
+                        consts::POOL_FS_LIMIT_PROP.to_string() =>
+                        box_variant!(new_fs_limit)
+                    }
+                ),
+            )
+            .await
+        {
             warn!("Failed to send a signal over D-Bus indicating pool size change: {e}");
         }
     }
 
     /// Send a signal indicating that the filesystem size limit has changed.
-    fn handle_fs_size_limit_change(&self, path: Path<'static>, new_size_limit: Option<Sectors>) {
+    async fn handle_fs_size_limit_change(
+        &self,
+        path: Path<'static>,
+        new_size_limit: Option<Sectors>,
+    ) {
         let size_limit = fs_size_limit_to_prop(new_size_limit);
-        if let Err(e) = self.property_changed_invalidated_signal(
-            &path,
-            prop_hashmap!(
-                consts::FILESYSTEM_INTERFACE_NAME_3_6 => {
-                    Vec::new(),
-                    consts::FILESYSTEM_SIZE_LIMIT_PROP.to_string() =>
-                    box_variant!(size_limit.clone())
-                },
-                consts::FILESYSTEM_INTERFACE_NAME_3_7 => {
-                    Vec::new(),
-                    consts::FILESYSTEM_SIZE_LIMIT_PROP.to_string() =>
-                    box_variant!(size_limit.clone())
-                },
-                consts::FILESYSTEM_INTERFACE_NAME_3_8 => {
-                    Vec::new(),
-                    consts::FILESYSTEM_SIZE_LIMIT_PROP.to_string() =>
-                    box_variant!(size_limit.clone())
-                },
-                consts::FILESYSTEM_INTERFACE_NAME_3_9 => {
-                    Vec::new(),
-                    consts::FILESYSTEM_SIZE_LIMIT_PROP.to_string() =>
-                    box_variant!(size_limit)
-                }
-            ),
-        ) {
+        if let Err(e) = self
+            .property_changed_invalidated_signal(
+                &path,
+                prop_hashmap!(
+                    consts::FILESYSTEM_INTERFACE_NAME_3_6 => {
+                        Vec::new(),
+                        consts::FILESYSTEM_SIZE_LIMIT_PROP.to_string() =>
+                        box_variant!(size_limit.clone())
+                    },
+                    consts::FILESYSTEM_INTERFACE_NAME_3_7 => {
+                        Vec::new(),
+                        consts::FILESYSTEM_SIZE_LIMIT_PROP.to_string() =>
+                        box_variant!(size_limit.clone())
+                    },
+                    consts::FILESYSTEM_INTERFACE_NAME_3_8 => {
+                        Vec::new(),
+                        consts::FILESYSTEM_SIZE_LIMIT_PROP.to_string() =>
+                        box_variant!(size_limit.clone())
+                    },
+                    consts::FILESYSTEM_INTERFACE_NAME_3_9 => {
+                        Vec::new(),
+                        consts::FILESYSTEM_SIZE_LIMIT_PROP.to_string() =>
+                        box_variant!(size_limit)
+                    }
+                ),
+            )
+            .await
+        {
             warn!(
                 "Failed to send a signal over D-Bus indicating filesystem size limit change: {e}"
             );
@@ -1055,27 +1083,30 @@ impl DbusTreeHandler {
 
     /// Send a signal indicating that the filesystem merge scheduled value has
     /// changed.
-    fn handle_fs_merge_scheduled_change(&self, path: Path<'static>, new_scheduled: bool) {
-        if let Err(e) = self.property_changed_invalidated_signal(
-            &path,
-            prop_hashmap!(
-                consts::FILESYSTEM_INTERFACE_NAME_3_7 => {
-                    Vec::new(),
-                    consts::FILESYSTEM_MERGE_SCHEDULED_PROP.to_string() =>
-                    box_variant!(new_scheduled)
-                },
-                consts::FILESYSTEM_INTERFACE_NAME_3_8 => {
-                    Vec::new(),
-                    consts::FILESYSTEM_MERGE_SCHEDULED_PROP.to_string() =>
-                    box_variant!(new_scheduled)
-                },
-                consts::FILESYSTEM_INTERFACE_NAME_3_9 => {
-                    Vec::new(),
-                    consts::FILESYSTEM_MERGE_SCHEDULED_PROP.to_string() =>
-                    box_variant!(new_scheduled)
-                }
-            ),
-        ) {
+    async fn handle_fs_merge_scheduled_change(&self, path: Path<'static>, new_scheduled: bool) {
+        if let Err(e) = self
+            .property_changed_invalidated_signal(
+                &path,
+                prop_hashmap!(
+                    consts::FILESYSTEM_INTERFACE_NAME_3_7 => {
+                        Vec::new(),
+                        consts::FILESYSTEM_MERGE_SCHEDULED_PROP.to_string() =>
+                        box_variant!(new_scheduled)
+                    },
+                    consts::FILESYSTEM_INTERFACE_NAME_3_8 => {
+                        Vec::new(),
+                        consts::FILESYSTEM_MERGE_SCHEDULED_PROP.to_string() =>
+                        box_variant!(new_scheduled)
+                    },
+                    consts::FILESYSTEM_INTERFACE_NAME_3_9 => {
+                        Vec::new(),
+                        consts::FILESYSTEM_MERGE_SCHEDULED_PROP.to_string() =>
+                        box_variant!(new_scheduled)
+                    }
+                ),
+            )
+            .await
+        {
             warn!(
                 "Failed to send a signal over D-Bus indicating filesystem merge scheduled value change: {e}"
             );
@@ -1083,116 +1114,126 @@ impl DbusTreeHandler {
     }
 
     /// Send a signal indicating that the blockdev user info has changed.
-    fn handle_blockdev_user_info_change(&self, path: Path<'static>, new_user_info: Option<String>) {
+    async fn handle_blockdev_user_info_change(
+        &self,
+        path: Path<'static>,
+        new_user_info: Option<String>,
+    ) {
         let user_info_prop = blockdev_user_info_to_prop(new_user_info);
-        if let Err(e) = self.property_changed_invalidated_signal(
-            &path,
-            prop_hashmap!(
-                consts::BLOCKDEV_INTERFACE_NAME_3_3 => {
-                    Vec::new(),
-                    consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
-                    box_variant!(user_info_prop.clone())
-                },
-                consts::BLOCKDEV_INTERFACE_NAME_3_4 => {
-                    Vec::new(),
-                    consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
-                    box_variant!(user_info_prop.clone())
-                },
-                consts::BLOCKDEV_INTERFACE_NAME_3_5 => {
-                    Vec::new(),
-                    consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
-                    box_variant!(user_info_prop.clone())
-                },
-                consts::BLOCKDEV_INTERFACE_NAME_3_6 => {
-                    Vec::new(),
-                    consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
-                    box_variant!(user_info_prop.clone())
-                },
-                consts::BLOCKDEV_INTERFACE_NAME_3_7 => {
-                    Vec::new(),
-                    consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
-                    box_variant!(user_info_prop.clone())
-                },
-                consts::BLOCKDEV_INTERFACE_NAME_3_8 => {
-                    Vec::new(),
-                    consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
-                    box_variant!(user_info_prop.clone())
-                },
-                consts::BLOCKDEV_INTERFACE_NAME_3_9 => {
-                    Vec::new(),
-                    consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
-                    box_variant!(user_info_prop)
-                }
-            ),
-        ) {
+        if let Err(e) = self
+            .property_changed_invalidated_signal(
+                &path,
+                prop_hashmap!(
+                    consts::BLOCKDEV_INTERFACE_NAME_3_3 => {
+                        Vec::new(),
+                        consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
+                        box_variant!(user_info_prop.clone())
+                    },
+                    consts::BLOCKDEV_INTERFACE_NAME_3_4 => {
+                        Vec::new(),
+                        consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
+                        box_variant!(user_info_prop.clone())
+                    },
+                    consts::BLOCKDEV_INTERFACE_NAME_3_5 => {
+                        Vec::new(),
+                        consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
+                        box_variant!(user_info_prop.clone())
+                    },
+                    consts::BLOCKDEV_INTERFACE_NAME_3_6 => {
+                        Vec::new(),
+                        consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
+                        box_variant!(user_info_prop.clone())
+                    },
+                    consts::BLOCKDEV_INTERFACE_NAME_3_7 => {
+                        Vec::new(),
+                        consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
+                        box_variant!(user_info_prop.clone())
+                    },
+                    consts::BLOCKDEV_INTERFACE_NAME_3_8 => {
+                        Vec::new(),
+                        consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
+                        box_variant!(user_info_prop.clone())
+                    },
+                    consts::BLOCKDEV_INTERFACE_NAME_3_9 => {
+                        Vec::new(),
+                        consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
+                        box_variant!(user_info_prop)
+                    }
+                ),
+            )
+            .await
+        {
             warn!("Failed to send a signal over D-Bus indicating blockdev user info change: {e}");
         }
     }
 
     /// Send a signal indicating that the blockdev total physical size has
     /// changed.
-    fn handle_blockdev_total_physical_size_change(
+    async fn handle_blockdev_total_physical_size_change(
         &self,
         path: Path<'static>,
         new_total_physical_size: Sectors,
     ) {
         let total_physical_size_prop =
             blockdev_total_physical_size_to_prop(new_total_physical_size);
-        if let Err(e) = self.property_changed_invalidated_signal(
-            &path,
-            prop_hashmap!(
-                consts::BLOCKDEV_INTERFACE_NAME_3_0 => {
-                    Vec::new(),
-                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(total_physical_size_prop.clone())
-                },
-                consts::BLOCKDEV_INTERFACE_NAME_3_1 => {
-                    Vec::new(),
-                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(total_physical_size_prop.clone())
-                },
-                consts::BLOCKDEV_INTERFACE_NAME_3_2 => {
-                    Vec::new(),
-                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(total_physical_size_prop.clone())
-                },
-                consts::BLOCKDEV_INTERFACE_NAME_3_3 => {
-                    Vec::new(),
-                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(total_physical_size_prop.clone())
-                },
-                consts::BLOCKDEV_INTERFACE_NAME_3_4 => {
-                    Vec::new(),
-                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(total_physical_size_prop.clone())
-                },
-                consts::BLOCKDEV_INTERFACE_NAME_3_5 => {
-                    Vec::new(),
-                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(total_physical_size_prop.clone())
-                },
-                consts::BLOCKDEV_INTERFACE_NAME_3_6 => {
-                    Vec::new(),
-                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(total_physical_size_prop.clone())
-                },
-                consts::BLOCKDEV_INTERFACE_NAME_3_7 => {
-                    Vec::new(),
-                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(total_physical_size_prop.clone())
-                },
-                consts::BLOCKDEV_INTERFACE_NAME_3_8 => {
-                    Vec::new(),
-                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(total_physical_size_prop.clone())
-                },
-                consts::BLOCKDEV_INTERFACE_NAME_3_9 => {
-                    Vec::new(),
-                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(total_physical_size_prop)
-                }
-            ),
-        ) {
+        if let Err(e) = self
+            .property_changed_invalidated_signal(
+                &path,
+                prop_hashmap!(
+                    consts::BLOCKDEV_INTERFACE_NAME_3_0 => {
+                        Vec::new(),
+                        consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                        box_variant!(total_physical_size_prop.clone())
+                    },
+                    consts::BLOCKDEV_INTERFACE_NAME_3_1 => {
+                        Vec::new(),
+                        consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                        box_variant!(total_physical_size_prop.clone())
+                    },
+                    consts::BLOCKDEV_INTERFACE_NAME_3_2 => {
+                        Vec::new(),
+                        consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                        box_variant!(total_physical_size_prop.clone())
+                    },
+                    consts::BLOCKDEV_INTERFACE_NAME_3_3 => {
+                        Vec::new(),
+                        consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                        box_variant!(total_physical_size_prop.clone())
+                    },
+                    consts::BLOCKDEV_INTERFACE_NAME_3_4 => {
+                        Vec::new(),
+                        consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                        box_variant!(total_physical_size_prop.clone())
+                    },
+                    consts::BLOCKDEV_INTERFACE_NAME_3_5 => {
+                        Vec::new(),
+                        consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                        box_variant!(total_physical_size_prop.clone())
+                    },
+                    consts::BLOCKDEV_INTERFACE_NAME_3_6 => {
+                        Vec::new(),
+                        consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                        box_variant!(total_physical_size_prop.clone())
+                    },
+                    consts::BLOCKDEV_INTERFACE_NAME_3_7 => {
+                        Vec::new(),
+                        consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                        box_variant!(total_physical_size_prop.clone())
+                    },
+                    consts::BLOCKDEV_INTERFACE_NAME_3_8 => {
+                        Vec::new(),
+                        consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                        box_variant!(total_physical_size_prop.clone())
+                    },
+                    consts::BLOCKDEV_INTERFACE_NAME_3_9 => {
+                        Vec::new(),
+                        consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                        box_variant!(total_physical_size_prop)
+                    }
+                ),
+            )
+            .await
+        {
             warn!(
                 "Failed to send a signal over D-Bus indicating blockdev total physical size change: {e}"
             );
@@ -1200,57 +1241,60 @@ impl DbusTreeHandler {
     }
 
     /// Send a signal indicating that the pool overprovisioning mode has changed.
-    fn handle_pool_overprov_mode_change(&self, path: Path<'static>, new_mode: bool) {
-        if let Err(e) = self.property_changed_invalidated_signal(
-            &path,
-            prop_hashmap!(
-                consts::POOL_INTERFACE_NAME_3_1 => {
-                    Vec::new(),
-                    consts::POOL_OVERPROV_PROP.to_string() =>
-                    box_variant!(new_mode)
-                },
-                consts::POOL_INTERFACE_NAME_3_2 => {
-                    Vec::new(),
-                    consts::POOL_OVERPROV_PROP.to_string() =>
-                    box_variant!(new_mode)
-                },
-                consts::POOL_INTERFACE_NAME_3_3 => {
-                    Vec::new(),
-                    consts::POOL_OVERPROV_PROP.to_string() =>
-                    box_variant!(new_mode)
-                },
-                consts::POOL_INTERFACE_NAME_3_4 => {
-                    Vec::new(),
-                    consts::POOL_OVERPROV_PROP.to_string() =>
-                    box_variant!(new_mode)
-                },
-                consts::POOL_INTERFACE_NAME_3_5 => {
-                    Vec::new(),
-                    consts::POOL_OVERPROV_PROP.to_string() =>
-                    box_variant!(new_mode)
-                },
-                consts::POOL_INTERFACE_NAME_3_6 => {
-                    Vec::new(),
-                    consts::POOL_OVERPROV_PROP.to_string() =>
-                    box_variant!(new_mode)
-                },
-                consts::POOL_INTERFACE_NAME_3_7 => {
-                    Vec::new(),
-                    consts::POOL_OVERPROV_PROP.to_string() =>
-                    box_variant!(new_mode)
-                },
-                consts::POOL_INTERFACE_NAME_3_8 => {
-                    Vec::new(),
-                    consts::POOL_OVERPROV_PROP.to_string() =>
-                    box_variant!(new_mode)
-                },
-                consts::POOL_INTERFACE_NAME_3_9 => {
-                    Vec::new(),
-                    consts::POOL_OVERPROV_PROP.to_string() =>
-                    box_variant!(new_mode)
-                }
-            ),
-        ) {
+    async fn handle_pool_overprov_mode_change(&self, path: Path<'static>, new_mode: bool) {
+        if let Err(e) = self
+            .property_changed_invalidated_signal(
+                &path,
+                prop_hashmap!(
+                    consts::POOL_INTERFACE_NAME_3_1 => {
+                        Vec::new(),
+                        consts::POOL_OVERPROV_PROP.to_string() =>
+                        box_variant!(new_mode)
+                    },
+                    consts::POOL_INTERFACE_NAME_3_2 => {
+                        Vec::new(),
+                        consts::POOL_OVERPROV_PROP.to_string() =>
+                        box_variant!(new_mode)
+                    },
+                    consts::POOL_INTERFACE_NAME_3_3 => {
+                        Vec::new(),
+                        consts::POOL_OVERPROV_PROP.to_string() =>
+                        box_variant!(new_mode)
+                    },
+                    consts::POOL_INTERFACE_NAME_3_4 => {
+                        Vec::new(),
+                        consts::POOL_OVERPROV_PROP.to_string() =>
+                        box_variant!(new_mode)
+                    },
+                    consts::POOL_INTERFACE_NAME_3_5 => {
+                        Vec::new(),
+                        consts::POOL_OVERPROV_PROP.to_string() =>
+                        box_variant!(new_mode)
+                    },
+                    consts::POOL_INTERFACE_NAME_3_6 => {
+                        Vec::new(),
+                        consts::POOL_OVERPROV_PROP.to_string() =>
+                        box_variant!(new_mode)
+                    },
+                    consts::POOL_INTERFACE_NAME_3_7 => {
+                        Vec::new(),
+                        consts::POOL_OVERPROV_PROP.to_string() =>
+                        box_variant!(new_mode)
+                    },
+                    consts::POOL_INTERFACE_NAME_3_8 => {
+                        Vec::new(),
+                        consts::POOL_OVERPROV_PROP.to_string() =>
+                        box_variant!(new_mode)
+                    },
+                    consts::POOL_INTERFACE_NAME_3_9 => {
+                        Vec::new(),
+                        consts::POOL_OVERPROV_PROP.to_string() =>
+                        box_variant!(new_mode)
+                    }
+                ),
+            )
+            .await
+        {
             warn!(
                 "Failed to send a signal over D-Bus indicating pool overprovisioning mode change: {e}"
             );
@@ -1258,23 +1302,30 @@ impl DbusTreeHandler {
     }
 
     /// Send a signal indicating that the pool filesystem limit has changed.
-    pub fn handle_pool_free_token_slots_change(&self, path: Path<'static>, new_ts: Option<u8>) {
+    pub async fn handle_pool_free_token_slots_change(
+        &self,
+        path: Path<'static>,
+        new_ts: Option<u8>,
+    ) {
         let prop = pool_free_token_slots_to_prop(new_ts);
-        if let Err(e) = self.property_changed_invalidated_signal(
-            &path,
-            prop_hashmap!(
-                consts::POOL_INTERFACE_NAME_3_8 => {
-                    Vec::new(),
-                    consts::POOL_FREE_TOKEN_SLOTS_PROP.to_string() =>
-                    box_variant!(prop)
-                },
-                consts::POOL_INTERFACE_NAME_3_9 => {
-                    Vec::new(),
-                    consts::POOL_FREE_TOKEN_SLOTS_PROP.to_string() =>
-                    box_variant!(prop)
-                }
-            ),
-        ) {
+        if let Err(e) = self
+            .property_changed_invalidated_signal(
+                &path,
+                prop_hashmap!(
+                    consts::POOL_INTERFACE_NAME_3_8 => {
+                        Vec::new(),
+                        consts::POOL_FREE_TOKEN_SLOTS_PROP.to_string() =>
+                        box_variant!(prop)
+                    },
+                    consts::POOL_INTERFACE_NAME_3_9 => {
+                        Vec::new(),
+                        consts::POOL_FREE_TOKEN_SLOTS_PROP.to_string() =>
+                        box_variant!(prop)
+                    }
+                ),
+            )
+            .await
+        {
             warn!(
                 "Failed to send a signal over D-Bus indicating pool free token slots change: {e}"
             );
@@ -1282,7 +1333,7 @@ impl DbusTreeHandler {
     }
 
     /// Send a signal indicating that the pool total allocated size has changed.
-    fn handle_pool_foreground_change(
+    async fn handle_pool_foreground_change(
         &self,
         path: Path<'static>,
         new_used: SignalChange<Option<Bytes>>,
@@ -1434,7 +1485,7 @@ impl DbusTreeHandler {
         );
     }
 
-    fn handle_udev_background_change(
+    async fn handle_udev_background_change(
         &self,
         read_lock: TreeReadLock,
         uuid: DevUuid,
@@ -1486,13 +1537,13 @@ impl DbusTreeHandler {
 
     /// Handle a D-Bus action that has been generated by the connection processing
     /// handle.
-    fn handle_dbus_action(&mut self, action: DbusAction) -> StratisResult<bool> {
+    async fn handle_dbus_action(&mut self, action: DbusAction) -> StratisResult<bool> {
         match action {
             DbusAction::Add(path, interfaces) => {
                 if let Some(write_lock) =
-                    poll_exit_and_future(self.should_exit.recv(), self.tree.write())?
+                    poll_exit_and_future(self.should_exit.recv(), self.tree.write()).await?
                 {
-                    self.handle_add_action(write_lock, path, interfaces);
+                    self.handle_add_action(write_lock, path, interfaces).await;
                     Ok(true)
                 } else {
                     Ok(false)
@@ -1500,82 +1551,88 @@ impl DbusTreeHandler {
             }
             DbusAction::Remove(path, interfaces) => {
                 if let Some(write_lock) =
-                    poll_exit_and_future(self.should_exit.recv(), self.tree.write())?
+                    poll_exit_and_future(self.should_exit.recv(), self.tree.write()).await?
                 {
-                    self.handle_remove_action(write_lock, path, interfaces);
+                    self.handle_remove_action(write_lock, path, interfaces)
+                        .await;
                     Ok(true)
                 } else {
                     Ok(false)
                 }
             }
             DbusAction::FsNameChange(item, new_name) => {
-                self.handle_fs_name_change(item, new_name);
+                self.handle_fs_name_change(item, new_name).await;
                 Ok(true)
             }
             DbusAction::FsOriginChange(item, new_origin) => {
-                self.handle_fs_origin_change(item, new_origin);
+                self.handle_fs_origin_change(item, new_origin).await;
                 Ok(true)
             }
             DbusAction::PoolNameChange(item, new_name) => {
                 if let Some(read_lock) =
-                    poll_exit_and_future(self.should_exit.recv(), self.tree.read())?
+                    poll_exit_and_future(self.should_exit.recv(), self.tree.read()).await?
                 {
-                    self.handle_pool_name_change(read_lock, item, new_name);
+                    self.handle_pool_name_change(read_lock, item, new_name)
+                        .await;
                     Ok(true)
                 } else {
                     Ok(false)
                 }
             }
             DbusAction::PoolAvailActions(item, new_avail_actions) => {
-                self.handle_pool_avail_actions_change(item, new_avail_actions);
+                self.handle_pool_avail_actions_change(item, new_avail_actions)
+                    .await;
                 Ok(true)
             }
             DbusAction::PoolKeyDescChange(item, ei) => {
-                self.handle_pool_key_desc_change(item, ei);
+                self.handle_pool_key_desc_change(item, ei).await;
                 Ok(true)
             }
             DbusAction::PoolClevisInfoChange(item, ei) => {
-                self.handle_pool_clevis_info_change(item, ei);
+                self.handle_pool_clevis_info_change(item, ei).await;
                 Ok(true)
             }
             DbusAction::PoolCacheChange(item, has_cache) => {
-                self.handle_pool_cache_change(item, has_cache);
+                self.handle_pool_cache_change(item, has_cache).await;
                 Ok(true)
             }
             DbusAction::PoolFsLimitChange(path, new_limit) => {
-                self.handle_pool_fs_limit_change(path, new_limit);
+                self.handle_pool_fs_limit_change(path, new_limit).await;
                 Ok(true)
             }
             DbusAction::PoolFreeTokenSlots(path, new_ts) => {
-                self.handle_pool_free_token_slots_change(path, new_ts);
+                self.handle_pool_free_token_slots_change(path, new_ts).await;
                 Ok(true)
             }
             DbusAction::FsSizeLimitChange(path, new_limit) => {
-                self.handle_fs_size_limit_change(path, new_limit);
+                self.handle_fs_size_limit_change(path, new_limit).await;
                 Ok(true)
             }
             DbusAction::FsMergeScheduledChange(path, new_scheduled) => {
-                self.handle_fs_merge_scheduled_change(path, new_scheduled);
+                self.handle_fs_merge_scheduled_change(path, new_scheduled)
+                    .await;
                 Ok(true)
             }
             DbusAction::PoolOverprovModeChange(path, new_mode) => {
-                self.handle_pool_overprov_mode_change(path, new_mode);
+                self.handle_pool_overprov_mode_change(path, new_mode).await;
                 Ok(true)
             }
             DbusAction::LockedPoolsChange(pools) => {
-                self.handle_locked_pools_change(pools);
+                self.handle_locked_pools_change(pools).await;
                 Ok(true)
             }
             DbusAction::StoppedPoolsChange(pools) => {
-                self.handle_stopped_pools_change(pools);
+                self.handle_stopped_pools_change(pools).await;
                 Ok(true)
             }
             DbusAction::BlockdevUserInfoChange(path, new_user_info) => {
-                self.handle_blockdev_user_info_change(path, new_user_info);
+                self.handle_blockdev_user_info_change(path, new_user_info)
+                    .await;
                 Ok(true)
             }
             DbusAction::BlockdevTotalPhysicalSizeChange(path, new_total_physical_size) => {
-                self.handle_blockdev_total_physical_size_change(path, new_total_physical_size);
+                self.handle_blockdev_total_physical_size_change(path, new_total_physical_size)
+                    .await;
                 Ok(true)
             }
             DbusAction::PoolForegroundChange(item, new_used, new_alloc, new_size, new_no_space) => {
@@ -1585,7 +1642,8 @@ impl DbusTreeHandler {
                     new_alloc,
                     new_size,
                     new_no_space,
-                );
+                )
+                .await;
                 Ok(true)
             }
             DbusAction::FsBackgroundChange(uuid, new_used, new_size) => {
@@ -1619,7 +1677,7 @@ impl DbusTreeHandler {
     }
 
     /// Send an InterfacesAdded signal on the D-Bus
-    fn added_object_signal(
+    async fn added_object_signal(
         &self,
         object: Path<'static>,
         interfaces: InterfacesAddedThreadSafe,
@@ -1639,7 +1697,7 @@ impl DbusTreeHandler {
     }
 
     /// Send an InterfacesRemoved signal on the D-Bus
-    fn removed_object_signal(
+    async fn removed_object_signal(
         &self,
         object: Path<'static>,
         interfaces: InterfacesRemoved,
@@ -1655,25 +1713,24 @@ impl DbusTreeHandler {
             })
     }
 
-    fn property_changed_invalidated_signal(
+    async fn property_changed_invalidated_signal(
         &self,
         object: &Path<'_>,
         props: PropertySignal,
     ) -> Result<(), dbus::Error> {
-        props.into_iter().try_for_each(
-            |(interface_name, (changed_properties, invalidated_properties))| {
-                let prop_changed = PropertiesPropertiesChanged {
-                    changed_properties,
-                    invalidated_properties,
-                    interface_name,
-                };
-                self.connection
-                    .send(prop_changed.to_emit_message(object))
-                    .map(|_| ())
-                    .map_err(|_| {
-                        dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
-                    })
-            },
-        )
+        for (interface_name, (changed_properties, invalidated_properties)) in props {
+            let prop_changed = PropertiesPropertiesChanged {
+                changed_properties,
+                invalidated_properties,
+                interface_name,
+            };
+            self.connection
+                .send(prop_changed.to_emit_message(object))
+                .map(|_| ())
+                .map_err(|_| {
+                    dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
+                })?
+        }
+        Ok(())
     }
 }

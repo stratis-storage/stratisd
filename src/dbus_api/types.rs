@@ -14,25 +14,29 @@ use std::{
 
 use dbus::{
     arg::{RefArg, Variant},
-    blocking::SyncConnection,
+    nonblock::SyncConnection,
     Path,
 };
 use dbus_tree::{DataType, MTSync, ObjectPath, Tree};
 use either::Either;
-use tokio::sync::{
-    mpsc::UnboundedSender as TokioSender, OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock,
+use tokio::{
+    sync::{
+        mpsc::UnboundedSender as TokioSender, OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock,
+    },
+    task::JoinHandle,
 };
 
 use devicemapper::{Bytes, Sectors};
 
 use crate::{
-    dbus_api::{connection::DbusConnectionHandler, tree::DbusTreeHandler, udev::DbusUdevHandler},
+    dbus_api::{message::DbusMessageHandler, tree::DbusTreeHandler, udev::DbusUdevHandler},
     engine::{
         total_allocated, total_used, ActionAvailability, DevUuid, Diff, EncryptionInfo, Engine,
         ExclusiveGuard, FilesystemUuid, Lockable, LockedPoolsInfo, PoolDiff, PoolEncryptionInfo,
         PoolUuid, SharedGuard, StoppedPoolsInfo, StratBlockDevDiff, StratFilesystemDiff,
         StratPoolDiff, StratisUuid, ThinPoolDiff,
     },
+    stratis::StratisResult,
 };
 
 /// Type for lockable D-Bus tree object.
@@ -48,8 +52,12 @@ pub type TreeReadLock = SharedGuard<OwnedRwLockReadGuard<Tree<MTSync<TData>, TDa
 pub type TreeWriteLock = ExclusiveGuard<OwnedRwLockWriteGuard<Tree<MTSync<TData>, TData>>>;
 
 /// Type representing all of the handlers for driving the multithreaded D-Bus layer.
-pub type DbusHandlers =
-    Result<(DbusConnectionHandler, DbusUdevHandler, DbusTreeHandler), dbus::Error>;
+pub type DbusHandlers = StratisResult<(
+    DbusMessageHandler,
+    JoinHandle<StratisResult<()>>,
+    DbusUdevHandler,
+    DbusTreeHandler,
+)>;
 
 /// Type for interfaces parameter for `ObjectManagerInterfacesAdded`. This type cannot be sent
 /// over the D-Bus but it is safe to send across threads.
@@ -224,7 +232,7 @@ impl Clone for DbusContext {
             next_index: Arc::clone(&self.next_index),
             engine: self.engine.clone(),
             sender: self.sender.clone(),
-            connection: Arc::clone(&self.connection),
+            connection: self.connection.clone(),
         }
     }
 }

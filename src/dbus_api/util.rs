@@ -2,21 +2,22 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, fmt::Display, future::Future, sync::Arc};
+use std::{collections::HashMap, fmt::Display, future::Future, sync::Arc, time::Duration};
 
-use dbus::{
-    arg::{ArgType, Iter, IterAppend, RefArg, Variant},
-    blocking::SyncConnection,
-};
+use dbus::arg::{ArgType, Iter, IterAppend, RefArg, Variant};
+use dbus_tokio::connection::{new_system_sync, IOResourceError};
 use dbus_tree::{MTSync, MethodErr, PropInfo};
 use futures::{
-    executor::block_on,
     future::{select, Either},
     pin_mut,
 };
-use tokio::sync::{
-    broadcast::{error::RecvError, Sender},
-    mpsc::{UnboundedReceiver, UnboundedSender},
+use tokio::{
+    sync::{
+        broadcast::{error::RecvError, Sender},
+        mpsc::{UnboundedReceiver, UnboundedSender},
+    },
+    task::JoinHandle,
+    time::sleep,
 };
 
 use devicemapper::DmError;
@@ -24,8 +25,8 @@ use devicemapper::DmError;
 use crate::{
     dbus_api::{
         api::get_base_tree,
-        connection::DbusConnectionHandler,
         consts,
+        message::DbusMessageHandler,
         tree::DbusTreeHandler,
         types::{
             DbusAction, DbusContext, DbusErrorEnum, DbusHandlers, InterfacesAdded,
@@ -157,24 +158,60 @@ pub fn get_parent(
 /// Messages may be:
 /// * received by the DbusUdevHandler from the udev thread,
 /// * sent by the DbusContext to the DbusTreeHandler
-pub fn create_dbus_handlers(
+pub async fn create_dbus_handlers(
     engine: Arc<dyn Engine>,
     udev_receiver: UnboundedReceiver<UdevEngineEvent>,
     trigger: Sender<()>,
     (tree_sender, tree_receiver): (UnboundedSender<DbusAction>, UnboundedReceiver<DbusAction>),
 ) -> DbusHandlers {
-    let conn = Arc::new(SyncConnection::new_system()?);
-    let (tree, object_path) =
-        get_base_tree(DbusContext::new(engine, tree_sender, Arc::clone(&conn)));
-    let dbus_context = tree.get_data().clone();
-    conn.request_name(consts::STRATIS_BASE_SERVICE, false, true, true)?;
+    let (resource, arc_conn) = spawn_blocking!(new_system_sync())??;
+    let conn = Lockable::new_shared(arc_conn);
+    let cloned_conn = conn.clone();
+    let connection: JoinHandle<StratisResult<()>> = tokio::spawn(async move {
+        let mut resource: JoinHandle<Result<(), IOResourceError>> =
+            tokio::spawn(async { Err(resource.await) });
+        cloned_conn
+            .read()
+            .await
+            .request_name(consts::STRATIS_BASE_SERVICE, false, true, true)
+            .await?;
 
+        loop {
+            let err = resource.await;
+            match err {
+                Ok(Err(e)) => {
+                    warn!("Lost connection to D-Bus: {e}");
+                }
+                Err(e) => {
+                    warn!("Error joining thread: {e}");
+                }
+                _ => unreachable!(),
+            }
+            loop {
+                match spawn_blocking!(new_system_sync()) {
+                    Ok(Ok((new_resource, arc_conn))) => {
+                        *cloned_conn.write().await = arc_conn;
+                        cloned_conn
+                            .read()
+                            .await
+                            .request_name(consts::STRATIS_BASE_SERVICE, false, true, true)
+                            .await?;
+                        resource = tokio::spawn(async { Err(new_resource.await) });
+                        break;
+                    }
+                    _ => sleep(Duration::from_secs(1)).await,
+                };
+            }
+        }
+    });
+
+    let (tree, object_path) = get_base_tree(DbusContext::new(engine, tree_sender, conn.clone()));
+    let dbus_context = tree.get_data().clone();
     let tree = Lockable::new_shared(tree);
-    let connection =
-        DbusConnectionHandler::new(Arc::clone(&conn), tree.clone(), trigger.subscribe());
+    let message = DbusMessageHandler::new(conn.clone(), tree.clone());
     let udev = DbusUdevHandler::new(udev_receiver, object_path, dbus_context);
-    let tree = DbusTreeHandler::new(tree, tree_receiver, conn, trigger.subscribe());
-    Ok((connection, udev, tree))
+    let tree = DbusTreeHandler::new(tree, tree_receiver, conn.clone(), trigger.subscribe());
+    Ok((message, connection, udev, tree))
 }
 
 /// This method converts the thread safe representation of D-Bus property maps to a type
@@ -191,7 +228,7 @@ pub fn thread_safe_to_dbus_sendable(ia: InterfacesAddedThreadSafe) -> Interfaces
         .collect()
 }
 
-pub fn poll_exit_and_future<E, F, R>(exit: E, future: F) -> StratisResult<Option<R>>
+pub async fn poll_exit_and_future<E, F, R>(exit: E, future: F) -> StratisResult<Option<R>>
 where
     E: Future<Output = Result<(), RecvError>>,
     F: Future<Output = R>,
@@ -199,7 +236,7 @@ where
     pin_mut!(exit);
     pin_mut!(future);
 
-    match block_on(select(exit, future)) {
+    match select(exit, future).await {
         Either::Left((Ok(()), _)) => {
             info!("D-Bus tree handler was notified to exit");
             Ok(None)

@@ -34,8 +34,9 @@ pub async fn setup(
     tree_channel: (UnboundedSender<DbusAction>, UnboundedReceiver<DbusAction>),
 ) -> StratisResult<()> {
     let engine_clone = Arc::clone(&engine);
-    let (mut conn, udev, mut tree) =
-        spawn_blocking!({ create_dbus_handlers(engine_clone, receiver, trigger, tree_channel) })??;
+    let (message, mut conn, udev, mut tree) =
+        create_dbus_handlers(engine_clone, receiver, trigger, tree_channel).await?;
+    message.process_dbus_requests().await?;
 
     let pools = engine.pools().await;
     let mut udev = spawn_blocking!({
@@ -46,15 +47,14 @@ pub async fn setup(
     })?;
     info!("D-Bus API is available");
 
-    let mut tree_handle = task::spawn_blocking(move || {
-        if let Err(e) = tree.process_dbus_actions() {
+    let mut tree_handle = task::spawn(async move {
+        if let Err(e) = tree.process_dbus_actions().await {
             error!(
                 "Failed to process D-Bus object path addition or removal: {e}; \
                 exiting D-Bus thread",
             );
         }
     });
-    let mut conn_handle = task::spawn_blocking(move || conn.process_dbus_requests());
     let mut udev_handle = task::spawn(async move {
         loop {
             trace!("Starting D-Bus udev event handling");
@@ -73,13 +73,13 @@ pub async fn setup(
             error!("The tree handling thread exited...");
             res.map_err(StratisError::from)
         }
-        res = &mut conn_handle => {
-            error!("The D-Bus request thread exited...");
-            res.map_err(StratisError::from).and_then(|res| res)
-        }
         res = &mut udev_handle => {
             error!("The udev processing thread exited...");
             res.map_err(StratisError::from)
+        }
+        res = &mut conn => {
+            error!("The connection processing thread exited...");
+            res.map_err(StratisError::from).and_then(|res| res)
         }
     }
 }

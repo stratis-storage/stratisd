@@ -53,6 +53,8 @@ pub enum StratisError {
     #[cfg(feature = "dbus_enabled")]
     Dbus(Arc<dbus::Error>),
     Udev(Arc<libudev::Error>),
+    #[cfg(feature = "dbus_enabled")]
+    IoResource(Arc<dbus_tokio::connection::IOResourceError>),
 }
 
 impl StratisError {
@@ -149,6 +151,8 @@ impl fmt::Display for StratisError {
                 write!(f, "Dbus error: {}", err.message().unwrap_or("Unknown"))
             }
             StratisError::Udev(ref err) => write!(f, "Udev error: {err}"),
+            #[cfg(feature = "dbus_enabled")]
+            StratisError::IoResource(ref err) => write!(f, "D-Bus connection lost: {err}"),
         }
     }
 }
@@ -237,6 +241,13 @@ impl From<libudev::Error> for StratisError {
 impl From<sync::mpsc::RecvError> for StratisError {
     fn from(err: sync::mpsc::RecvError) -> StratisError {
         StratisError::Recv(err)
+    }
+}
+
+#[cfg(feature = "dbus_enabled")]
+impl From<dbus_tokio::connection::IOResourceError> for StratisError {
+    fn from(err: dbus_tokio::connection::IOResourceError) -> StratisError {
+        StratisError::IoResource(Arc::new(err))
     }
 }
 

@@ -398,3 +398,10 @@ pub fn pool_volume_key_loaded(pool: &dyn Pool, pool_uuid: PoolUuid) -> Variant<B
         Err(e) => Variant(Box::new(e.to_string())),
     }
 }
+
+/// Generate a D-Bus representation of the timestamp of the last time when the pool was
+/// reencrypted.
+#[inline]
+pub fn pool_last_reencrypted_timestamp(pool: &dyn Pool) -> (bool, String) {
+    prop_conv::pool_last_reencrypted_timestamp_to_prop(pool.last_reencrypt())
+}

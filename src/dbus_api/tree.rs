@@ -2,8 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, thread::sleep, time::Duration};
 
+use chrono::{DateTime, Utc};
 use dbus::{
     arg::{RefArg, Variant},
     blocking::{
@@ -37,7 +38,7 @@ use crate::{
         pool::prop_conv::{
             avail_actions_to_prop, clevis_info_to_prop, clevis_infos_to_prop, key_desc_to_prop,
             key_descs_to_prop, pool_alloc_to_prop, pool_free_token_slots_to_prop,
-            pool_size_to_prop, pool_used_to_prop,
+            pool_last_reencrypted_timestamp_to_prop, pool_size_to_prop, pool_used_to_prop,
         },
         types::{
             DbusAction, InterfacesAddedThreadSafe, InterfacesRemoved, LockableTree, SignalChange,
@@ -448,7 +449,7 @@ impl DbusTreeHandler {
             .map(|either| {
                 either.as_ref().left().map(|(b, _)| *b).unwrap_or(false) || either.is_right()
             })
-            .expect("Should be encrypted to send signal")
+            .unwrap_or(true)
             && self
                 .property_changed_invalidated_signal(
                     &item,
@@ -534,7 +535,7 @@ impl DbusTreeHandler {
             .map(|either| {
                 either.as_ref().left().map(|(b, _)| *b).unwrap_or(false) || either.is_right()
             })
-            .expect("Should be encrypted to send signal")
+            .unwrap_or(true)
             && self
                 .property_changed_invalidated_signal(
                     &item,
@@ -1082,6 +1083,30 @@ impl DbusTreeHandler {
         }
     }
 
+    /// Send a signal indicating that the pool reencrypt timestamp value has
+    /// changed.
+    fn handle_pool_reencrypt_timestamp_change(
+        &self,
+        path: Path<'static>,
+        timestamp: Option<DateTime<Utc>>,
+    ) {
+        let prop = pool_last_reencrypted_timestamp_to_prop(timestamp);
+        if let Err(e) = self.property_changed_invalidated_signal(
+            &path,
+            prop_hashmap!(
+                consts::POOL_INTERFACE_NAME_3_9 => {
+                    Vec::new(),
+                    consts::POOL_LAST_REENCRYPTED_TIMESTAMP_PROP.to_string() =>
+                    box_variant!(prop)
+                }
+            ),
+        ) {
+            warn!(
+                "Failed to send a signal over D-Bus indicating that reencryption timestamp changed: {e}"
+            );
+        }
+    }
+
     /// Send a signal indicating that the blockdev user info has changed.
     fn handle_blockdev_user_info_change(&self, path: Path<'static>, new_user_info: Option<String>) {
         let user_info_prop = blockdev_user_info_to_prop(new_user_info);
@@ -1196,6 +1221,67 @@ impl DbusTreeHandler {
             warn!(
                 "Failed to send a signal over D-Bus indicating blockdev total physical size change: {e}"
             );
+        }
+    }
+
+    /// Send a signal indicating that the pool encryption status has changed.
+    fn handle_pool_encryption_change(&self, path: Path<'static>, new_encryption: bool) {
+        if let Err(e) = self.property_changed_invalidated_signal(
+            &path,
+            prop_hashmap!(
+                consts::POOL_INTERFACE_NAME_3_0 => {
+                    Vec::new(),
+                    consts::POOL_ENCRYPTED_PROP.to_string() =>
+                    box_variant!(new_encryption)
+                },
+                consts::POOL_INTERFACE_NAME_3_1 => {
+                    Vec::new(),
+                    consts::POOL_ENCRYPTED_PROP.to_string() =>
+                    box_variant!(new_encryption)
+                },
+                consts::POOL_INTERFACE_NAME_3_2 => {
+                    Vec::new(),
+                    consts::POOL_ENCRYPTED_PROP.to_string() =>
+                    box_variant!(new_encryption)
+                },
+                consts::POOL_INTERFACE_NAME_3_3 => {
+                    Vec::new(),
+                    consts::POOL_ENCRYPTED_PROP.to_string() =>
+                    box_variant!(new_encryption)
+                },
+                consts::POOL_INTERFACE_NAME_3_4 => {
+                    Vec::new(),
+                    consts::POOL_ENCRYPTED_PROP.to_string() =>
+                    box_variant!(new_encryption)
+                },
+                consts::POOL_INTERFACE_NAME_3_5 => {
+                    Vec::new(),
+                    consts::POOL_ENCRYPTED_PROP.to_string() =>
+                    box_variant!(new_encryption)
+                },
+                consts::POOL_INTERFACE_NAME_3_6 => {
+                    Vec::new(),
+                    consts::POOL_ENCRYPTED_PROP.to_string() =>
+                    box_variant!(new_encryption)
+                },
+                consts::POOL_INTERFACE_NAME_3_7 => {
+                    Vec::new(),
+                    consts::POOL_ENCRYPTED_PROP.to_string() =>
+                    box_variant!(new_encryption)
+                },
+                consts::POOL_INTERFACE_NAME_3_8 => {
+                    Vec::new(),
+                    consts::POOL_ENCRYPTED_PROP.to_string() =>
+                    box_variant!(new_encryption)
+                },
+                consts::POOL_INTERFACE_NAME_3_9 => {
+                    Vec::new(),
+                    consts::POOL_ENCRYPTED_PROP.to_string() =>
+                    box_variant!(new_encryption)
+                }
+            ),
+        ) {
+            warn!("Failed to send a signal over D-Bus indicating encryption status change: {e}",);
         }
     }
 
@@ -1488,26 +1574,26 @@ impl DbusTreeHandler {
     /// handle.
     fn handle_dbus_action(&mut self, action: DbusAction) -> StratisResult<bool> {
         match action {
-            DbusAction::Add(path, interfaces) => {
-                if let Some(write_lock) =
-                    poll_exit_and_future(self.should_exit.recv(), self.tree.write())?
-                {
+            DbusAction::Add(path, interfaces) => loop {
+                if let Ok(write_lock) = self.tree.try_write() {
                     self.handle_add_action(write_lock, path, interfaces);
-                    Ok(true)
-                } else {
-                    Ok(false)
+                    return Ok(true);
                 }
-            }
-            DbusAction::Remove(path, interfaces) => {
-                if let Some(write_lock) =
-                    poll_exit_and_future(self.should_exit.recv(), self.tree.write())?
-                {
+                if let Ok(_) = self.should_exit.try_recv() {
+                    return Ok(false);
+                }
+                sleep(Duration::from_secs(1));
+            },
+            DbusAction::Remove(path, interfaces) => loop {
+                if let Ok(write_lock) = self.tree.try_write() {
                     self.handle_remove_action(write_lock, path, interfaces);
-                    Ok(true)
-                } else {
-                    Ok(false)
+                    return Ok(true);
                 }
-            }
+                if let Ok(_) = self.should_exit.try_recv() {
+                    return Ok(false);
+                }
+                sleep(Duration::from_secs(1));
+            },
             DbusAction::FsNameChange(item, new_name) => {
                 self.handle_fs_name_change(item, new_name);
                 Ok(true)
@@ -1576,6 +1662,14 @@ impl DbusTreeHandler {
             }
             DbusAction::BlockdevTotalPhysicalSizeChange(path, new_total_physical_size) => {
                 self.handle_blockdev_total_physical_size_change(path, new_total_physical_size);
+                Ok(true)
+            }
+            DbusAction::PoolEncryptionChange(path, encryption_change) => {
+                self.handle_pool_encryption_change(path, encryption_change);
+                Ok(true)
+            }
+            DbusAction::PoolReencryptTimestamp(path, timestamp) => {
+                self.handle_pool_reencrypt_timestamp_change(path, timestamp);
                 Ok(true)
             }
             DbusAction::PoolForegroundChange(item, new_used, new_alloc, new_size, new_no_space) => {

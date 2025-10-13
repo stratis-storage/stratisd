@@ -163,6 +163,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "bindgen"
+version = "0.72.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "993776b509cfb49c750f11b8f07a46fa23e0a1386ffc01fb1e7d343efc387895"
+dependencies = [
+ "bitflags",
+ "cexpr",
+ "clang-sys",
+ "itertools 0.10.5",
+ "log",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "rustc-hash",
+ "shlex",
+ "syn",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -402,7 +422,7 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "893c021558a1dc78c60171bb832e52340e7006ce0e05e6127df73de8825d0a09"
 dependencies = [
- "bindgen",
+ "bindgen 0.71.1",
  "pkg-config",
 ]
 
@@ -470,7 +490,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33d852cb9b869c2a9b3df2f71a3074817f01e1844f839a144f5fcef059a4eb5d"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -769,7 +789,7 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a74d58a9c6e334aee5bfcce3a604d77fb3cca933205622035f6badc1ce67107"
 dependencies = [
- "bindgen",
+ "bindgen 0.71.1",
  "cc",
  "pkg-config",
 ]
@@ -805,7 +825,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d70e7b16c75f442c560d3b9514c6343e8dde6426651745de12868e1500edbc0f"
 dependencies = [
- "bindgen",
+ "bindgen 0.71.1",
  "cc",
  "pkg-config",
  "semver",
@@ -868,7 +888,7 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c48e069775cb94ff50e9cd572544e439c65d5856207119fef992a09ce8f2517"
 dependencies = [
- "bindgen",
+ "bindgen 0.71.1",
  "errno",
  "libc",
 ]
@@ -1214,7 +1234,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1327,7 +1347,7 @@ dependencies = [
  "assert_cmd",
  "assert_matches",
  "async-trait",
- "bindgen",
+ "bindgen 0.72.1",
  "byteorder",
  "chrono",
  "clap",
@@ -1428,7 +1448,7 @@ dependencies = [
  "fastrand",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

@@ -16,7 +16,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use tokio::{io::unix::AsyncFd, task::spawn};
 
 #[cfg(feature = "dbus_enabled")]
-use crate::dbus_api::DbusAction;
+use crate::dbus::DbusAction;
 use crate::{
     engine::{get_dm, get_dm_init, Engine},
     stratis::errors::{StratisError, StratisResult},

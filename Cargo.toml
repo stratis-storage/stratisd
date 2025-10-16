@@ -100,14 +100,6 @@ optional = true
 version = "0.34.4"
 optional = true
 
-[dependencies.dbus]
-version = "0.9.0"
-optional = true
-
-[dependencies.dbus-tree]
-version = "0.9.2"
-optional = true
-
 [dependencies.either]
 version = "1.6.1"
 optional = true
@@ -234,6 +226,10 @@ version = "1.0.0"
 optional = true
 features = ["serde", "v4"]
 
+[dependencies.zbus]
+version = "5.12.0"
+optional = true
+
 [build-dependencies]
 pkg-config = "0.3.31"
 
@@ -287,7 +283,7 @@ engine = [
     "dep:uuid"
 ]
 default = ["dbus_enabled", "engine"]
-dbus_enabled = ["dep:dbus", "dep:dbus-tree"]
+dbus_enabled = ["dep:zbus"]
 extras = ["dep:pretty-hex"]
 min = ["dep:termios"]
 systemd_compat = ["dep:bindgen"]

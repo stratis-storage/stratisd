@@ -22,7 +22,7 @@ use tokio::{
 use nix::unistd::getpid;
 
 #[cfg(feature = "dbus_enabled")]
-use crate::dbus_api::DbusAction;
+use crate::dbus::DbusAction;
 use crate::{
     engine::{
         create_process_keyring, register_clevis_token, set_up_crypt_logging,
@@ -103,8 +103,6 @@ pub fn run(sim: bool) -> StratisResult<()> {
             let join_ipc = setup(
                 Arc::clone(&engine),
                 udev_receiver,
-                #[cfg(feature = "dbus_enabled")]
-                trigger.clone(),
                 #[cfg(feature = "dbus_enabled")]
                 (dbus_sender.clone(), dbus_receiver),
             );

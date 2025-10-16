@@ -13,15 +13,12 @@ use std::sync::Arc;
 
 use tokio::{
     select,
-    sync::{
-        broadcast::Sender,
-        mpsc::{UnboundedReceiver, UnboundedSender},
-    },
+    sync::mpsc::{UnboundedReceiver, UnboundedSender},
     task,
 };
 
 use crate::{
-    dbus_api::{create_dbus_handlers, DbusAction},
+    dbus::{create_dbus_handlers, DbusAction},
     engine::{Engine, UdevEngineEvent},
     stratis::{StratisError, StratisResult},
 };
@@ -30,31 +27,25 @@ use crate::{
 pub async fn setup(
     engine: Arc<dyn Engine>,
     receiver: UnboundedReceiver<UdevEngineEvent>,
-    trigger: Sender<()>,
     tree_channel: (UnboundedSender<DbusAction>, UnboundedReceiver<DbusAction>),
 ) -> StratisResult<()> {
     let engine_clone = Arc::clone(&engine);
-    let (mut conn, udev, mut tree) =
-        spawn_blocking!({ create_dbus_handlers(engine_clone, receiver, trigger, tree_channel) })??;
+    let (mut udev, mut signal) = create_dbus_handlers(engine_clone, receiver, tree_channel).await?;
 
     let pools = engine.pools().await;
-    let mut udev = spawn_blocking!({
-        for (pool_name, pool_uuid, pool) in pools.iter() {
-            udev.register_pool(pool_name, *pool_uuid, pool);
-        }
-        udev
-    })?;
+    for (pool_name, pool_uuid, pool) in pools.iter() {
+        udev.register_pool(pool_name, *pool_uuid, pool).await;
+    }
     info!("D-Bus API is available");
 
-    let mut tree_handle = task::spawn_blocking(move || {
-        if let Err(e) = tree.process_dbus_actions() {
+    let mut signal_handle = task::spawn(async move {
+        if let Err(e) = signal.process_dbus_actions().await {
             error!(
                 "Failed to process D-Bus object path addition or removal: {e}; \
                 exiting D-Bus thread",
             );
         }
     });
-    let mut conn_handle = task::spawn_blocking(move || conn.process_dbus_requests());
     let mut udev_handle = task::spawn(async move {
         loop {
             trace!("Starting D-Bus udev event handling");
@@ -69,13 +60,9 @@ pub async fn setup(
     });
 
     select! {
-        res = &mut tree_handle => {
-            error!("The tree handling thread exited...");
+        res = &mut signal_handle => {
+            error!("The signal handling thread exited...");
             res.map_err(StratisError::from)
-        }
-        res = &mut conn_handle => {
-            error!("The D-Bus request thread exited...");
-            res.map_err(StratisError::from).and_then(|res| res)
         }
         res = &mut udev_handle => {
             error!("The udev processing thread exited...");

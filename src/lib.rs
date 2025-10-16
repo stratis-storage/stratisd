@@ -39,7 +39,7 @@ mod macros;
 pub mod engine;
 
 #[cfg(feature = "dbus_enabled")]
-pub mod dbus_api;
+pub mod dbus;
 
 #[cfg(feature = "engine")]
 pub mod stratis;

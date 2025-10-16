@@ -9,7 +9,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use tokio::{task::spawn, time::sleep};
 
 #[cfg(feature = "dbus_enabled")]
-use crate::dbus_api::DbusAction;
+use crate::dbus::DbusAction;
 use crate::{engine::Engine, stratis::errors::StratisResult};
 
 /// Runs checks on thin pool usage and filesystem usage to determine whether either

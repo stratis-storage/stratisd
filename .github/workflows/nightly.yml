@@ -19,7 +19,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-24.04
     container:
-      image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:42  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - name: Install dependencies for Fedora
         run: >
@@ -50,7 +50,7 @@ jobs:
   check_future_dependencies:
     runs-on: ubuntu-24.04
     container:
-      image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:42  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - name: Install dependencies for Fedora
         run: >
@@ -93,7 +93,7 @@ jobs:
           - task: AUDITABLE=1 PROFILEDIR=debug make -f Makefile audit-all-rust
     runs-on: ubuntu-24.04
     container:
-      image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:42  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - name: Install dependencies for Fedora
         run: >
@@ -130,7 +130,7 @@ jobs:
   checks-with-ci-repo:
     runs-on: ubuntu-24.04
     container:
-      image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:42  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - name: Install dependencies for Fedora
         run: >

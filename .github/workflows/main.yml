@@ -45,7 +45,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-24.04
     container:
-      image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:42  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - name: Install dependencies for Fedora
@@ -79,7 +79,7 @@ jobs:
   stratis-cli-checks:
     runs-on: ubuntu-24.04
     container:
-      image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:42  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged --userns=host --ipc=host -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1
     steps:
       - name: Install dependencies
@@ -144,7 +144,7 @@ jobs:
   stratis-min-cli-checks:
     runs-on: ubuntu-24.04
     container:
-      image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:42  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged --userns=host --ipc=host -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1
     steps:
       - name: Install dependencies
@@ -192,7 +192,7 @@ jobs:
   shell-checks:
     runs-on: ubuntu-24.04
     container:
-      image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:42  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - name: Install dependencies
         run: >
@@ -210,7 +210,7 @@ jobs:
   pylint:
     runs-on: ubuntu-24.04
     container:
-      image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:42  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - name: Install dependencies
         run: >
@@ -235,7 +235,7 @@ jobs:
   python-based-tests:
     runs-on: ubuntu-24.04
     container:
-      image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:42  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - name: Install dependencies for Fedora

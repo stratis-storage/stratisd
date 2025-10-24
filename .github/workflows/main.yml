@@ -220,6 +220,7 @@ jobs:
           dnf install -y
           bandit
           git
+          libatomic
           make
           pip
           pylint

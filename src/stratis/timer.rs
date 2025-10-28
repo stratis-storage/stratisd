@@ -4,23 +4,23 @@
 
 use std::{sync::Arc, time::Duration};
 
-#[cfg(feature = "dbus_enabled")]
-use tokio::sync::mpsc::UnboundedSender;
 use tokio::{task::spawn, time::sleep};
+#[cfg(feature = "dbus_enabled")]
+use zbus::Connection;
 
 #[cfg(feature = "dbus_enabled")]
-use crate::dbus::DbusAction;
+use crate::dbus::{send_fs_background_signals, send_pool_background_signals};
 use crate::{engine::Engine, stratis::errors::StratisResult};
 
 /// Runs checks on thin pool usage and filesystem usage to determine whether either
 /// need to be extended.
 async fn check_pool_and_fs(
+    #[cfg(feature = "dbus_enabled")] connection: Arc<Connection>,
     engine: Arc<dyn Engine>,
-    #[cfg(feature = "dbus_enabled")] sender: UnboundedSender<DbusAction>,
 ) {
     async fn process_checks(
+        #[cfg(feature = "dbus_enabled")] connection: &Arc<Connection>,
         engine: &Arc<dyn Engine>,
-        #[cfg(feature = "dbus_enabled")] sender: &UnboundedSender<DbusAction>,
     ) -> StratisResult<()> {
         #[cfg(any(feature = "min", not(feature = "dbus_enabled")))]
         {
@@ -30,16 +30,12 @@ async fn check_pool_and_fs(
         #[cfg(feature = "dbus_enabled")]
         {
             let pool_diffs = engine.pool_evented(None).await;
-            for action in DbusAction::from_pool_diffs(pool_diffs) {
-                if let Err(e) = sender.send(action) {
-                    warn!("Failed to update D-Bus API with information on changed properties: {e}");
-                }
+            if let Err(e) = send_pool_background_signals(connection, pool_diffs) {
+                warn!("Failed to update D-Bus layer with changed engine properties: {e}");
             }
             let fs_diffs = engine.fs_evented(None).await;
-            for action in DbusAction::from_fs_diffs(fs_diffs) {
-                if let Err(e) = sender.send(action) {
-                    warn!("Failed to update D-Bus API with information on changed properties: {e}");
-                }
+            if let Err(e) = send_fs_background_signals(connection, fs_diffs) {
+                warn!("Failed to update D-Bus layer with changed engine properties: {e}");
             }
         }
         Ok(())
@@ -48,9 +44,9 @@ async fn check_pool_and_fs(
     loop {
         trace!("Starting timed pool and filesystem checks");
         if let Err(e) = process_checks(
-            &engine,
             #[cfg(feature = "dbus_enabled")]
-            &sender,
+            &connection,
+            &engine,
         )
         .await
         {
@@ -65,13 +61,13 @@ async fn check_pool_and_fs(
 ///
 /// Currently runs a timer to check thin pool and filesystem usage.
 pub async fn run_timers(
+    #[cfg(feature = "dbus_enabled")] connection: Arc<Connection>,
     engine: Arc<dyn Engine>,
-    #[cfg(feature = "dbus_enabled")] sender: UnboundedSender<DbusAction>,
 ) -> StratisResult<()> {
     spawn(check_pool_and_fs(
-        engine,
         #[cfg(feature = "dbus_enabled")]
-        sender,
+        connection,
+        engine,
     ))
     .await?;
     Ok(())

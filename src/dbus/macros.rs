@@ -2,6 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-pub const STRATIS_BASE_PATH: &str = "/org/storage/stratis3";
-pub const STRATIS_BASE_SERVICE: &str = "org.storage.stratis3";
-pub const OK_STRING: &str = "Ok";
+macro_rules! handle_action {
+    ($action:expr) => {{
+        let action = $action;
+        if let Ok(ref a) = action {
+            log::info!("{}", a);
+        }
+        action
+    }};
+}

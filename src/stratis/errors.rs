@@ -52,6 +52,8 @@ pub enum StratisError {
 
     #[cfg(feature = "dbus_enabled")]
     Dbus(zbus::Error),
+    #[cfg(feature = "dbus_enabled")]
+    DbusType(zbus::zvariant::Error),
     Udev(Arc<libudev::Error>),
 }
 
@@ -148,6 +150,10 @@ impl fmt::Display for StratisError {
             StratisError::Dbus(ref err) => {
                 write!(f, "Dbus error: {err}",)
             }
+            #[cfg(feature = "dbus_enabled")]
+            StratisError::DbusType(ref err) => {
+                write!(f, "Dbus type error: {err}",)
+            }
             StratisError::Udev(ref err) => write!(f, "Udev error: {err}"),
         }
     }
@@ -225,6 +231,13 @@ impl From<libcryptsetup_rs::LibcryptErr> for StratisError {
 impl From<zbus::Error> for StratisError {
     fn from(err: zbus::Error) -> StratisError {
         StratisError::Dbus(err)
+    }
+}
+
+#[cfg(feature = "dbus_enabled")]
+impl From<zbus::zvariant::Error> for StratisError {
+    fn from(err: zbus::zvariant::Error) -> StratisError {
+        StratisError::DbusType(err)
     }
 }
 

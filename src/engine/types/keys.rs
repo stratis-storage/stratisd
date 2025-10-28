@@ -13,8 +13,10 @@ use std::{
 };
 
 use itertools::Itertools;
-use serde_json::{Map, Value};
+use serde_json::Map;
 use strum_macros::{self, EnumString, VariantNames};
+#[cfg(feature = "dbus_enabled")]
+use zbus::zvariant::{Type, Value};
 
 use libcryptsetup_rs::SafeMemHandle;
 
@@ -465,8 +467,8 @@ impl Hash for EncryptionInfo {
     }
 }
 
-impl Into<Value> for &EncryptionInfo {
-    fn into(self) -> Value {
+impl Into<serde_json::Value> for &EncryptionInfo {
+    fn into(self) -> serde_json::Value {
         let json = self
             .encryption_infos
             .iter()
@@ -474,15 +476,20 @@ impl Into<Value> for &EncryptionInfo {
                 (
                     token_slot.to_string(),
                     match mech {
-                        UnlockMechanism::KeyDesc(kd) => Value::from(kd.as_application_str()),
+                        UnlockMechanism::KeyDesc(kd) => {
+                            serde_json::Value::from(kd.as_application_str())
+                        }
                         UnlockMechanism::ClevisInfo((pin, config)) => {
-                            Value::from(vec![Value::from(pin.to_owned()), config.to_owned()])
+                            serde_json::Value::from(vec![
+                                serde_json::Value::from(pin.to_owned()),
+                                config.to_owned(),
+                            ])
                         }
                     },
                 )
             })
             .collect::<Map<_, _>>();
-        Value::from(json)
+        serde_json::Value::from(json)
     }
 }
 
@@ -671,6 +678,13 @@ where
 }
 
 /// A data type representing a key description for the kernel keyring
+#[cfg(feature = "dbus_enabled")]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize, Type, Value)]
+#[zvariant(signature = "s")]
+pub struct KeyDescription(String);
+
+/// A data type representing a key description for the kernel keyring
+#[cfg(not(feature = "dbus_enabled"))]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct KeyDescription(String);
 

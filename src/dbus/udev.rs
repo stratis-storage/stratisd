@@ -2,39 +2,62 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{future::pending, sync::Arc};
+use std::sync::{atomic::AtomicU64, Arc};
 
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::UnboundedReceiver;
 use zbus::Connection;
 
 use crate::{
-    dbus::types::DbusAction,
-    engine::{Name, Pool, PoolUuid, UdevEngineEvent},
-    stratis::StratisResult,
+    dbus::pool::register_pool,
+    engine::{Engine, PoolUuid, UdevEngineEvent},
+    stratis::{StratisError, StratisResult},
 };
 
 pub struct UdevHandler {
-    _connection: Arc<Connection>,
-    _receiver: UnboundedReceiver<UdevEngineEvent>,
-    _sender: UnboundedSender<DbusAction>,
+    connection: Arc<Connection>,
+    engine: Arc<dyn Engine>,
+    receiver: UnboundedReceiver<UdevEngineEvent>,
+    counter: Arc<AtomicU64>,
 }
 
 impl UdevHandler {
     pub fn new(
         connection: Arc<Connection>,
+        engine: Arc<dyn Engine>,
         receiver: UnboundedReceiver<UdevEngineEvent>,
-        sender: UnboundedSender<DbusAction>,
+        counter: Arc<AtomicU64>,
     ) -> Self {
         UdevHandler {
-            _connection: connection,
-            _receiver: receiver,
-            _sender: sender,
+            connection,
+            engine,
+            receiver,
+            counter,
         }
     }
 
-    pub async fn register_pool(&self, _name: &Name, _uuid: PoolUuid, _pool: &dyn Pool) {}
+    pub async fn process_udev_events(&mut self) -> StratisResult<()> {
+        let mut events = Vec::new();
+        events.push(self.receiver.recv().await.ok_or_else(|| {
+            StratisError::Msg("Channel from udev handler to D-Bus handler was shut".to_string())
+        })?);
 
-    pub async fn handle_udev_event(&mut self) -> StratisResult<()> {
-        pending().await
+        while let Ok(event) = self.receiver.try_recv() {
+            events.push(event);
+        }
+
+        let (pool_infos, _) = self.engine.handle_events(events).await;
+        for guard in pool_infos {
+            let (_, pool_uuid, _) = guard.as_tuple();
+            if let Err(e) = self.register_pool(pool_uuid).await {
+                warn!("Failed to register pool: {e}");
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn register_pool(&self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        register_pool(&self.engine, &self.connection, &self.counter, pool_uuid).await?;
+        Ok(())
     }
 }

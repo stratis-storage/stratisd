@@ -22,7 +22,7 @@ use tokio::{
 use nix::unistd::getpid;
 
 #[cfg(feature = "dbus_enabled")]
-use crate::dbus::DbusAction;
+use crate::dbus::create_dbus_handler;
 use crate::{
     engine::{
         create_process_keyring, register_clevis_token, set_up_crypt_logging,
@@ -97,29 +97,33 @@ pub fn run(sim: bool) -> StratisResult<()> {
             let (trigger, should_exit) = channel(1);
             let (udev_sender, udev_receiver) = unbounded_channel::<UdevEngineEvent>();
             #[cfg(feature = "dbus_enabled")]
-            let (dbus_sender, dbus_receiver) = unbounded_channel::<DbusAction>();
+            let (connection, udev) = create_dbus_handler(Arc::clone(&engine), udev_receiver).await?;
 
             let join_udev = udev_thread(udev_sender, should_exit);
+            #[cfg(feature = "dbus_enabled")]
+            let join_ipc = setup(
+                Arc::clone(&engine),
+                udev
+            );
+            #[cfg(not(feature = "dbus_enabled"))]
             let join_ipc = setup(
                 Arc::clone(&engine),
                 udev_receiver,
-                #[cfg(feature = "dbus_enabled")]
-                (dbus_sender.clone(), dbus_receiver),
             );
             let join_signal = signal_thread();
             let join_dm = dm_event_thread(
+                #[cfg(feature = "dbus_enabled")]
+                Arc::clone(&connection),
                 if sim {
                     None
                 } else {
                     Some(Arc::clone(&engine) as Arc<dyn Engine>)
                 },
-                #[cfg(feature = "dbus_enabled")]
-                dbus_sender.clone(),
             );
             let join_timer = run_timers(
-                Arc::clone(&engine),
                 #[cfg(feature = "dbus_enabled")]
-                dbus_sender,
+                connection,
+                Arc::clone(&engine),
             );
             let vks = load_vks(engine, key_recv);
 

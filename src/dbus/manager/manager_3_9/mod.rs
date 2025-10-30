@@ -7,19 +7,21 @@ use std::{
     sync::{atomic::AtomicU64, Arc},
 };
 
+use tokio::sync::RwLock;
 use zbus::{interface, zvariant::ObjectPath, Connection, Result};
 
 use crate::{
     dbus::{
         consts,
-        manager::{manager_3_0::version_prop, manager_3_8::create_pool_method},
+        manager::{manager_3_0::version_prop, manager_3_8::create_pool_method, Manager},
     },
-    engine::{Engine, KeyDescription},
+    engine::{Engine, KeyDescription, Lockable},
 };
 
 pub struct ManagerR9 {
     connection: Arc<Connection>,
     engine: Arc<dyn Engine>,
+    manager: Lockable<Arc<RwLock<Manager>>>,
     counter: Arc<AtomicU64>,
 }
 
@@ -27,11 +29,13 @@ impl ManagerR9 {
     pub fn new(
         engine: Arc<dyn Engine>,
         connection: Arc<Connection>,
+        manager: Lockable<Arc<RwLock<Manager>>>,
         counter: Arc<AtomicU64>,
     ) -> Self {
         ManagerR9 {
             connection,
             engine,
+            manager,
             counter,
         }
     }
@@ -39,11 +43,13 @@ impl ManagerR9 {
     pub async fn register(
         engine: &Arc<dyn Engine>,
         connection: &Arc<Connection>,
+        manager: &Lockable<Arc<RwLock<Manager>>>,
         counter: &Arc<AtomicU64>,
     ) -> Result<()> {
         let manager = Self::new(
             Arc::clone(engine),
             Arc::clone(connection),
+            manager.clone(),
             Arc::clone(counter),
         );
         connection
@@ -71,6 +77,7 @@ impl ManagerR9 {
         create_pool_method(
             &self.engine,
             &self.connection,
+            &self.manager,
             &self.counter,
             name,
             devs,

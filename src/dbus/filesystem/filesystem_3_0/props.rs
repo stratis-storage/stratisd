@@ -2,11 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-pub type FilesystemSpec<'a> = Vec<(&'a str, (bool, &'a str), (bool, &'a str))>;
+use crate::engine::{Filesystem, FilesystemUuid, Name};
 
-#[derive(Clone, Copy, Debug)]
-#[allow(non_camel_case_types)]
-pub enum DbusErrorEnum {
-    OK = 0,
-    ERROR = 1,
+pub fn name_prop(name: Name, _: FilesystemUuid, _: &dyn Filesystem) -> Name {
+    name
 }

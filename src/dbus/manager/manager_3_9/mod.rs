@@ -46,12 +46,7 @@ impl ManagerR9 {
         manager: Lockable<Arc<RwLock<Manager>>>,
         counter: Arc<AtomicU64>,
     ) -> Result<()> {
-        let manager = Self::new(
-            Arc::clone(connection),
-            Arc::clone(&engine),
-            manager,
-            counter,
-        );
+        let manager = Self::new(Arc::clone(connection), engine, manager, counter);
         connection
             .object_server()
             .at(consts::STRATIS_BASE_PATH, manager)

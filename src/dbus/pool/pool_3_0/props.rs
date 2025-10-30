@@ -2,17 +2,30 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::sync::Arc;
+use devicemapper::Bytes;
 
-use zbus::fdo::Error;
+use crate::{
+    dbus::util::option_to_tuple,
+    engine::{Name, Pool, PoolUuid, SomeLockReadGuard},
+};
 
-use crate::engine::{Engine, Name, PoolIdentifier, PoolUuid};
-
-pub async fn name_prop(engine: &Arc<dyn Engine>, uuid: PoolUuid) -> Result<Name, Error> {
-    let guard = engine
-        .get_pool(PoolIdentifier::Uuid(uuid))
-        .await
-        .ok_or_else(|| Error::Failed(format!("No pool associated with UUID {uuid}")))?;
+pub fn name_prop(guard: SomeLockReadGuard<PoolUuid, dyn Pool>) -> Name {
     let (name, _, _) = guard.as_tuple();
-    Ok(name)
+    name
+}
+
+pub fn size_prop(guard: SomeLockReadGuard<PoolUuid, dyn Pool>) -> String {
+    (*guard.total_physical_size()).to_string()
+}
+
+pub fn used_prop(guard: SomeLockReadGuard<PoolUuid, dyn Pool>) -> (bool, String) {
+    let (b, used) = option_to_tuple(
+        guard.total_physical_used().map(|s| s.bytes()),
+        Bytes::from(0u64),
+    );
+    (b, (*used).to_string())
+}
+
+pub fn allocated_prop(guard: SomeLockReadGuard<PoolUuid, dyn Pool>) -> String {
+    (*guard.total_allocated_size()).to_string()
 }

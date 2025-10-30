@@ -7,7 +7,10 @@ use std::sync::Arc;
 use zbus::{fdo::Error, interface, zvariant::ObjectPath, Connection};
 
 use crate::{
-    dbus::pool::pool_3_0::name_prop,
+    dbus::pool::{
+        pool_3_0::{allocated_prop, name_prop, size_prop, used_prop},
+        shared::{pool_prop, try_pool_prop},
+    },
     engine::{self, Engine, PoolUuid},
     stratis::StratisResult,
 };
@@ -51,6 +54,24 @@ impl PoolR9 {
     #[zbus(property(emits_changed_signal = "const"))]
     #[allow(non_snake_case)]
     async fn Name(&self) -> Result<engine::Name, Error> {
-        name_prop(&self.engine, self.uuid).await
+        pool_prop(&self.engine, self.uuid, name_prop).await
+    }
+
+    #[zbus(property(emits_changed_signal = "true"))]
+    #[allow(non_snake_case)]
+    async fn TotalPhysicalSize(&self) -> Result<String, Error> {
+        pool_prop(&self.engine, self.uuid, size_prop).await
+    }
+
+    #[zbus(property(emits_changed_signal = "true"))]
+    #[allow(non_snake_case)]
+    async fn TotalPhysicalUsed(&self) -> Result<(bool, String), Error> {
+        try_pool_prop(&self.engine, self.uuid, used_prop).await
+    }
+
+    #[zbus(property(emits_changed_signal = "true"))]
+    #[allow(non_snake_case)]
+    async fn AllocatedSize(&self) -> Result<String, Error> {
+        pool_prop(&self.engine, self.uuid, allocated_prop).await
     }
 }

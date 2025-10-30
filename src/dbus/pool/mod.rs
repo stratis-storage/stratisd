@@ -7,36 +7,42 @@ use std::sync::{
     Arc,
 };
 
-use zbus::{zvariant::ObjectPath, Connection};
+use tokio::sync::RwLock;
+use zbus::{
+    zvariant::{ObjectPath, OwnedObjectPath},
+    Connection,
+};
 
 use crate::{
-    dbus::consts,
-    engine::{Engine, PoolUuid},
+    dbus::{consts, Manager},
+    engine::{Engine, Lockable, PoolUuid},
     stratis::StratisResult,
 };
 
 mod pool_3_0;
 mod pool_3_9;
+mod shared;
 
 pub use pool_3_9::PoolR9;
 
 pub async fn register_pool<'a>(
     engine: &Arc<dyn Engine>,
     connection: &Arc<Connection>,
+    manager: &Lockable<Arc<RwLock<Manager>>>,
     counter: &Arc<AtomicU64>,
     pool_uuid: PoolUuid,
 ) -> StratisResult<(ObjectPath<'a>, Vec<ObjectPath<'a>>)> {
-    PoolR9::register(
-        engine,
-        connection,
-        ObjectPath::try_from(format!(
-            "{}/{}",
-            consts::STRATIS_BASE_PATH,
-            counter.fetch_add(1, Ordering::AcqRel),
-        ))?,
-        pool_uuid,
-    )
-    .await?;
+    let path = ObjectPath::try_from(format!(
+        "{}/{}",
+        consts::STRATIS_BASE_PATH,
+        counter.fetch_add(1, Ordering::AcqRel),
+    ))?;
+    PoolR9::register(engine, connection, path.clone(), pool_uuid).await?;
 
-    Ok((ObjectPath::default(), Vec::default()))
+    manager
+        .write()
+        .await
+        .add_pool(pool_uuid, OwnedObjectPath::from(path.clone()));
+
+    Ok((path, Vec::default()))
 }

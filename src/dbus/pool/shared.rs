@@ -8,15 +8,22 @@ use zbus::fdo::Error;
 
 use crate::engine::{Engine, Pool, PoolIdentifier, PoolUuid, SomeLockReadGuard};
 
+async fn get_pool(
+    engine: &Arc<dyn Engine>,
+    uuid: PoolUuid,
+) -> Result<SomeLockReadGuard<PoolUuid, dyn Pool>, Error> {
+    engine
+        .get_pool(PoolIdentifier::Uuid(uuid))
+        .await
+        .ok_or_else(|| Error::Failed(format!("No pool associated with UUID {uuid}")))
+}
+
 pub async fn pool_prop<R>(
     engine: &Arc<dyn Engine>,
     uuid: PoolUuid,
     f: impl Fn(SomeLockReadGuard<PoolUuid, dyn Pool>) -> R,
 ) -> Result<R, Error> {
-    let guard = engine
-        .get_pool(PoolIdentifier::Uuid(uuid))
-        .await
-        .ok_or_else(|| Error::Failed(format!("No pool associated with UUID {uuid}")))?;
+    let guard = get_pool(engine, uuid).await?;
 
     Ok(f(guard))
 }
@@ -26,10 +33,7 @@ pub async fn try_pool_prop<R>(
     uuid: PoolUuid,
     f: impl Fn(SomeLockReadGuard<PoolUuid, dyn Pool>) -> R,
 ) -> Result<R, Error> {
-    let guard = engine
-        .get_pool(PoolIdentifier::Uuid(uuid))
-        .await
-        .ok_or_else(|| Error::Failed(format!("No pool associated with UUID {uuid}")))?;
+    let guard = get_pool(engine, uuid).await?;
 
     Ok(f(guard))
 }

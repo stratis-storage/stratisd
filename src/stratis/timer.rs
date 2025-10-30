@@ -4,22 +4,29 @@
 
 use std::{sync::Arc, time::Duration};
 
+#[cfg(feature = "dbus_enabled")]
+use tokio::sync::RwLock;
 use tokio::{task::spawn, time::sleep};
 #[cfg(feature = "dbus_enabled")]
 use zbus::Connection;
 
 #[cfg(feature = "dbus_enabled")]
-use crate::dbus::{send_fs_background_signals, send_pool_background_signals};
+use crate::{
+    dbus::{send_fs_background_signals, send_pool_background_signals, Manager},
+    engine::Lockable,
+};
 use crate::{engine::Engine, stratis::errors::StratisResult};
 
 /// Runs checks on thin pool usage and filesystem usage to determine whether either
 /// need to be extended.
 async fn check_pool_and_fs(
     #[cfg(feature = "dbus_enabled")] connection: Arc<Connection>,
+    #[cfg(feature = "dbus_enabled")] manager: Lockable<Arc<RwLock<Manager>>>,
     engine: Arc<dyn Engine>,
 ) {
     async fn process_checks(
         #[cfg(feature = "dbus_enabled")] connection: &Arc<Connection>,
+        #[cfg(feature = "dbus_enabled")] manager: Lockable<Arc<RwLock<Manager>>>,
         engine: &Arc<dyn Engine>,
     ) -> StratisResult<()> {
         #[cfg(any(feature = "min", not(feature = "dbus_enabled")))]
@@ -30,11 +37,13 @@ async fn check_pool_and_fs(
         #[cfg(feature = "dbus_enabled")]
         {
             let pool_diffs = engine.pool_evented(None).await;
-            if let Err(e) = send_pool_background_signals(connection, pool_diffs) {
+            if let Err(e) =
+                send_pool_background_signals(manager.clone(), connection, pool_diffs).await
+            {
                 warn!("Failed to update D-Bus layer with changed engine properties: {e}");
             }
             let fs_diffs = engine.fs_evented(None).await;
-            if let Err(e) = send_fs_background_signals(connection, fs_diffs) {
+            if let Err(e) = send_fs_background_signals(manager, connection, fs_diffs).await {
                 warn!("Failed to update D-Bus layer with changed engine properties: {e}");
             }
         }
@@ -46,6 +55,8 @@ async fn check_pool_and_fs(
         if let Err(e) = process_checks(
             #[cfg(feature = "dbus_enabled")]
             &connection,
+            #[cfg(feature = "dbus_enabled")]
+            manager.clone(),
             &engine,
         )
         .await
@@ -62,11 +73,14 @@ async fn check_pool_and_fs(
 /// Currently runs a timer to check thin pool and filesystem usage.
 pub async fn run_timers(
     #[cfg(feature = "dbus_enabled")] connection: Arc<Connection>,
+    #[cfg(feature = "dbus_enabled")] manager: Lockable<Arc<RwLock<Manager>>>,
     engine: Arc<dyn Engine>,
 ) -> StratisResult<()> {
     spawn(check_pool_and_fs(
         #[cfg(feature = "dbus_enabled")]
         connection,
+        #[cfg(feature = "dbus_enabled")]
+        manager,
         engine,
     ))
     .await?;

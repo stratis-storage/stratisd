@@ -8,6 +8,7 @@ use std::{
 };
 
 use serde_json::{from_str, Value};
+use tokio::sync::RwLock;
 use zbus::{zvariant::ObjectPath, Connection};
 
 use devicemapper::Bytes;
@@ -15,12 +16,14 @@ use devicemapper::Bytes;
 use crate::{
     dbus::{
         consts::OK_STRING,
+        manager::Manager,
         pool::register_pool,
         types::DbusErrorEnum,
         util::{engine_to_dbus_err_tuple, tuple_to_option},
     },
     engine::{
         CreateAction, Engine, InputEncryptionInfo, IntegritySpec, IntegrityTagSpec, KeyDescription,
+        Lockable,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -29,6 +32,7 @@ use crate::{
 pub async fn create_pool_method<'a>(
     connection: &Arc<Connection>,
     engine: &Arc<dyn Engine>,
+    manager: &Lockable<Arc<RwLock<Manager>>>,
     counter: &Arc<AtomicU64>,
     name: &str,
     devs: Vec<PathBuf>,
@@ -100,7 +104,7 @@ pub async fn create_pool_method<'a>(
         .await
     {
         Ok(CreateAction::Created(uuid)) => {
-            match register_pool(connection, counter, Arc::clone(engine), uuid).await {
+            match register_pool(manager, connection, counter, Arc::clone(engine), uuid).await {
                 Ok(tuple) => (
                     (true, tuple),
                     DbusErrorEnum::OK as u16,

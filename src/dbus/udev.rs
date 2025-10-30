@@ -4,18 +4,19 @@
 
 use std::sync::{atomic::AtomicU64, Arc};
 
-use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::sync::{mpsc::UnboundedReceiver, RwLock};
 use zbus::Connection;
 
 use crate::{
-    dbus::pool::register_pool,
-    engine::{Engine, PoolUuid, UdevEngineEvent},
+    dbus::{manager::Manager, pool::register_pool},
+    engine::{Engine, Lockable, PoolUuid, UdevEngineEvent},
     stratis::{StratisError, StratisResult},
 };
 
 pub struct UdevHandler {
     connection: Arc<Connection>,
     engine: Arc<dyn Engine>,
+    manager: Lockable<Arc<RwLock<Manager>>>,
     receiver: UnboundedReceiver<UdevEngineEvent>,
     counter: Arc<AtomicU64>,
 }
@@ -24,12 +25,14 @@ impl UdevHandler {
     pub fn new(
         connection: Arc<Connection>,
         engine: Arc<dyn Engine>,
+        manager: Lockable<Arc<RwLock<Manager>>>,
         receiver: UnboundedReceiver<UdevEngineEvent>,
         counter: Arc<AtomicU64>,
     ) -> Self {
         UdevHandler {
             connection,
             engine,
+            manager,
             receiver,
             counter,
         }
@@ -58,6 +61,7 @@ impl UdevHandler {
 
     pub async fn register_pool(&self, pool_uuid: PoolUuid) -> StratisResult<()> {
         register_pool(
+            &self.manager,
             &self.connection,
             &self.counter,
             Arc::clone(&self.engine),

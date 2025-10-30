@@ -4,4 +4,4 @@
 
 mod props;
 
-pub use props::{name_prop, uuid_prop};
+pub use props::{allocated_prop, name_prop, size_prop, used_prop, uuid_prop};

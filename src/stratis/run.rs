@@ -97,7 +97,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
             let (trigger, should_exit) = channel(1);
             let (udev_sender, udev_receiver) = unbounded_channel::<UdevEngineEvent>();
             #[cfg(feature = "dbus_enabled")]
-            let (connection, udev) = create_dbus_handler(Arc::clone(&engine), udev_receiver).await?;
+            let (connection, udev, manager) = create_dbus_handler(Arc::clone(&engine), udev_receiver).await?;
 
             let join_udev = udev_thread(udev_sender, should_exit);
             #[cfg(feature = "dbus_enabled")]
@@ -114,6 +114,8 @@ pub fn run(sim: bool) -> StratisResult<()> {
             let join_dm = dm_event_thread(
                 #[cfg(feature = "dbus_enabled")]
                 Arc::clone(&connection),
+                #[cfg(feature = "dbus_enabled")]
+                manager.clone(),
                 if sim {
                     None
                 } else {
@@ -123,6 +125,8 @@ pub fn run(sim: bool) -> StratisResult<()> {
             let join_timer = run_timers(
                 #[cfg(feature = "dbus_enabled")]
                 connection,
+                #[cfg(feature = "dbus_enabled")]
+                manager.clone(),
                 Arc::clone(&engine),
             );
             let vks = load_vks(engine, key_recv);

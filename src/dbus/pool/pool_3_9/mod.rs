@@ -2,30 +2,46 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::sync::Arc;
+use std::sync::{atomic::AtomicU64, Arc};
 
+use tokio::sync::RwLock;
 use zbus::{fdo::Error, interface, zvariant::ObjectPath, Connection};
 
 use crate::{
-    dbus::pool::{
-        pool_3_0::{allocated_prop, name_prop, size_prop, used_prop},
-        shared::{pool_prop, try_pool_prop},
+    dbus::{
+        manager::Manager,
+        pool::{
+            pool_3_0::{allocated_prop, name_prop, size_prop, used_prop},
+            pool_3_6::create_filesystems_method,
+            shared::{pool_prop, try_pool_prop},
+        },
+        types::FilesystemSpec,
     },
-    engine::{self, Engine, PoolUuid},
+    engine::{self, Engine, Lockable, PoolUuid},
     stratis::StratisResult,
 };
 
 pub struct PoolR9 {
-    _connection: Arc<Connection>,
+    connection: Arc<Connection>,
     engine: Arc<dyn Engine>,
+    manager: Lockable<Arc<RwLock<Manager>>>,
+    counter: Arc<AtomicU64>,
     uuid: PoolUuid,
 }
 
 impl PoolR9 {
-    fn new(engine: Arc<dyn Engine>, connection: Arc<Connection>, uuid: PoolUuid) -> Self {
+    fn new(
+        engine: Arc<dyn Engine>,
+        connection: Arc<Connection>,
+        manager: Lockable<Arc<RwLock<Manager>>>,
+        counter: Arc<AtomicU64>,
+        uuid: PoolUuid,
+    ) -> Self {
         PoolR9 {
-            _connection: connection,
+            connection,
             engine,
+            manager,
+            counter,
             uuid,
         }
     }
@@ -33,10 +49,18 @@ impl PoolR9 {
     pub async fn register(
         engine: &Arc<dyn Engine>,
         connection: &Arc<Connection>,
+        manager: &Lockable<Arc<RwLock<Manager>>>,
+        counter: &Arc<AtomicU64>,
         path: ObjectPath<'_>,
         uuid: PoolUuid,
     ) -> StratisResult<()> {
-        let pool = Self::new(Arc::clone(engine), Arc::clone(connection), uuid);
+        let pool = Self::new(
+            Arc::clone(engine),
+            Arc::clone(connection),
+            manager.clone(),
+            Arc::clone(counter),
+            uuid,
+        );
 
         connection.object_server().at(path, pool).await?;
         Ok(())
@@ -45,6 +69,22 @@ impl PoolR9 {
 
 #[interface(name = "org.storage.stratis3.pool.r9")]
 impl PoolR9 {
+    #[allow(non_snake_case)]
+    async fn CreateFilesystems(
+        &self,
+        specs: FilesystemSpec<'_>,
+    ) -> ((bool, Vec<ObjectPath<'_>>), u16, String) {
+        create_filesystems_method(
+            &self.engine,
+            &self.connection,
+            &self.manager,
+            &self.counter,
+            self.uuid,
+            specs,
+        )
+        .await
+    }
+
     #[zbus(property(emits_changed_signal = "const"))]
     #[allow(non_snake_case)]
     fn Uuid(&self) -> PoolUuid {

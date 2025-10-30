@@ -11,12 +11,17 @@ use std::{
 };
 
 use nix::fcntl::{fcntl, FcntlArg, OFlag};
+#[cfg(feature = "dbus_enabled")]
+use tokio::sync::RwLock;
 use tokio::{io::unix::AsyncFd, task::spawn};
 #[cfg(feature = "dbus_enabled")]
 use zbus::Connection;
 
 #[cfg(feature = "dbus_enabled")]
-use crate::dbus::{send_fs_background_signals, send_pool_background_signals};
+use crate::{
+    dbus::{send_fs_background_signals, send_pool_background_signals, Manager},
+    engine::Lockable,
+};
 use crate::{
     engine::{get_dm, get_dm_init, Engine},
     stratis::errors::{StratisError, StratisResult},
@@ -30,10 +35,12 @@ const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 // to be ignored.
 pub async fn dm_event_thread(
     #[cfg(feature = "dbus_enabled")] connection: Arc<Connection>,
+    #[cfg(feature = "dbus_enabled")] manager: Lockable<Arc<RwLock<Manager>>>,
     engine: Option<Arc<dyn Engine>>,
 ) -> StratisResult<()> {
     async fn process_dm_event(
         #[cfg(feature = "dbus_enabled")] connection: &Arc<Connection>,
+        #[cfg(feature = "dbus_enabled")] manager: Lockable<Arc<RwLock<Manager>>>,
         engine: &Arc<dyn Engine>,
         fd: &AsyncFd<RawFd>,
     ) -> StratisResult<()> {
@@ -56,11 +63,13 @@ pub async fn dm_event_thread(
         #[cfg(feature = "dbus_enabled")]
         {
             let pool_diffs = engine.pool_evented(Some(&evented)).await;
-            if let Err(e) = send_pool_background_signals(connection, pool_diffs) {
+            if let Err(e) =
+                send_pool_background_signals(manager.clone(), connection, pool_diffs).await
+            {
                 warn!("Failed to update D-Bus layer with changed engine properties: {e}");
             }
             let fs_diffs = engine.fs_evented(Some(&evented)).await;
-            if let Err(e) = send_fs_background_signals(connection, fs_diffs) {
+            if let Err(e) = send_fs_background_signals(manager, connection, fs_diffs).await {
                 warn!("Failed to update D-Bus layer with changed engine properties: {e}");
             }
         }
@@ -77,6 +86,8 @@ pub async fn dm_event_thread(
                     if let Err(e) = process_dm_event(
                         #[cfg(feature = "dbus_enabled")]
                         &connection,
+                        #[cfg(feature = "dbus_enabled")]
+                        manager.clone(),
                         &engine,
                         &fd,
                     )

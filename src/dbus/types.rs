@@ -18,6 +18,8 @@ impl Type for Name {
     const SIGNATURE: &Signature = &Signature::Str;
 }
 
+pub type FilesystemSpec<'a> = Vec<(&'a str, (bool, &'a str), (bool, &'a str))>;
+
 #[derive(Clone, Copy, Debug)]
 #[allow(non_camel_case_types)]
 pub enum DbusErrorEnum {

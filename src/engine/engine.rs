@@ -163,12 +163,12 @@ pub trait Pool: Debug + Send + Sync {
     /// Returns an error if any of the specified names are already in use
     /// for filesystems in this pool. If the same name is passed multiple
     /// times, the size associated with the last item is used.
-    fn create_filesystems<'b>(
+    fn create_filesystems(
         &mut self,
         pool_name: &str,
         pool_uuid: PoolUuid,
-        specs: &[(&'b str, Option<Bytes>, Option<Bytes>)],
-    ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid, Sectors)>>;
+        specs: &[(&str, Option<Bytes>, Option<Bytes>)],
+    ) -> StratisResult<SetCreateAction<(Name, FilesystemUuid, Sectors)>>;
 
     /// Adds blockdevs specified by paths to pool.
     /// Returns a list of uuids corresponding to devices actually added.

@@ -224,12 +224,12 @@ impl Pool for SimPool {
         }
     }
 
-    fn create_filesystems<'b>(
+    fn create_filesystems(
         &mut self,
         _pool_name: &str,
         _pool_uuid: PoolUuid,
-        specs: &[(&'b str, Option<Bytes>, Option<Bytes>)],
-    ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid, Sectors)>> {
+        specs: &[(&str, Option<Bytes>, Option<Bytes>)],
+    ) -> StratisResult<SetCreateAction<(Name, FilesystemUuid, Sectors)>> {
         self.check_fs_limit(specs.len())?;
 
         let spec_map = validate_filesystem_size_specs(specs)?;
@@ -261,7 +261,7 @@ impl Pool for SimPool {
                 let new_filesystem = SimFilesystem::new(size, size_limit, None)?;
                 self.filesystems
                     .insert(Name::new((name).to_owned()), uuid, new_filesystem);
-                result.push((name, uuid, size));
+                result.push((Name::new(name.to_owned()), uuid, size));
             }
         }
 
@@ -1216,7 +1216,7 @@ mod tests {
             .unwrap()
             .changed()
             .unwrap();
-        let old_uuid = results.iter().find(|x| x.0 == old_name).unwrap().1;
+        let old_uuid = results.iter().find(|x| x.0.as_ref() == old_name).unwrap().1;
         assert_matches!(
             pool.rename_filesystem(pool_name, old_uuid, new_name),
             Err(_)
@@ -1355,7 +1355,7 @@ mod tests {
             .ok()
             .and_then(|fs| fs.changed())
         {
-            Some(names) => (names.len() == 1) & (names[0].0 == "name"),
+            Some(names) => (names.len() == 1) & (names[0].0.as_ref() == "name"),
             _ => false,
         });
     }
@@ -1409,7 +1409,7 @@ mod tests {
             .ok()
             .and_then(|fs| fs.changed())
         {
-            Some(names) => (names.len() == 1) & (names[0].0 == fs_name),
+            Some(names) => (names.len() == 1) & (names[0].0.as_ref() == fs_name),
             _ => false,
         });
     }

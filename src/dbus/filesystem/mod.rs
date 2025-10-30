@@ -15,43 +15,35 @@ use zbus::{
 
 use crate::{
     dbus::{consts, Manager},
-    engine::{Engine, Lockable, PoolUuid},
+    engine::{Engine, FilesystemUuid, Lockable, PoolUuid},
     stratis::StratisResult,
 };
 
-mod pool_3_0;
-mod pool_3_6;
-mod pool_3_9;
+mod filesystem_3_0;
+mod filesystem_3_9;
 mod shared;
 
-pub use pool_3_9::PoolR9;
+pub use filesystem_3_9::FilesystemR9;
 
-pub async fn register_pool<'a>(
+pub async fn register_filesystem<'a>(
     manager: &Lockable<Arc<RwLock<Manager>>>,
     connection: &Arc<Connection>,
     counter: &Arc<AtomicU64>,
     engine: Arc<dyn Engine>,
     pool_uuid: PoolUuid,
-) -> StratisResult<(ObjectPath<'a>, Vec<ObjectPath<'a>>)> {
+    uuid: FilesystemUuid,
+) -> StratisResult<ObjectPath<'a>> {
     let path = ObjectPath::try_from(format!(
         "{}/{}",
         consts::STRATIS_BASE_PATH,
         counter.fetch_add(1, Ordering::AcqRel),
     ))?;
-    PoolR9::register(
-        connection,
-        path.clone(),
-        engine,
-        manager.clone(),
-        Arc::clone(counter),
-        pool_uuid,
-    )
-    .await?;
+    FilesystemR9::register(connection, path.clone(), engine, pool_uuid, uuid).await?;
 
     manager
         .write()
         .await
-        .add_pool(pool_uuid, OwnedObjectPath::from(path.clone()));
+        .add_filesystem(uuid, OwnedObjectPath::from(path.clone()));
 
-    Ok((path, Vec::default()))
+    Ok(path)
 }

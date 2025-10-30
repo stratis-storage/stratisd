@@ -8,6 +8,16 @@ use zbus::{fdo::Error, zvariant::OwnedValue};
 
 use crate::engine::{Engine, Pool, PoolIdentifier, PoolUuid, SomeLockReadGuard};
 
+async fn get_pool(
+    engine: &Arc<dyn Engine>,
+    uuid: PoolUuid,
+) -> Result<SomeLockReadGuard<PoolUuid, dyn Pool>, Error> {
+    engine
+        .get_pool(PoolIdentifier::Uuid(uuid))
+        .await
+        .ok_or_else(|| Error::Failed(format!("No pool associated with UUID {uuid}")))
+}
+
 pub async fn pool_prop<R>(
     engine: &Arc<dyn Engine>,
     uuid: PoolUuid,
@@ -16,10 +26,7 @@ pub async fn pool_prop<R>(
 where
     OwnedValue: From<R>,
 {
-    let guard = engine
-        .get_pool(PoolIdentifier::Uuid(uuid))
-        .await
-        .ok_or_else(|| Error::Failed(format!("No pool associated with UUID {uuid}")))?;
+    let guard = get_pool(engine, uuid).await?;
 
     Ok(OwnedValue::from(f(guard)))
 }
@@ -32,10 +39,7 @@ pub async fn try_pool_prop<R>(
 where
     OwnedValue: TryFrom<R>,
 {
-    let guard = engine
-        .get_pool(PoolIdentifier::Uuid(uuid))
-        .await
-        .ok_or_else(|| Error::Failed(format!("No pool associated with UUID {uuid}")))?;
+    let guard = get_pool(engine, uuid).await?;
 
     OwnedValue::try_from(f(guard))
         .map_err(|_| Error::Failed("D-Bus data type conversion failed".to_string()))

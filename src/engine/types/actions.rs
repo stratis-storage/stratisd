@@ -14,7 +14,7 @@ use devicemapper::Sectors;
 
 use crate::engine::{
     engine::Filesystem,
-    types::{DevUuid, FilesystemUuid, PoolUuid},
+    types::{DevUuid, FilesystemUuid, Name, PoolUuid},
 };
 
 /// Return value indicating key operation
@@ -333,7 +333,7 @@ impl<T> EngineAction for SetCreateAction<T> {
     }
 }
 
-impl Display for SetCreateAction<(&str, FilesystemUuid, Sectors)> {
+impl Display for SetCreateAction<(Name, FilesystemUuid, Sectors)> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.changed.is_empty() {
             write!(

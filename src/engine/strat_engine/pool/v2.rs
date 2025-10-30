@@ -752,8 +752,8 @@ impl Pool for StratPool {
         &mut self,
         pool_name: &str,
         pool_uuid: PoolUuid,
-        specs: &[(&'a str, Option<Bytes>, Option<Bytes>)],
-    ) -> StratisResult<SetCreateAction<(&'a str, FilesystemUuid, Sectors)>> {
+        specs: &[(&str, Option<Bytes>, Option<Bytes>)],
+    ) -> StratisResult<SetCreateAction<(Name, FilesystemUuid, Sectors)>> {
         self.check_fs_limit(specs.len())?;
 
         let spec_map = validate_filesystem_size_specs(specs)?;
@@ -792,7 +792,7 @@ impl Pool for StratPool {
                 let fs_uuid = self
                     .thin_pool
                     .create_filesystem(pool_name, pool_uuid, name, size, size_limit)?;
-                result.push((name, fs_uuid, size));
+                result.push((Name::new(name.to_string()), fs_uuid, size));
             }
         }
 

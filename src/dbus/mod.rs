@@ -22,6 +22,7 @@ use crate::{
 mod macros;
 
 mod consts;
+mod filesystem;
 mod manager;
 mod pool;
 mod types;

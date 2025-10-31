@@ -785,11 +785,11 @@ dependencies = [
 
 [[package]]
 name = "libblkid-rs-sys"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a74d58a9c6e334aee5bfcce3a604d77fb3cca933205622035f6badc1ce67107"
+checksum = "5a49302d1b1c51dd61f0ae7bc3f3700ab812250866716013eb1b0921ba089476"
 dependencies = [
- "bindgen 0.71.1",
+ "bindgen 0.72.1",
  "cc",
  "pkg-config",
 ]

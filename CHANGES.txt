@@ -1,3 +1,27 @@
+stratisd 3.8.6
+==============
+Recommended Rust toolchain version: 1.90.0
+Recommended development platform for Python development: Fedora 41
+
+* Cherry-picked commits:
+  * Sort pools in report by pool UUID
+  * Remove redundant parentheses
+  * github actions: Update recommended Rust to 1.90.0
+  * Remove assertion that is not entailed
+  * Remove assertion that is not entailed
+  * Add option for capping lints to Makefile
+  * Require libatomic for pyright
+  * Stop checking rust dependency versions on Fedora 41
+  * Increase bindgen dependency lower bound to 0.72.0
+  * Use black profile instead of separate configuration keys
+  * Restrict src directories when formatting stratis-decode-dm
+  * Update generic-array to highest semantically compatible
+  * Increase actual loopdev-3 dependency version
+  * Increase actual libblkid-rs-sys dependency version
+  * Increase actual libcryptsetup-rs-sys dependency version
+  * Increase actual devicemapper-sys dependency version
+
+
 stratisd 3.8.5
 ==============
 Recommended Rust toolchain version: 1.89.0

@@ -77,7 +77,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-24.04
     container:
-      image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:42  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev
     steps:
       - name: Install dependencies for Fedora
@@ -117,7 +117,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-24.04
     container:
-      image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:42  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev --ipc=host
     steps:
       - name: Install dependencies for Fedora
@@ -169,7 +169,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-24.04
     container:
-      image: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:42  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev --ipc=host
     steps:
       - name: Install dependencies for Fedora

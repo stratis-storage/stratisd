@@ -18,6 +18,7 @@ use crate::{
         pool::{
             pool_3_0::{allocated_prop, name_prop, size_prop, used_prop, uuid_prop},
             pool_3_6::create_filesystems_method,
+            pool_3_9::{methods::encrypt_pool_method, props::last_reencrypted_timestamp_prop},
             shared::{pool_prop, try_pool_prop},
         },
         types::FilesystemSpec,
@@ -25,6 +26,9 @@ use crate::{
     engine::{Engine, Lockable, PoolUuid},
     stratis::StratisResult,
 };
+
+mod methods;
+mod props;
 
 pub struct PoolR9 {
     connection: Arc<Connection>,
@@ -84,6 +88,22 @@ impl PoolR9 {
         .await
     }
 
+    #[allow(non_snake_case)]
+    async fn EncryptPool(
+        &self,
+        key_desc_array: Vec<((bool, u32), &str)>,
+        clevis_array: Vec<((bool, u32), &str, &str)>,
+    ) -> (bool, u16, String) {
+        encrypt_pool_method(
+            &self.connection,
+            &self.engine,
+            self.uuid,
+            key_desc_array,
+            clevis_array,
+        )
+        .await
+    }
+
     #[zbus(property(emits_changed_signal = "const"))]
     #[allow(non_snake_case)]
     fn Uuid(&self) -> String {
@@ -112,5 +132,11 @@ impl PoolR9 {
     #[allow(non_snake_case)]
     async fn AllocatedSize(&self) -> Result<OwnedValue, Error> {
         pool_prop(&self.engine, self.uuid, allocated_prop).await
+    }
+
+    #[zbus(property(emits_changed_signal = "true"))]
+    #[allow(non_snake_case)]
+    async fn LastReencryptedTimestamp(&self) -> Result<OwnedValue, Error> {
+        try_pool_prop(&self.engine, self.uuid, last_reencrypted_timestamp_prop).await
     }
 }

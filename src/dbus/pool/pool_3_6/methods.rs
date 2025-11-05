@@ -4,7 +4,7 @@
 
 use std::sync::{atomic::AtomicU64, Arc};
 
-use tokio::sync::RwLock;
+use tokio::{sync::RwLock, task::spawn_blocking};
 use zbus::{zvariant::ObjectPath, Connection};
 
 use devicemapper::Bytes;
@@ -66,7 +66,7 @@ pub async fn create_filesystems_method<'a>(
         .get_mut_pool(PoolIdentifier::Uuid(pool_uuid))
         .await
         .ok_or_else(|| StratisError::Msg(format!("No pool associated with uuid {pool_uuid}")));
-    match tokio::task::spawn_blocking(move || {
+    match spawn_blocking(move || {
         let mut guard = guard_res?;
         let (name, _, pool) = guard.as_mut_tuple();
         pool.create_filesystems(

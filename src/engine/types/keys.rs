@@ -735,6 +735,20 @@ impl VolumeKeyKeyDescription {
 }
 
 /// Use Clevis or keyring to unlock LUKS volume.
+#[cfg(feature = "dbus_enabled")]
+#[derive(
+    Serialize, Deserialize, Clone, Copy, Eq, PartialEq, Debug, EnumString, VariantNames, Type, Value,
+)]
+#[zvariant(signature = "s")]
+#[strum(serialize_all = "snake_case")]
+pub enum UnlockMethod {
+    Clevis,
+    Keyring,
+    Any,
+}
+
+/// Use Clevis or keyring to unlock LUKS volume.
+#[cfg(not(feature = "dbus_enabled"))]
 #[derive(Serialize, Deserialize, Clone, Copy, Eq, PartialEq, Debug, EnumString, VariantNames)]
 #[strum(serialize_all = "snake_case")]
 pub enum UnlockMethod {

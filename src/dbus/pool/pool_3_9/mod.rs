@@ -65,6 +65,14 @@ impl PoolR9 {
         connection.object_server().at(path, pool).await?;
         Ok(())
     }
+
+    pub async fn unregister(
+        connection: &Arc<Connection>,
+        path: ObjectPath<'_>,
+    ) -> StratisResult<()> {
+        connection.object_server().remove::<PoolR9, _>(path).await?;
+        Ok(())
+    }
 }
 
 #[interface(name = "org.storage.stratis3.pool.r9")]

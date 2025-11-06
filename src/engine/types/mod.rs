@@ -57,13 +57,7 @@ mod keys;
 
 macro_rules! uuid {
     ($vis:vis $ident:ident) => {
-        #[cfg(feature = "dbus_enabled")]
-        #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Deserialize, Serialize, zbus::zvariant::Type)]
-        #[zvariant(signature = "s")]
-        $vis struct $ident(pub uuid::Uuid);
-
-        #[cfg(not(feature = "dbus_enabled"))]
-        #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Deserialize, Serialize)]
+        #[derive(Copy, Clone, Debug, Default, Hash, Eq, PartialEq, Deserialize, Serialize)]
         $vis struct $ident(pub uuid::Uuid);
 
         impl $ident {
@@ -95,13 +89,6 @@ macro_rules! uuid {
         }
 
         impl $crate::engine::types::AsUuid for $ident {}
-
-        #[cfg(feature = "dbus_enabled")]
-        impl<'a> From<$ident> for zbus::zvariant::Value<'a> {
-            fn from(uuid: $ident) -> Self {
-                zbus::zvariant::Value::from(uuid.simple().to_string())
-            }
-        }
     }
 }
 

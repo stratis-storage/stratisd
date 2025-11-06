@@ -8,15 +8,33 @@ use std::{
 };
 
 use tokio::sync::RwLock;
-use zbus::{interface, zvariant::ObjectPath, Connection, Result};
+use zbus::{
+    interface,
+    zvariant::{Fd, ObjectPath, OwnedObjectPath},
+    Connection, Result,
+};
 
 use crate::{
     dbus::{
         consts,
-        manager::{manager_3_0::version_prop, manager_3_8::create_pool_method, Manager},
+        manager::Manager,
+        manager::{
+            manager_3_0::{
+                destroy_pool_method, list_keys_method, set_key_method, unset_key_method,
+                version_prop,
+            },
+            manager_3_2::refresh_state_method,
+            manager_3_6::stop_pool_method,
+            manager_3_8::{create_pool_method, stopped_pools_prop},
+        },
+        types,
     },
-    engine::{Engine, KeyDescription, Lockable},
+    engine::{Engine, KeyDescription, Lockable, StoppedPoolsInfo},
 };
+
+mod methods;
+
+pub use methods::start_pool_method;
 
 pub struct ManagerR9 {
     connection: Arc<Connection>,
@@ -62,9 +80,35 @@ impl ManagerR9 {
 
 #[interface(name = "org.storage.stratis3.Manager.r9")]
 impl ManagerR9 {
-    #[allow(non_snake_case)]
+    #[zbus(property(emits_changed_signal = "const"))]
+    #[allow(clippy::unused_self)]
+    fn version(&self) -> &str {
+        version_prop()
+    }
+
+    #[zbus(property(emits_changed_signal = "true"))]
+    async fn stopped_pools(&self) -> types::ManagerR8<StoppedPoolsInfo> {
+        stopped_pools_prop(&self.engine).await
+    }
+
+    async fn list_keys(&self) -> (Vec<KeyDescription>, u16, String) {
+        list_keys_method(&self.engine).await
+    }
+
+    async fn set_key(
+        &self,
+        key_desc: KeyDescription,
+        key_fd: Fd<'_>,
+    ) -> ((bool, bool), u16, String) {
+        set_key_method(&self.engine, &key_desc, key_fd).await
+    }
+
+    async fn unset_key(&self, key_desc: KeyDescription) -> (bool, u16, String) {
+        unset_key_method(&self.engine, &key_desc).await
+    }
+
     #[allow(clippy::too_many_arguments)]
-    async fn CreatePool(
+    async fn create_pool(
         &self,
         name: &str,
         devs: Vec<PathBuf>,
@@ -73,7 +117,7 @@ impl ManagerR9 {
         journal_size: (bool, u64),
         tag_spec: (bool, &str),
         allocate_superblock: (bool, bool),
-    ) -> ((bool, (ObjectPath<'_>, Vec<ObjectPath<'_>>)), u16, String) {
+    ) -> ((bool, (OwnedObjectPath, Vec<OwnedObjectPath>)), u16, String) {
         create_pool_method(
             &self.engine,
             &self.connection,
@@ -90,10 +134,44 @@ impl ManagerR9 {
         .await
     }
 
-    #[zbus(property(emits_changed_signal = "const"))]
-    #[allow(non_snake_case)]
-    #[allow(clippy::unused_self)]
-    fn Version(&self) -> &str {
-        version_prop()
+    async fn destroy_pool(&self, pool: ObjectPath<'_>) -> ((bool, String), u16, String) {
+        destroy_pool_method(&self.engine, &self.connection, &self.manager, pool).await
+    }
+
+    async fn start_pool(
+        &self,
+        id: &str,
+        id_type: &str,
+        unlock_method: (bool, (bool, u32)),
+        key_fd: (bool, Fd<'_>),
+        remove_cache: bool,
+    ) -> (
+        (
+            bool,
+            (OwnedObjectPath, Vec<OwnedObjectPath>, Vec<OwnedObjectPath>),
+        ),
+        u16,
+        String,
+    ) {
+        start_pool_method(
+            &self.engine,
+            &self.connection,
+            &self.manager,
+            &self.counter,
+            id,
+            id_type,
+            unlock_method,
+            key_fd,
+            remove_cache,
+        )
+        .await
+    }
+
+    async fn stop_pool(&self, id: &str, id_type: &str) -> ((bool, String), u16, String) {
+        stop_pool_method(&self.engine, &self.connection, &self.manager, id, id_type).await
+    }
+
+    async fn refresh_state(&self) -> (u16, String) {
+        refresh_state_method(&self.engine).await
     }
 }

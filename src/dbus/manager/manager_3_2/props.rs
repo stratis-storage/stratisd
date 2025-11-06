@@ -5,14 +5,12 @@
 use std::sync::Arc;
 
 use crate::{
-    engine::{Engine, LockedPoolsInfo},
-    stratis::VERSION,
+    dbus::types::ManagerR2,
+    engine::{Engine, StoppedPoolsInfo},
 };
 
-pub fn version_prop() -> &'static str {
-    VERSION
-}
-
-pub async fn locked_pools_prop(engine: &Arc<dyn Engine>) -> LockedPoolsInfo {
-    engine.locked_pools().await
+pub async fn stopped_pools_prop(engine: &Arc<dyn Engine>) -> ManagerR2<StoppedPoolsInfo> {
+    ManagerR2 {
+        inner: engine.stopped_pools().await,
+    }
 }

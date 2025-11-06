@@ -291,7 +291,7 @@ impl<B> ThinPool<B> {
                 );
             } else {
                 info!(
-                    "Status of thinpool device with \"{}\" changed from \"{}\" to \"{}\"",
+                    "Status of thinpool device with \"{}\" transmogrified from \"{}\" to \"{}\"",
                     thin_pool_identifiers(&self.thin_pool),
                     current_status_str,
                     new_status

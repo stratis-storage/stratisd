@@ -4,18 +4,14 @@
 
 use std::{
     os::fd::AsRawFd,
-    path::PathBuf,
     sync::{atomic::AtomicU64, Arc},
 };
 
-use serde_json::{from_str, Value};
 use tokio::sync::RwLock;
 use zbus::{
     zvariant::{Fd, OwnedObjectPath},
     Connection,
 };
-
-use devicemapper::Bytes;
 
 use crate::{
     dbus::{
@@ -29,119 +25,8 @@ use crate::{
             tuple_to_option,
         },
     },
-    engine::{
-        CreateAction, Engine, InputEncryptionInfo, IntegritySpec, IntegrityTagSpec, KeyDescription,
-        Lockable, Name, PoolIdentifier, PoolUuid, StartAction, TokenUnlockMethod,
-    },
-    stratis::{StratisError, StratisResult},
+    engine::{Engine, Lockable, Name, PoolIdentifier, PoolUuid, StartAction, TokenUnlockMethod},
 };
-
-#[allow(clippy::too_many_arguments)]
-pub async fn create_pool_method(
-    engine: &Arc<dyn Engine>,
-    connection: &Arc<Connection>,
-    manager: &Lockable<Arc<RwLock<Manager>>>,
-    counter: &Arc<AtomicU64>,
-    name: &str,
-    devs: Vec<PathBuf>,
-    key_desc: Vec<((bool, u32), KeyDescription)>,
-    clevis_info: Vec<((bool, u32), &str, &str)>,
-    journal_size: (bool, u64),
-    tag_spec: (bool, &str),
-    allocate_superblock: (bool, bool),
-) -> ((bool, (OwnedObjectPath, Vec<OwnedObjectPath>)), u16, String) {
-    let default_return = (false, (OwnedObjectPath::default(), Vec::new()));
-
-    let devs_ref = devs.iter().map(|path| path.as_path()).collect::<Vec<_>>();
-    let key_desc = key_desc
-        .into_iter()
-        .map(|(tup, kd)| (tuple_to_option(tup), kd))
-        .collect::<Vec<_>>();
-    let clevis_info = match clevis_info.into_iter().try_fold::<_, _, StratisResult<_>>(
-        Vec::new(),
-        |mut vec, (tup, s, json)| {
-            vec.push((
-                tuple_to_option(tup),
-                (
-                    s.to_string(),
-                    from_str::<Value>(json).map_err(StratisError::from)?,
-                ),
-            ));
-            Ok(vec)
-        },
-    ) {
-        Ok(ci) => ci,
-        Err(e) => {
-            let (rc, rs) = engine_to_dbus_err_tuple(&e);
-            return (default_return, rc, rs);
-        }
-    };
-    let iei = match InputEncryptionInfo::new(key_desc, clevis_info) {
-        Ok(info) => info,
-        Err(e) => {
-            let (rc, rs) = engine_to_dbus_err_tuple(&e);
-            return (default_return, rc, rs);
-        }
-    };
-    let journal_size = tuple_to_option(journal_size).map(Bytes::from);
-    let tag_spec = match tuple_to_option(tag_spec)
-        .map(IntegrityTagSpec::try_from)
-        .transpose()
-    {
-        Ok(s) => s,
-        Err(e) => {
-            let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::Msg(format!(
-                "Failed to parse integrity tag specification: {e}"
-            )));
-            return (default_return, rc, rs);
-        }
-    };
-    let allocate_superblock = tuple_to_option(allocate_superblock);
-
-    match handle_action!(
-        engine
-            .create_pool(
-                name,
-                devs_ref.as_slice(),
-                iei.as_ref(),
-                IntegritySpec {
-                    journal_size,
-                    tag_spec,
-                    allocate_superblock,
-                },
-            )
-            .await
-    ) {
-        Ok(CreateAction::Created(uuid)) => {
-            match register_pool(engine, connection, manager, counter, uuid).await {
-                Ok((pool_path, fs_paths)) => (
-                    (
-                        true,
-                        (
-                            OwnedObjectPath::from(pool_path),
-                            fs_paths.into_iter().map(OwnedObjectPath::from).collect(),
-                        ),
-                    ),
-                    DbusErrorEnum::OK as u16,
-                    OK_STRING.to_string(),
-                ),
-                Err(e) => {
-                    let (rc, rs) = engine_to_dbus_err_tuple(&e);
-                    (default_return, rc, rs)
-                }
-            }
-        }
-        Ok(CreateAction::Identity) => (
-            default_return,
-            DbusErrorEnum::OK as u16,
-            OK_STRING.to_string(),
-        ),
-        Err(e) => {
-            let (rc, rs) = engine_to_dbus_err_tuple(&e);
-            (default_return, rc, rs)
-        }
-    }
-}
 
 #[allow(clippy::too_many_arguments)]
 pub async fn start_pool_method(
@@ -153,6 +38,7 @@ pub async fn start_pool_method(
     id_type: &str,
     unlock_method_tuple: (bool, (bool, u32)),
     key_fd: (bool, Fd<'_>),
+    remove_cache: bool,
 ) -> (
     (
         bool,
@@ -193,7 +79,7 @@ pub async fn start_pool_method(
                     tuple_to_option(unlock_method_tuple).map(tuple_to_option)
                 ),
                 key_fd_option.as_ref().map(|fd| fd.as_raw_fd()),
-                false
+                remove_cache,
             )
             .await
     ) {
@@ -230,10 +116,7 @@ pub async fn start_pool_method(
             }
             let (pool_path, dev_paths) =
                 match register_pool(engine, connection, manager, counter, pool_uuid).await {
-                    Ok((pp, dp)) => (
-                        OwnedObjectPath::from(pp),
-                        dp.into_iter().map(OwnedObjectPath::from).collect(),
-                    ),
+                    Ok(pp) => pp,
                     Err(e) => {
                         let (rc, rs) = engine_to_dbus_err_tuple(&e);
                         return (default_return, rc, rs);
@@ -246,7 +129,17 @@ pub async fn start_pool_method(
             send_stopped_pools_signals(connection).await;
 
             (
-                (true, (pool_path, dev_paths, fs_paths)),
+                (
+                    true,
+                    (
+                        OwnedObjectPath::from(pool_path),
+                        dev_paths
+                            .into_iter()
+                            .map(OwnedObjectPath::from)
+                            .collect::<Vec<_>>(),
+                        fs_paths,
+                    ),
+                ),
                 DbusErrorEnum::OK as u16,
                 OK_STRING.to_string(),
             )

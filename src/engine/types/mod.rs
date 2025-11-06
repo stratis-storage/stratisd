@@ -58,7 +58,7 @@ mod keys;
 macro_rules! uuid {
     ($vis:vis $ident:ident) => {
         #[cfg(feature = "dbus_enabled")]
-        #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Deserialize, Serialize, zbus::zvariant::Type)]
+        #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Default, Deserialize, Serialize, zbus::zvariant::Type)]
         #[zvariant(signature = "s")]
         $vis struct $ident(pub uuid::Uuid);
 

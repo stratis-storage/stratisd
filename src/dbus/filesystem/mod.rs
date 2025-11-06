@@ -8,10 +8,7 @@ use std::sync::{
 };
 
 use tokio::sync::RwLock;
-use zbus::{
-    zvariant::{ObjectPath, OwnedObjectPath},
-    Connection,
-};
+use zbus::{zvariant::ObjectPath, Connection};
 
 use crate::{
     dbus::{consts, Manager},
@@ -40,10 +37,7 @@ pub async fn register_filesystem<'a>(
     ))?;
     FilesystemR9::register(engine, connection, path.clone(), pool_uuid, uuid).await?;
 
-    manager
-        .write()
-        .await
-        .add_filesystem(uuid, OwnedObjectPath::from(path.clone()));
+    manager.write().await.add_filesystem(&path, uuid)?;
 
     Ok(path)
 }

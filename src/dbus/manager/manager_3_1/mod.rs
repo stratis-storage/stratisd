@@ -17,41 +17,30 @@ use zbus::{
 use crate::{
     dbus::{
         consts,
-        manager::Manager,
-        manager::{
-            manager_3_0::{
-                destroy_pool_method, list_keys_method, set_key_method, unset_key_method,
-                version_prop,
-            },
-            manager_3_2::refresh_state_method,
-            manager_3_6::stop_pool_method,
+        manager::manager_3_0::{
+            create_pool_method, destroy_pool_method, list_keys_method, locked_pools_prop,
+            set_key_method, unlock_pool_method, unset_key_method, version_prop,
         },
-        types,
+        manager::Manager,
     },
-    engine::{Engine, KeyDescription, Lockable, StoppedPoolsInfo},
+    engine::{DevUuid, Engine, KeyDescription, Lockable, LockedPoolsInfo, PoolUuid, UnlockMethod},
 };
 
-mod methods;
-mod props;
-
-pub use methods::{create_pool_method, start_pool_method};
-pub use props::stopped_pools_prop;
-
-pub struct ManagerR8 {
+pub struct ManagerR1 {
     connection: Arc<Connection>,
     engine: Arc<dyn Engine>,
     manager: Lockable<Arc<RwLock<Manager>>>,
     counter: Arc<AtomicU64>,
 }
 
-impl ManagerR8 {
+impl ManagerR1 {
     pub fn new(
         engine: Arc<dyn Engine>,
         connection: Arc<Connection>,
         manager: Lockable<Arc<RwLock<Manager>>>,
         counter: Arc<AtomicU64>,
     ) -> Self {
-        ManagerR8 {
+        ManagerR1 {
             connection,
             engine,
             manager,
@@ -79,8 +68,8 @@ impl ManagerR8 {
     }
 }
 
-#[interface(name = "org.storage.stratis3.Manager.r8")]
-impl ManagerR8 {
+#[interface(name = "org.storage.stratis3.Manager.r1")]
+impl ManagerR1 {
     #[zbus(property(emits_changed_signal = "const"))]
     #[allow(clippy::unused_self)]
     fn version(&self) -> &str {
@@ -88,8 +77,8 @@ impl ManagerR8 {
     }
 
     #[zbus(property(emits_changed_signal = "true"))]
-    async fn stopped_pools(&self) -> types::ManagerR8<StoppedPoolsInfo> {
-        stopped_pools_prop(&self.engine).await
+    async fn locked_pools(&self) -> LockedPoolsInfo {
+        locked_pools_prop(&self.engine).await
     }
 
     async fn list_keys(&self) -> (Vec<KeyDescription>, u16, String) {
@@ -112,12 +101,10 @@ impl ManagerR8 {
     async fn create_pool(
         &self,
         name: &str,
+        #[allow(unused_variables)] redundancy: (bool, u16),
         devs: Vec<PathBuf>,
-        key_desc: Vec<((bool, u32), KeyDescription)>,
-        clevis_info: Vec<((bool, u32), &str, &str)>,
-        journal_size: (bool, u64),
-        tag_spec: (bool, &str),
-        allocate_superblock: (bool, bool),
+        key_desc: (bool, KeyDescription),
+        clevis_info: (bool, (&str, &str)),
     ) -> ((bool, (OwnedObjectPath, Vec<OwnedObjectPath>)), u16, String) {
         create_pool_method(
             &self.engine,
@@ -128,9 +115,6 @@ impl ManagerR8 {
             devs,
             key_desc,
             clevis_info,
-            journal_size,
-            tag_spec,
-            allocate_superblock,
         )
         .await
     }
@@ -139,38 +123,11 @@ impl ManagerR8 {
         destroy_pool_method(&self.engine, &self.connection, &self.manager, pool).await
     }
 
-    async fn start_pool(
+    async fn unlock_pool(
         &self,
-        id: &str,
-        id_type: &str,
-        unlock_method: (bool, (bool, u32)),
-        key_fd: (bool, Fd<'_>),
-    ) -> (
-        (
-            bool,
-            (OwnedObjectPath, Vec<OwnedObjectPath>, Vec<OwnedObjectPath>),
-        ),
-        u16,
-        String,
-    ) {
-        start_pool_method(
-            &self.engine,
-            &self.connection,
-            &self.manager,
-            &self.counter,
-            id,
-            id_type,
-            unlock_method,
-            key_fd,
-        )
-        .await
-    }
-
-    async fn stop_pool(&self, id: &str, id_type: &str) -> ((bool, String), u16, String) {
-        stop_pool_method(&self.engine, &self.connection, &self.manager, id, id_type).await
-    }
-
-    async fn refresh_state(&self) -> (u16, String) {
-        refresh_state_method(&self.engine).await
+        pool_uuid: PoolUuid,
+        unlock_method: UnlockMethod,
+    ) -> ((bool, Vec<DevUuid>), u16, String) {
+        unlock_pool_method(&self.engine, &self.connection, pool_uuid, unlock_method).await
     }
 }

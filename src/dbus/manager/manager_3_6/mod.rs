@@ -20,38 +20,36 @@ use crate::{
         manager::Manager,
         manager::{
             manager_3_0::{
-                destroy_pool_method, list_keys_method, set_key_method, unset_key_method,
-                version_prop,
+                create_pool_method, destroy_pool_method, list_keys_method, set_key_method,
+                unset_key_method, version_prop,
             },
-            manager_3_2::refresh_state_method,
-            manager_3_6::stop_pool_method,
+            manager_3_2::{refresh_state_method, stopped_pools_prop},
+            manager_3_4::start_pool_method,
         },
         types,
     },
-    engine::{Engine, KeyDescription, Lockable, StoppedPoolsInfo},
+    engine::{Engine, KeyDescription, Lockable, StoppedPoolsInfo, UnlockMethod},
 };
 
 mod methods;
-mod props;
 
-pub use methods::{create_pool_method, start_pool_method};
-pub use props::stopped_pools_prop;
+pub use methods::stop_pool_method;
 
-pub struct ManagerR8 {
+pub struct ManagerR6 {
     connection: Arc<Connection>,
     engine: Arc<dyn Engine>,
     manager: Lockable<Arc<RwLock<Manager>>>,
     counter: Arc<AtomicU64>,
 }
 
-impl ManagerR8 {
+impl ManagerR6 {
     pub fn new(
         engine: Arc<dyn Engine>,
         connection: Arc<Connection>,
         manager: Lockable<Arc<RwLock<Manager>>>,
         counter: Arc<AtomicU64>,
     ) -> Self {
-        ManagerR8 {
+        ManagerR6 {
             connection,
             engine,
             manager,
@@ -79,8 +77,8 @@ impl ManagerR8 {
     }
 }
 
-#[interface(name = "org.storage.stratis3.Manager.r8")]
-impl ManagerR8 {
+#[interface(name = "org.storage.stratis3.Manager.r6")]
+impl ManagerR6 {
     #[zbus(property(emits_changed_signal = "const"))]
     #[allow(clippy::unused_self)]
     fn version(&self) -> &str {
@@ -88,7 +86,7 @@ impl ManagerR8 {
     }
 
     #[zbus(property(emits_changed_signal = "true"))]
-    async fn stopped_pools(&self) -> types::ManagerR8<StoppedPoolsInfo> {
+    async fn stopped_pools(&self) -> types::ManagerR2<StoppedPoolsInfo> {
         stopped_pools_prop(&self.engine).await
     }
 
@@ -113,11 +111,8 @@ impl ManagerR8 {
         &self,
         name: &str,
         devs: Vec<PathBuf>,
-        key_desc: Vec<((bool, u32), KeyDescription)>,
-        clevis_info: Vec<((bool, u32), &str, &str)>,
-        journal_size: (bool, u64),
-        tag_spec: (bool, &str),
-        allocate_superblock: (bool, bool),
+        key_desc: (bool, KeyDescription),
+        clevis_info: (bool, (&str, &str)),
     ) -> ((bool, (OwnedObjectPath, Vec<OwnedObjectPath>)), u16, String) {
         create_pool_method(
             &self.engine,
@@ -128,9 +123,6 @@ impl ManagerR8 {
             devs,
             key_desc,
             clevis_info,
-            journal_size,
-            tag_spec,
-            allocate_superblock,
         )
         .await
     }
@@ -143,8 +135,7 @@ impl ManagerR8 {
         &self,
         id: &str,
         id_type: &str,
-        unlock_method: (bool, (bool, u32)),
-        key_fd: (bool, Fd<'_>),
+        unlock_method: (bool, UnlockMethod),
     ) -> (
         (
             bool,
@@ -161,7 +152,6 @@ impl ManagerR8 {
             id,
             id_type,
             unlock_method,
-            key_fd,
         )
         .await
     }

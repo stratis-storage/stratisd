@@ -16,7 +16,7 @@ use zbus::{
 use crate::{
     dbus::{consts, Manager},
     engine::{Engine, Lockable, PoolUuid},
-    stratis::StratisResult,
+    stratis::{StratisError, StratisResult},
 };
 
 mod pool_3_0;
@@ -48,10 +48,23 @@ pub async fn register_pool<'a>(
     )
     .await?;
 
-    manager
-        .write()
-        .await
-        .add_pool(pool_uuid, OwnedObjectPath::from(path.clone()));
+    manager.write().await.add_pool(&path, pool_uuid);
 
     Ok((path, Vec::default()))
+}
+
+pub async fn unregister_pool(
+    manager: &Lockable<Arc<RwLock<Manager>>>,
+    connection: &Arc<Connection>,
+    path: ObjectPath<'_>,
+) -> StratisResult<PoolUuid> {
+    PoolR9::unregister(connection, path.clone()).await?;
+
+    let mut lock = manager.write().await;
+    let uuid = lock
+        .pool_get_uuid(&path)
+        .ok_or_else(|| StratisError::Msg(format!("No UUID associated with path {path}")))?;
+    lock.remove_pool(&OwnedObjectPath::from(path));
+
+    Ok(uuid)
 }

@@ -13,7 +13,7 @@ pub use crate::dbus::{
     util::{send_fs_background_signals, send_pool_background_signals},
 };
 use crate::{
-    dbus::manager::ManagerR9,
+    dbus::manager::register_manager,
     engine::{Engine, Lockable, UdevEngineEvent},
     stratis::StratisResult,
 };
@@ -41,7 +41,7 @@ pub async fn create_dbus_handler(
             .build()
             .await?,
     );
-    ManagerR9::register(
+    register_manager(
         &connection,
         Arc::clone(&engine),
         manager.clone(),

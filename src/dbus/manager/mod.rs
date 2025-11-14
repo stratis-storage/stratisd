@@ -21,10 +21,12 @@ use crate::{
 };
 
 mod manager_3_0;
+mod manager_3_1;
 mod manager_3_8;
 mod manager_3_9;
 
 pub use manager_3_0::ManagerR0;
+pub use manager_3_1::ManagerR1;
 pub use manager_3_9::ManagerR9;
 
 #[derive(Default)]
@@ -179,6 +181,7 @@ pub async fn register_manager(
     counter: &Arc<AtomicU64>,
 ) -> StratisResult<()> {
     ManagerR0::register(engine, connection, manager, counter).await?;
+    ManagerR1::register(engine, connection, manager, counter).await?;
     ManagerR9::register(engine, connection, manager, counter).await?;
     connection
         .object_server()

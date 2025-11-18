@@ -8,10 +8,15 @@ use zbus::zvariant::{signature::Child, Basic, Dict, Signature, Type, Value};
 
 use crate::{
     dbus::util::result_option_to_tuple,
-    engine::{LockedPoolsInfo, PoolUuid},
+    engine::{LockedPoolsInfo, PoolUuid, StoppedPoolsInfo},
 };
 
 pub type FilesystemSpec<'a> = Vec<(&'a str, (bool, &'a str), (bool, &'a str))>;
+
+/// Wrapper type indicating that the return value is being returned from Manager.r2
+pub struct ManagerR2<T> {
+    pub inner: T,
+}
 
 #[derive(Clone, Copy, Debug)]
 #[allow(non_camel_case_types)]
@@ -101,6 +106,106 @@ impl<'a> From<LockedPoolsInfo> for Value<'a> {
                 warn!("Failed to convert locked pool information to D-Bus format: {e}");
             }
         }
+        Value::from(top_level_dict)
+    }
+}
+
+fn stopped_pools_to_value<'b>(infos: &StoppedPoolsInfo) -> Dict<'b, 'b> {
+    let mut top_level_dict = Dict::new(
+        &Signature::Str,
+        &Signature::Dict {
+            key: Child::Static {
+                child: &Signature::Str,
+            },
+            value: Child::Static {
+                child: &Signature::Variant,
+            },
+        },
+    );
+    for (uuid, info) in infos
+        .stopped
+        .iter()
+        .chain(infos.partially_constructed.iter())
+    {
+        let mut dict = Dict::new(&Signature::Str, &Signature::Variant);
+        if let Some(enc_info) = info.info.as_ref() {
+            if let Err(e) = dict.add(
+                "key_description",
+                result_option_to_tuple(
+                    enc_info
+                        .key_description()
+                        .map(|opt| opt.map(|kd| kd.as_application_str().to_owned())),
+                    String::new(),
+                ),
+            ) {
+                warn!("Failed to convert locked pool information to D-Bus format: {e}");
+            };
+            if let Err(e) = dict.add(
+                "clevis_info",
+                result_option_to_tuple(
+                    enc_info
+                        .clevis_info()
+                        .map(|opt| opt.map(|(pin, value)| (pin.to_owned(), value.to_string()))),
+                    (String::new(), String::new()),
+                ),
+            ) {
+                warn!("Failed to convert locked pool information to D-Bus format: {e}");
+            };
+        }
+        if let Err(e) = dict.add(
+            "devs",
+            info.devices
+                .iter()
+                .map(|d| {
+                    let mut map = HashMap::new();
+                    map.insert(
+                        "devnode".to_string(),
+                        Value::from(d.devnode.display().to_string()),
+                    );
+                    map.insert("uuid".to_string(), Value::from(d.uuid));
+                    map
+                })
+                .collect::<Vec<_>>(),
+        ) {
+            warn!("Failed to convert locked pool information to D-Bus format: {e}");
+        };
+        if let Some(name) = infos.uuid_to_name.get(uuid) {
+            if let Err(e) = dict.add("name", Value::from(name.clone())) {
+                warn!("Failed to convert locked pool information to D-Bus format: {e}");
+            };
+        }
+        if let Err(e) = top_level_dict.add(*uuid, Value::Dict(dict)) {
+            warn!("Failed to convert locked pool information to D-Bus format: {e}");
+        }
+    }
+
+    top_level_dict
+}
+
+impl Type for ManagerR2<StoppedPoolsInfo> {
+    const SIGNATURE: &Signature = &Signature::Dict {
+        key: Child::Static {
+            child: &Signature::Str,
+        },
+        value: Child::Static {
+            child: &Signature::Dict {
+                key: Child::Static {
+                    child: &Signature::Str,
+                },
+                value: Child::Static {
+                    child: &Signature::Variant,
+                },
+            },
+        },
+    };
+}
+
+impl<'a> From<ManagerR2<StoppedPoolsInfo>> for Value<'a> {
+    fn from(wrapper: ManagerR2<StoppedPoolsInfo>) -> Self {
+        let infos = wrapper.inner;
+
+        let top_level_dict = stopped_pools_to_value(&infos);
+
         Value::from(top_level_dict)
     }
 }

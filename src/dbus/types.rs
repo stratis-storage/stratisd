@@ -18,6 +18,11 @@ pub struct ManagerR2<T> {
     pub inner: T,
 }
 
+/// Wrapper type indicating that the return value is being returned from Manager.r8
+pub struct ManagerR8<T> {
+    pub inner: T,
+}
+
 #[derive(Clone, Copy, Debug)]
 #[allow(non_camel_case_types)]
 pub enum DbusErrorEnum {
@@ -110,7 +115,7 @@ impl<'a> From<LockedPoolsInfo> for Value<'a> {
     }
 }
 
-fn stopped_pools_to_value<'b>(infos: &StoppedPoolsInfo) -> Dict<'b, 'b> {
+fn stopped_pools_to_value<'b>(infos: &StoppedPoolsInfo, metadata: bool) -> Dict<'b, 'b> {
     let mut top_level_dict = Dict::new(
         &Signature::Str,
         &Signature::Dict {
@@ -138,7 +143,7 @@ fn stopped_pools_to_value<'b>(infos: &StoppedPoolsInfo) -> Dict<'b, 'b> {
                     String::new(),
                 ),
             ) {
-                warn!("Failed to convert locked pool information to D-Bus format: {e}");
+                warn!("Failed to convert stopped pool information to D-Bus format: {e}");
             };
             if let Err(e) = dict.add(
                 "clevis_info",
@@ -149,7 +154,7 @@ fn stopped_pools_to_value<'b>(infos: &StoppedPoolsInfo) -> Dict<'b, 'b> {
                     (String::new(), String::new()),
                 ),
             ) {
-                warn!("Failed to convert locked pool information to D-Bus format: {e}");
+                warn!("Failed to convert stopped pool information to D-Bus format: {e}");
             };
         }
         if let Err(e) = dict.add(
@@ -167,15 +172,47 @@ fn stopped_pools_to_value<'b>(infos: &StoppedPoolsInfo) -> Dict<'b, 'b> {
                 })
                 .collect::<Vec<_>>(),
         ) {
-            warn!("Failed to convert locked pool information to D-Bus format: {e}");
+            warn!("Failed to convert stopped pool information to D-Bus format: {e}");
         };
         if let Some(name) = infos.uuid_to_name.get(uuid) {
             if let Err(e) = dict.add("name", Value::from(name.clone())) {
-                warn!("Failed to convert locked pool information to D-Bus format: {e}");
+                warn!("Failed to convert stopped pool information to D-Bus format: {e}");
+            };
+        }
+        if metadata {
+            if let Err(e) = dict.add(
+                "metadata_version".to_string(),
+                match info.metadata_version {
+                    Some(m) => Value::from((true, m as u64)),
+                    None => Value::from((false, 0)),
+                },
+            ) {
+                warn!("Failed to convert stopped pool information to D-Bus format: {e}");
+            };
+            if let Err(e) = dict.add(
+                "features".to_string(),
+                match info.features {
+                    Some(ref f) => {
+                        let mut feat = HashMap::new();
+                        if f.encryption {
+                            feat.insert("encryption".to_string(), true);
+                        }
+                        if f.key_description_enabled {
+                            feat.insert("key_description_present".to_string(), true);
+                        }
+                        if f.clevis_enabled {
+                            feat.insert("clevis_present".to_string(), true);
+                        }
+                        Value::from((true, feat))
+                    }
+                    None => Value::from((false, HashMap::<String, bool>::new())),
+                },
+            ) {
+                warn!("Failed to convert stopped pool information to D-Bus format: {e}");
             };
         }
         if let Err(e) = top_level_dict.add(*uuid, Value::Dict(dict)) {
-            warn!("Failed to convert locked pool information to D-Bus format: {e}");
+            warn!("Failed to convert stopped pool information to D-Bus format: {e}");
         }
     }
 
@@ -204,7 +241,35 @@ impl<'a> From<ManagerR2<StoppedPoolsInfo>> for Value<'a> {
     fn from(wrapper: ManagerR2<StoppedPoolsInfo>) -> Self {
         let infos = wrapper.inner;
 
-        let top_level_dict = stopped_pools_to_value(&infos);
+        let top_level_dict = stopped_pools_to_value(&infos, false);
+
+        Value::from(top_level_dict)
+    }
+}
+
+impl Type for ManagerR8<StoppedPoolsInfo> {
+    const SIGNATURE: &Signature = &Signature::Dict {
+        key: Child::Static {
+            child: &Signature::Str,
+        },
+        value: Child::Static {
+            child: &Signature::Dict {
+                key: Child::Static {
+                    child: &Signature::Str,
+                },
+                value: Child::Static {
+                    child: &Signature::Variant,
+                },
+            },
+        },
+    };
+}
+
+impl<'a> From<ManagerR8<StoppedPoolsInfo>> for Value<'a> {
+    fn from(wrapper: ManagerR8<StoppedPoolsInfo>) -> Self {
+        let infos = wrapper.inner;
+
+        let top_level_dict = stopped_pools_to_value(&infos, true);
 
         Value::from(top_level_dict)
     }

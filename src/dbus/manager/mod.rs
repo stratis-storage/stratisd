@@ -25,6 +25,7 @@ mod manager_3_1;
 mod manager_3_2;
 mod manager_3_3;
 mod manager_3_4;
+mod manager_3_5;
 mod manager_3_8;
 mod manager_3_9;
 
@@ -33,6 +34,7 @@ pub use manager_3_1::ManagerR1;
 pub use manager_3_2::ManagerR2;
 pub use manager_3_3::ManagerR3;
 pub use manager_3_4::ManagerR4;
+pub use manager_3_5::ManagerR5;
 pub use manager_3_9::ManagerR9;
 
 #[derive(Default)]
@@ -191,6 +193,7 @@ pub async fn register_manager(
     ManagerR2::register(engine, connection, manager, counter).await?;
     ManagerR3::register(engine, connection, manager, counter).await?;
     ManagerR4::register(engine, connection, manager, counter).await?;
+    ManagerR5::register(engine, connection, manager, counter).await?;
     ManagerR9::register(engine, connection, manager, counter).await?;
     connection
         .object_server()

@@ -17,6 +17,7 @@ use crate::{
         consts::STRATIS_BASE_PATH,
         manager::{
             Manager, ManagerR0, ManagerR1, ManagerR2, ManagerR3, ManagerR4, ManagerR5, ManagerR6,
+            ManagerR7,
         },
         pool::PoolR9,
         types::DbusErrorEnum,
@@ -188,6 +189,15 @@ pub async fn send_stopped_pools_signals(connection: &Arc<Connection>) -> Stratis
     let iface_ref = connection
         .object_server()
         .interface::<_, ManagerR6>(&path)
+        .await?;
+    let mut_iface_ref = iface_ref.get_mut().await;
+    mut_iface_ref
+        .stopped_pools_changed(iface_ref.signal_emitter())
+        .await?;
+
+    let iface_ref = connection
+        .object_server()
+        .interface::<_, ManagerR7>(&path)
         .await?;
     let mut_iface_ref = iface_ref.get_mut().await;
     mut_iface_ref

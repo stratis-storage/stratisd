@@ -15,7 +15,7 @@ use devicemapper::DmError;
 use crate::{
     dbus::{
         consts::STRATIS_BASE_PATH,
-        manager::{Manager, ManagerR0, ManagerR1, ManagerR2},
+        manager::{Manager, ManagerR0, ManagerR1, ManagerR2, ManagerR3},
         pool::PoolR9,
         types::DbusErrorEnum,
     },
@@ -150,6 +150,15 @@ pub async fn send_stopped_pools_signals(connection: &Arc<Connection>) -> Stratis
     let iface_ref = connection
         .object_server()
         .interface::<_, ManagerR2>(&path)
+        .await?;
+    let mut_iface_ref = iface_ref.get_mut().await;
+    mut_iface_ref
+        .stopped_pools_changed(iface_ref.signal_emitter())
+        .await?;
+
+    let iface_ref = connection
+        .object_server()
+        .interface::<_, ManagerR3>(&path)
         .await?;
     let mut_iface_ref = iface_ref.get_mut().await;
     mut_iface_ref

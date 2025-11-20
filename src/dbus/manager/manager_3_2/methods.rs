@@ -147,12 +147,6 @@ pub async fn stop_pool_method(
         }
     };
 
-    let send_locked_signal = engine
-        .get_pool(PoolIdentifier::Uuid(pool_uuid))
-        .await
-        .map(|g| g.is_encrypted())
-        .unwrap_or(false);
-
     let action = handle_action!(
         engine
             .stop_pool(PoolIdentifier::Uuid(pool_uuid), false)
@@ -166,7 +160,12 @@ pub async fn stop_pool_method(
         if let Err(e) = send_stopped_pools_signals(connection).await {
             warn!("Failed to send signals for changed properties for the Manager interfaces: {e}");
         }
-        if send_locked_signal {
+        let stopped_pools = engine.stopped_pools().await;
+        let stopped = stopped_pools
+            .stopped
+            .get(&pool_uuid)
+            .or_else(|| stopped_pools.partially_constructed.get(&pool_uuid));
+        if stopped.map(|s| s.info.is_some()).unwrap_or(false) {
             if let Err(e) = send_locked_pools_signals(connection).await {
                 warn!(
                     "Failed to send signals for changed properties for the Manager interfaces: {e}"

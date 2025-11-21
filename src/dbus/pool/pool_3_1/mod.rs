@@ -11,7 +11,7 @@ use tokio::sync::RwLock;
 use zbus::{
     fdo::Error,
     interface,
-    zvariant::{ObjectPath, OwnedObjectPath, Value},
+    zvariant::{ObjectPath, OwnedObjectPath},
     Connection,
 };
 
@@ -21,36 +21,30 @@ use crate::{
         pool::{
             pool_3_0::{
                 add_cache_devs_method, add_data_devs_method, allocated_prop,
-                avail_actions_property, destroy_filesystems_method, encrypted_prop,
-                has_cache_property, name_prop, set_name_method, size_prop,
-                snapshot_filesystem_method, used_prop,
-            },
-            pool_3_1::{
-                enable_overprovisioning_prop, fs_limit_prop, no_alloc_space_prop,
-                send_enable_overprovisioning_signal_on_change, send_fs_limit_signal_on_change,
-                set_enable_overprovisioning_prop, set_fs_limit_prop,
-            },
-            pool_3_3::grow_physical_device_method,
-            pool_3_5::init_cache_method,
-            pool_3_6::create_filesystems_method,
-            pool_3_7::{filesystem_metadata_method, metadata_method},
-            pool_3_8::{
-                bind_clevis_method, bind_keyring_method, clevis_infos_prop, free_token_slots_prop,
-                key_descs_prop, metadata_version_prop, rebind_clevis_method, rebind_keyring_method,
-                unbind_clevis_method, unbind_keyring_method, volume_key_loaded_prop,
+                avail_actions_property, bind_clevis_method, bind_keyring_method,
+                clevis_info_property, create_filesystems_method, destroy_filesystems_method,
+                encrypted_prop, has_cache_property, init_cache_method, key_description_property,
+                name_prop, rebind_clevis_method, rebind_keyring_method, set_name_method, size_prop,
+                snapshot_filesystem_method, unbind_clevis_method, unbind_keyring_method, used_prop,
             },
             shared::{pool_prop, set_pool_prop, try_pool_prop},
         },
-        types::FilesystemSpec,
     },
     engine::{
-        self, ActionAvailability, DevUuid, Engine, FilesystemUuid, KeyDescription, Lockable,
-        PoolUuid,
+        self, ActionAvailability, Engine, FilesystemUuid, KeyDescription, Lockable, PoolUuid,
     },
     stratis::StratisResult,
 };
 
-pub struct PoolR9 {
+mod props;
+
+pub use props::{
+    enable_overprovisioning_prop, fs_limit_prop, no_alloc_space_prop,
+    send_enable_overprovisioning_signal_on_change, send_fs_limit_signal_on_change,
+    set_enable_overprovisioning_prop, set_fs_limit_prop,
+};
+
+pub struct PoolR1 {
     connection: Arc<Connection>,
     engine: Arc<dyn Engine>,
     manager: Lockable<Arc<RwLock<Manager>>>,
@@ -58,7 +52,7 @@ pub struct PoolR9 {
     uuid: PoolUuid,
 }
 
-impl PoolR9 {
+impl PoolR1 {
     fn new(
         engine: Arc<dyn Engine>,
         connection: Arc<Connection>,
@@ -66,7 +60,7 @@ impl PoolR9 {
         counter: Arc<AtomicU64>,
         uuid: PoolUuid,
     ) -> Self {
-        PoolR9 {
+        PoolR1 {
             connection,
             engine,
             manager,
@@ -99,16 +93,16 @@ impl PoolR9 {
         connection: &Arc<Connection>,
         path: ObjectPath<'_>,
     ) -> StratisResult<()> {
-        connection.object_server().remove::<PoolR9, _>(path).await?;
+        connection.object_server().remove::<PoolR1, _>(path).await?;
         Ok(())
     }
 }
 
-#[interface(name = "org.storage.stratis3.pool.r9")]
-impl PoolR9 {
+#[interface(name = "org.storage.stratis3.pool.r1")]
+impl PoolR1 {
     async fn create_filesystems(
         &self,
-        specs: FilesystemSpec<'_>,
+        specs: Vec<(&str, (bool, &str))>,
     ) -> ((bool, Vec<(OwnedObjectPath, String)>), u16, String) {
         create_filesystems_method(
             &self.engine,
@@ -208,12 +202,7 @@ impl PoolR9 {
         .await
     }
 
-    async fn bind_clevis(
-        &self,
-        pin: String,
-        json: &str,
-        token_slot: (bool, u32),
-    ) -> (bool, u16, String) {
+    async fn bind_clevis(&self, pin: String, json: &str) -> (bool, u16, String) {
         bind_clevis_method(
             &self.engine,
             &self.connection,
@@ -221,97 +210,42 @@ impl PoolR9 {
             self.uuid,
             pin,
             json,
-            token_slot,
         )
         .await
     }
 
-    async fn bind_keyring(
-        &self,
-        key_desc: KeyDescription,
-        token_slot: (bool, u32),
-    ) -> (bool, u16, String) {
+    async fn bind_keyring(&self, key_desc: KeyDescription) -> (bool, u16, String) {
         bind_keyring_method(
             &self.engine,
             &self.connection,
             &self.manager,
             self.uuid,
             key_desc,
-            token_slot,
         )
         .await
     }
 
-    async fn rebind_clevis(&self, token_slot: (bool, u32)) -> (bool, u16, String) {
-        rebind_clevis_method(
-            &self.engine,
-            &self.connection,
-            &self.manager,
-            self.uuid,
-            token_slot,
-        )
-        .await
+    async fn rebind_clevis(&self) -> (bool, u16, String) {
+        rebind_clevis_method(&self.engine, &self.connection, &self.manager, self.uuid).await
     }
 
-    async fn rebind_keyring(
-        &self,
-        key_desc: KeyDescription,
-        token_slot: (bool, u32),
-    ) -> (bool, u16, String) {
+    async fn rebind_keyring(&self, key_desc: KeyDescription) -> (bool, u16, String) {
         rebind_keyring_method(
             &self.engine,
             &self.connection,
             &self.manager,
             self.uuid,
             key_desc,
-            token_slot,
         )
         .await
     }
 
-    async fn unbind_clevis(&self, token_slot: (bool, u32)) -> (bool, u16, String) {
-        unbind_clevis_method(
-            &self.engine,
-            &self.connection,
-            &self.manager,
-            self.uuid,
-            token_slot,
-        )
-        .await
+    async fn unbind_clevis(&self) -> (bool, u16, String) {
+        unbind_clevis_method(&self.engine, &self.connection, &self.manager, self.uuid).await
     }
 
-    async fn unbind_keyring(&self, token_slot: (bool, u32)) -> (bool, u16, String) {
-        unbind_keyring_method(
-            &self.engine,
-            &self.connection,
-            &self.manager,
-            self.uuid,
-            token_slot,
-        )
-        .await
-    }
-
-    async fn grow_physical_device(&self, dev: DevUuid) -> (bool, u16, String) {
-        grow_physical_device_method(
-            &self.engine,
-            &self.connection,
-            &self.manager,
-            self.uuid,
-            dev,
-        )
-        .await
-    }
-
-    async fn metadata(&self, current: bool) -> (String, u16, String) {
-        metadata_method(&self.engine, self.uuid, current).await
-    }
-
-    async fn filesystem_metadata(
-        &self,
-        fs_name: (bool, &str),
-        current: bool,
-    ) -> (String, u16, String) {
-        filesystem_metadata_method(&self.engine, self.uuid, fs_name, current).await
+    async fn unbind_keyring(&self) -> (bool, u16, String) {
+        unbind_keyring_method(&self.engine, &self.connection, &self.manager, self.uuid).await
     }
 
     #[zbus(property(emits_changed_signal = "const"))]
@@ -335,13 +269,13 @@ impl PoolR9 {
     }
 
     #[zbus(property(emits_changed_signal = "true"))]
-    async fn key_descriptions(&self) -> Result<Value<'_>, Error> {
-        pool_prop(&self.engine, self.uuid, key_descs_prop).await
+    async fn key_description(&self) -> Result<(bool, (bool, String)), Error> {
+        pool_prop(&self.engine, self.uuid, key_description_property).await
     }
 
     #[zbus(property(emits_changed_signal = "true"))]
-    async fn clevis_infos(&self) -> Result<Value<'_>, Error> {
-        pool_prop(&self.engine, self.uuid, clevis_infos_prop).await
+    async fn clevis_info(&self) -> Result<(bool, (bool, (String, String))), Error> {
+        pool_prop(&self.engine, self.uuid, clevis_info_property).await
     }
 
     #[zbus(property(emits_changed_signal = "true"))]
@@ -405,20 +339,5 @@ impl PoolR9 {
     #[zbus(property(emits_changed_signal = "true"))]
     async fn no_alloc_space(&self) -> Result<bool, Error> {
         pool_prop(&self.engine, self.uuid, no_alloc_space_prop).await
-    }
-
-    #[zbus(property(emits_changed_signal = "true"))]
-    async fn free_token_slots(&self) -> Result<(bool, u8), Error> {
-        pool_prop(&self.engine, self.uuid, free_token_slots_prop).await
-    }
-
-    #[zbus(property(emits_changed_signal = "false"))]
-    async fn volume_key_loaded(&self) -> Result<Value<'_>, Error> {
-        pool_prop(&self.engine, self.uuid, volume_key_loaded_prop).await
-    }
-
-    #[zbus(property(emits_changed_signal = "false"))]
-    async fn metadata_version(&self) -> Result<u64, Error> {
-        pool_prop(&self.engine, self.uuid, metadata_version_prop).await
     }
 }

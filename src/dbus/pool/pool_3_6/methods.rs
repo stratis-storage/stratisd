@@ -5,7 +5,7 @@
 use std::sync::{atomic::AtomicU64, Arc};
 
 use tokio::sync::RwLock;
-use zbus::{zvariant::ObjectPath, Connection};
+use zbus::{zvariant::OwnedObjectPath, Connection};
 
 use devicemapper::Bytes;
 
@@ -22,14 +22,14 @@ use crate::{
 };
 
 #[allow(clippy::too_many_arguments)]
-pub async fn create_filesystems_method<'a>(
+pub async fn create_filesystems_method(
     engine: &Arc<dyn Engine>,
     connection: &Arc<Connection>,
     manager: &Lockable<Arc<RwLock<Manager>>>,
     counter: &Arc<AtomicU64>,
     pool_uuid: PoolUuid,
     filesystems: FilesystemSpec<'_>,
-) -> ((bool, Vec<ObjectPath<'a>>), u16, String) {
+) -> ((bool, Vec<(OwnedObjectPath, String)>), u16, String) {
     let default_return = (false, (Vec::new()));
 
     let filesystem_specs = match filesystems
@@ -85,14 +85,14 @@ pub async fn create_filesystems_method<'a>(
             let mut object_paths = Vec::new();
             match changed.changed() {
                 Some(v) => {
-                    for (_, uuid, _) in v {
+                    for (name, uuid, _) in v {
                         match register_filesystem(
                             engine, connection, manager, counter, pool_uuid, uuid,
                         )
                         .await
                         {
                             Ok(path) => {
-                                object_paths.push(path);
+                                object_paths.push((OwnedObjectPath::from(path), name.to_string()));
                             }
                             Err(e) => {
                                 warn!("Failed to register the filesystem with the D-Bus: {e}; object may not be visible to clients");

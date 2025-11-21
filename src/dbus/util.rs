@@ -19,7 +19,7 @@ use crate::{
             Manager, ManagerR0, ManagerR1, ManagerR2, ManagerR3, ManagerR4, ManagerR5, ManagerR6,
             ManagerR7, ManagerR8, ManagerR9,
         },
-        pool::PoolR9,
+        pool::{PoolR0, PoolR1, PoolR2, PoolR3, PoolR4, PoolR5, PoolR6, PoolR7, PoolR8, PoolR9},
         types::DbusErrorEnum,
     },
     engine::{FilesystemUuid, Lockable, PoolDiff, PoolUuid, StratFilesystemDiff},
@@ -113,14 +113,86 @@ pub async fn send_pool_background_signals(
 ) {
     let dbus = manager.read().await;
     for (uuid, diff) in diffs {
+        let pool_path = match dbus.pool_get_path(&uuid) {
+            Some(path) => path,
+            None => {
+                warn!("No pool associated with UUID {uuid}, skipping background signals");
+                continue;
+            }
+        };
         if diff.thin_pool.allocated_size.changed().is_some() {
-            let pool_path = match dbus.pool_get_path(&uuid) {
-                Some(path) => path,
-                None => {
-                    warn!("No pool associated with UUID {uuid}, skipping allocated_size_changed signal");
-                    continue;
-                }
-            };
+            send_signal!(
+                connection,
+                PoolR0,
+                pool_path,
+                allocated_size_changed,
+                "allocated size",
+                "pool.r0"
+            );
+            send_signal!(
+                connection,
+                PoolR1,
+                pool_path,
+                allocated_size_changed,
+                "allocated size",
+                "pool.r1"
+            );
+            send_signal!(
+                connection,
+                PoolR2,
+                pool_path,
+                allocated_size_changed,
+                "allocated size",
+                "pool.r2"
+            );
+            send_signal!(
+                connection,
+                PoolR3,
+                pool_path,
+                allocated_size_changed,
+                "allocated size",
+                "pool.r3"
+            );
+            send_signal!(
+                connection,
+                PoolR4,
+                pool_path,
+                allocated_size_changed,
+                "allocated size",
+                "pool.r4"
+            );
+            send_signal!(
+                connection,
+                PoolR5,
+                pool_path,
+                allocated_size_changed,
+                "allocated size",
+                "pool.r5"
+            );
+            send_signal!(
+                connection,
+                PoolR6,
+                pool_path,
+                allocated_size_changed,
+                "allocated size",
+                "pool.r6"
+            );
+            send_signal!(
+                connection,
+                PoolR7,
+                pool_path,
+                allocated_size_changed,
+                "allocated size",
+                "pool.r7"
+            );
+            send_signal!(
+                connection,
+                PoolR8,
+                pool_path,
+                allocated_size_changed,
+                "allocated size",
+                "pool.r8"
+            );
             send_signal!(
                 connection,
                 PoolR9,
@@ -131,13 +203,78 @@ pub async fn send_pool_background_signals(
             );
         }
         if diff.thin_pool.used.changed().is_some() {
-            let pool_path = match dbus.pool_get_path(&uuid) {
-                Some(path) => path,
-                None => {
-                    warn!("No pool associated with UUID {uuid}, skipping total_physical_used_changed signal");
-                    continue;
-                }
-            };
+            send_signal!(
+                connection,
+                PoolR0,
+                pool_path,
+                total_physical_used_changed,
+                "total physical used",
+                "pool.r0"
+            );
+            send_signal!(
+                connection,
+                PoolR1,
+                pool_path,
+                total_physical_used_changed,
+                "total physical used",
+                "pool.r1"
+            );
+            send_signal!(
+                connection,
+                PoolR2,
+                pool_path,
+                total_physical_used_changed,
+                "total physical used",
+                "pool.r2"
+            );
+            send_signal!(
+                connection,
+                PoolR3,
+                pool_path,
+                total_physical_used_changed,
+                "total physical used",
+                "pool.r3"
+            );
+            send_signal!(
+                connection,
+                PoolR4,
+                pool_path,
+                total_physical_used_changed,
+                "total physical used",
+                "pool.r4"
+            );
+            send_signal!(
+                connection,
+                PoolR5,
+                pool_path,
+                total_physical_used_changed,
+                "total physical used",
+                "pool.r5"
+            );
+            send_signal!(
+                connection,
+                PoolR6,
+                pool_path,
+                total_physical_used_changed,
+                "total physical used",
+                "pool.r6"
+            );
+            send_signal!(
+                connection,
+                PoolR7,
+                pool_path,
+                total_physical_used_changed,
+                "total physical used",
+                "pool.r7"
+            );
+            send_signal!(
+                connection,
+                PoolR8,
+                pool_path,
+                total_physical_used_changed,
+                "total physical used",
+                "pool.r8"
+            );
             send_signal!(
                 connection,
                 PoolR9,
@@ -147,6 +284,416 @@ pub async fn send_pool_background_signals(
                 "pool.r9"
             );
         }
+        if diff.pool.out_of_alloc_space.changed().is_some() {
+            send_signal!(
+                connection,
+                PoolR1,
+                pool_path,
+                no_alloc_space_changed,
+                "no alloc space",
+                "pool.r1"
+            );
+            send_signal!(
+                connection,
+                PoolR2,
+                pool_path,
+                no_alloc_space_changed,
+                "no alloc space",
+                "pool.r2"
+            );
+            send_signal!(
+                connection,
+                PoolR3,
+                pool_path,
+                no_alloc_space_changed,
+                "no alloc space",
+                "pool.r3"
+            );
+            send_signal!(
+                connection,
+                PoolR4,
+                pool_path,
+                no_alloc_space_changed,
+                "no alloc space",
+                "pool.r4"
+            );
+            send_signal!(
+                connection,
+                PoolR5,
+                pool_path,
+                no_alloc_space_changed,
+                "no alloc space",
+                "pool.r5"
+            );
+            send_signal!(
+                connection,
+                PoolR6,
+                pool_path,
+                no_alloc_space_changed,
+                "no alloc space",
+                "pool.r6"
+            );
+            send_signal!(
+                connection,
+                PoolR7,
+                pool_path,
+                no_alloc_space_changed,
+                "no alloc space",
+                "pool.r7"
+            );
+            send_signal!(
+                connection,
+                PoolR8,
+                pool_path,
+                no_alloc_space_changed,
+                "no alloc space",
+                "pool.r8"
+            );
+            send_signal!(
+                connection,
+                PoolR9,
+                pool_path,
+                no_alloc_space_changed,
+                "no alloc space",
+                "pool.r9"
+            );
+        }
+    }
+}
+
+pub async fn send_pool_foreground_signals(
+    connection: &Arc<Connection>,
+    manager: &Lockable<Arc<RwLock<Manager>>>,
+    uuid: PoolUuid,
+    diff: PoolDiff,
+) {
+    let dbus = manager.read().await;
+    let pool_path = match dbus.pool_get_path(&uuid) {
+        Some(path) => path,
+        None => {
+            warn!("No pool associated with UUID {uuid}, skipping allocated_size_changed signal");
+            return;
+        }
+    };
+    if diff.thin_pool.allocated_size.changed().is_some() {
+        send_signal!(
+            connection,
+            PoolR0,
+            pool_path,
+            allocated_size_changed,
+            "allocated size",
+            "pool.r0"
+        );
+        send_signal!(
+            connection,
+            PoolR1,
+            pool_path,
+            allocated_size_changed,
+            "allocated size",
+            "pool.r1"
+        );
+        send_signal!(
+            connection,
+            PoolR2,
+            pool_path,
+            allocated_size_changed,
+            "allocated size",
+            "pool.r2"
+        );
+        send_signal!(
+            connection,
+            PoolR3,
+            pool_path,
+            allocated_size_changed,
+            "allocated size",
+            "pool.r3"
+        );
+        send_signal!(
+            connection,
+            PoolR4,
+            pool_path,
+            allocated_size_changed,
+            "allocated size",
+            "pool.r4"
+        );
+        send_signal!(
+            connection,
+            PoolR5,
+            pool_path,
+            allocated_size_changed,
+            "allocated size",
+            "pool.r5"
+        );
+        send_signal!(
+            connection,
+            PoolR6,
+            pool_path,
+            allocated_size_changed,
+            "allocated size",
+            "pool.r6"
+        );
+        send_signal!(
+            connection,
+            PoolR7,
+            pool_path,
+            allocated_size_changed,
+            "allocated size",
+            "pool.r7"
+        );
+        send_signal!(
+            connection,
+            PoolR8,
+            pool_path,
+            allocated_size_changed,
+            "allocated size",
+            "pool.r8"
+        );
+        send_signal!(
+            connection,
+            PoolR9,
+            pool_path,
+            allocated_size_changed,
+            "allocated size",
+            "pool.r9"
+        );
+    }
+    if diff.thin_pool.used.changed().is_some() {
+        send_signal!(
+            connection,
+            PoolR0,
+            pool_path,
+            total_physical_used_changed,
+            "total physical used",
+            "pool.r0"
+        );
+        send_signal!(
+            connection,
+            PoolR1,
+            pool_path,
+            total_physical_used_changed,
+            "total physical used",
+            "pool.r1"
+        );
+        send_signal!(
+            connection,
+            PoolR2,
+            pool_path,
+            total_physical_used_changed,
+            "total physical used",
+            "pool.r2"
+        );
+        send_signal!(
+            connection,
+            PoolR3,
+            pool_path,
+            total_physical_used_changed,
+            "total physical used",
+            "pool.r3"
+        );
+        send_signal!(
+            connection,
+            PoolR4,
+            pool_path,
+            total_physical_used_changed,
+            "total physical used",
+            "pool.r4"
+        );
+        send_signal!(
+            connection,
+            PoolR5,
+            pool_path,
+            total_physical_used_changed,
+            "total physical used",
+            "pool.r5"
+        );
+        send_signal!(
+            connection,
+            PoolR6,
+            pool_path,
+            total_physical_used_changed,
+            "total physical used",
+            "pool.r6"
+        );
+        send_signal!(
+            connection,
+            PoolR7,
+            pool_path,
+            total_physical_used_changed,
+            "total physical used",
+            "pool.r7"
+        );
+        send_signal!(
+            connection,
+            PoolR8,
+            pool_path,
+            total_physical_used_changed,
+            "total physical used",
+            "pool.r8"
+        );
+        send_signal!(
+            connection,
+            PoolR9,
+            pool_path,
+            total_physical_used_changed,
+            "total physical used",
+            "pool.r9"
+        );
+    }
+    if diff.pool.total_physical_size.changed().is_some() {
+        send_signal!(
+            connection,
+            PoolR0,
+            pool_path,
+            total_physical_size_changed,
+            "total physical size",
+            "pool.r0"
+        );
+        send_signal!(
+            connection,
+            PoolR1,
+            pool_path,
+            total_physical_size_changed,
+            "total physical size",
+            "pool.r1"
+        );
+        send_signal!(
+            connection,
+            PoolR2,
+            pool_path,
+            total_physical_size_changed,
+            "total physical size",
+            "pool.r2"
+        );
+        send_signal!(
+            connection,
+            PoolR3,
+            pool_path,
+            total_physical_size_changed,
+            "total physical size",
+            "pool.r3"
+        );
+        send_signal!(
+            connection,
+            PoolR4,
+            pool_path,
+            total_physical_size_changed,
+            "total physical size",
+            "pool.r4"
+        );
+        send_signal!(
+            connection,
+            PoolR5,
+            pool_path,
+            total_physical_size_changed,
+            "total physical size",
+            "pool.r5"
+        );
+        send_signal!(
+            connection,
+            PoolR6,
+            pool_path,
+            total_physical_size_changed,
+            "total physical size",
+            "pool.r6"
+        );
+        send_signal!(
+            connection,
+            PoolR7,
+            pool_path,
+            total_physical_size_changed,
+            "total physical size",
+            "pool.r7"
+        );
+        send_signal!(
+            connection,
+            PoolR8,
+            pool_path,
+            total_physical_size_changed,
+            "total physical size",
+            "pool.r8"
+        );
+        send_signal!(
+            connection,
+            PoolR9,
+            pool_path,
+            total_physical_size_changed,
+            "total physical size",
+            "pool.r9"
+        );
+    }
+    if diff.pool.out_of_alloc_space.changed().is_some() {
+        send_signal!(
+            connection,
+            PoolR1,
+            pool_path,
+            no_alloc_space_changed,
+            "no alloc space",
+            "pool.r1"
+        );
+        send_signal!(
+            connection,
+            PoolR2,
+            pool_path,
+            no_alloc_space_changed,
+            "no alloc space",
+            "pool.r2"
+        );
+        send_signal!(
+            connection,
+            PoolR3,
+            pool_path,
+            no_alloc_space_changed,
+            "no alloc space",
+            "pool.r3"
+        );
+        send_signal!(
+            connection,
+            PoolR4,
+            pool_path,
+            no_alloc_space_changed,
+            "no alloc space",
+            "pool.r4"
+        );
+        send_signal!(
+            connection,
+            PoolR5,
+            pool_path,
+            no_alloc_space_changed,
+            "no alloc space",
+            "pool.r5"
+        );
+        send_signal!(
+            connection,
+            PoolR6,
+            pool_path,
+            no_alloc_space_changed,
+            "no alloc space",
+            "pool.r6"
+        );
+        send_signal!(
+            connection,
+            PoolR7,
+            pool_path,
+            no_alloc_space_changed,
+            "no alloc space",
+            "pool.r7"
+        );
+        send_signal!(
+            connection,
+            PoolR8,
+            pool_path,
+            no_alloc_space_changed,
+            "no alloc space",
+            "pool.r8"
+        );
+        send_signal!(
+            connection,
+            PoolR9,
+            pool_path,
+            no_alloc_space_changed,
+            "no alloc space",
+            "pool.r9"
+        );
     }
 }
 
@@ -257,5 +804,531 @@ pub async fn send_stopped_pools_signals(connection: &Arc<Connection>) {
         stopped_pools_changed,
         "stopped pools",
         "Manager.r9"
+    );
+}
+
+pub async fn send_pool_name_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    send_signal!(connection, PoolR0, path, name_changed, "name", "pool.r0");
+    send_signal!(connection, PoolR1, path, name_changed, "name", "pool.r1");
+    send_signal!(connection, PoolR2, path, name_changed, "name", "pool.r2");
+    send_signal!(connection, PoolR3, path, name_changed, "name", "pool.r3");
+    send_signal!(connection, PoolR4, path, name_changed, "name", "pool.r4");
+    send_signal!(connection, PoolR5, path, name_changed, "name", "pool.r5");
+    send_signal!(connection, PoolR6, path, name_changed, "name", "pool.r6");
+    send_signal!(connection, PoolR7, path, name_changed, "name", "pool.r7");
+    send_signal!(connection, PoolR8, path, name_changed, "name", "pool.r8");
+    send_signal!(connection, PoolR9, path, name_changed, "name", "pool.r9");
+}
+
+pub async fn send_overprovisioning_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    send_signal!(
+        connection,
+        PoolR1,
+        path,
+        overprovisioning_changed,
+        "overprovisioning",
+        "pool.r1"
+    );
+    send_signal!(
+        connection,
+        PoolR2,
+        path,
+        overprovisioning_changed,
+        "overprovisioning",
+        "pool.r2"
+    );
+    send_signal!(
+        connection,
+        PoolR3,
+        path,
+        overprovisioning_changed,
+        "overprovisioning",
+        "pool.r3"
+    );
+    send_signal!(
+        connection,
+        PoolR4,
+        path,
+        overprovisioning_changed,
+        "overprovisioning",
+        "pool.r4"
+    );
+    send_signal!(
+        connection,
+        PoolR5,
+        path,
+        overprovisioning_changed,
+        "overprovisioning",
+        "pool.r5"
+    );
+    send_signal!(
+        connection,
+        PoolR6,
+        path,
+        overprovisioning_changed,
+        "overprovisioning",
+        "pool.r6"
+    );
+    send_signal!(
+        connection,
+        PoolR7,
+        path,
+        overprovisioning_changed,
+        "overprovisioning",
+        "pool.r7"
+    );
+    send_signal!(
+        connection,
+        PoolR8,
+        path,
+        overprovisioning_changed,
+        "overprovisioning",
+        "pool.r8"
+    );
+    send_signal!(
+        connection,
+        PoolR9,
+        path,
+        overprovisioning_changed,
+        "overprovisioning",
+        "pool.r9"
+    );
+}
+
+pub async fn send_fs_limit_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    send_signal!(
+        connection,
+        PoolR1,
+        path,
+        fs_limit_changed,
+        "filesystem limit",
+        "pool.r1"
+    );
+    send_signal!(
+        connection,
+        PoolR2,
+        path,
+        fs_limit_changed,
+        "filesystem limit",
+        "pool.r2"
+    );
+    send_signal!(
+        connection,
+        PoolR3,
+        path,
+        fs_limit_changed,
+        "filesystem limit",
+        "pool.r3"
+    );
+    send_signal!(
+        connection,
+        PoolR4,
+        path,
+        fs_limit_changed,
+        "filesystem limit",
+        "pool.r4"
+    );
+    send_signal!(
+        connection,
+        PoolR5,
+        path,
+        fs_limit_changed,
+        "filesystem limit",
+        "pool.r5"
+    );
+    send_signal!(
+        connection,
+        PoolR6,
+        path,
+        fs_limit_changed,
+        "filesystem limit",
+        "pool.r6"
+    );
+    send_signal!(
+        connection,
+        PoolR7,
+        path,
+        fs_limit_changed,
+        "filesystem limit",
+        "pool.r7"
+    );
+    send_signal!(
+        connection,
+        PoolR8,
+        path,
+        fs_limit_changed,
+        "filesystem limit",
+        "pool.r8"
+    );
+    send_signal!(
+        connection,
+        PoolR9,
+        path,
+        fs_limit_changed,
+        "filesystem limit",
+        "pool.r9"
+    );
+}
+
+pub async fn send_clevis_info_signal(
+    connection: &Arc<Connection>,
+    path: &ObjectPath<'_>,
+    lowest_token_slot: bool,
+) {
+    if lowest_token_slot {
+        send_signal!(
+            connection,
+            PoolR0,
+            path,
+            clevis_info_changed,
+            "clevis info",
+            "pool.r0"
+        );
+        send_signal!(
+            connection,
+            PoolR1,
+            path,
+            clevis_info_changed,
+            "clevis info",
+            "pool.r1"
+        );
+        send_signal!(
+            connection,
+            PoolR2,
+            path,
+            clevis_info_changed,
+            "clevis info",
+            "pool.r2"
+        );
+        send_signal!(
+            connection,
+            PoolR3,
+            path,
+            clevis_info_changed,
+            "clevis info",
+            "pool.r3"
+        );
+        send_signal!(
+            connection,
+            PoolR4,
+            path,
+            clevis_info_changed,
+            "clevis info",
+            "pool.r4"
+        );
+        send_signal!(
+            connection,
+            PoolR5,
+            path,
+            clevis_info_changed,
+            "clevis info",
+            "pool.r5"
+        );
+        send_signal!(
+            connection,
+            PoolR6,
+            path,
+            clevis_info_changed,
+            "clevis info",
+            "pool.r6"
+        );
+        send_signal!(
+            connection,
+            PoolR7,
+            path,
+            clevis_info_changed,
+            "clevis info",
+            "pool.r7"
+        );
+    }
+    send_signal!(
+        connection,
+        PoolR8,
+        path,
+        clevis_infos_changed,
+        "clevis infos",
+        "pool.r8"
+    );
+    send_signal!(
+        connection,
+        PoolR9,
+        path,
+        clevis_infos_changed,
+        "clevis infos",
+        "pool.r9"
+    );
+}
+
+pub async fn send_keyring_signal(
+    connection: &Arc<Connection>,
+    path: &ObjectPath<'_>,
+    lowest_token_slot: bool,
+) {
+    if lowest_token_slot {
+        send_signal!(
+            connection,
+            PoolR0,
+            path,
+            key_description_changed,
+            "key description",
+            "pool.r0"
+        );
+        send_signal!(
+            connection,
+            PoolR1,
+            path,
+            key_description_changed,
+            "key description",
+            "pool.r1"
+        );
+        send_signal!(
+            connection,
+            PoolR2,
+            path,
+            key_description_changed,
+            "key description",
+            "pool.r2"
+        );
+        send_signal!(
+            connection,
+            PoolR3,
+            path,
+            key_description_changed,
+            "key description",
+            "pool.r3"
+        );
+        send_signal!(
+            connection,
+            PoolR4,
+            path,
+            key_description_changed,
+            "key description",
+            "pool.r4"
+        );
+        send_signal!(
+            connection,
+            PoolR5,
+            path,
+            key_description_changed,
+            "key description",
+            "pool.r5"
+        );
+        send_signal!(
+            connection,
+            PoolR6,
+            path,
+            key_description_changed,
+            "key description",
+            "pool.r6"
+        );
+        send_signal!(
+            connection,
+            PoolR7,
+            path,
+            key_description_changed,
+            "key description",
+            "pool.r7"
+        );
+    }
+    send_signal!(
+        connection,
+        PoolR8,
+        path,
+        key_descriptions_changed,
+        "key descriptions",
+        "pool.r8"
+    );
+    send_signal!(
+        connection,
+        PoolR9,
+        path,
+        key_descriptions_changed,
+        "key descriptions",
+        "pool.r9"
+    );
+}
+
+pub async fn send_free_token_slots_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    send_signal!(
+        connection,
+        PoolR8,
+        path,
+        free_token_slots_changed,
+        "free token slots",
+        "pool.r8"
+    );
+    send_signal!(
+        connection,
+        PoolR9,
+        path,
+        free_token_slots_changed,
+        "free token slots",
+        "pool.r9"
+    );
+}
+
+pub async fn send_action_availability_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    send_signal!(
+        connection,
+        PoolR0,
+        path,
+        available_actions_changed,
+        "available actions",
+        "pool.r0"
+    );
+    send_signal!(
+        connection,
+        PoolR1,
+        path,
+        available_actions_changed,
+        "available actions",
+        "pool.r1"
+    );
+    send_signal!(
+        connection,
+        PoolR2,
+        path,
+        available_actions_changed,
+        "available actions",
+        "pool.r2"
+    );
+    send_signal!(
+        connection,
+        PoolR3,
+        path,
+        available_actions_changed,
+        "available actions",
+        "pool.r3"
+    );
+    send_signal!(
+        connection,
+        PoolR4,
+        path,
+        available_actions_changed,
+        "available actions",
+        "pool.r4"
+    );
+    send_signal!(
+        connection,
+        PoolR5,
+        path,
+        available_actions_changed,
+        "available actions",
+        "pool.r5"
+    );
+    send_signal!(
+        connection,
+        PoolR6,
+        path,
+        available_actions_changed,
+        "available actions",
+        "pool.r6"
+    );
+    send_signal!(
+        connection,
+        PoolR7,
+        path,
+        available_actions_changed,
+        "available actions",
+        "pool.r7"
+    );
+    send_signal!(
+        connection,
+        PoolR8,
+        path,
+        available_actions_changed,
+        "available actions",
+        "pool.r8"
+    );
+    send_signal!(
+        connection,
+        PoolR9,
+        path,
+        available_actions_changed,
+        "available actions",
+        "pool.r9"
+    );
+}
+
+pub async fn send_has_cache_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    send_signal!(
+        connection,
+        PoolR0,
+        path,
+        has_cache_changed,
+        "has cache",
+        "pool.r0"
+    );
+    send_signal!(
+        connection,
+        PoolR1,
+        path,
+        has_cache_changed,
+        "has cache",
+        "pool.r1"
+    );
+    send_signal!(
+        connection,
+        PoolR2,
+        path,
+        has_cache_changed,
+        "has cache",
+        "pool.r2"
+    );
+    send_signal!(
+        connection,
+        PoolR3,
+        path,
+        has_cache_changed,
+        "has cache",
+        "pool.r3"
+    );
+    send_signal!(
+        connection,
+        PoolR4,
+        path,
+        has_cache_changed,
+        "has cache",
+        "pool.r4"
+    );
+    send_signal!(
+        connection,
+        PoolR5,
+        path,
+        has_cache_changed,
+        "has cache",
+        "pool.r5"
+    );
+    send_signal!(
+        connection,
+        PoolR6,
+        path,
+        has_cache_changed,
+        "has cache",
+        "pool.r6"
+    );
+    send_signal!(
+        connection,
+        PoolR7,
+        path,
+        has_cache_changed,
+        "has cache",
+        "pool.r7"
+    );
+    send_signal!(
+        connection,
+        PoolR8,
+        path,
+        has_cache_changed,
+        "has cache",
+        "pool.r8"
+    );
+    send_signal!(
+        connection,
+        PoolR9,
+        path,
+        has_cache_changed,
+        "has cache",
+        "pool.r9"
     );
 }

@@ -301,7 +301,7 @@ impl Display for SetUnlockAction<DevUuid> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 /// An action which may create multiple things.
 pub struct SetCreateAction<T> {
     changed: Vec<T>,
@@ -730,6 +730,7 @@ impl<T> EngineAction for StopAction<T> {
 }
 
 /// Action indicating the result of growing a block device or block devices in a pool.
+#[derive(Clone)]
 pub enum GrowAction<T> {
     Identity,
     Grown(T),

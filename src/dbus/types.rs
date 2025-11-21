@@ -8,7 +8,7 @@ use zbus::zvariant::{signature::Child, Basic, Signature, Type, Value};
 
 use crate::{
     dbus::util::result_option_to_tuple,
-    engine::{LockedPoolsInfo, PoolUuid, StoppedPoolsInfo},
+    engine::{ActionAvailability, LockedPoolsInfo, PoolUuid, StoppedPoolsInfo},
 };
 
 pub type FilesystemSpec<'a> = Vec<(&'a str, (bool, &'a str), (bool, &'a str))>;
@@ -241,4 +241,14 @@ impl<'a> From<ManagerR8<StoppedPoolsInfo>> for Value<'a> {
 impl Basic for PoolUuid {
     const SIGNATURE_CHAR: char = 's';
     const SIGNATURE_STR: &str = "s";
+}
+
+impl Type for ActionAvailability {
+    const SIGNATURE: &Signature = &Signature::Str;
+}
+
+impl<'a> From<ActionAvailability> for Value<'a> {
+    fn from(aa: ActionAvailability) -> Self {
+        Value::from(aa.to_string())
+    }
 }

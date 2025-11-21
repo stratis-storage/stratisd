@@ -34,11 +34,6 @@ use crate::{
             pool_3_5::init_cache_method,
             pool_3_6::create_filesystems_method,
             pool_3_7::{filesystem_metadata_method, metadata_method},
-            pool_3_8::{
-                bind_clevis_method, bind_keyring_method, clevis_infos_prop, free_token_slots_prop,
-                key_descs_prop, metadata_version_prop, rebind_clevis_method, rebind_keyring_method,
-                unbind_clevis_method, unbind_keyring_method, volume_key_loaded_prop,
-            },
             shared::{pool_prop, set_pool_prop, try_pool_prop},
         },
         types::FilesystemSpec,
@@ -50,7 +45,19 @@ use crate::{
     stratis::StratisResult,
 };
 
-pub struct PoolR9 {
+mod methods;
+mod props;
+
+pub use methods::{
+    bind_clevis_method, bind_keyring_method, rebind_clevis_method, rebind_keyring_method,
+    unbind_clevis_method, unbind_keyring_method,
+};
+pub use props::{
+    clevis_infos_prop, free_token_slots_prop, key_descs_prop, metadata_version_prop,
+    volume_key_loaded_prop,
+};
+
+pub struct PoolR8 {
     connection: Arc<Connection>,
     engine: Arc<dyn Engine>,
     manager: Lockable<Arc<RwLock<Manager>>>,
@@ -58,7 +65,7 @@ pub struct PoolR9 {
     uuid: PoolUuid,
 }
 
-impl PoolR9 {
+impl PoolR8 {
     fn new(
         engine: Arc<dyn Engine>,
         connection: Arc<Connection>,
@@ -66,7 +73,7 @@ impl PoolR9 {
         counter: Arc<AtomicU64>,
         uuid: PoolUuid,
     ) -> Self {
-        PoolR9 {
+        PoolR8 {
             connection,
             engine,
             manager,
@@ -99,13 +106,13 @@ impl PoolR9 {
         connection: &Arc<Connection>,
         path: ObjectPath<'_>,
     ) -> StratisResult<()> {
-        connection.object_server().remove::<PoolR9, _>(path).await?;
+        connection.object_server().remove::<PoolR8, _>(path).await?;
         Ok(())
     }
 }
 
-#[interface(name = "org.storage.stratis3.pool.r9")]
-impl PoolR9 {
+#[interface(name = "org.storage.stratis3.pool.r8")]
+impl PoolR8 {
     async fn create_filesystems(
         &self,
         specs: FilesystemSpec<'_>,

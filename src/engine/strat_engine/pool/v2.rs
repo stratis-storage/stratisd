@@ -1262,6 +1262,7 @@ impl Pool for StratPool {
 pub struct StratPoolState {
     metadata_size: Bytes,
     out_of_alloc_space: bool,
+    total_physical_size: Bytes,
 }
 
 impl StateDiff for StratPoolState {
@@ -1271,6 +1272,7 @@ impl StateDiff for StratPoolState {
         StratPoolDiff {
             metadata_size: self.metadata_size.compare(&other.metadata_size),
             out_of_alloc_space: self.out_of_alloc_space.compare(&other.out_of_alloc_space),
+            total_physical_size: self.total_physical_size.compare(&other.total_physical_size),
         }
     }
 
@@ -1278,6 +1280,7 @@ impl StateDiff for StratPoolState {
         StratPoolDiff {
             metadata_size: Diff::Unchanged(self.metadata_size),
             out_of_alloc_space: Diff::Unchanged(self.out_of_alloc_space),
+            total_physical_size: Diff::Unchanged(self.total_physical_size),
         }
     }
 }
@@ -1290,6 +1293,7 @@ impl DumpState<'_> for StratPool {
         StratPoolState {
             metadata_size: self.metadata_size.bytes(),
             out_of_alloc_space: self.thin_pool.out_of_alloc_space(),
+            total_physical_size: self.total_physical_size().bytes(),
         }
     }
 
@@ -1298,6 +1302,7 @@ impl DumpState<'_> for StratPool {
         StratPoolState {
             metadata_size: self.metadata_size.bytes(),
             out_of_alloc_space: self.thin_pool.out_of_alloc_space(),
+            total_physical_size: self.total_physical_size().bytes(),
         }
     }
 }

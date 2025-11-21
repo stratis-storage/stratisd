@@ -34,6 +34,7 @@ use crate::{
             },
             pool_3_3::grow_physical_device_method,
             pool_3_5::init_cache_method,
+            pool_3_6::create_filesystems_method,
             shared::{pool_prop, set_pool_prop, try_pool_prop},
         },
         types::FilesystemSpec,
@@ -44,9 +45,9 @@ use crate::{
 
 mod methods;
 
-pub use methods::create_filesystems_method;
+pub use methods::{filesystem_metadata_method, metadata_method};
 
-pub struct PoolR6 {
+pub struct PoolR7 {
     connection: Arc<Connection>,
     engine: Arc<dyn Engine>,
     manager: Lockable<Arc<RwLock<Manager>>>,
@@ -54,7 +55,7 @@ pub struct PoolR6 {
     uuid: PoolUuid,
 }
 
-impl PoolR6 {
+impl PoolR7 {
     fn new(
         engine: Arc<dyn Engine>,
         connection: Arc<Connection>,
@@ -62,7 +63,7 @@ impl PoolR6 {
         counter: Arc<AtomicU64>,
         uuid: PoolUuid,
     ) -> Self {
-        PoolR6 {
+        PoolR7 {
             connection,
             engine,
             manager,
@@ -95,13 +96,13 @@ impl PoolR6 {
         connection: &Arc<Connection>,
         path: ObjectPath<'_>,
     ) -> StratisResult<()> {
-        connection.object_server().remove::<PoolR6, _>(path).await?;
+        connection.object_server().remove::<PoolR7, _>(path).await?;
         Ok(())
     }
 }
 
-#[interface(name = "org.storage.stratis3.pool.r6")]
-impl PoolR6 {
+#[interface(name = "org.storage.stratis3.pool.r7")]
+impl PoolR7 {
     async fn create_filesystems(
         &self,
         specs: FilesystemSpec<'_>,
@@ -259,6 +260,18 @@ impl PoolR6 {
             dev,
         )
         .await
+    }
+
+    async fn metadata(&self, current: bool) -> (String, u16, String) {
+        metadata_method(&self.engine, self.uuid, current).await
+    }
+
+    async fn filesystem_metadata(
+        &self,
+        fs_name: (bool, &str),
+        current: bool,
+    ) -> (String, u16, String) {
+        filesystem_metadata_method(&self.engine, self.uuid, fs_name, current).await
     }
 
     #[zbus(property(emits_changed_signal = "const"))]

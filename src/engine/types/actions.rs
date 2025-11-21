@@ -301,7 +301,7 @@ impl Display for SetUnlockAction<DevUuid> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 /// An action which may create multiple things.
 pub struct SetCreateAction<T> {
     changed: Vec<T>,

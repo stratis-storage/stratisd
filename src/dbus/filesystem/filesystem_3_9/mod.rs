@@ -39,6 +39,17 @@ impl FilesystemR9 {
         connection.object_server().at(path, filesystem).await?;
         Ok(())
     }
+
+    pub async fn unregister(
+        connection: &Arc<Connection>,
+        path: ObjectPath<'_>,
+    ) -> StratisResult<()> {
+        connection
+            .object_server()
+            .remove::<FilesystemR9, _>(path)
+            .await?;
+        Ok(())
+    }
 }
 
 #[interface(name = "org.storage.stratis3.filesystem.r9")]

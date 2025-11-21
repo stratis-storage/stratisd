@@ -99,7 +99,7 @@ impl PoolR9 {
         self.uuid
     }
 
-    #[zbus(property(emits_changed_signal = "const"))]
+    #[zbus(property(emits_changed_signal = "true"))]
     #[allow(non_snake_case)]
     async fn Name(&self) -> Result<engine::Name, Error> {
         pool_prop(&self.engine, self.uuid, name_prop).await

@@ -23,7 +23,7 @@ use crate::{
                 destroy_pool_method, list_keys_method, set_key_method, unset_key_method,
                 version_prop,
             },
-            manager_3_2::{refresh_state_method},
+            manager_3_2::refresh_state_method,
             manager_3_6::stop_pool_method,
         },
         types,

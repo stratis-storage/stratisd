@@ -85,6 +85,7 @@ pub struct ThinPoolDiff {
 /// IPC layer.
 #[derive(Debug)]
 pub struct StratPoolDiff {
+    pub total_physical_size: Diff<Bytes>,
     pub metadata_size: Diff<Bytes>,
     pub out_of_alloc_space: Diff<bool>,
 }

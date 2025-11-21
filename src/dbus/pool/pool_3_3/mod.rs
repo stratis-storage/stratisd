@@ -22,21 +22,18 @@ use crate::{
             pool_3_0::{
                 add_cache_devs_method, add_data_devs_method, allocated_prop,
                 avail_actions_property, bind_clevis_method, bind_keyring_method,
-                clevis_info_property, destroy_filesystems_method, encrypted_prop,
-                has_cache_property, key_description_property, name_prop, rebind_clevis_method,
-                rebind_keyring_method, set_name_method, size_prop, snapshot_filesystem_method,
-                unbind_clevis_method, unbind_keyring_method, used_prop,
+                clevis_info_property, create_filesystems_method, destroy_filesystems_method,
+                encrypted_prop, has_cache_property, init_cache_method, key_description_property,
+                name_prop, rebind_clevis_method, rebind_keyring_method, set_name_method, size_prop,
+                snapshot_filesystem_method, unbind_clevis_method, unbind_keyring_method, used_prop,
             },
             pool_3_1::{
                 enable_overprovisioning_prop, fs_limit_prop, no_alloc_space_prop,
                 send_enable_overprovisioning_signal_on_change, send_fs_limit_signal_on_change,
                 set_enable_overprovisioning_prop, set_fs_limit_prop,
             },
-            pool_3_3::grow_physical_device_method,
-            pool_3_5::init_cache_method,
             shared::{pool_prop, set_pool_prop, try_pool_prop},
         },
-        types::FilesystemSpec,
     },
     engine::{self, ActionAvailability, Engine, KeyDescription, Lockable, PoolUuid},
     stratis::StratisResult,
@@ -44,9 +41,9 @@ use crate::{
 
 mod methods;
 
-pub use methods::create_filesystems_method;
+pub use methods::grow_physical_device_method;
 
-pub struct PoolR6 {
+pub struct PoolR3 {
     connection: Arc<Connection>,
     engine: Arc<dyn Engine>,
     manager: Lockable<Arc<RwLock<Manager>>>,
@@ -54,7 +51,7 @@ pub struct PoolR6 {
     uuid: PoolUuid,
 }
 
-impl PoolR6 {
+impl PoolR3 {
     fn new(
         engine: Arc<dyn Engine>,
         connection: Arc<Connection>,
@@ -62,7 +59,7 @@ impl PoolR6 {
         counter: Arc<AtomicU64>,
         uuid: PoolUuid,
     ) -> Self {
-        PoolR6 {
+        PoolR3 {
             connection,
             engine,
             manager,
@@ -95,16 +92,16 @@ impl PoolR6 {
         connection: &Arc<Connection>,
         path: ObjectPath<'_>,
     ) -> StratisResult<()> {
-        connection.object_server().remove::<PoolR6, _>(path).await?;
+        connection.object_server().remove::<PoolR3, _>(path).await?;
         Ok(())
     }
 }
 
-#[interface(name = "org.storage.stratis3.pool.r6")]
-impl PoolR6 {
+#[interface(name = "org.storage.stratis3.pool.r3")]
+impl PoolR3 {
     async fn create_filesystems(
         &self,
-        specs: FilesystemSpec<'_>,
+        specs: Vec<(&str, (bool, &str))>,
     ) -> ((bool, Vec<(OwnedObjectPath, String)>), u16, String) {
         create_filesystems_method(
             &self.engine,

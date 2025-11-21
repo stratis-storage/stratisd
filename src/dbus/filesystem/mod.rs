@@ -13,7 +13,7 @@ use zbus::{zvariant::ObjectPath, Connection};
 use crate::{
     dbus::{consts, Manager},
     engine::{Engine, FilesystemUuid, Lockable, PoolUuid},
-    stratis::StratisResult,
+    stratis::{StratisError, StratisResult},
 };
 
 mod filesystem_3_0;
@@ -35,9 +35,29 @@ pub async fn register_filesystem<'a>(
         consts::STRATIS_BASE_PATH,
         counter.fetch_add(1, Ordering::AcqRel),
     ))?;
-    FilesystemR9::register(engine, connection, path.clone(), pool_uuid, uuid).await?;
 
     manager.write().await.add_filesystem(&path, uuid)?;
 
+    FilesystemR9::register(engine, connection, path.clone(), pool_uuid, uuid).await?;
+
     Ok(path)
+}
+
+pub async fn unregister_filesystem(
+    connection: &Arc<Connection>,
+    manager: &Lockable<Arc<RwLock<Manager>>>,
+    path: &ObjectPath<'_>,
+) -> StratisResult<FilesystemUuid> {
+    let uuid = {
+        let mut lock = manager.write().await;
+        let uuid = lock
+            .filesystem_get_uuid(path)
+            .ok_or_else(|| StratisError::Msg(format!("No UUID associated with path {path}")))?;
+        lock.remove_filesystem(path);
+        uuid
+    };
+
+    FilesystemR9::unregister(connection, path.clone()).await?;
+
+    Ok(uuid)
 }

@@ -111,17 +111,9 @@ pub async fn start_pool_method<'a>(
                 };
 
             if guard.is_encrypted() {
-                if let Err(e) = send_locked_pools_signals(connection).await {
-                    warn!(
-                        "Failed to send signals for changed properties for the Manager interfaces: {e}"
-                    );
-                }
+                send_locked_pools_signals(connection).await;
             }
-            if let Err(e) = send_stopped_pools_signals(connection).await {
-                warn!(
-                    "Failed to send signals for changed properties for the Manager interfaces: {e}"
-                );
-            }
+            send_stopped_pools_signals(connection).await;
 
             (
                 (true, (pool_path, dev_paths, fs_paths)),

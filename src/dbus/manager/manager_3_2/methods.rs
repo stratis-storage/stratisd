@@ -98,17 +98,9 @@ pub async fn start_pool_method<'a>(
                 };
 
             if guard.is_encrypted() {
-                if let Err(e) = send_locked_pools_signals(connection).await {
-                    warn!(
-                        "Failed to send signals for changed properties for the Manager interfaces: {e}"
-                    );
-                }
+                send_locked_pools_signals(connection).await;
             }
-            if let Err(e) = send_stopped_pools_signals(connection).await {
-                warn!(
-                    "Failed to send signals for changed properties for the Manager interfaces: {e}"
-                );
-            }
+            send_stopped_pools_signals(connection).await;
 
             (
                 (true, (pool_path, dev_paths, fs_paths)),
@@ -157,20 +149,14 @@ pub async fn stop_pool_method(
         if let Err(e) = unregister_pool(connection, manager, &pool).await {
             warn!("Failed to remove pool with path {pool} from the D-Bus: {e}");
         }
-        if let Err(e) = send_stopped_pools_signals(connection).await {
-            warn!("Failed to send signals for changed properties for the Manager interfaces: {e}");
-        }
+        send_stopped_pools_signals(connection).await;
         let stopped_pools = engine.stopped_pools().await;
         let stopped = stopped_pools
             .stopped
             .get(&pool_uuid)
             .or_else(|| stopped_pools.partially_constructed.get(&pool_uuid));
         if stopped.map(|s| s.info.is_some()).unwrap_or(false) {
-            if let Err(e) = send_locked_pools_signals(connection).await {
-                warn!(
-                    "Failed to send signals for changed properties for the Manager interfaces: {e}"
-                );
-            }
+            send_locked_pools_signals(connection).await;
         }
     }
 

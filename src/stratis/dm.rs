@@ -63,15 +63,9 @@ pub async fn dm_event_thread(
         #[cfg(feature = "dbus_enabled")]
         {
             let pool_diffs = engine.pool_evented(Some(&evented)).await;
-            if let Err(e) =
-                send_pool_background_signals(manager.clone(), connection, pool_diffs).await
-            {
-                warn!("Failed to update D-Bus layer with changed engine properties: {e}");
-            }
+            send_pool_background_signals(manager.clone(), connection, pool_diffs).await;
             let fs_diffs = engine.fs_evented(Some(&evented)).await;
-            if let Err(e) = send_fs_background_signals(manager, connection, fs_diffs).await {
-                warn!("Failed to update D-Bus layer with changed engine properties: {e}");
-            }
+            send_fs_background_signals(manager, connection, fs_diffs).await;
         }
 
         Ok(())

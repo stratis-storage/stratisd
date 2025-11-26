@@ -41,7 +41,7 @@ pub async fn create_dbus_handler(
             .build()
             .await?,
     );
-    register_manager(&connection, &engine, &manager, &counter).await?;
+    register_manager(&connection, &engine, &manager, &counter).await;
     let udev = UdevHandler::new(
         Arc::clone(&connection),
         engine,

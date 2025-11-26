@@ -58,20 +58,14 @@ pub async fn stop_pool_method(
                 warn!("Failed to unregister the stopped pool from the D-Bus");
             }
         };
-        if let Err(e) = send_stopped_pools_signals(connection).await {
-            warn!("Failed to send signals for changed properties for the Manager interfaces: {e}");
-        }
+        send_stopped_pools_signals(connection).await;
         let stopped_pools = engine.stopped_pools().await;
         let stopped = stopped_pools
             .stopped
             .get(&pool_uuid)
             .or_else(|| stopped_pools.partially_constructed.get(&pool_uuid));
         if stopped.map(|s| s.info.is_some()).unwrap_or(false) {
-            if let Err(e) = send_locked_pools_signals(connection).await {
-                warn!(
-                    "Failed to send signals for changed properties for the Manager interfaces: {e}"
-                );
-            }
+            send_locked_pools_signals(connection).await;
         }
     }
 

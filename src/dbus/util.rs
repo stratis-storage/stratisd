@@ -23,7 +23,7 @@ use crate::{
         types::DbusErrorEnum,
     },
     engine::{FilesystemUuid, Lockable, PoolDiff, PoolUuid, StratFilesystemDiff},
-    stratis::{StratisError, StratisResult},
+    stratis::StratisError,
 };
 
 /// Convert a tuple as option to an Option type
@@ -80,38 +80,66 @@ pub async fn send_pool_background_signals(
     manager: Lockable<Arc<RwLock<Manager>>>,
     connection: &Arc<Connection>,
     diffs: HashMap<PoolUuid, PoolDiff>,
-) -> StratisResult<()> {
+) {
     let dbus = manager.read().await;
     for (uuid, diff) in diffs {
         if diff.thin_pool.allocated_size.changed().is_some() {
-            let iface_ref = connection
+            let pool_path = match dbus.pool_get_path(&uuid) {
+                Some(path) => path,
+                None => {
+                    warn!("No pool associated with UUID {uuid}, skipping allocated_size_changed signal");
+                    continue;
+                }
+            };
+            match connection
                 .object_server()
-                .interface::<_, PoolR9>(dbus.pool_get_path(&uuid).ok_or_else(|| {
-                    StratisError::Msg(format!("No pool associated with UUID {uuid}"))
-                })?)
-                .await?;
-            iface_ref
-                .get_mut()
+                .interface::<_, PoolR9>(pool_path)
                 .await
-                .allocated_size_changed(iface_ref.signal_emitter())
-                .await?;
+            {
+                Ok(iface_ref) => {
+                    if let Err(e) = iface_ref
+                        .get_mut()
+                        .await
+                        .allocated_size_changed(iface_ref.signal_emitter())
+                        .await
+                    {
+                        warn!("Failed to send allocated_size_changed signal for pool {uuid}: {e}");
+                    }
+                }
+                Err(e) => {
+                    warn!("Failed to get interface for pool {uuid} to send allocated_size_changed signal: {e}");
+                }
+            }
         }
         if diff.thin_pool.used.changed().is_some() {
-            let iface_ref = connection
+            let pool_path = match dbus.pool_get_path(&uuid) {
+                Some(path) => path,
+                None => {
+                    warn!("No pool associated with UUID {uuid}, skipping total_physical_used_changed signal");
+                    continue;
+                }
+            };
+            match connection
                 .object_server()
-                .interface::<_, PoolR9>(dbus.pool_get_path(&uuid).ok_or_else(|| {
-                    StratisError::Msg(format!("No pool associated with UUID {uuid}"))
-                })?)
-                .await?;
-            iface_ref
-                .get_mut()
+                .interface::<_, PoolR9>(pool_path)
                 .await
-                .total_physical_used_changed(iface_ref.signal_emitter())
-                .await?;
+            {
+                Ok(iface_ref) => {
+                    if let Err(e) = iface_ref
+                        .get_mut()
+                        .await
+                        .total_physical_used_changed(iface_ref.signal_emitter())
+                        .await
+                    {
+                        warn!("Failed to send total_physical_used_changed signal for pool {uuid}: {e}");
+                    }
+                }
+                Err(e) => {
+                    warn!("Failed to get interface for pool {uuid} to send total_physical_used_changed signal: {e}");
+                }
+            }
         }
     }
-
-    Ok(())
 }
 
 #[allow(clippy::implicit_hasher)]
@@ -119,108 +147,215 @@ pub async fn send_fs_background_signals(
     _manager: Lockable<Arc<RwLock<Manager>>>,
     _connection: &Arc<Connection>,
     _diffs: HashMap<FilesystemUuid, StratFilesystemDiff>,
-) -> StratisResult<()> {
-    Ok(())
+) {
 }
 
-pub async fn send_locked_pools_signals(connection: &Arc<Connection>) -> StratisResult<()> {
-    let path = ObjectPath::from_static_str(STRATIS_BASE_PATH)?;
+pub async fn send_locked_pools_signals(connection: &Arc<Connection>) {
+    let path = match ObjectPath::from_static_str(STRATIS_BASE_PATH) {
+        Ok(path) => path,
+        Err(e) => {
+            warn!("Failed to convert string to object path: {e}");
+            return;
+        }
+    };
 
-    let iface_ref = connection
+    match connection
         .object_server()
         .interface::<_, ManagerR0>(&path)
-        .await?;
-    let mut_iface_ref = iface_ref.get_mut().await;
-    mut_iface_ref
-        .locked_pools_changed(iface_ref.signal_emitter())
-        .await?;
+        .await
+    {
+        Ok(iface_ref) => {
+            let mut_iface_ref = iface_ref.get_mut().await;
+            if let Err(e) = mut_iface_ref
+                .locked_pools_changed(iface_ref.signal_emitter())
+                .await
+            {
+                warn!("Failed to send property changed signal for locked pools on interface Manager.r0: {e}");
+            }
+        }
+        Err(e) => {
+            warn!("Failed to get Manager.r0 interface: {e}");
+        }
+    }
 
-    let iface_ref = connection
+    match connection
         .object_server()
         .interface::<_, ManagerR1>(&path)
-        .await?;
-    let mut_iface_ref = iface_ref.get_mut().await;
-    mut_iface_ref
-        .locked_pools_changed(iface_ref.signal_emitter())
-        .await?;
-
-    Ok(())
+        .await
+    {
+        Ok(iface_ref) => {
+            let mut_iface_ref = iface_ref.get_mut().await;
+            if let Err(e) = mut_iface_ref
+                .locked_pools_changed(iface_ref.signal_emitter())
+                .await
+            {
+                warn!("Failed to send property changed signal for locked pools on interface Manager.r1: {e}");
+            }
+        }
+        Err(e) => {
+            warn!("Failed to get Manager.r1 interface: {e}");
+        }
+    }
 }
 
-pub async fn send_stopped_pools_signals(connection: &Arc<Connection>) -> StratisResult<()> {
-    let path = ObjectPath::from_static_str(STRATIS_BASE_PATH)?;
+pub async fn send_stopped_pools_signals(connection: &Arc<Connection>) {
+    let path = match ObjectPath::from_static_str(STRATIS_BASE_PATH) {
+        Ok(path) => path,
+        Err(e) => {
+            warn!("Failed to create object path for stopped_pools_changed signal: {e}");
+            return;
+        }
+    };
 
-    let iface_ref = connection
+    match connection
         .object_server()
         .interface::<_, ManagerR2>(&path)
-        .await?;
-    let mut_iface_ref = iface_ref.get_mut().await;
-    mut_iface_ref
-        .stopped_pools_changed(iface_ref.signal_emitter())
-        .await?;
+        .await
+    {
+        Ok(iface_ref) => {
+            let mut_iface_ref = iface_ref.get_mut().await;
+            if let Err(e) = mut_iface_ref
+                .stopped_pools_changed(iface_ref.signal_emitter())
+                .await
+            {
+                warn!("Failed to send property changed signal for stopped pools on interface Manager.r2: {e}");
+            }
+        }
+        Err(e) => {
+            warn!("Failed to get Manager.r2 interface: {e}");
+        }
+    }
 
-    let iface_ref = connection
+    match connection
         .object_server()
         .interface::<_, ManagerR3>(&path)
-        .await?;
-    let mut_iface_ref = iface_ref.get_mut().await;
-    mut_iface_ref
-        .stopped_pools_changed(iface_ref.signal_emitter())
-        .await?;
+        .await
+    {
+        Ok(iface_ref) => {
+            let mut_iface_ref = iface_ref.get_mut().await;
+            if let Err(e) = mut_iface_ref
+                .stopped_pools_changed(iface_ref.signal_emitter())
+                .await
+            {
+                warn!("Failed to send property changed signal for stopped pools on interface Manager.r3: {e}");
+            }
+        }
+        Err(e) => {
+            warn!("Failed to get Manager.r3 interface: {e}");
+        }
+    }
 
-    let iface_ref = connection
+    match connection
         .object_server()
         .interface::<_, ManagerR4>(&path)
-        .await?;
-    let mut_iface_ref = iface_ref.get_mut().await;
-    mut_iface_ref
-        .stopped_pools_changed(iface_ref.signal_emitter())
-        .await?;
+        .await
+    {
+        Ok(iface_ref) => {
+            let mut_iface_ref = iface_ref.get_mut().await;
+            if let Err(e) = mut_iface_ref
+                .stopped_pools_changed(iface_ref.signal_emitter())
+                .await
+            {
+                warn!("Failed to send property changed signal for stopped pools on interface Manager.r4: {e}");
+            }
+        }
+        Err(e) => {
+            warn!("Failed to get Manager.r4 interface: {e}");
+        }
+    }
 
-    let iface_ref = connection
+    match connection
         .object_server()
         .interface::<_, ManagerR5>(&path)
-        .await?;
-    let mut_iface_ref = iface_ref.get_mut().await;
-    mut_iface_ref
-        .stopped_pools_changed(iface_ref.signal_emitter())
-        .await?;
+        .await
+    {
+        Ok(iface_ref) => {
+            let mut_iface_ref = iface_ref.get_mut().await;
+            if let Err(e) = mut_iface_ref
+                .stopped_pools_changed(iface_ref.signal_emitter())
+                .await
+            {
+                warn!("Failed to send property changed signal for stopped pools on interface Manager.r5: {e}");
+            }
+        }
+        Err(e) => {
+            warn!("Failed to get Manager.r5 interface: {e}");
+        }
+    }
 
-    let iface_ref = connection
+    match connection
         .object_server()
         .interface::<_, ManagerR6>(&path)
-        .await?;
-    let mut_iface_ref = iface_ref.get_mut().await;
-    mut_iface_ref
-        .stopped_pools_changed(iface_ref.signal_emitter())
-        .await?;
+        .await
+    {
+        Ok(iface_ref) => {
+            let mut_iface_ref = iface_ref.get_mut().await;
+            if let Err(e) = mut_iface_ref
+                .stopped_pools_changed(iface_ref.signal_emitter())
+                .await
+            {
+                warn!("Failed to send property changed signal for stopped pools on interface Manager.r6: {e}");
+            }
+        }
+        Err(e) => {
+            warn!("Failed to get Manager.r6 interface: {e}");
+        }
+    }
 
-    let iface_ref = connection
+    match connection
         .object_server()
         .interface::<_, ManagerR7>(&path)
-        .await?;
-    let mut_iface_ref = iface_ref.get_mut().await;
-    mut_iface_ref
-        .stopped_pools_changed(iface_ref.signal_emitter())
-        .await?;
+        .await
+    {
+        Ok(iface_ref) => {
+            let mut_iface_ref = iface_ref.get_mut().await;
+            if let Err(e) = mut_iface_ref
+                .stopped_pools_changed(iface_ref.signal_emitter())
+                .await
+            {
+                warn!("Failed to send property changed signal for stopped pools on interface Manager.r7: {e}");
+            }
+        }
+        Err(e) => {
+            warn!("Failed to get Manager.r7 interface: {e}");
+        }
+    }
 
-    let iface_ref = connection
+    match connection
         .object_server()
         .interface::<_, ManagerR8>(&path)
-        .await?;
-    let mut_iface_ref = iface_ref.get_mut().await;
-    mut_iface_ref
-        .stopped_pools_changed(iface_ref.signal_emitter())
-        .await?;
+        .await
+    {
+        Ok(iface_ref) => {
+            let mut_iface_ref = iface_ref.get_mut().await;
+            if let Err(e) = mut_iface_ref
+                .stopped_pools_changed(iface_ref.signal_emitter())
+                .await
+            {
+                warn!("Failed to send property changed signal for stopped pools on interface Manager.r8: {e}");
+            }
+        }
+        Err(e) => {
+            warn!("Failed to get Manager.r8 interface: {e}");
+        }
+    }
 
-    let iface_ref = connection
+    match connection
         .object_server()
         .interface::<_, ManagerR9>(&path)
-        .await?;
-    let mut_iface_ref = iface_ref.get_mut().await;
-    mut_iface_ref
-        .stopped_pools_changed(iface_ref.signal_emitter())
-        .await?;
-
-    Ok(())
+        .await
+    {
+        Ok(iface_ref) => {
+            let mut_iface_ref = iface_ref.get_mut().await;
+            if let Err(e) = mut_iface_ref
+                .stopped_pools_changed(iface_ref.signal_emitter())
+                .await
+            {
+                warn!("Failed to send property changed signal for stopped pools on interface Manager.r9: {e}");
+            }
+        }
+        Err(e) => {
+            warn!("Failed to get Manager.r9 interface: {e}");
+        }
+    }
 }

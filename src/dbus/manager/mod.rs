@@ -192,20 +192,42 @@ pub async fn register_manager(
     engine: &Arc<dyn Engine>,
     manager: &Lockable<Arc<RwLock<Manager>>>,
     counter: &Arc<AtomicU64>,
-) -> StratisResult<()> {
-    ManagerR0::register(engine, connection, manager, counter).await?;
-    ManagerR1::register(engine, connection, manager, counter).await?;
-    ManagerR2::register(engine, connection, manager, counter).await?;
-    ManagerR3::register(engine, connection, manager, counter).await?;
-    ManagerR4::register(engine, connection, manager, counter).await?;
-    ManagerR5::register(engine, connection, manager, counter).await?;
-    ManagerR6::register(engine, connection, manager, counter).await?;
-    ManagerR7::register(engine, connection, manager, counter).await?;
-    ManagerR8::register(engine, connection, manager, counter).await?;
-    ManagerR9::register(engine, connection, manager, counter).await?;
-    connection
+) {
+    if let Err(e) = ManagerR0::register(engine, connection, manager, counter).await {
+        warn!("Failed to register interface Manager.r0: {e}");
+    }
+    if let Err(e) = ManagerR1::register(engine, connection, manager, counter).await {
+        warn!("Failed to register interface Manager.r1: {e}");
+    }
+    if let Err(e) = ManagerR2::register(engine, connection, manager, counter).await {
+        warn!("Failed to register interface Manager.r2: {e}");
+    }
+    if let Err(e) = ManagerR3::register(engine, connection, manager, counter).await {
+        warn!("Failed to register interface Manager.r3: {e}");
+    }
+    if let Err(e) = ManagerR4::register(engine, connection, manager, counter).await {
+        warn!("Failed to register interface Manager.r4: {e}");
+    }
+    if let Err(e) = ManagerR5::register(engine, connection, manager, counter).await {
+        warn!("Failed to register interface Manager.r5: {e}");
+    }
+    if let Err(e) = ManagerR6::register(engine, connection, manager, counter).await {
+        warn!("Failed to register interface Manager.r6: {e}");
+    }
+    if let Err(e) = ManagerR7::register(engine, connection, manager, counter).await {
+        warn!("Failed to register interface Manager.r7: {e}");
+    }
+    if let Err(e) = ManagerR8::register(engine, connection, manager, counter).await {
+        warn!("Failed to register interface Manager.r8: {e}");
+    }
+    if let Err(e) = ManagerR9::register(engine, connection, manager, counter).await {
+        warn!("Failed to register interface Manager.r9: {e}");
+    }
+    if let Err(e) = connection
         .object_server()
         .at(STRATIS_BASE_PATH, ObjectManager)
-        .await?;
-    Ok(())
+        .await
+    {
+        warn!("Failed to register ObjectManager at {STRATIS_BASE_PATH}: {e}");
+    }
 }

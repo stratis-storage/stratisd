@@ -215,11 +215,7 @@ pub async fn unlock_pool_method(
 
     match handle_action!(engine.unlock_pool(pool_uuid, unlock_method).await) {
         Ok(SetUnlockAction::Started(v)) => {
-            if let Err(e) = send_locked_pools_signals(connection).await {
-                warn!(
-                    "Failed to send signals for changed properties for the Manager interfaces: {e}"
-                );
-            }
+            send_locked_pools_signals(connection).await;
 
             ((true, v), DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }

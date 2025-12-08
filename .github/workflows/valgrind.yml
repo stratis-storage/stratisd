@@ -112,7 +112,7 @@ jobs:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT ENVIRONMENT
           - toolchain: 1.91.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           # MANDATORY CHECKS USING LOWEST SUPPORTED ENVIRONMENT PROXY
-          - toolchain: 1.77.0  # LOWEST SUPPORTED RUST TOOLCHAIN
+          - toolchain: 1.82.0  # LOWEST SUPPORTED RUST TOOLCHAIN
     runs-on: ubuntu-24.04
     steps:
       - name: Install dependencies for Ubuntu

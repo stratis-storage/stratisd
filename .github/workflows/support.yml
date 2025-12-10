@@ -72,7 +72,7 @@ jobs:
           ${{ matrix.dependencies }}
       - name: Install pyright
         run: pip install --user pyright
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Run test

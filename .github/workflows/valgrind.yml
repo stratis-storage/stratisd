@@ -51,7 +51,7 @@ jobs:
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
@@ -93,7 +93,7 @@ jobs:
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Build stratisd
@@ -149,7 +149,7 @@ jobs:
         with:
           components: cargo
           toolchain: ${{ matrix.toolchain }}
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Build stratisd
@@ -215,7 +215,7 @@ jobs:
         with:
           components: cargo
           toolchain: 1.91.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Build stratisd

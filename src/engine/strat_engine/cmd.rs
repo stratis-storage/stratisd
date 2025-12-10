@@ -20,12 +20,12 @@ use std::{
     io::{Read, Write},
     path::{Path, PathBuf},
     process::{Command, Output, Stdio},
+    sync::LazyLock,
 };
 
 use either::Either;
 use libc::c_uint;
 use libcryptsetup_rs::SafeMemHandle;
-use once_cell::sync::Lazy;
 use semver::{Version, VersionReq};
 use serde_json::Value;
 
@@ -119,7 +119,7 @@ const CLEVIS_EXEC_NAMES: &[&str] = &[
     MKTEMP,
 ];
 
-static EXECUTABLES: Lazy<HashMap<String, Option<PathBuf>>> = Lazy::new(|| {
+static EXECUTABLES: LazyLock<HashMap<String, Option<PathBuf>>> = LazyLock::new(|| {
     [
         (MKFS_XFS.to_string(), find_executable(MKFS_XFS)),
         (THIN_CHECK.to_string(), find_executable(THIN_CHECK)),
@@ -138,8 +138,8 @@ static EXECUTABLES: Lazy<HashMap<String, Option<PathBuf>>> = Lazy::new(|| {
     .collect()
 });
 
-static EXECUTABLES_PATHS: Lazy<Vec<PathBuf>> =
-    Lazy::new(|| match std::option_env!("EXECUTABLES_PATHS") {
+static EXECUTABLES_PATHS: LazyLock<Vec<PathBuf>> =
+    LazyLock::new(|| match std::option_env!("EXECUTABLES_PATHS") {
         Some(paths) => std::env::split_paths(paths).collect(),
         None => ["/usr/sbin", "/sbin", "/usr/bin", "/bin"]
             .iter()

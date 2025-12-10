@@ -4,9 +4,7 @@
 
 // Get ability to instantiate a devicemapper context.
 
-use std::path::Path;
-
-use once_cell::sync::Lazy;
+use std::{path::Path, sync::LazyLock};
 
 use devicemapper::{DevId, DmError, DmNameBuf, DmOptions, DM};
 
@@ -24,7 +22,7 @@ use crate::{
 /// Path to logical devices for encrypted devices
 pub const DEVICEMAPPER_PATH: &str = "/dev/mapper";
 
-pub static DM_CONTEXT: Lazy<Result<DM, DmError>> = Lazy::new(DM::new);
+pub static DM_CONTEXT: LazyLock<Result<DM, DmError>> = LazyLock::new(DM::new);
 
 pub fn get_dm_init() -> StratisResult<&'static DM> {
     match *DM_CONTEXT {

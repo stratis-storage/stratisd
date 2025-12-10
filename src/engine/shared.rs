@@ -11,11 +11,11 @@ use std::{
         unix::io::{FromRawFd, RawFd},
     },
     path::{Path, PathBuf},
+    sync::LazyLock,
 };
 
 use chrono::{DateTime, LocalResult, TimeZone, Utc};
 use nix::poll::{poll, PollFd, PollFlags};
-use once_cell::sync::Lazy;
 use regex::Regex;
 
 use devicemapper::{Bytes, Sectors, IEC, SECTOR_SIZE};
@@ -174,8 +174,9 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
         )));
     }
 
-    static NAME_UDEVREGEX: Lazy<Regex> =
-        Lazy::new(|| Regex::new(r"[[:ascii:]&&[^0-9A-Za-z#+-.:=@_/]]+").expect("regex is valid"));
+    static NAME_UDEVREGEX: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"[[:ascii:]&&[^0-9A-Za-z#+-.:=@_/]]+").expect("regex is valid")
+    });
 
     if NAME_UDEVREGEX.is_match(name) {
         return Err(StratisError::Msg(format!(

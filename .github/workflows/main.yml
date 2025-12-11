@@ -72,7 +72,7 @@ jobs:
       - uses: baptiste0928/cargo-install@v3
         with:
           crate: typos-cli
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
@@ -112,7 +112,7 @@ jobs:
         with:
           components: cargo
           toolchain: 1.82.0  # LOWEST SUPPORTED RUST TOOLCHAIN
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           path: stratisd
           persist-credentials: false
@@ -179,7 +179,7 @@ jobs:
         with:
           components: cargo
           toolchain: 1.91.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Overwrite stratisd dependencies as necessary
@@ -203,7 +203,7 @@ jobs:
           make
           ncurses
           shfmt
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Run shell check
@@ -226,7 +226,7 @@ jobs:
           python3-dbus
       - name: Install pyright
         run: pip install --user pyright
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Run lint
@@ -264,7 +264,7 @@ jobs:
         with:
           components: cargo
           toolchain: 1.91.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Overwrite stratisd dependencies as necessary
@@ -318,7 +318,7 @@ jobs:
         with:
           components: cargo
           toolchain: 1.82.0  # LOWEST SUPPORTED RUST TOOLCHAIN
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           path: stratisd
           persist-credentials: false

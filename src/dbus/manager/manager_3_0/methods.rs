@@ -24,9 +24,9 @@ use crate::{
         util::{engine_to_dbus_err_tuple, send_locked_pools_signals, tuple_to_option},
     },
     engine::{
-        CreateAction, DeleteAction, Engine, InputEncryptionInfo, IntegritySpec,
-        KeyDescription, Lockable, MappingCreateAction, MappingDeleteAction, PoolUuid,
-        SetUnlockAction, UnlockMethod,
+        CreateAction, DeleteAction, Engine, InputEncryptionInfo, IntegritySpec, KeyDescription,
+        Lockable, MappingCreateAction, MappingDeleteAction, PoolUuid, SetUnlockAction,
+        UnlockMethod,
     },
     stratis::StratisError,
 };

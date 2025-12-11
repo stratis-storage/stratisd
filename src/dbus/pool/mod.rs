@@ -11,8 +11,8 @@ use tokio::sync::RwLock;
 use zbus::{zvariant::ObjectPath, Connection};
 
 use crate::{
-    dbus::{consts, Manager},
-    engine::{Engine, Lockable, PoolUuid},
+    dbus::{consts, register_blockdev, Manager},
+    engine::{Engine, Lockable, PoolIdentifier, PoolUuid},
     stratis::{StratisError, StratisResult},
 };
 
@@ -46,136 +46,154 @@ pub async fn register_pool<'a>(
     counter: &Arc<AtomicU64>,
     pool_uuid: PoolUuid,
 ) -> StratisResult<(ObjectPath<'a>, Vec<ObjectPath<'a>>)> {
-    let path = ObjectPath::try_from(format!(
-        "{}/{}",
-        consts::STRATIS_BASE_PATH,
-        counter.fetch_add(1, Ordering::AcqRel),
-    ))?;
+    match engine.get_pool(PoolIdentifier::Uuid(pool_uuid)).await {
+        Some(pool) => {
 
-    manager.write().await.add_pool(&path, pool_uuid)?;
+            let path = ObjectPath::try_from(format!(
+                "{}/{}",
+                consts::STRATIS_BASE_PATH,
+                counter.fetch_add(1, Ordering::AcqRel),
+            ))?;
 
-    if let Err(e) = PoolR0::register(
-        engine,
-        connection,
-        manager,
-        counter,
-        path.clone(),
-        pool_uuid,
-    )
-    .await
-    {
-        warn!("Failed to register interface pool.r0 for pool with UUID {pool_uuid}: {e}");
-    }
-    if let Err(e) = PoolR1::register(
-        engine,
-        connection,
-        manager,
-        counter,
-        path.clone(),
-        pool_uuid,
-    )
-    .await
-    {
-        warn!("Failed to register interface pool.r1 for pool with UUID {pool_uuid}: {e}");
-    }
-    if let Err(e) = PoolR2::register(
-        engine,
-        connection,
-        manager,
-        counter,
-        path.clone(),
-        pool_uuid,
-    )
-    .await
-    {
-        warn!("Failed to register interface pool.r2 for pool with UUID {pool_uuid}: {e}");
-    }
-    if let Err(e) = PoolR3::register(
-        engine,
-        connection,
-        manager,
-        counter,
-        path.clone(),
-        pool_uuid,
-    )
-    .await
-    {
-        warn!("Failed to register interface pool.r3 for pool with UUID {pool_uuid}: {e}");
-    }
-    if let Err(e) = PoolR4::register(
-        engine,
-        connection,
-        manager,
-        counter,
-        path.clone(),
-        pool_uuid,
-    )
-    .await
-    {
-        warn!("Failed to register interface pool.r4 for pool with UUID {pool_uuid}: {e}");
-    }
-    if let Err(e) = PoolR5::register(
-        engine,
-        connection,
-        manager,
-        counter,
-        path.clone(),
-        pool_uuid,
-    )
-    .await
-    {
-        warn!("Failed to register interface pool.r5 for pool with UUID {pool_uuid}: {e}");
-    }
-    if let Err(e) = PoolR6::register(
-        engine,
-        connection,
-        manager,
-        counter,
-        path.clone(),
-        pool_uuid,
-    )
-    .await
-    {
-        warn!("Failed to register interface pool.r6 for pool with UUID {pool_uuid}: {e}");
-    }
-    if let Err(e) = PoolR7::register(
-        engine,
-        connection,
-        manager,
-        counter,
-        path.clone(),
-        pool_uuid,
-    )
-    .await
-    {
-        warn!("Failed to register interface pool.r7 for pool with UUID {pool_uuid}: {e}");
-    }
-    if let Err(e) = PoolR8::register(
-        engine,
-        connection,
-        manager,
-        counter,
-        path.clone(),
-        pool_uuid,
-    )
-    .await
-    {
-        warn!("Failed to register interface pool.r8 for pool with UUID {pool_uuid}: {e}");
-    }
-    if let Err(e) = PoolR9::register(
-        engine,
-        connection,
-        manager,
-        counter,
-        path.clone(),
-        pool_uuid,
-    )
-    .await
-    {
-        warn!("Failed to register interface pool.r9 for pool with UUID {pool_uuid}: {e}");
-    }
+            if let Err(e) = PoolR0::register(
+                engine,
+                connection,
+                manager,
+                counter,
+                path.clone(),
+                pool_uuid,
+            )
+            .await
+            {
+                warn!("Failed to register interface pool.r0 for pool with UUID {pool_uuid}: {e}");
+            }
+            if let Err(e) = PoolR1::register(
+                engine,
+                connection,
+                manager,
+                counter,
+                path.clone(),
+                pool_uuid,
+            )
+            .await
+            {
+                warn!("Failed to register interface pool.r1 for pool with UUID {pool_uuid}: {e}");
+            }
+            if let Err(e) = PoolR2::register(
+                engine,
+                connection,
+                manager,
+                counter,
+                path.clone(),
+                pool_uuid,
+            )
+            .await
+            {
+                warn!("Failed to register interface pool.r2 for pool with UUID {pool_uuid}: {e}");
+            }
+            if let Err(e) = PoolR3::register(
+                engine,
+                connection,
+                manager,
+                counter,
+                path.clone(),
+                pool_uuid,
+            )
+            .await
+            {
+                warn!("Failed to register interface pool.r3 for pool with UUID {pool_uuid}: {e}");
+            }
+            if let Err(e) = PoolR4::register(
+                engine,
+                connection,
+                manager,
+                counter,
+                path.clone(),
+                pool_uuid,
+            )
+            .await
+            {
+                warn!("Failed to register interface pool.r4 for pool with UUID {pool_uuid}: {e}");
+            }
+            if let Err(e) = PoolR5::register(
+                engine,
+                connection,
+                manager,
+                counter,
+                path.clone(),
+                pool_uuid,
+            )
+            .await
+            {
+                warn!("Failed to register interface pool.r5 for pool with UUID {pool_uuid}: {e}");
+            }
+            if let Err(e) = PoolR6::register(
+                engine,
+                connection,
+                manager,
+                counter,
+                path.clone(),
+                pool_uuid,
+            )
+            .await
+            {
+                warn!("Failed to register interface pool.r6 for pool with UUID {pool_uuid}: {e}");
+            }
+            if let Err(e) = PoolR7::register(
+                engine,
+                connection,
+                manager,
+                counter,
+                path.clone(),
+                pool_uuid,
+            )
+            .await
+            {
+                warn!("Failed to register interface pool.r7 for pool with UUID {pool_uuid}: {e}");
+            }
+            if let Err(e) = PoolR8::register(
+                engine,
+                connection,
+                manager,
+                counter,
+                path.clone(),
+                pool_uuid,
+            )
+            .await
+            {
+                warn!("Failed to register interface pool.r8 for pool with UUID {pool_uuid}: {e}");
+            }
+            if let Err(e) = PoolR9::register(
+                engine,
+                connection,
+                manager,
+                counter,
+                path.clone(),
+                pool_uuid,
+            )
+            .await
+            {
+                warn!("Failed to register interface pool.r9 for pool with UUID {pool_uuid}: {e}");
+            }
 
-    Ok((path, Vec::default()))
+            manager.write().await.add_pool(&path, pool_uuid)?;
+
+            let mut bd_paths = Vec::new();
+            let bd_uuids = pool.blockdevs().into_iter().map(|(u, _, _)| u).collect::<Vec<_>>();
+            for dev_uuid in bd_uuids {
+                match register_blockdev(engine, connection, manager, counter, pool_uuid, dev_uuid).await {
+                    Ok(op) => bd_paths.push(op),
+                    Err(_) => {
+                        warn!("Unable to register object path for blockdev with UUID {dev_uuid} belonging to pool {pool_uuid} on the D-Bus");
+                    },
+                }
+            }
+            Ok((path, bd_paths))
+        }
+        None => {
+            Err(StratisError::Msg(format!("Pool with {pool_uuid} was successfully started but appears to have been removed before it could be exposed on the D-Bus")))
+        }
+    }
 }
 
 pub async fn unregister_pool(

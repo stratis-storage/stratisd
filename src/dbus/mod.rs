@@ -21,6 +21,7 @@ use crate::{
 #[macro_use]
 mod macros;
 
+mod blockdev;
 mod consts;
 mod filesystem;
 mod manager;

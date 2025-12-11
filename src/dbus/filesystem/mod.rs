@@ -17,9 +17,26 @@ use crate::{
 };
 
 mod filesystem_3_0;
+mod filesystem_3_1;
+mod filesystem_3_2;
+mod filesystem_3_3;
+mod filesystem_3_4;
+mod filesystem_3_5;
+mod filesystem_3_6;
+mod filesystem_3_7;
+mod filesystem_3_8;
 mod filesystem_3_9;
 mod shared;
 
+pub use filesystem_3_0::FilesystemR0;
+pub use filesystem_3_1::FilesystemR1;
+pub use filesystem_3_2::FilesystemR2;
+pub use filesystem_3_3::FilesystemR3;
+pub use filesystem_3_4::FilesystemR4;
+pub use filesystem_3_5::FilesystemR5;
+pub use filesystem_3_6::FilesystemR6;
+pub use filesystem_3_7::FilesystemR7;
+pub use filesystem_3_8::FilesystemR8;
 pub use filesystem_3_9::FilesystemR9;
 
 pub async fn register_filesystem<'a>(
@@ -38,7 +55,96 @@ pub async fn register_filesystem<'a>(
 
     manager.write().await.add_filesystem(&path, uuid)?;
 
-    FilesystemR9::register(engine, connection, path.clone(), pool_uuid, uuid).await?;
+    FilesystemR0::register(
+        engine.clone(),
+        connection,
+        manager,
+        path.clone(),
+        pool_uuid,
+        uuid,
+    )
+    .await?;
+    FilesystemR1::register(
+        engine.clone(),
+        connection,
+        manager,
+        path.clone(),
+        pool_uuid,
+        uuid,
+    )
+    .await?;
+    FilesystemR2::register(
+        engine.clone(),
+        connection,
+        manager,
+        path.clone(),
+        pool_uuid,
+        uuid,
+    )
+    .await?;
+    FilesystemR3::register(
+        engine.clone(),
+        connection,
+        manager,
+        path.clone(),
+        pool_uuid,
+        uuid,
+    )
+    .await?;
+    FilesystemR4::register(
+        engine.clone(),
+        connection,
+        manager,
+        path.clone(),
+        pool_uuid,
+        uuid,
+    )
+    .await?;
+    FilesystemR5::register(
+        engine.clone(),
+        connection,
+        manager,
+        path.clone(),
+        pool_uuid,
+        uuid,
+    )
+    .await?;
+    FilesystemR6::register(
+        engine.clone(),
+        connection,
+        manager,
+        path.clone(),
+        pool_uuid,
+        uuid,
+    )
+    .await?;
+    FilesystemR7::register(
+        engine.clone(),
+        connection,
+        manager,
+        path.clone(),
+        pool_uuid,
+        uuid,
+    )
+    .await?;
+    FilesystemR8::register(
+        engine.clone(),
+        connection,
+        manager,
+        path.clone(),
+        pool_uuid,
+        uuid,
+    )
+    .await?;
+    FilesystemR9::register(
+        engine.clone(),
+        connection,
+        manager,
+        path.clone(),
+        pool_uuid,
+        uuid,
+    )
+    .await?;
 
     Ok(path)
 }
@@ -57,6 +163,15 @@ pub async fn unregister_filesystem(
         uuid
     };
 
+    FilesystemR0::unregister(connection, path.clone()).await?;
+    FilesystemR1::unregister(connection, path.clone()).await?;
+    FilesystemR2::unregister(connection, path.clone()).await?;
+    FilesystemR3::unregister(connection, path.clone()).await?;
+    FilesystemR4::unregister(connection, path.clone()).await?;
+    FilesystemR5::unregister(connection, path.clone()).await?;
+    FilesystemR6::unregister(connection, path.clone()).await?;
+    FilesystemR7::unregister(connection, path.clone()).await?;
+    FilesystemR8::unregister(connection, path.clone()).await?;
     FilesystemR9::unregister(connection, path.clone()).await?;
 
     Ok(uuid)

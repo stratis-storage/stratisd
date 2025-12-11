@@ -9,7 +9,6 @@ use nix::unistd::{pipe, write};
 use crate::{
     engine::KeyDescription,
     jsonrpc::client::utils::prompt_password,
-    print_table,
     stratis::{StratisError, StratisResult},
 };
 

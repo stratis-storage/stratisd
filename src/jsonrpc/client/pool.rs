@@ -14,7 +14,6 @@ use crate::{
         TokenUnlockMethod,
     },
     jsonrpc::client::utils::{prompt_password, to_suffix_repr},
-    print_table,
     stratis::{StratisError, StratisResult},
 };
 

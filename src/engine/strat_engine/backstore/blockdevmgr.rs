@@ -112,13 +112,15 @@ impl BlockDevMgr<v1::StratBlockDev> {
         devices: UnownedDevices,
         sector_size: Option<u32>,
     ) -> StratisResult<Vec<DevUuid>> {
-        let this_pool_uuid = self.block_devs.first().map(|bd| bd.pool_uuid());
-        if this_pool_uuid.is_some() && this_pool_uuid != Some(pool_uuid) {
-            return Err(StratisError::Msg(
-                format!("block devices being managed have pool UUID {} but new devices are to be added with pool UUID {}",
-                        this_pool_uuid.expect("guarded by if-expression"),
+        match self.block_devs.first().map(|bd| bd.pool_uuid()) {
+            Some(this_pool_uuid) if this_pool_uuid != pool_uuid => {
+                return Err(StratisError::Msg(
+                    format!("block devices being managed have pool UUID {} but new devices are to be added with pool UUID {}",
+                        this_pool_uuid,
                         pool_uuid)
-            ));
+                ));
+            }
+            _ => {}
         }
 
         let encryption_info = pool_enc_to_enc!(self.encryption_info());
@@ -226,13 +228,15 @@ impl BlockDevMgr<v2::StratBlockDev> {
         pool_uuid: PoolUuid,
         devices: UnownedDevices,
     ) -> StratisResult<Vec<DevUuid>> {
-        let this_pool_uuid = self.block_devs.first().map(|bd| bd.pool_uuid());
-        if this_pool_uuid.is_some() && this_pool_uuid != Some(pool_uuid) {
-            return Err(StratisError::Msg(
-                format!("block devices being managed have pool UUID {} but new devices are to be added with pool UUID {}",
-                        this_pool_uuid.expect("guarded by if-expression"),
+        match self.block_devs.first().map(|bd| bd.pool_uuid()) {
+            Some(this_pool_uuid) if this_pool_uuid != pool_uuid => {
+                return Err(StratisError::Msg(
+                    format!("block devices being managed have pool UUID {} but new devices are to be added with pool UUID {}",
+                        this_pool_uuid,
                         pool_uuid)
-            ));
+                ));
+            }
+            _ => {}
         }
 
         // FIXME: This is a bug. If new devices are added to a pool, and the

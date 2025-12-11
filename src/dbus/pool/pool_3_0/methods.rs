@@ -29,8 +29,8 @@ use crate::{
         },
     },
     engine::{
-        BlockDevTier, CreateAction, DeleteAction, Engine, EngineAction,
-        KeyDescription, Lockable, OptionalTokenSlotInput, PoolIdentifier, PoolUuid, RenameAction,
+        BlockDevTier, CreateAction, DeleteAction, Engine, EngineAction, KeyDescription, Lockable,
+        OptionalTokenSlotInput, PoolIdentifier, PoolUuid, RenameAction,
     },
     stratis::StratisError,
 };

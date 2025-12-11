@@ -11,33 +11,40 @@ use zbus::{
     zvariant::{ObjectPath, OwnedObjectPath},
     Connection,
 };
-mod methods;
 mod props;
 
-pub use methods::set_name_method;
-pub use props::{created_prop, devnode_prop, name_prop, pool_prop, size_prop, used_prop};
+pub use props::{set_size_limit_prop, size_limit_prop};
 
 use crate::{
-    dbus::{filesystem::shared::filesystem_prop, manager::Manager},
+    dbus::{
+        filesystem::{
+            filesystem_3_0::{
+                created_prop, devnode_prop, name_prop, pool_prop, set_name_method, size_prop,
+                used_prop,
+            },
+            shared::{filesystem_prop, set_filesystem_prop},
+        },
+        manager::Manager,
+    },
     engine::{Engine, FilesystemUuid, Lockable, Name, PoolUuid},
     stratis::StratisResult,
 };
 
-pub struct FilesystemR0 {
+pub struct FilesystemR6 {
     engine: Arc<dyn Engine>,
     manager: Lockable<Arc<RwLock<Manager>>>,
     parent_uuid: PoolUuid,
     uuid: FilesystemUuid,
 }
 
-impl FilesystemR0 {
+impl FilesystemR6 {
     fn new(
         engine: Arc<dyn Engine>,
         manager: Lockable<Arc<RwLock<Manager>>>,
         parent_uuid: PoolUuid,
         uuid: FilesystemUuid,
     ) -> Self {
-        FilesystemR0 {
+        FilesystemR6 {
             engine,
             manager,
             parent_uuid,
@@ -65,17 +72,17 @@ impl FilesystemR0 {
     ) -> StratisResult<()> {
         connection
             .object_server()
-            .remove::<FilesystemR0, _>(path)
+            .remove::<FilesystemR6, _>(path)
             .await?;
         Ok(())
     }
 }
 
 #[interface(
-    name = "org.storage.stratis3.filesystem.r0",
+    name = "org.storage.stratis3.filesystem.r6",
     introspection_docs = false
 )]
-impl FilesystemR0 {
+impl FilesystemR6 {
     #[zbus(out_args("result", "return_code", "return_string"))]
     async fn set_name(&self, name: &str) -> ((bool, FilesystemUuid), u16, String) {
         set_name_method(&self.engine, self.parent_uuid, self.uuid, name).await
@@ -104,6 +111,23 @@ impl FilesystemR0 {
     #[zbus(property)]
     async fn size(&self) -> Result<String, Error> {
         filesystem_prop(&self.engine, self.parent_uuid, self.uuid, size_prop).await
+    }
+
+    #[zbus(property)]
+    async fn size_limit(&self) -> Result<(bool, String), Error> {
+        filesystem_prop(&self.engine, self.parent_uuid, self.uuid, size_limit_prop).await
+    }
+
+    #[zbus(property)]
+    async fn set_size_limit(&self, value: (bool, String)) -> Result<(), zbus::Error> {
+        set_filesystem_prop(
+            &self.engine,
+            self.parent_uuid,
+            self.uuid,
+            value,
+            set_size_limit_prop,
+        )
+        .await
     }
 
     #[zbus(property)]

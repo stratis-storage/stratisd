@@ -40,7 +40,6 @@ pub use blockdev_3_7::BlockdevR7;
 pub use blockdev_3_8::BlockdevR8;
 pub use blockdev_3_9::BlockdevR9;
 
-#[allow(dead_code)]
 pub async fn register_blockdev<'a>(
     engine: &Arc<dyn Engine>,
     connection: &Arc<Connection>,

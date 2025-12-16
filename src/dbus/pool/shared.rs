@@ -6,7 +6,9 @@ use std::sync::Arc;
 
 use zbus::fdo::Error;
 
-use crate::engine::{Engine, Pool, PoolIdentifier, PoolUuid, SomeLockReadGuard};
+use crate::engine::{
+    Engine, Pool, PoolIdentifier, PoolUuid, SomeLockReadGuard, SomeLockWriteGuard,
+};
 
 async fn get_pool(
     engine: &Arc<dyn Engine>,
@@ -16,6 +18,16 @@ async fn get_pool(
         .get_pool(PoolIdentifier::Uuid(uuid))
         .await
         .ok_or_else(|| Error::Failed(format!("No pool associated with UUID {uuid}")))
+}
+
+async fn get_pool_mut(
+    engine: &Arc<dyn Engine>,
+    uuid: PoolUuid,
+) -> Result<SomeLockWriteGuard<PoolUuid, dyn Pool>, zbus::Error> {
+    engine
+        .get_mut_pool(PoolIdentifier::Uuid(uuid))
+        .await
+        .ok_or_else(|| zbus::Error::Failure(format!("No pool associated with UUID {uuid}")))
 }
 
 pub async fn pool_prop<R>(
@@ -36,4 +48,15 @@ pub async fn try_pool_prop<R>(
     let guard = get_pool(engine, uuid).await?;
 
     Ok(f(guard))
+}
+
+pub async fn set_pool_prop<I, R>(
+    engine: &Arc<dyn Engine>,
+    uuid: PoolUuid,
+    f: impl Fn(SomeLockWriteGuard<PoolUuid, dyn Pool>, I) -> Result<R, zbus::Error>,
+    input: I,
+) -> Result<R, zbus::Error> {
+    let guard = get_pool_mut(engine, uuid).await?;
+
+    f(guard, input)
 }

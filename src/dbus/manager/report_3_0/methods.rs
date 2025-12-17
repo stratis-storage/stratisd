@@ -10,7 +10,7 @@ use crate::{
     stratis::StratisError,
 };
 
-pub async fn get_report_method(engine: &Arc<dyn Engine>, name: &str) -> (String, u16, String) {
+pub fn get_report_method(engine: &Arc<dyn Engine>, name: &str) -> (String, u16, String) {
     let default_return = String::new();
 
     let report_type = match ReportType::try_from(name)

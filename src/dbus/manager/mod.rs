@@ -30,6 +30,16 @@ mod manager_3_6;
 mod manager_3_7;
 mod manager_3_8;
 mod manager_3_9;
+mod report_3_0;
+mod report_3_1;
+mod report_3_2;
+mod report_3_3;
+mod report_3_4;
+mod report_3_5;
+mod report_3_6;
+mod report_3_7;
+mod report_3_8;
+mod report_3_9;
 
 pub use manager_3_0::ManagerR0;
 pub use manager_3_1::ManagerR1;
@@ -41,6 +51,16 @@ pub use manager_3_6::ManagerR6;
 pub use manager_3_7::ManagerR7;
 pub use manager_3_8::ManagerR8;
 pub use manager_3_9::ManagerR9;
+pub use report_3_0::ReportR0;
+pub use report_3_1::ReportR1;
+pub use report_3_2::ReportR2;
+pub use report_3_3::ReportR3;
+pub use report_3_4::ReportR4;
+pub use report_3_5::ReportR5;
+pub use report_3_6::ReportR6;
+pub use report_3_7::ReportR7;
+pub use report_3_8::ReportR8;
+pub use report_3_9::ReportR9;
 
 #[derive(Default)]
 pub struct Manager {
@@ -222,6 +242,36 @@ pub async fn register_manager(
     }
     if let Err(e) = ManagerR9::register(engine, connection, manager, counter).await {
         warn!("Failed to register interface Manager.r9: {e}");
+    }
+    if let Err(e) = ReportR0::register(engine, connection).await {
+        warn!("Failed to register interface Report.r0: {e}");
+    }
+    if let Err(e) = ReportR1::register(engine, connection).await {
+        warn!("Failed to register interface Report.r1: {e}");
+    }
+    if let Err(e) = ReportR2::register(engine, connection).await {
+        warn!("Failed to register interface Report.r2: {e}");
+    }
+    if let Err(e) = ReportR3::register(engine, connection).await {
+        warn!("Failed to register interface Report.r3: {e}");
+    }
+    if let Err(e) = ReportR4::register(engine, connection).await {
+        warn!("Failed to register interface Report.r4: {e}");
+    }
+    if let Err(e) = ReportR5::register(engine, connection).await {
+        warn!("Failed to register interface Report.r5: {e}");
+    }
+    if let Err(e) = ReportR6::register(engine, connection).await {
+        warn!("Failed to register interface Report.r6: {e}");
+    }
+    if let Err(e) = ReportR7::register(engine, connection).await {
+        warn!("Failed to register interface Report.r7: {e}");
+    }
+    if let Err(e) = ReportR8::register(engine, connection).await {
+        warn!("Failed to register interface Report.r8: {e}");
+    }
+    if let Err(e) = ReportR9::register(engine, connection).await {
+        warn!("Failed to register interface Report.r9: {e}");
     }
     if let Err(e) = connection
         .object_server()

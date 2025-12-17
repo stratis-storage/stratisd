@@ -32,7 +32,7 @@ impl ReportR9 {
 
 #[interface(name = "org.storage.stratis3.Report.r9", introspection_docs = false)]
 impl ReportR9 {
-    async fn get_report(&self, name: &str) -> (String, u16, String) {
-        get_report_method(&self.engine, name).await
+    fn get_report(&self, name: &str) -> (String, u16, String) {
+        get_report_method(&self.engine, name)
     }
 }

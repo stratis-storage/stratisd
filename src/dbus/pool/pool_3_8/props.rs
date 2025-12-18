@@ -14,6 +14,10 @@ pub fn free_token_slots_prop(guard: SomeLockReadGuard<PoolUuid, dyn Pool>) -> (b
     option_to_tuple(guard.free_token_slots(), 0)
 }
 
+pub fn metadata_version_prop(guard: SomeLockReadGuard<PoolUuid, dyn Pool>) -> u64 {
+    guard.metadata_version() as u64
+}
+
 pub fn volume_key_loaded_prop<'a>(guard: SomeLockReadGuard<PoolUuid, dyn Pool>) -> Value<'a> {
     let (_, pool_uuid, pool) = guard.as_tuple();
     match pool.volume_key_is_loaded(pool_uuid) {

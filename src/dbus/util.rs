@@ -19,7 +19,7 @@ use crate::{
             Manager, ManagerR0, ManagerR1, ManagerR2, ManagerR3, ManagerR4, ManagerR5, ManagerR6,
             ManagerR7, ManagerR8, ManagerR9,
         },
-        pool::{PoolR0, PoolR1, PoolR2, PoolR3, PoolR4, PoolR5, PoolR6, PoolR7, PoolR9},
+        pool::{PoolR0, PoolR1, PoolR2, PoolR3, PoolR4, PoolR5, PoolR6, PoolR7, PoolR8, PoolR9},
         types::DbusErrorEnum,
     },
     engine::{FilesystemUuid, Lockable, PoolDiff, PoolUuid, StratFilesystemDiff},
@@ -187,6 +187,14 @@ pub async fn send_pool_background_signals(
             );
             send_signal!(
                 connection,
+                PoolR8,
+                pool_path,
+                allocated_size_changed,
+                "allocated size",
+                "pool.r8"
+            );
+            send_signal!(
+                connection,
                 PoolR9,
                 pool_path,
                 allocated_size_changed,
@@ -261,6 +269,14 @@ pub async fn send_pool_background_signals(
             );
             send_signal!(
                 connection,
+                PoolR8,
+                pool_path,
+                total_physical_used_changed,
+                "total physical used",
+                "pool.r8"
+            );
+            send_signal!(
+                connection,
                 PoolR9,
                 pool_path,
                 total_physical_used_changed,
@@ -324,6 +340,14 @@ pub async fn send_pool_background_signals(
                 no_alloc_space_changed,
                 "no alloc space",
                 "pool.r7"
+            );
+            send_signal!(
+                connection,
+                PoolR8,
+                pool_path,
+                no_alloc_space_changed,
+                "no alloc space",
+                "pool.r8"
             );
         }
     }
@@ -410,6 +434,14 @@ pub async fn send_pool_foreground_signals(
         );
         send_signal!(
             connection,
+            PoolR8,
+            pool_path,
+            allocated_size_changed,
+            "allocated size",
+            "pool.r8"
+        );
+        send_signal!(
+            connection,
             PoolR9,
             pool_path,
             allocated_size_changed,
@@ -484,6 +516,14 @@ pub async fn send_pool_foreground_signals(
         );
         send_signal!(
             connection,
+            PoolR8,
+            pool_path,
+            total_physical_used_changed,
+            "total physical used",
+            "pool.r8"
+        );
+        send_signal!(
+            connection,
             PoolR9,
             pool_path,
             total_physical_used_changed,
@@ -555,6 +595,14 @@ pub async fn send_pool_foreground_signals(
             total_physical_size_changed,
             "total physical size",
             "pool.r7"
+        );
+        send_signal!(
+            connection,
+            PoolR8,
+            pool_path,
+            total_physical_size_changed,
+            "total physical size",
+            "pool.r8"
         );
         send_signal!(
             connection,
@@ -704,6 +752,7 @@ pub async fn send_pool_name_signal(connection: &Arc<Connection>, path: &ObjectPa
     send_signal!(connection, PoolR5, path, name_changed, "name", "pool.r5");
     send_signal!(connection, PoolR6, path, name_changed, "name", "pool.r6");
     send_signal!(connection, PoolR7, path, name_changed, "name", "pool.r7");
+    send_signal!(connection, PoolR8, path, name_changed, "name", "pool.r8");
 }
 
 pub async fn send_clevis_info_signal(
@@ -777,6 +826,14 @@ pub async fn send_clevis_info_signal(
             "pool.r7"
         );
     }
+    send_signal!(
+        connection,
+        PoolR8,
+        path,
+        clevis_infos_changed,
+        "clevis infos",
+        "pool.r8"
+    );
 }
 
 pub async fn send_keyring_signal(
@@ -850,9 +907,26 @@ pub async fn send_keyring_signal(
             "pool.r7"
         );
     }
+    send_signal!(
+        connection,
+        PoolR8,
+        path,
+        key_descriptions_changed,
+        "key descriptions",
+        "pool.r8"
+    );
 }
 
-pub async fn send_free_token_slots_signal(_connection: &Arc<Connection>, _path: &ObjectPath<'_>) {}
+pub async fn send_free_token_slots_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    send_signal!(
+        connection,
+        PoolR8,
+        path,
+        free_token_slots_changed,
+        "free token slots",
+        "pool.r8"
+    );
+}
 
 pub async fn send_action_availability_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
     send_signal!(
@@ -918,6 +992,14 @@ pub async fn send_action_availability_signal(connection: &Arc<Connection>, path:
         available_actions_changed,
         "available actions",
         "pool.r7"
+    );
+    send_signal!(
+        connection,
+        PoolR8,
+        path,
+        available_actions_changed,
+        "available actions",
+        "pool.r8"
     );
 }
 
@@ -985,5 +1067,13 @@ pub async fn send_has_cache_signal(connection: &Arc<Connection>, path: &ObjectPa
         has_cache_changed,
         "has cache",
         "pool.r7"
+    );
+    send_signal!(
+        connection,
+        PoolR8,
+        path,
+        has_cache_changed,
+        "has cache",
+        "pool.r8"
     );
 }

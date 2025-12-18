@@ -18,8 +18,8 @@ use crate::{
     dbus::{
         consts,
         manager::manager_3_0::{
-            create_pool_method, destroy_pool_method, list_keys_method, locked_pools_prop,
-            set_key_method, unlock_pool_method, unset_key_method, version_prop,
+            create_pool_method, destroy_pool_method, engine_state_report_method, list_keys_method,
+            locked_pools_prop, set_key_method, unlock_pool_method, unset_key_method, version_prop,
         },
         manager::Manager,
     },
@@ -129,5 +129,10 @@ impl ManagerR1 {
         unlock_method: UnlockMethod,
     ) -> ((bool, Vec<DevUuid>), u16, String) {
         unlock_pool_method(&self.engine, &self.connection, pool_uuid, unlock_method).await
+    }
+
+    #[allow(non_snake_case)]
+    fn EngineStateReport(&self) -> (String, u16, String) {
+        engine_state_report_method(&self.engine)
     }
 }

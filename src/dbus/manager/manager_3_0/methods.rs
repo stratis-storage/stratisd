@@ -164,15 +164,17 @@ pub async fn destroy_pool_method(
 ) -> ((bool, String), u16, String) {
     let default_return = (false, String::default());
 
-    let manager_lock = manager.write().await;
-    let uuid = match manager_lock.pool_get_uuid(&pool) {
-        Some(u) => u,
-        None => {
-            return (
-                default_return,
-                DbusErrorEnum::ERROR as u16,
-                format!("Object path {pool} not associated with pool"),
-            );
+    let uuid = {
+        let manager_lock = manager.write().await;
+        match manager_lock.pool_get_uuid(&pool) {
+            Some(u) => u,
+            None => {
+                return (
+                    default_return,
+                    DbusErrorEnum::ERROR as u16,
+                    format!("Object path {pool} not associated with pool"),
+                );
+            }
         }
     };
 

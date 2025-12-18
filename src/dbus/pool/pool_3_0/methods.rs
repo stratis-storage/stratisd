@@ -179,6 +179,7 @@ pub async fn destroy_filesystems_method(
                                 let (rc, rs) = engine_to_dbus_err_tuple(&e);
                                 return (default_return, rc, rs);
                             }
+                            // TODO: Add signal handling for origin updating.
                         }
                         None => {
                             warn!("No path found to unregister for destroyed filesystem with UUID {uuid}");

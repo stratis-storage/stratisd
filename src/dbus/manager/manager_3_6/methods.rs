@@ -45,12 +45,13 @@ pub async fn stop_pool_method(
         }
     };
 
-    let action = handle_action!(engine.stop_pool(id, false).await);
+    let action = handle_action!(engine.stop_pool(id, true).await);
 
     if let Ok(StopAction::Stopped(pool_uuid) | StopAction::Partial(pool_uuid)) = action {
-        match manager.read().await.pool_get_path(&pool_uuid) {
+        let path = manager.read().await.pool_get_path(&pool_uuid).cloned();
+        match path {
             Some(pool) => {
-                if let Err(e) = unregister_pool(connection, manager, pool).await {
+                if let Err(e) = unregister_pool(connection, manager, &pool.as_ref()).await {
                     warn!("Failed to remove pool with path {pool} from the D-Bus: {e}");
                 }
             }

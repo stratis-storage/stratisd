@@ -23,8 +23,8 @@ mod methods;
 mod props;
 
 pub use methods::{
-    create_pool_method, destroy_pool_method, list_keys_method, set_key_method, unlock_pool_method,
-    unset_key_method,
+    create_pool_method, destroy_pool_method, engine_state_report_method, list_keys_method,
+    set_key_method, unlock_pool_method, unset_key_method,
 };
 pub use props::{locked_pools_prop, version_prop};
 
@@ -139,5 +139,10 @@ impl ManagerR0 {
         unlock_method: UnlockMethod,
     ) -> ((bool, Vec<DevUuid>), u16, String) {
         unlock_pool_method(&self.engine, &self.connection, pool_uuid, unlock_method).await
+    }
+
+    #[allow(non_snake_case)]
+    fn EngineStateReport(&self) -> (String, u16, String) {
+        engine_state_report_method(&self.engine)
     }
 }

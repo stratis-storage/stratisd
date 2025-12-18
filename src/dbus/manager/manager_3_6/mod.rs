@@ -20,8 +20,8 @@ use crate::{
         manager::Manager,
         manager::{
             manager_3_0::{
-                create_pool_method, destroy_pool_method, list_keys_method, set_key_method,
-                unset_key_method, version_prop,
+                create_pool_method, destroy_pool_method, engine_state_report_method,
+                list_keys_method, set_key_method, unset_key_method, version_prop,
             },
             manager_3_2::{refresh_state_method, stopped_pools_prop},
             manager_3_4::start_pool_method,
@@ -172,5 +172,10 @@ impl ManagerR6 {
     #[allow(non_snake_case)]
     async fn RefreshState(&self) -> (u16, String) {
         refresh_state_method(&self.engine).await
+    }
+
+    #[allow(non_snake_case)]
+    fn EngineStateReport(&self) -> (String, u16, String) {
+        engine_state_report_method(&self.engine)
     }
 }

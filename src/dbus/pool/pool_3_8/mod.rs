@@ -51,7 +51,10 @@ pub use methods::{
     bind_clevis_method, bind_keyring_method, rebind_clevis_method, rebind_keyring_method,
     unbind_clevis_method, unbind_keyring_method,
 };
-pub use props::{clevis_infos_prop, free_token_slots_prop, key_descs_prop, volume_key_loaded_prop};
+pub use props::{
+    clevis_infos_prop, free_token_slots_prop, key_descs_prop, metadata_version_prop,
+    volume_key_loaded_prop,
+};
 
 pub struct PoolR8 {
     connection: Arc<Connection>,
@@ -406,5 +409,10 @@ impl PoolR8 {
     #[zbus(property(emits_changed_signal = "false"))]
     async fn volume_key_loaded(&self) -> Result<Value<'_>, Error> {
         pool_prop(&self.engine, self.uuid, volume_key_loaded_prop).await
+    }
+
+    #[zbus(property(emits_changed_signal = "false"))]
+    async fn metadata_version(&self) -> Result<u64, Error> {
+        pool_prop(&self.engine, self.uuid, metadata_version_prop).await
     }
 }

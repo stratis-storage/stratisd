@@ -24,6 +24,7 @@ mod pool_3_4;
 mod pool_3_5;
 mod pool_3_6;
 mod pool_3_7;
+mod pool_3_8;
 mod pool_3_9;
 mod shared;
 
@@ -35,6 +36,7 @@ pub use pool_3_4::PoolR4;
 pub use pool_3_5::PoolR5;
 pub use pool_3_6::PoolR6;
 pub use pool_3_7::PoolR7;
+pub use pool_3_8::PoolR8;
 pub use pool_3_9::PoolR9;
 
 pub async fn register_pool<'a>(
@@ -148,6 +150,18 @@ pub async fn register_pool<'a>(
     {
         warn!("Failed to register interface pool.r7 for pool with UUID {pool_uuid}: {e}");
     }
+    if let Err(e) = PoolR8::register(
+        engine,
+        connection,
+        manager,
+        counter,
+        path.clone(),
+        pool_uuid,
+    )
+    .await
+    {
+        warn!("Failed to register interface pool.r8 for pool with UUID {pool_uuid}: {e}");
+    }
     if let Err(e) = PoolR9::register(
         engine,
         connection,
@@ -201,6 +215,9 @@ pub async fn unregister_pool(
     }
     if let Err(e) = PoolR7::unregister(connection, path.clone()).await {
         warn!("Failed to deregister interface pool.r7 for path {path}: {e}");
+    }
+    if let Err(e) = PoolR8::unregister(connection, path.clone()).await {
+        warn!("Failed to deregister interface pool.r8 for path {path}: {e}");
     }
     if let Err(e) = PoolR9::unregister(connection, path.clone()).await {
         warn!("Failed to deregister interface pool.r9 for path {path}: {e}");

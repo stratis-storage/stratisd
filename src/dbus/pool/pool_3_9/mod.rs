@@ -35,8 +35,8 @@ use crate::{
             pool_3_7::{filesystem_metadata_method, metadata_method},
             pool_3_8::{
                 bind_clevis_method, bind_keyring_method, clevis_infos_prop, free_token_slots_prop,
-                key_descs_prop, rebind_clevis_method, rebind_keyring_method, unbind_clevis_method,
-                unbind_keyring_method, volume_key_loaded_prop,
+                key_descs_prop, metadata_version_prop, rebind_clevis_method, rebind_keyring_method,
+                unbind_clevis_method, unbind_keyring_method, volume_key_loaded_prop,
             },
             shared::{pool_prop, set_pool_prop, try_pool_prop},
         },
@@ -402,5 +402,10 @@ impl PoolR9 {
     #[zbus(property(emits_changed_signal = "false"))]
     async fn volume_key_loaded(&self) -> Result<Value<'_>, Error> {
         pool_prop(&self.engine, self.uuid, volume_key_loaded_prop).await
+    }
+
+    #[zbus(property(emits_changed_signal = "false"))]
+    async fn metadata_version(&self) -> Result<u64, Error> {
+        pool_prop(&self.engine, self.uuid, metadata_version_prop).await
     }
 }

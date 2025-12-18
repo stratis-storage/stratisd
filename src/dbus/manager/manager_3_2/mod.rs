@@ -78,25 +78,21 @@ impl ManagerR2 {
 #[interface(name = "org.storage.stratis3.Manager.r2")]
 impl ManagerR2 {
     #[zbus(property(emits_changed_signal = "const"))]
-    #[allow(non_snake_case)]
     #[allow(clippy::unused_self)]
-    fn Version(&self) -> &str {
+    fn version(&self) -> &str {
         version_prop()
     }
 
     #[zbus(property(emits_changed_signal = "true"))]
-    #[allow(non_snake_case)]
-    async fn StoppedPools(&self) -> types::ManagerR2<StoppedPoolsInfo> {
+    async fn stopped_pools(&self) -> types::ManagerR2<StoppedPoolsInfo> {
         stopped_pools_prop(&self.engine).await
     }
 
-    #[allow(non_snake_case)]
-    async fn ListKeys(&self) -> (Vec<KeyDescription>, u16, String) {
+    async fn list_keys(&self) -> (Vec<KeyDescription>, u16, String) {
         list_keys_method(&self.engine).await
     }
 
-    #[allow(non_snake_case)]
-    async fn SetKey(
+    async fn set_key(
         &self,
         key_desc: KeyDescription,
         key_fd: Fd<'_>,
@@ -104,14 +100,12 @@ impl ManagerR2 {
         set_key_method(&self.engine, &key_desc, key_fd).await
     }
 
-    #[allow(non_snake_case)]
-    async fn UnsetKey(&self, key_desc: KeyDescription) -> (bool, u16, String) {
+    async fn unset_key(&self, key_desc: KeyDescription) -> (bool, u16, String) {
         unset_key_method(&self.engine, &key_desc).await
     }
 
-    #[allow(non_snake_case)]
     #[allow(clippy::too_many_arguments)]
-    async fn CreatePool(
+    async fn create_pool(
         &self,
         name: &str,
         #[allow(unused_variables)] redundancy: (bool, u16),
@@ -132,13 +126,11 @@ impl ManagerR2 {
         .await
     }
 
-    #[allow(non_snake_case)]
-    async fn DestroyPool(&self, pool: ObjectPath<'_>) -> ((bool, String), u16, String) {
+    async fn destroy_pool(&self, pool: ObjectPath<'_>) -> ((bool, String), u16, String) {
         destroy_pool_method(&self.engine, &self.connection, &self.manager, pool).await
     }
 
-    #[allow(non_snake_case)]
-    async fn StartPool(
+    async fn start_pool(
         &self,
         pool_uuid: PoolUuid,
         unlock_method: (bool, UnlockMethod),
@@ -161,13 +153,11 @@ impl ManagerR2 {
         .await
     }
 
-    #[allow(non_snake_case)]
-    async fn StopPool(&self, pool: ObjectPath<'_>) -> ((bool, PoolUuid), u16, String) {
+    async fn stop_pool(&self, pool: ObjectPath<'_>) -> ((bool, PoolUuid), u16, String) {
         stop_pool_method(&self.engine, &self.connection, &self.manager, pool).await
     }
 
-    #[allow(non_snake_case)]
-    async fn RefreshState(&self) -> (u16, String) {
+    async fn refresh_state(&self) -> (u16, String) {
         refresh_state_method(&self.engine).await
     }
 }

@@ -632,11 +632,67 @@ pub async fn send_pool_foreground_signals(
         );
         send_signal!(
             connection,
-            PoolR1,
+            PoolR2,
             pool_path,
             no_alloc_space_changed,
             "no alloc space",
             "pool.r2"
+        );
+        send_signal!(
+            connection,
+            PoolR3,
+            pool_path,
+            no_alloc_space_changed,
+            "no alloc space",
+            "pool.r3"
+        );
+        send_signal!(
+            connection,
+            PoolR4,
+            pool_path,
+            no_alloc_space_changed,
+            "no alloc space",
+            "pool.r4"
+        );
+        send_signal!(
+            connection,
+            PoolR5,
+            pool_path,
+            no_alloc_space_changed,
+            "no alloc space",
+            "pool.r5"
+        );
+        send_signal!(
+            connection,
+            PoolR6,
+            pool_path,
+            no_alloc_space_changed,
+            "no alloc space",
+            "pool.r6"
+        );
+        send_signal!(
+            connection,
+            PoolR7,
+            pool_path,
+            no_alloc_space_changed,
+            "no alloc space",
+            "pool.r7"
+        );
+        send_signal!(
+            connection,
+            PoolR8,
+            pool_path,
+            no_alloc_space_changed,
+            "no alloc space",
+            "pool.r8"
+        );
+        send_signal!(
+            connection,
+            PoolR9,
+            pool_path,
+            no_alloc_space_changed,
+            "no alloc space",
+            "pool.r9"
         );
     }
 }

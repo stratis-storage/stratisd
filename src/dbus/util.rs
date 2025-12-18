@@ -349,6 +349,14 @@ pub async fn send_pool_background_signals(
                 "no alloc space",
                 "pool.r8"
             );
+            send_signal!(
+                connection,
+                PoolR9,
+                pool_path,
+                no_alloc_space_changed,
+                "no alloc space",
+                "pool.r9"
+            );
         }
     }
 }
@@ -753,6 +761,7 @@ pub async fn send_pool_name_signal(connection: &Arc<Connection>, path: &ObjectPa
     send_signal!(connection, PoolR6, path, name_changed, "name", "pool.r6");
     send_signal!(connection, PoolR7, path, name_changed, "name", "pool.r7");
     send_signal!(connection, PoolR8, path, name_changed, "name", "pool.r8");
+    send_signal!(connection, PoolR8, path, name_changed, "name", "pool.r9");
 }
 
 pub async fn send_clevis_info_signal(
@@ -833,6 +842,14 @@ pub async fn send_clevis_info_signal(
         clevis_infos_changed,
         "clevis infos",
         "pool.r8"
+    );
+    send_signal!(
+        connection,
+        PoolR9,
+        path,
+        clevis_infos_changed,
+        "clevis infos",
+        "pool.r9"
     );
 }
 
@@ -915,6 +932,14 @@ pub async fn send_keyring_signal(
         "key descriptions",
         "pool.r8"
     );
+    send_signal!(
+        connection,
+        PoolR9,
+        path,
+        key_descriptions_changed,
+        "key descriptions",
+        "pool.r9"
+    );
 }
 
 pub async fn send_free_token_slots_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
@@ -925,6 +950,14 @@ pub async fn send_free_token_slots_signal(connection: &Arc<Connection>, path: &O
         free_token_slots_changed,
         "free token slots",
         "pool.r8"
+    );
+    send_signal!(
+        connection,
+        PoolR9,
+        path,
+        free_token_slots_changed,
+        "free token slots",
+        "pool.r9"
     );
 }
 
@@ -1001,6 +1034,14 @@ pub async fn send_action_availability_signal(connection: &Arc<Connection>, path:
         "available actions",
         "pool.r8"
     );
+    send_signal!(
+        connection,
+        PoolR9,
+        path,
+        available_actions_changed,
+        "available actions",
+        "pool.r9"
+    );
 }
 
 pub async fn send_has_cache_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
@@ -1075,5 +1116,13 @@ pub async fn send_has_cache_signal(connection: &Arc<Connection>, path: &ObjectPa
         has_cache_changed,
         "has cache",
         "pool.r8"
+    );
+    send_signal!(
+        connection,
+        PoolR9,
+        path,
+        has_cache_changed,
+        "has cache",
+        "pool.r9"
     );
 }

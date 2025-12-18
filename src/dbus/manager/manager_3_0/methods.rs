@@ -238,3 +238,13 @@ pub async fn unlock_pool_method(
         }
     }
 }
+
+pub fn engine_state_report_method(engine: &Arc<dyn Engine>) -> (String, u16, String) {
+    match serde_json::to_string(&engine.engine_state_report()) {
+        Ok(result) => (result, DbusErrorEnum::OK as u16, OK_STRING.to_string()),
+        Err(e) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&e.into());
+            (String::new(), rc, rs)
+        }
+    }
+}

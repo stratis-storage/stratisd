@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    os::fd::AsRawFd,
+    os::fd::{AsRawFd, IntoRawFd},
     path::PathBuf,
     sync::{atomic::AtomicU64, Arc},
 };
@@ -50,6 +50,17 @@ pub async fn set_key_method(
 ) -> ((bool, bool), u16, String) {
     let default_return = (false, false);
 
+    let fd = match fd {
+        Fd::Borrowed(_) => match fd.try_to_owned() {
+            Ok(Fd::Owned(fd)) => fd.into_raw_fd(),
+            Ok(_) => unreachable!(),
+            Err(e) => {
+                let (rc, rs) = engine_to_dbus_err_tuple(&e.into());
+                return (default_return, rc, rs);
+            }
+        },
+        Fd::Owned(fd) => fd.into_raw_fd(),
+    };
     match handle_action!(engine.get_key_handler().await.set(key_desc, fd.as_raw_fd())) {
         Ok(MappingCreateAction::Created(_)) => (
             (true, false),

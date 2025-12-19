@@ -84,46 +84,50 @@ pub async fn start_pool_method<'a>(
             .await
     ) {
         Ok(StartAction::Started(pool_uuid)) => {
-            let guard = match engine.get_pool(PoolIdentifier::Uuid(pool_uuid)).await {
-                Some(g) => g,
-                None => {
-                    return (
-                        default_return,
-                        DbusErrorEnum::ERROR as u16,
-                        format!("No pool found for newly started pool with UUID {pool_uuid}"),
-                    );
-                }
-            };
-            let mut fs_paths = Vec::default();
-            for fs_uuid in guard
-                .filesystems()
-                .into_iter()
-                .map(|(_, fs_uuid, _)| fs_uuid)
-                .collect::<Vec<_>>()
-            {
-                let fs_path = match register_filesystem(
-                    engine, connection, manager, counter, pool_uuid, fs_uuid,
-                )
-                .await
+            let (pool_path, dev_paths, fs_paths, is_encrypted) = {
+                let guard = match engine.get_pool(PoolIdentifier::Uuid(pool_uuid)).await {
+                    Some(g) => g,
+                    None => {
+                        return (
+                            default_return,
+                            DbusErrorEnum::ERROR as u16,
+                            format!("No pool found for newly started pool with UUID {pool_uuid}"),
+                        );
+                    }
+                };
+                let mut fs_paths = Vec::default();
+                for fs_uuid in guard
+                    .filesystems()
+                    .into_iter()
+                    .map(|(_, fs_uuid, _)| fs_uuid)
+                    .collect::<Vec<_>>()
                 {
-                    Ok(fp) => fp,
-                    Err(e) => {
-                        let (rc, rs) = engine_to_dbus_err_tuple(&e);
-                        return (default_return, rc, rs);
-                    }
-                };
-                fs_paths.push(fs_path);
-            }
-            let (pool_path, dev_paths) =
-                match register_pool(engine, connection, manager, counter, pool_uuid).await {
-                    Ok(pp) => pp,
-                    Err(e) => {
-                        let (rc, rs) = engine_to_dbus_err_tuple(&e);
-                        return (default_return, rc, rs);
-                    }
-                };
+                    let fs_path = match register_filesystem(
+                        engine, connection, manager, counter, pool_uuid, fs_uuid,
+                    )
+                    .await
+                    {
+                        Ok(fp) => fp,
+                        Err(e) => {
+                            let (rc, rs) = engine_to_dbus_err_tuple(&e);
+                            return (default_return, rc, rs);
+                        }
+                    };
+                    fs_paths.push(fs_path);
+                }
+                let (pool_path, dev_paths) =
+                    match register_pool(engine, connection, manager, counter, pool_uuid).await {
+                        Ok(pp) => pp,
+                        Err(e) => {
+                            let (rc, rs) = engine_to_dbus_err_tuple(&e);
+                            return (default_return, rc, rs);
+                        }
+                    };
 
-            if guard.is_encrypted() {
+                (pool_path, dev_paths, fs_paths, guard.is_encrypted())
+            };
+
+            if is_encrypted {
                 send_locked_pools_signals(connection).await;
             }
             send_stopped_pools_signals(connection).await;

@@ -15,6 +15,7 @@ use devicemapper::Bytes;
 
 use crate::{
     dbus::{
+        blockdev::register_blockdev,
         consts::OK_STRING,
         filesystem::{register_filesystem, unregister_filesystem},
         manager::Manager,
@@ -297,7 +298,7 @@ pub async fn add_data_devs_method<'a>(
     engine: &Arc<dyn Engine>,
     connection: &Arc<Connection>,
     manager: &Lockable<Arc<RwLock<Manager>>>,
-    _counter: &Arc<AtomicU64>,
+    counter: &Arc<AtomicU64>,
     pool_uuid: PoolUuid,
     devices: Vec<PathBuf>,
 ) -> ((bool, Vec<ObjectPath<'a>>), u16, String) {
@@ -329,30 +330,36 @@ pub async fn add_data_devs_method<'a>(
     })
     .await
     {
-        Ok(Ok((action, diff))) => {
-            match action.changed() {
-                Some(_) => {
-                    if let Some(d) = diff {
-                        send_pool_foreground_signals(connection, manager, pool_uuid, d).await;
+        Ok(Ok((action, diff))) => match action.changed() {
+            Some(bd_uuids) => {
+                if let Some(d) = diff {
+                    send_pool_foreground_signals(connection, manager, pool_uuid, d).await;
+                }
+                let mut bd_paths = Vec::new();
+                for dev_uuid in bd_uuids {
+                    match register_blockdev(
+                        engine, connection, manager, counter, pool_uuid, dev_uuid,
+                    )
+                    .await
+                    {
+                        Ok(op) => bd_paths.push(op),
+                        Err(_) => {
+                            warn!("Unable to register object path for blockdev with UUID {dev_uuid} belonging to pool {pool_uuid} on the D-Bus");
+                        }
                     }
-                    // TODO: Register blockdevs here.
-                    (
-                        // TODO: Change to blockdev object paths.
-                        default_return,
-                        DbusErrorEnum::OK as u16,
-                        OK_STRING.to_string(),
-                    )
                 }
-                None => {
-                    (
-                        // TODO: Change to blockdev object paths.
-                        default_return,
-                        DbusErrorEnum::OK as u16,
-                        OK_STRING.to_string(),
-                    )
-                }
+                (
+                    (true, bd_paths),
+                    DbusErrorEnum::OK as u16,
+                    OK_STRING.to_string(),
+                )
             }
-        }
+            None => (
+                default_return,
+                DbusErrorEnum::OK as u16,
+                OK_STRING.to_string(),
+            ),
+        },
         Ok(Err(e)) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e);
             (default_return, rc, rs)
@@ -368,7 +375,7 @@ pub async fn init_cache_method<'a>(
     engine: &Arc<dyn Engine>,
     connection: &Arc<Connection>,
     manager: &Lockable<Arc<RwLock<Manager>>>,
-    _counter: &Arc<AtomicU64>,
+    counter: &Arc<AtomicU64>,
     pool_uuid: PoolUuid,
     devices: Vec<PathBuf>,
 ) -> ((bool, Vec<ObjectPath<'a>>), u16, String) {
@@ -398,35 +405,41 @@ pub async fn init_cache_method<'a>(
     })
     .await
     {
-        Ok(Ok(action)) => {
-            match action.changed() {
-                Some(_) => {
-                    match manager.read().await.pool_get_path(&pool_uuid) {
-                        Some(p) => {
-                            send_has_cache_signal(connection, p).await;
-                        }
-                        None => {
-                            warn!("No object path associated with pool UUID {pool_uuid}; failed to send pool has cache change signals");
-                        }
-                    };
-                    // TODO: Register blockdevs here.
-                    (
-                        // TODO: Change to blockdev object paths.
-                        default_return,
-                        DbusErrorEnum::OK as u16,
-                        OK_STRING.to_string(),
+        Ok(Ok(action)) => match action.changed() {
+            Some(bd_uuids) => {
+                match manager.read().await.pool_get_path(&pool_uuid) {
+                    Some(p) => {
+                        send_has_cache_signal(connection, p).await;
+                    }
+                    None => {
+                        warn!("No object path associated with pool UUID {pool_uuid}; failed to send pool has cache change signals");
+                    }
+                };
+                let mut bd_paths = Vec::new();
+                for dev_uuid in bd_uuids {
+                    match register_blockdev(
+                        engine, connection, manager, counter, pool_uuid, dev_uuid,
                     )
+                    .await
+                    {
+                        Ok(op) => bd_paths.push(op),
+                        Err(_) => {
+                            warn!("Unable to register object path for blockdev with UUID {dev_uuid} belonging to pool {pool_uuid} on the D-Bus");
+                        }
+                    }
                 }
-                None => {
-                    (
-                        // TODO: Change to blockdev object paths.
-                        default_return,
-                        DbusErrorEnum::OK as u16,
-                        OK_STRING.to_string(),
-                    )
-                }
+                (
+                    (true, bd_paths),
+                    DbusErrorEnum::OK as u16,
+                    OK_STRING.to_string(),
+                )
             }
-        }
+            None => (
+                default_return,
+                DbusErrorEnum::OK as u16,
+                OK_STRING.to_string(),
+            ),
+        },
         Ok(Err(e)) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e);
             (default_return, rc, rs)
@@ -442,7 +455,7 @@ pub async fn add_cache_devs_method<'a>(
     engine: &Arc<dyn Engine>,
     connection: &Arc<Connection>,
     manager: &Lockable<Arc<RwLock<Manager>>>,
-    _counter: &Arc<AtomicU64>,
+    counter: &Arc<AtomicU64>,
     pool_uuid: PoolUuid,
     devices: Vec<PathBuf>,
 ) -> ((bool, Vec<ObjectPath<'a>>), u16, String) {
@@ -473,27 +486,33 @@ pub async fn add_cache_devs_method<'a>(
     })
     .await
     {
-        Ok(Ok(action)) => {
-            match action.changed() {
-                Some(_) => {
-                    // TODO: Register blockdevs here.
-                    (
-                        // TODO: Change to blockdev object paths.
-                        default_return,
-                        DbusErrorEnum::OK as u16,
-                        OK_STRING.to_string(),
+        Ok(Ok(action)) => match action.changed() {
+            Some(bd_uuids) => {
+                let mut bd_paths = Vec::new();
+                for dev_uuid in bd_uuids {
+                    match register_blockdev(
+                        engine, connection, manager, counter, pool_uuid, dev_uuid,
                     )
+                    .await
+                    {
+                        Ok(op) => bd_paths.push(op),
+                        Err(_) => {
+                            warn!("Unable to register object path for blockdev with UUID {dev_uuid} belonging to pool {pool_uuid} on the D-Bus");
+                        }
+                    }
                 }
-                None => {
-                    (
-                        // TODO: Change to blockdev object paths.
-                        default_return,
-                        DbusErrorEnum::OK as u16,
-                        OK_STRING.to_string(),
-                    )
-                }
+                (
+                    (true, bd_paths),
+                    DbusErrorEnum::OK as u16,
+                    OK_STRING.to_string(),
+                )
             }
-        }
+            None => (
+                default_return,
+                DbusErrorEnum::OK as u16,
+                OK_STRING.to_string(),
+            ),
+        },
         Ok(Err(e)) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e);
             (default_return, rc, rs)

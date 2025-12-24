@@ -264,8 +264,8 @@ impl Pool for SimPool {
 
     fn add_blockdevs(
         &mut self,
-        _pool_uuid: PoolUuid,
-        _pool_name: &str,
+        pool_uuid: PoolUuid,
+        pool_name: &str,
         paths: &[&Path],
         tier: BlockDevTier,
     ) -> StratisResult<(SetCreateAction<DevUuid>, Option<PoolDiff>)> {
@@ -284,31 +284,67 @@ impl Pool for SimPool {
 
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
 
-        let the_vec = match tier {
-            BlockDevTier::Cache => &self.cache_devs,
-            BlockDevTier::Data => &self.block_devs,
-        };
+        let device_pairs: Vec<_> = devices.iter().map(|p| SimDev::new(p)).collect();
+        let data_filter: Vec<_> = self.block_devs.values().map(|d| d.devnode()).collect();
+        let cache_filter: Vec<_> = self.cache_devs.values().map(|d| d.devnode()).collect();
 
-        let filter: Vec<_> = the_vec.values().map(|d| d.devnode()).collect();
+        match tier {
+            BlockDevTier::Cache => {
+                let in_data_tier: Vec<_> = device_pairs
+                    .iter()
+                    .map(|(_, sd)| sd)
+                    .filter(|sd| data_filter.contains(&sd.devnode()))
+                    .collect();
+                if !in_data_tier.is_empty() {
+                    return Err(StratisError::Msg(format!(
+                        "Devices {} are already in the data tier of pool with UUID {pool_uuid} and name {pool_name}",
+                        in_data_tier
+                            .into_iter()
+                            .map(|sd| sd.devnode().display())
+                            .join(", ")
+                    )));
+                }
+                let filtered_device_pairs: Vec<_> = device_pairs
+                    .into_iter()
+                    .filter(|(_, sd)| !cache_filter.contains(&sd.devnode()))
+                    .collect();
 
-        let filtered_device_pairs: Vec<_> = devices
-            .iter()
-            .map(|p| SimDev::new(p))
-            .filter(|(_, sd)| !filter.contains(&sd.devnode()))
-            .collect();
+                let ret_uuids = filtered_device_pairs
+                    .iter()
+                    .map(|&(uuid, _)| uuid)
+                    .collect();
+                self.cache_devs.extend(filtered_device_pairs);
+                Ok((SetCreateAction::new(ret_uuids), None))
+            }
+            BlockDevTier::Data => {
+                let in_cache_tier: Vec<_> = device_pairs
+                    .iter()
+                    .map(|(_, sd)| sd)
+                    .filter(|sd| cache_filter.contains(&sd.devnode()))
+                    .collect();
+                if !in_cache_tier.is_empty() {
+                    return Err(StratisError::Msg(format!(
+                        "Devices {} are already in use in the cache tier of pool with UUID {pool_uuid} and name {pool_name}",
+                        in_cache_tier
+                            .into_iter()
+                            .map(|sd| sd.devnode().display())
+                            .join(", ")
+                    )));
+                }
 
-        let ret_uuids = filtered_device_pairs
-            .iter()
-            .map(|&(uuid, _)| uuid)
-            .collect();
+                let filtered_device_pairs: Vec<_> = device_pairs
+                    .into_iter()
+                    .filter(|(_, sd)| !data_filter.contains(&sd.devnode()))
+                    .collect();
 
-        let the_vec = match tier {
-            BlockDevTier::Cache => &mut self.cache_devs,
-            BlockDevTier::Data => &mut self.block_devs,
-        };
-
-        the_vec.extend(filtered_device_pairs);
-        Ok((SetCreateAction::new(ret_uuids), None))
+                let ret_uuids = filtered_device_pairs
+                    .iter()
+                    .map(|&(uuid, _)| uuid)
+                    .collect();
+                self.block_devs.extend(filtered_device_pairs);
+                Ok((SetCreateAction::new(ret_uuids), None))
+            }
+        }
     }
 
     fn bind_clevis(

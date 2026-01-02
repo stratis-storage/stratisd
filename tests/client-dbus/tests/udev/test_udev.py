@@ -266,7 +266,7 @@ class UdevTest3(UdevTest):
 
         with OptionalKeyServiceContextManager(key_spec=key_spec):
             if _LEGACY_POOL is not None:
-                ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+                ((changed, _), exit_code, message) = Manager.Methods.StartPool(
                     get_object(TOP_OBJECT),
                     {
                         "id": pool_uuid,
@@ -277,7 +277,7 @@ class UdevTest3(UdevTest):
                     },
                 )
             else:
-                ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+                ((changed, _), exit_code, message) = Manager.Methods.StartPool(
                     get_object(TOP_OBJECT),
                     {
                         "id": pool_uuid,
@@ -292,7 +292,7 @@ class UdevTest3(UdevTest):
                 self.assertNotEqual(exit_code, StratisdErrors.OK)
                 self.assertEqual(changed, False)
             else:
-                self.assertEqual(exit_code, StratisdErrors.OK)
+                self.assertEqual(exit_code, StratisdErrors.OK, msg=message)
                 self.assertEqual(changed, take_down_dm)
 
             wait_for_udev_count(num_devices)
@@ -426,7 +426,7 @@ class UdevTest4(UdevTest):
             wait_for_udev(udev_wait_type, self._lb_mgr.device_files(tokens_up))
 
             if _LEGACY_POOL is not None:
-                ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+                ((changed, _), exit_code, message) = Manager.Methods.StartPool(
                     get_object(TOP_OBJECT),
                     {
                         "id": pool_uuid,
@@ -437,7 +437,7 @@ class UdevTest4(UdevTest):
                     },
                 )
             else:
-                ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+                ((changed, _), exit_code, message) = Manager.Methods.StartPool(
                     get_object(TOP_OBJECT),
                     {
                         "id": pool_uuid,
@@ -452,7 +452,7 @@ class UdevTest4(UdevTest):
                 self.assertNotEqual(exit_code, StratisdErrors.OK)
                 self.assertEqual(changed, False)
             else:
-                self.assertEqual(exit_code, StratisdErrors.OK)
+                self.assertEqual(exit_code, StratisdErrors.OK, msg=message)
                 self.assertEqual(changed, True)
 
             wait_for_udev_count(num_devices)
@@ -726,14 +726,14 @@ class UdevTest6(UdevTest):
                 0,
             )
 
-            ((changed, _), exit_code, _) = Manager.Methods.StopPool(
+            ((changed, _), exit_code, message) = Manager.Methods.StopPool(
                 get_object(TOP_OBJECT),
                 {
                     "id": pool_name1,
                     "id_type": "name",
                 },
             )
-            self.assertEqual(exit_code, 0)
+            self.assertEqual(exit_code, StratisdErrors.OK, msg=message)
             self.assertEqual(changed, True)
 
             self.assertEqual(
@@ -811,11 +811,11 @@ class UdevTest7(UdevTest):
             )
             self.assertEqual(exit_code, 0)
             self.assertEqual(changed, True)
-            ((changed, _), exit_code, _) = Manager.Methods.StopPool(
+            ((changed, _), exit_code, message) = Manager.Methods.StopPool(
                 get_object(TOP_OBJECT),
                 {"id": "unencrypted", "id_type": "name"},
             )
-            self.assertEqual(exit_code, 0)
+            self.assertEqual(exit_code, StratisdErrors.OK, msg=message)
             self.assertEqual(changed, True)
 
             self.wait_for_pools(0)
@@ -882,7 +882,7 @@ class UdevTest7(UdevTest):
             settle()
 
             if _LEGACY_POOL is not None:
-                ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+                ((changed, _), exit_code, message) = Manager.Methods.StartPool(
                     get_object(TOP_OBJECT),
                     {
                         "id": "encrypted",
@@ -893,7 +893,7 @@ class UdevTest7(UdevTest):
                     },
                 )
             else:
-                ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+                ((changed, _), exit_code, message) = Manager.Methods.StartPool(
                     get_object(TOP_OBJECT),
                     {
                         "id": "encrypted",
@@ -904,12 +904,12 @@ class UdevTest7(UdevTest):
                     },
                 )
             self.assertTrue(changed)
-            self.assertEqual(exit_code, 0)
+            self.assertEqual(exit_code, StratisdErrors.OK, msg=message)
             self.assertEqual(
                 len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))),
                 1,
             )
-            ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+            ((changed, _), exit_code, message) = Manager.Methods.StartPool(
                 get_object(TOP_OBJECT),
                 {
                     "id": "unencrypted",
@@ -920,7 +920,7 @@ class UdevTest7(UdevTest):
                 },
             )
             self.assertTrue(changed)
-            self.assertEqual(exit_code, 0)
+            self.assertEqual(exit_code, StratisdErrors.OK, msg=message)
             self.assertEqual(
                 len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))),
                 0,

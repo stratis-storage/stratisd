@@ -21,7 +21,7 @@ import json
 from time import sleep
 
 # isort: LOCAL
-from stratisd_client_dbus import Manager, Pool, get_object
+from stratisd_client_dbus import Manager, Pool, StratisdErrors, get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from ._utils import OptionalKeyServiceContextManager, UdevTest, create_pool, get_pools
@@ -65,16 +65,16 @@ class TestExtendOnAddData(UdevTest):
             allocs = metadata_dct["backstore"]["cap"]["allocs"]
 
         with OptionalKeyServiceContextManager(key_spec=[("testkey", "testkey")]):
-            (_, rc, _) = Manager.Methods.UnsetKey(
+            (_, rc, message) = Manager.Methods.UnsetKey(
                 get_object(TOP_OBJECT), {"key_desc": "testkey"}
             )
-            self.assertEqual(0, rc)
+            self.assertEqual(rc, StratisdErrors.OK, msg=message)
 
             (pool_object_path, _) = get_pools(name="testpool")[0]
-            (_, rc, _) = Pool.Methods.AddDataDevs(
+            (_, rc, message) = Pool.Methods.AddDataDevs(
                 get_object(pool_object_path), {"devices": [devnodes[2]]}
             )
-            self.assertEqual(rc, 0)
+            self.assertEqual(rc, StratisdErrors.OK, msg=message)
 
             sleep(10)
 

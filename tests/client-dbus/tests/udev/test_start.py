@@ -20,7 +20,7 @@ Test starting additional stratisd processes.
 import os
 
 # isort: LOCAL
-from stratisd_client_dbus import Manager, Pool, get_object
+from stratisd_client_dbus import Manager, Pool, StratisdErrors, get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from ._utils import OptionalKeyServiceContextManager, UdevTest, create_pool
@@ -61,12 +61,12 @@ class TestFailedStart(UdevTest):
             )
             self.wait_for_pools(1)
 
-            (_, rc, _) = Pool.Methods.InitCache(
+            (_, rc, message) = Pool.Methods.InitCache(
                 get_object(pool_object_path), {"devices": [devnodes[2]]}
             )
-            self.assertEqual(rc, 0)
+            self.assertEqual(rc, StratisdErrors.OK, msg=message)
 
-            ((b, _), rc, _) = Manager.Methods.StopPool(
+            ((b, _), rc, message) = Manager.Methods.StopPool(
                 get_object(TOP_OBJECT),
                 {
                     "id": "testpool",
@@ -74,15 +74,15 @@ class TestFailedStart(UdevTest):
                 },
             )
             self.assertEqual(b, True)
-            self.assertEqual(rc, 0)
+            self.assertEqual(rc, StratisdErrors.OK, msg=message)
 
-            (_, rc, _) = Manager.Methods.UnsetKey(
+            (_, rc, message) = Manager.Methods.UnsetKey(
                 get_object(TOP_OBJECT),
                 {
                     "key_desc": "testkey",
                 },
             )
-            self.assertEqual(rc, 0)
+            self.assertEqual(rc, StratisdErrors.OK, msg=message)
 
             (_, rc, _) = Manager.Methods.StartPool(
                 get_object(TOP_OBJECT),
@@ -98,16 +98,16 @@ class TestFailedStart(UdevTest):
 
             (out_side, in_side) = os.pipe()
             os.write(in_side, b"testkey")
-            (_, rc, _) = Manager.Methods.SetKey(
+            (_, rc, message) = Manager.Methods.SetKey(
                 get_object(TOP_OBJECT),
                 {
                     "key_desc": "testkey",
                     "key_fd": out_side,
                 },
             )
-            self.assertEqual(rc, 0)
+            self.assertEqual(rc, StratisdErrors.OK, msg=message)
 
-            (_, rc, _) = Manager.Methods.StartPool(
+            (_, rc, message) = Manager.Methods.StartPool(
                 get_object(TOP_OBJECT),
                 {
                     "id": "testpool",
@@ -117,7 +117,7 @@ class TestFailedStart(UdevTest):
                     "remove_cache": False,
                 },
             )
-            self.assertEqual(rc, 0)
+            self.assertEqual(rc, StratisdErrors.OK, msg=message)
 
 
 class TestRemoveCache(UdevTest):
@@ -140,14 +140,14 @@ class TestRemoveCache(UdevTest):
 
         with OptionalKeyServiceContextManager(key_spec=key_spec):
             (_, (pool_object_path, _)) = create_pool("testpool", devnodes[:2])
-            (_, rc, _) = Pool.Methods.InitCache(
+            (_, rc, message) = Pool.Methods.InitCache(
                 get_object(pool_object_path), {"devices": [devnodes[2]]}
             )
-            self.assertEqual(rc, 0)
+            self.assertEqual(rc, StratisdErrors.OK, msg=message)
 
             assert bool(Pool.Properties.HasCache.Get(get_object(pool_object_path)))
 
-            ((b, _), rc, _) = Manager.Methods.StopPool(
+            ((b, _), rc, message) = Manager.Methods.StopPool(
                 get_object(TOP_OBJECT),
                 {
                     "id": "testpool",
@@ -155,9 +155,9 @@ class TestRemoveCache(UdevTest):
                 },
             )
             self.assertEqual(b, True)
-            self.assertEqual(rc, 0)
+            self.assertEqual(rc, StratisdErrors.OK, msg=message)
 
-            ((b, (pool_object_path, _, _)), rc, _) = Manager.Methods.StartPool(
+            ((b, (pool_object_path, _, _)), rc, message) = Manager.Methods.StartPool(
                 get_object(TOP_OBJECT),
                 {
                     "id": "testpool",
@@ -167,14 +167,14 @@ class TestRemoveCache(UdevTest):
                     "remove_cache": True,
                 },
             )
-            self.assertEqual(rc, 0)
+            self.assertEqual(rc, StratisdErrors.OK, msg=message)
 
             assert not bool(Pool.Properties.HasCache.Get(get_object(pool_object_path)))
 
-            (_, rc, _) = Pool.Methods.InitCache(
+            (_, rc, message) = Pool.Methods.InitCache(
                 get_object(pool_object_path), {"devices": [devnodes[2]]}
             )
-            self.assertEqual(rc, 0)
+            self.assertEqual(rc, StratisdErrors.OK, msg=message)
 
     def test_unencrypted_cache_removal(self):
         """

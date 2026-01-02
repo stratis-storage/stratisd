@@ -70,13 +70,13 @@ class TestBindingAndAddingTrustedUrl(UdevTest):
                 },
             )
 
-            self.assertEqual(exit_code, StratisdErrors.OK, message)
+            self.assertEqual(exit_code, StratisdErrors.OK, msg=message)
 
             (_, exit_code, message) = Pool.Methods.AddDataDevs(
                 get_object(pool_object_path), {"devices": added_devnodes}
             )
 
-            self.assertEqual(exit_code, StratisdErrors.OK, message)
+            self.assertEqual(exit_code, StratisdErrors.OK, msg=message)
 
     def test_binding_unbinding_adding(self):
         """
@@ -105,19 +105,19 @@ class TestBindingAndAddingTrustedUrl(UdevTest):
                 },
             )
 
-            self.assertEqual(exit_code, StratisdErrors.OK, message)
+            self.assertEqual(exit_code, StratisdErrors.OK, msg=message)
 
             (_, exit_code, message) = Pool.Methods.UnbindClevis(
                 get_object(pool_object_path), {"token_slot": (False, 0)}
             )
 
-            self.assertEqual(exit_code, StratisdErrors.OK, message)
+            self.assertEqual(exit_code, StratisdErrors.OK, msg=message)
 
             (_, exit_code, message) = Pool.Methods.AddDataDevs(
                 get_object(pool_object_path), {"devices": added_devnodes}
             )
 
-            self.assertEqual(exit_code, StratisdErrors.OK, message)
+            self.assertEqual(exit_code, StratisdErrors.OK, msg=message)
 
     def test_swap_binding(self):
         """
@@ -147,19 +147,19 @@ class TestBindingAndAddingTrustedUrl(UdevTest):
                 },
             )
 
-            self.assertEqual(exit_code, StratisdErrors.OK, message)
+            self.assertEqual(exit_code, StratisdErrors.OK, msg=message)
 
             (_, exit_code, message) = Pool.Methods.UnbindKeyring(
                 get_object(pool_object_path), {"token_slot": (False, 0)}
             )
 
-            self.assertEqual(exit_code, StratisdErrors.OK, message)
+            self.assertEqual(exit_code, StratisdErrors.OK, msg=message)
 
             (_, exit_code, message) = Pool.Methods.AddDataDevs(
                 get_object(pool_object_path), {"devices": added_devnodes}
             )
 
-            self.assertEqual(exit_code, StratisdErrors.OK, message)
+            self.assertEqual(exit_code, StratisdErrors.OK, msg=message)
 
     def test_swap_binding_2(self):
         """
@@ -187,19 +187,19 @@ class TestBindingAndAddingTrustedUrl(UdevTest):
                 {"key_desc": key_description, "token_slot": (False, 0)},
             )
 
-            self.assertEqual(exit_code, StratisdErrors.OK, message)
+            self.assertEqual(exit_code, StratisdErrors.OK, msg=message)
 
             (_, exit_code, message) = Pool.Methods.UnbindClevis(
                 get_object(pool_object_path), {"token_slot": (False, 0)}
             )
 
-            self.assertEqual(exit_code, StratisdErrors.OK, message)
+            self.assertEqual(exit_code, StratisdErrors.OK, msg=message)
 
             (_, exit_code, message) = Pool.Methods.AddDataDevs(
                 get_object(pool_object_path), {"devices": added_devnodes}
             )
 
-            self.assertEqual(exit_code, StratisdErrors.OK, message)
+            self.assertEqual(exit_code, StratisdErrors.OK, msg=message)
 
     def test_rebind_with_clevis(self):
         """

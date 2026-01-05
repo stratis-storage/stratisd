@@ -84,7 +84,7 @@ macro_rules! send_signal {
         {
             Ok(iface_ref) => {
                 if let Err(e) = iface_ref
-                    .get_mut()
+                    .get()
                     .await
                     .$changed(iface_ref.signal_emitter())
                     .await

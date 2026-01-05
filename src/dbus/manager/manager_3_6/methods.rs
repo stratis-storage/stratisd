@@ -60,12 +60,16 @@ pub async fn stop_pool_method(
             }
         };
         send_stopped_pools_signals(connection).await;
-        let stopped_pools = engine.stopped_pools().await;
-        let stopped = stopped_pools
-            .stopped
-            .get(&pool_uuid)
-            .or_else(|| stopped_pools.partially_constructed.get(&pool_uuid));
-        if stopped.map(|s| s.info.is_some()).unwrap_or(false) {
+        let stopped = {
+            let stopped_pools = engine.stopped_pools().await;
+            stopped_pools
+                .stopped
+                .get(&pool_uuid)
+                .or_else(|| stopped_pools.partially_constructed.get(&pool_uuid))
+                .map(|s| s.info.is_some())
+                .unwrap_or(false)
+        };
+        if stopped {
             send_locked_pools_signals(connection).await;
         }
     }

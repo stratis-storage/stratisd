@@ -8,7 +8,7 @@ use std::{
     io::Read,
     os::{
         fd::AsFd,
-        unix::io::{FromRawFd, RawFd},
+        unix::io::{FromRawFd, IntoRawFd, RawFd},
     },
     path::{Path, PathBuf},
     sync::LazyLock,
@@ -138,6 +138,8 @@ pub fn read_key_shared(key_fd: RawFd, memory: &mut [u8]) -> StratisResult<usize>
             )));
         }
     }
+
+    let _ = key_file.into_raw_fd();
 
     Ok(bytes_read)
 }

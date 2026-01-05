@@ -11,7 +11,7 @@ use std::{
 use serde_json::{from_str, Value};
 use tokio::sync::RwLock;
 use zbus::{
-    zvariant::{Fd, ObjectPath},
+    zvariant::{Fd, OwnedObjectPath},
     Connection,
 };
 
@@ -37,7 +37,7 @@ use crate::{
 };
 
 #[allow(clippy::too_many_arguments)]
-pub async fn create_pool_method<'a>(
+pub async fn create_pool_method(
     engine: &Arc<dyn Engine>,
     connection: &Arc<Connection>,
     manager: &Lockable<Arc<RwLock<Manager>>>,
@@ -49,8 +49,8 @@ pub async fn create_pool_method<'a>(
     journal_size: (bool, u64),
     tag_spec: (bool, &str),
     allocate_superblock: (bool, bool),
-) -> ((bool, (ObjectPath<'a>, Vec<ObjectPath<'a>>)), u16, String) {
-    let default_return = (false, (ObjectPath::default(), Vec::new()));
+) -> ((bool, (OwnedObjectPath, Vec<OwnedObjectPath>)), u16, String) {
+    let default_return = (false, (OwnedObjectPath::default(), Vec::new()));
 
     let devs_ref = devs.iter().map(|path| path.as_path()).collect::<Vec<_>>();
     let key_desc = key_desc
@@ -114,8 +114,14 @@ pub async fn create_pool_method<'a>(
     ) {
         Ok(CreateAction::Created(uuid)) => {
             match register_pool(engine, connection, manager, counter, uuid).await {
-                Ok(tuple) => (
-                    (true, tuple),
+                Ok((pool_path, fs_paths)) => (
+                    (
+                        true,
+                        (
+                            OwnedObjectPath::from(pool_path),
+                            fs_paths.into_iter().map(OwnedObjectPath::from).collect(),
+                        ),
+                    ),
                     DbusErrorEnum::OK as u16,
                     OK_STRING.to_string(),
                 ),
@@ -138,7 +144,7 @@ pub async fn create_pool_method<'a>(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn start_pool_method<'a>(
+pub async fn start_pool_method(
     engine: &Arc<dyn Engine>,
     connection: &Arc<Connection>,
     manager: &Lockable<Arc<RwLock<Manager>>>,
@@ -150,14 +156,14 @@ pub async fn start_pool_method<'a>(
 ) -> (
     (
         bool,
-        (ObjectPath<'a>, Vec<ObjectPath<'a>>, Vec<ObjectPath<'a>>),
+        (OwnedObjectPath, Vec<OwnedObjectPath>, Vec<OwnedObjectPath>),
     ),
     u16,
     String,
 ) {
     let default_return = (
         false,
-        (ObjectPath::default(), Vec::default(), Vec::default()),
+        (OwnedObjectPath::default(), Vec::default(), Vec::default()),
     );
 
     let id = match id_type {
@@ -220,11 +226,14 @@ pub async fn start_pool_method<'a>(
                         return (default_return, rc, rs);
                     }
                 };
-                fs_paths.push(fs_path);
+                fs_paths.push(OwnedObjectPath::from(fs_path));
             }
             let (pool_path, dev_paths) =
                 match register_pool(engine, connection, manager, counter, pool_uuid).await {
-                    Ok(pp) => pp,
+                    Ok((pp, dp)) => (
+                        OwnedObjectPath::from(pp),
+                        dp.into_iter().map(OwnedObjectPath::from).collect(),
+                    ),
                     Err(e) => {
                         let (rc, rs) = engine_to_dbus_err_tuple(&e);
                         return (default_return, rc, rs);

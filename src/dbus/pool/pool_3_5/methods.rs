@@ -8,7 +8,7 @@ use std::{
 };
 
 use tokio::sync::RwLock;
-use zbus::{zvariant::ObjectPath, Connection};
+use zbus::{zvariant::OwnedObjectPath, Connection};
 
 use crate::{
     dbus::{
@@ -21,14 +21,14 @@ use crate::{
     stratis::StratisError,
 };
 
-pub async fn init_cache_method<'a>(
+pub async fn init_cache_method(
     engine: &Arc<dyn Engine>,
     connection: &Arc<Connection>,
     manager: &Lockable<Arc<RwLock<Manager>>>,
     _counter: &Arc<AtomicU64>,
     pool_uuid: PoolUuid,
     devices: Vec<PathBuf>,
-) -> ((bool, Vec<ObjectPath<'a>>), u16, String) {
+) -> ((bool, Vec<OwnedObjectPath>), u16, String) {
     let default_return = (false, Vec::default());
 
     let guard_res = engine

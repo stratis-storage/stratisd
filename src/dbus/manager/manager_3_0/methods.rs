@@ -11,7 +11,7 @@ use std::{
 use serde_json::from_str;
 use tokio::sync::RwLock;
 use zbus::{
-    zvariant::{Fd, ObjectPath},
+    zvariant::{Fd, ObjectPath, OwnedObjectPath},
     Connection,
 };
 
@@ -96,7 +96,7 @@ pub async fn unset_key_method(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn create_pool_method<'a>(
+pub async fn create_pool_method(
     engine: &Arc<dyn Engine>,
     connection: &Arc<Connection>,
     manager: &Lockable<Arc<RwLock<Manager>>>,
@@ -105,8 +105,8 @@ pub async fn create_pool_method<'a>(
     devs: Vec<PathBuf>,
     key_desc: (bool, KeyDescription),
     clevis_info: (bool, (&str, &str)),
-) -> ((bool, (ObjectPath<'a>, Vec<ObjectPath<'a>>)), u16, String) {
-    let default_return = (false, (ObjectPath::default(), Vec::new()));
+) -> ((bool, (OwnedObjectPath, Vec<OwnedObjectPath>)), u16, String) {
+    let default_return = (false, (OwnedObjectPath::default(), Vec::new()));
 
     let devs_ref = devs.iter().map(|path| path.as_path()).collect::<Vec<_>>();
     let key_desc = tuple_to_option(key_desc);
@@ -133,8 +133,14 @@ pub async fn create_pool_method<'a>(
     {
         Ok(CreateAction::Created(uuid)) => {
             match register_pool(engine, connection, manager, counter, uuid).await {
-                Ok(tuple) => (
-                    (true, tuple),
+                Ok((pool_path, fs_paths)) => (
+                    (
+                        true,
+                        (
+                            OwnedObjectPath::from(pool_path),
+                            fs_paths.into_iter().map(OwnedObjectPath::from).collect(),
+                        ),
+                    ),
                     DbusErrorEnum::OK as u16,
                     OK_STRING.to_string(),
                 ),

@@ -8,7 +8,12 @@ use std::{
 };
 
 use tokio::sync::RwLock;
-use zbus::{fdo::Error, interface, zvariant::ObjectPath, Connection};
+use zbus::{
+    fdo::Error,
+    interface,
+    zvariant::{ObjectPath, OwnedObjectPath},
+    Connection,
+};
 
 use crate::{
     dbus::{
@@ -97,7 +102,7 @@ impl PoolR1 {
     async fn create_filesystems(
         &self,
         specs: Vec<(&str, (bool, &str))>,
-    ) -> ((bool, Vec<ObjectPath<'_>>), u16, String) {
+    ) -> ((bool, Vec<OwnedObjectPath>), u16, String) {
         create_filesystems_method(
             &self.engine,
             &self.connection,
@@ -127,7 +132,7 @@ impl PoolR1 {
         &self,
         origin: ObjectPath<'_>,
         snapshot_name: String,
-    ) -> ((bool, ObjectPath<'_>), u16, String) {
+    ) -> ((bool, OwnedObjectPath), u16, String) {
         snapshot_filesystem_method(
             &self.engine,
             &self.connection,
@@ -143,7 +148,7 @@ impl PoolR1 {
     async fn add_data_devs(
         &self,
         devices: Vec<PathBuf>,
-    ) -> ((bool, Vec<ObjectPath<'_>>), u16, String) {
+    ) -> ((bool, Vec<OwnedObjectPath>), u16, String) {
         add_data_devs_method(
             &self.engine,
             &self.connection,
@@ -158,7 +163,7 @@ impl PoolR1 {
     async fn init_cache(
         &self,
         devices: Vec<PathBuf>,
-    ) -> ((bool, Vec<ObjectPath<'_>>), u16, String) {
+    ) -> ((bool, Vec<OwnedObjectPath>), u16, String) {
         init_cache_method(
             &self.engine,
             &self.connection,
@@ -173,7 +178,7 @@ impl PoolR1 {
     async fn add_cache_devs(
         &self,
         devices: Vec<PathBuf>,
-    ) -> ((bool, Vec<ObjectPath<'_>>), u16, String) {
+    ) -> ((bool, Vec<OwnedObjectPath>), u16, String) {
         add_cache_devs_method(
             &self.engine,
             &self.connection,

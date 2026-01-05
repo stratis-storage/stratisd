@@ -5,7 +5,7 @@
 use std::sync::{atomic::AtomicU64, Arc};
 
 use tokio::sync::RwLock;
-use zbus::{zvariant::ObjectPath, Connection};
+use zbus::{zvariant::OwnedObjectPath, Connection};
 
 use crate::{
     dbus::{
@@ -25,7 +25,7 @@ use crate::{
     },
 };
 
-pub async fn start_pool_method<'a>(
+pub async fn start_pool_method(
     engine: &Arc<dyn Engine>,
     connection: &Arc<Connection>,
     manager: &Lockable<Arc<RwLock<Manager>>>,
@@ -36,14 +36,14 @@ pub async fn start_pool_method<'a>(
 ) -> (
     (
         bool,
-        (ObjectPath<'a>, Vec<ObjectPath<'a>>, Vec<ObjectPath<'a>>),
+        (OwnedObjectPath, Vec<OwnedObjectPath>, Vec<OwnedObjectPath>),
     ),
     u16,
     String,
 ) {
     let default_return = (
         false,
-        (ObjectPath::default(), Vec::default(), Vec::default()),
+        (OwnedObjectPath::default(), Vec::default(), Vec::default()),
     );
 
     let id = match id_type {
@@ -99,11 +99,14 @@ pub async fn start_pool_method<'a>(
                         return (default_return, rc, rs);
                     }
                 };
-                fs_paths.push(fs_path);
+                fs_paths.push(OwnedObjectPath::from(fs_path));
             }
             let (pool_path, dev_paths) =
                 match register_pool(engine, connection, manager, counter, pool_uuid).await {
-                    Ok(pp) => pp,
+                    Ok((pp, dp)) => (
+                        OwnedObjectPath::from(pp),
+                        dp.into_iter().map(OwnedObjectPath::from).collect(),
+                    ),
                     Err(e) => {
                         let (rc, rs) = engine_to_dbus_err_tuple(&e);
                         return (default_return, rc, rs);

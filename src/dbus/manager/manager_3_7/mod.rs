@@ -10,7 +10,7 @@ use std::{
 use tokio::sync::RwLock;
 use zbus::{
     interface,
-    zvariant::{Fd, ObjectPath},
+    zvariant::{Fd, ObjectPath, OwnedObjectPath},
     Connection, Result,
 };
 
@@ -110,7 +110,7 @@ impl ManagerR7 {
         devs: Vec<PathBuf>,
         key_desc: (bool, KeyDescription),
         clevis_info: (bool, (&str, &str)),
-    ) -> ((bool, (ObjectPath<'_>, Vec<ObjectPath<'_>>)), u16, String) {
+    ) -> ((bool, (OwnedObjectPath, Vec<OwnedObjectPath>)), u16, String) {
         create_pool_method(
             &self.engine,
             &self.connection,
@@ -136,7 +136,7 @@ impl ManagerR7 {
     ) -> (
         (
             bool,
-            (ObjectPath<'_>, Vec<ObjectPath<'_>>, Vec<ObjectPath<'_>>),
+            (OwnedObjectPath, Vec<OwnedObjectPath>, Vec<OwnedObjectPath>),
         ),
         u16,
         String,

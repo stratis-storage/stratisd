@@ -9,7 +9,7 @@ use std::{
 
 use tokio::sync::RwLock;
 use zbus::{
-    zvariant::{Fd, ObjectPath},
+    zvariant::{Fd, OwnedObjectPath},
     Connection,
 };
 
@@ -29,7 +29,7 @@ use crate::{
 };
 
 #[allow(clippy::too_many_arguments)]
-pub async fn start_pool_method<'a>(
+pub async fn start_pool_method(
     engine: &Arc<dyn Engine>,
     connection: &Arc<Connection>,
     manager: &Lockable<Arc<RwLock<Manager>>>,
@@ -42,14 +42,14 @@ pub async fn start_pool_method<'a>(
 ) -> (
     (
         bool,
-        (ObjectPath<'a>, Vec<ObjectPath<'a>>, Vec<ObjectPath<'a>>),
+        (OwnedObjectPath, Vec<OwnedObjectPath>, Vec<OwnedObjectPath>),
     ),
     u16,
     String,
 ) {
     let default_return = (
         false,
-        (ObjectPath::default(), Vec::default(), Vec::default()),
+        (OwnedObjectPath::default(), Vec::default(), Vec::default()),
     );
 
     let id = match id_type {
@@ -107,7 +107,7 @@ pub async fn start_pool_method<'a>(
                     )
                     .await
                     {
-                        Ok(fp) => fp,
+                        Ok(fp) => OwnedObjectPath::from(fp),
                         Err(e) => {
                             let (rc, rs) = engine_to_dbus_err_tuple(&e);
                             return (default_return, rc, rs);
@@ -133,7 +133,7 @@ pub async fn start_pool_method<'a>(
             send_stopped_pools_signals(connection).await;
 
             (
-                (true, (pool_path, dev_paths, fs_paths)),
+                (true, (OwnedObjectPath::from(pool_path), dev_paths.into_iter().map(OwnedObjectPath::from).collect::<Vec<_>>(), fs_paths)),
                 DbusErrorEnum::OK as u16,
                 OK_STRING.to_string(),
             )

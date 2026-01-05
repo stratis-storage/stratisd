@@ -9,7 +9,7 @@ use std::{
 };
 
 use tokio::sync::RwLock;
-use zbus::{zvariant::ObjectPath, Connection};
+use zbus::{zvariant::{ObjectPath, OwnedObjectPath}, Connection};
 
 use devicemapper::Bytes;
 
@@ -32,14 +32,14 @@ use crate::{
     stratis::StratisError,
 };
 
-pub async fn create_filesystems_method<'a>(
+pub async fn create_filesystems_method(
     engine: &Arc<dyn Engine>,
     connection: &Arc<Connection>,
     manager: &Lockable<Arc<RwLock<Manager>>>,
     counter: &Arc<AtomicU64>,
     pool_uuid: PoolUuid,
     filesystems: Vec<(&str, (bool, &str))>,
-) -> ((bool, Vec<ObjectPath<'a>>), u16, String) {
+) -> ((bool, Vec<OwnedObjectPath>), u16, String) {
     let default_return = (false, (Vec::new()));
 
     let filesystem_specs = match filesystems
@@ -100,7 +100,7 @@ pub async fn create_filesystems_method<'a>(
                         .await
                         {
                             Ok(path) => {
-                                object_paths.push(path);
+                                object_paths.push(OwnedObjectPath::from(path));
                             }
                             Err(e) => {
                                 let (rc, rs) = engine_to_dbus_err_tuple(&e);
@@ -205,7 +205,7 @@ pub async fn destroy_filesystems_method(
     }
 }
 
-pub async fn snapshot_filesystem_method<'a>(
+pub async fn snapshot_filesystem_method(
     engine: &Arc<dyn Engine>,
     connection: &Arc<Connection>,
     manager: &Lockable<Arc<RwLock<Manager>>>,
@@ -213,8 +213,8 @@ pub async fn snapshot_filesystem_method<'a>(
     pool_uuid: PoolUuid,
     filesystem: ObjectPath<'_>,
     snapshot_name: String,
-) -> ((bool, ObjectPath<'a>), u16, String) {
-    let default_return = (false, ObjectPath::default());
+) -> ((bool, OwnedObjectPath), u16, String) {
+    let default_return = (false, OwnedObjectPath::default());
 
     let fs_uuid = match manager.read().await.filesystem_get_uuid(&filesystem) {
         Some(u) => u,
@@ -272,7 +272,7 @@ pub async fn snapshot_filesystem_method<'a>(
                 }
             };
             (
-                (true, path),
+                (true, OwnedObjectPath::from(path)),
                 DbusErrorEnum::OK as u16,
                 OK_STRING.to_string(),
             )
@@ -293,14 +293,14 @@ pub async fn snapshot_filesystem_method<'a>(
     }
 }
 
-pub async fn add_data_devs_method<'a>(
+pub async fn add_data_devs_method(
     engine: &Arc<dyn Engine>,
     connection: &Arc<Connection>,
     manager: &Lockable<Arc<RwLock<Manager>>>,
     _counter: &Arc<AtomicU64>,
     pool_uuid: PoolUuid,
     devices: Vec<PathBuf>,
-) -> ((bool, Vec<ObjectPath<'a>>), u16, String) {
+) -> ((bool, Vec<OwnedObjectPath>), u16, String) {
     let default_return = (false, Vec::default());
 
     let guard_res = engine
@@ -364,14 +364,14 @@ pub async fn add_data_devs_method<'a>(
     }
 }
 
-pub async fn init_cache_method<'a>(
+pub async fn init_cache_method(
     engine: &Arc<dyn Engine>,
     connection: &Arc<Connection>,
     manager: &Lockable<Arc<RwLock<Manager>>>,
     _counter: &Arc<AtomicU64>,
     pool_uuid: PoolUuid,
     devices: Vec<PathBuf>,
-) -> ((bool, Vec<ObjectPath<'a>>), u16, String) {
+) -> ((bool, Vec<OwnedObjectPath>), u16, String) {
     let default_return = (false, Vec::default());
 
     let guard_res = engine
@@ -438,14 +438,14 @@ pub async fn init_cache_method<'a>(
     }
 }
 
-pub async fn add_cache_devs_method<'a>(
+pub async fn add_cache_devs_method(
     engine: &Arc<dyn Engine>,
     connection: &Arc<Connection>,
     manager: &Lockable<Arc<RwLock<Manager>>>,
     _counter: &Arc<AtomicU64>,
     pool_uuid: PoolUuid,
     devices: Vec<PathBuf>,
-) -> ((bool, Vec<ObjectPath<'a>>), u16, String) {
+) -> ((bool, Vec<OwnedObjectPath>), u16, String) {
     let default_return = (false, Vec::default());
 
     let guard_res = engine

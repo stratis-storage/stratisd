@@ -24,8 +24,8 @@ pub async fn stop_pool_method(
     manager: &Lockable<Arc<RwLock<Manager>>>,
     id: &str,
     id_type: &str,
-) -> ((bool, PoolUuid), u16, String) {
-    let default_return = (false, PoolUuid::default());
+) -> ((bool, String), u16, String) {
+    let default_return = (false, String::new());
 
     let id = match id_type {
         "uuid" => match PoolUuid::parse_str(id) {
@@ -80,7 +80,7 @@ pub async fn stop_pool_method(
             OK_STRING.to_string(),
         ),
         Ok(StopAction::Stopped(pool_uuid)) => (
-            (true, pool_uuid),
+            (true, pool_uuid.simple().to_string()),
             DbusErrorEnum::OK as u16,
             OK_STRING.to_string(),
         ),

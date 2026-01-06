@@ -152,7 +152,7 @@ impl ManagerR3 {
         .await
     }
 
-    async fn stop_pool(&self, pool: ObjectPath<'_>) -> ((bool, PoolUuid), u16, String) {
+    async fn stop_pool(&self, pool: ObjectPath<'_>) -> ((bool, String), u16, String) {
         stop_pool_method(&self.engine, &self.connection, &self.manager, pool).await
     }
 

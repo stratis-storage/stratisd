@@ -17,6 +17,7 @@ use zbus::{
 
 use crate::{
     dbus::{
+        blockdev::unregister_blockdev,
         consts::OK_STRING,
         manager::Manager,
         pool::{register_pool, unregister_pool},
@@ -25,8 +26,8 @@ use crate::{
     },
     engine::{
         CreateAction, DeleteAction, DevUuid, Engine, InputEncryptionInfo, IntegritySpec,
-        KeyDescription, Lockable, MappingCreateAction, MappingDeleteAction, PoolUuid,
-        SetUnlockAction, UnlockMethod,
+        KeyDescription, Lockable, MappingCreateAction, MappingDeleteAction, PoolIdentifier,
+        PoolUuid, SetUnlockAction, UnlockMethod,
     },
     stratis::StratisError,
 };
@@ -184,8 +185,23 @@ pub async fn destroy_pool_method(
         }
     };
 
+    let dev_uuids = match engine.get_pool(PoolIdentifier::Uuid(uuid)).await {
+        Some(p) => p.blockdevs().into_iter().map(|(u, _, _)| u).collect(),
+        None => vec![],
+    };
+
     match engine.destroy_pool(uuid).await {
         Ok(DeleteAction::Deleted(uuid)) => {
+            for dev_uuid in dev_uuids {
+                let maybe_dev_path = manager.write().await.blockdev_get_path(&dev_uuid).cloned();
+                if let Some(dev_path) = maybe_dev_path {
+                    if let Err(e) = unregister_blockdev(connection, manager, &dev_path).await {
+                        warn!(
+                            "Failed to unregister {dev_path} representing blockdev {dev_uuid}: {e}"
+                        );
+                    }
+                }
+            }
             match unregister_pool(connection, manager, &pool).await {
                 Ok(u) => {
                     assert_eq!(uuid, u);

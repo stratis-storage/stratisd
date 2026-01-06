@@ -12,6 +12,7 @@ use zbus::{
 
 use crate::{
     dbus::{
+        blockdev::unregister_blockdev,
         consts::OK_STRING,
         filesystem::register_filesystem,
         manager::Manager,
@@ -153,6 +154,11 @@ pub async fn stop_pool_method(
         }
     };
 
+    let dev_uuids = match engine.get_pool(PoolIdentifier::Uuid(pool_uuid)).await {
+        Some(p) => p.blockdevs().into_iter().map(|(u, _, _)| u).collect(),
+        None => vec![],
+    };
+
     let action = handle_action!(
         engine
             .stop_pool(PoolIdentifier::Uuid(pool_uuid), false)
@@ -160,6 +166,14 @@ pub async fn stop_pool_method(
     );
 
     if let Ok(StopAction::Stopped(_) | StopAction::Partial(_)) = action {
+        for dev_uuid in dev_uuids {
+            let maybe_dev_path = manager.write().await.blockdev_get_path(&dev_uuid).cloned();
+            if let Some(dev_path) = maybe_dev_path {
+                if let Err(e) = unregister_blockdev(connection, manager, &dev_path).await {
+                    warn!("Failed to unregister {dev_path} representing blockdev {dev_uuid}: {e}");
+                }
+            }
+        }
         if let Err(e) = unregister_pool(connection, manager, &pool).await {
             warn!("Failed to remove pool with path {pool} from the D-Bus: {e}");
         }

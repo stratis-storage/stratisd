@@ -9,6 +9,7 @@ use zbus::Connection;
 
 use crate::{
     dbus::{
+        blockdev::unregister_blockdev,
         consts::OK_STRING,
         manager::Manager,
         pool::unregister_pool,
@@ -45,9 +46,22 @@ pub async fn stop_pool_method(
         }
     };
 
+    let dev_uuids = match engine.get_pool(id.clone()).await {
+        Some(p) => p.blockdevs().into_iter().map(|(u, _, _)| u).collect(),
+        None => vec![],
+    };
+
     let action = handle_action!(engine.stop_pool(id, true).await);
 
     if let Ok(StopAction::Stopped(pool_uuid) | StopAction::Partial(pool_uuid)) = action {
+        for dev_uuid in dev_uuids {
+            let maybe_dev_path = manager.write().await.blockdev_get_path(&dev_uuid).cloned();
+            if let Some(dev_path) = maybe_dev_path {
+                if let Err(e) = unregister_blockdev(connection, manager, &dev_path).await {
+                    warn!("Failed to unregister {dev_path} representing blockdev {dev_uuid}: {e}");
+                }
+            }
+        }
         let path = manager.read().await.pool_get_path(&pool_uuid).cloned();
         match path {
             Some(pool) => {

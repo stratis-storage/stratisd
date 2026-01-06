@@ -177,8 +177,6 @@ pub async fn register_blockdev<'a>(
     Ok(path)
 }
 
-#[allow(dead_code)]
-// FIXME: should be used
 pub async fn unregister_blockdev(
     connection: &Arc<Connection>,
     manager: &Lockable<Arc<RwLock<Manager>>>,

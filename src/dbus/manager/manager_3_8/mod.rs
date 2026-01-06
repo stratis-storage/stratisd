@@ -28,7 +28,7 @@ use crate::{
         },
         types,
     },
-    engine::{Engine, KeyDescription, Lockable, PoolUuid, StoppedPoolsInfo},
+    engine::{Engine, KeyDescription, Lockable, StoppedPoolsInfo},
 };
 
 mod methods;
@@ -166,7 +166,7 @@ impl ManagerR8 {
         .await
     }
 
-    async fn stop_pool(&self, id: &str, id_type: &str) -> ((bool, PoolUuid), u16, String) {
+    async fn stop_pool(&self, id: &str, id_type: &str) -> ((bool, String), u16, String) {
         stop_pool_method(&self.engine, &self.connection, &self.manager, id, id_type).await
     }
 

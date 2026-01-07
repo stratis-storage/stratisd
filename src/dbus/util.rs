@@ -15,6 +15,7 @@ use devicemapper::DmError;
 use crate::{
     dbus::{
         consts::STRATIS_BASE_PATH,
+        filesystem::{FilesystemR7, FilesystemR8, FilesystemR9},
         manager::{
             Manager, ManagerR0, ManagerR1, ManagerR2, ManagerR3, ManagerR4, ManagerR5, ManagerR6,
             ManagerR7, ManagerR8, ManagerR9,
@@ -1330,5 +1331,32 @@ pub async fn send_has_cache_signal(connection: &Arc<Connection>, path: &ObjectPa
         has_cache_changed,
         "has cache",
         "pool.r9"
+    );
+}
+
+pub async fn send_origin_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    send_signal!(
+        connection,
+        FilesystemR7,
+        path,
+        origin_changed,
+        "origin",
+        "filesystem.r7"
+    );
+    send_signal!(
+        connection,
+        FilesystemR8,
+        path,
+        origin_changed,
+        "origin",
+        "filesystem.r8"
+    );
+    send_signal!(
+        connection,
+        FilesystemR9,
+        path,
+        origin_changed,
+        "origin",
+        "filesystem.r9"
     );
 }

@@ -25,8 +25,8 @@ use crate::{
         types::DbusErrorEnum,
         util::{
             engine_to_dbus_err_tuple, send_clevis_info_signal, send_free_token_slots_signal,
-            send_has_cache_signal, send_keyring_signal, send_pool_foreground_signals,
-            send_pool_name_signal, tuple_to_option,
+            send_has_cache_signal, send_keyring_signal, send_origin_signal,
+            send_pool_foreground_signals, send_pool_name_signal, tuple_to_option,
         },
     },
     engine::{
@@ -172,8 +172,8 @@ pub async fn destroy_filesystems_method(
     .await
     {
         Ok(Ok(changed)) => match changed.changed() {
-            Some((v, _)) => {
-                for uuid in v.iter() {
+            Some((changed, updated_origins)) => {
+                for uuid in changed.iter() {
                     let opt = manager.read().await.filesystem_get_path(uuid).cloned();
                     match opt {
                         Some(p) => {
@@ -183,17 +183,32 @@ pub async fn destroy_filesystems_method(
                                 let (rc, rs) = engine_to_dbus_err_tuple(&e);
                                 return (default_return, rc, rs);
                             }
-                            // TODO: Add signal handling for origin updating.
                         }
                         None => {
                             warn!("No path found to unregister for destroyed filesystem with UUID {uuid}");
                         }
                     }
                 }
+                for (updated_origin, _) in updated_origins {
+                    match manager
+                        .read()
+                        .await
+                        .filesystem_get_path(&updated_origin)
+                        .cloned()
+                    {
+                        Some(p) => send_origin_signal(connection, &p.as_ref()).await,
+                        None => {
+                            warn!("Failed to find path associated with filesystem UUID {updated_origin}");
+                        }
+                    }
+                }
                 (
                     (
                         true,
-                        v.into_iter().map(|u| u.simple().to_string()).collect(),
+                        changed
+                            .into_iter()
+                            .map(|u| u.simple().to_string())
+                            .collect(),
                     ),
                     DbusErrorEnum::OK as u16,
                     OK_STRING.to_string(),

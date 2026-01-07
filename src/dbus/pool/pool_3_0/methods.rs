@@ -191,7 +191,10 @@ pub async fn destroy_filesystems_method(
                     }
                 }
                 (
-                    (true, v.iter().map(|u| u.simple().to_string()).collect()),
+                    (
+                        true,
+                        v.into_iter().map(|u| u.simple().to_string()).collect(),
+                    ),
                     DbusErrorEnum::OK as u16,
                     OK_STRING.to_string(),
                 )

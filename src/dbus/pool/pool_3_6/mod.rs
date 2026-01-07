@@ -192,7 +192,7 @@ impl PoolR6 {
         .await
     }
 
-    async fn set_name(&self, name: &str) -> ((bool, PoolUuid), u16, String) {
+    async fn set_name(&self, name: &str) -> ((bool, String), u16, String) {
         set_name_method(
             &self.engine,
             &self.connection,

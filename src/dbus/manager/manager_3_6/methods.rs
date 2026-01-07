@@ -66,7 +66,8 @@ pub async fn stop_pool_method(
                 .stopped
                 .get(&pool_uuid)
                 .or_else(|| stopped_pools.partially_constructed.get(&pool_uuid))
-                .map(|s| s.info.is_some()).unwrap_or(false)
+                .map(|s| s.info.is_some())
+                .unwrap_or(false)
         };
         if stopped {
             send_locked_pools_signals(connection).await;

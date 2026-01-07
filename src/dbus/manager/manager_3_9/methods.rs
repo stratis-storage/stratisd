@@ -133,7 +133,17 @@ pub async fn start_pool_method(
             send_stopped_pools_signals(connection).await;
 
             (
-                (true, (OwnedObjectPath::from(pool_path), dev_paths.into_iter().map(OwnedObjectPath::from).collect::<Vec<_>>(), fs_paths)),
+                (
+                    true,
+                    (
+                        OwnedObjectPath::from(pool_path),
+                        dev_paths
+                            .into_iter()
+                            .map(OwnedObjectPath::from)
+                            .collect::<Vec<_>>(),
+                        fs_paths,
+                    ),
+                ),
                 DbusErrorEnum::OK as u16,
                 OK_STRING.to_string(),
             )

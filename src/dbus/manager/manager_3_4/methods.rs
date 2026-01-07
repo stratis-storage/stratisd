@@ -103,7 +103,10 @@ pub async fn start_pool_method(
             }
             let (pool_path, dev_paths) =
                 match register_pool(engine, connection, manager, counter, pool_uuid).await {
-                    Ok((pp, dp)) => (OwnedObjectPath::from(pp), dp.into_iter().map(OwnedObjectPath::from).collect()),
+                    Ok((pp, dp)) => (
+                        OwnedObjectPath::from(pp),
+                        dp.into_iter().map(OwnedObjectPath::from).collect(),
+                    ),
                     Err(e) => {
                         let (rc, rs) = engine_to_dbus_err_tuple(&e);
                         return (default_return, rc, rs);

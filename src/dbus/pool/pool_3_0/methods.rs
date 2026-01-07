@@ -9,7 +9,10 @@ use std::{
 };
 
 use tokio::sync::RwLock;
-use zbus::{zvariant::{ObjectPath, OwnedObjectPath}, Connection};
+use zbus::{
+    zvariant::{ObjectPath, OwnedObjectPath},
+    Connection,
+};
 
 use devicemapper::Bytes;
 

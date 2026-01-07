@@ -115,7 +115,13 @@ pub async fn create_pool_method(
         Ok(CreateAction::Created(uuid)) => {
             match register_pool(engine, connection, manager, counter, uuid).await {
                 Ok((pool_path, fs_paths)) => (
-                    (true, (OwnedObjectPath::from(pool_path), fs_paths.into_iter().map(OwnedObjectPath::from).collect())),
+                    (
+                        true,
+                        (
+                            OwnedObjectPath::from(pool_path),
+                            fs_paths.into_iter().map(OwnedObjectPath::from).collect(),
+                        ),
+                    ),
                     DbusErrorEnum::OK as u16,
                     OK_STRING.to_string(),
                 ),
@@ -224,7 +230,10 @@ pub async fn start_pool_method(
             }
             let (pool_path, dev_paths) =
                 match register_pool(engine, connection, manager, counter, pool_uuid).await {
-                    Ok((pp, dp)) => (OwnedObjectPath::from(pp), dp.into_iter().map(OwnedObjectPath::from).collect()),
+                    Ok((pp, dp)) => (
+                        OwnedObjectPath::from(pp),
+                        dp.into_iter().map(OwnedObjectPath::from).collect(),
+                    ),
                     Err(e) => {
                         let (rc, rs) = engine_to_dbus_err_tuple(&e);
                         return (default_return, rc, rs);

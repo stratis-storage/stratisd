@@ -134,7 +134,13 @@ pub async fn create_pool_method(
         Ok(CreateAction::Created(uuid)) => {
             match register_pool(engine, connection, manager, counter, uuid).await {
                 Ok((pool_path, fs_paths)) => (
-                    (true, (OwnedObjectPath::from(pool_path), fs_paths.into_iter().map(OwnedObjectPath::from).collect())),
+                    (
+                        true,
+                        (
+                            OwnedObjectPath::from(pool_path),
+                            fs_paths.into_iter().map(OwnedObjectPath::from).collect(),
+                        ),
+                    ),
                     DbusErrorEnum::OK as u16,
                     OK_STRING.to_string(),
                 ),

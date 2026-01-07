@@ -15,8 +15,8 @@ pub async fn set_name_method(
     uuid: PoolUuid,
     fs_uuid: FilesystemUuid,
     name: &str,
-) -> ((bool, FilesystemUuid), u16, String) {
-    let default_return = (false, FilesystemUuid::nil());
+) -> ((bool, String), u16, String) {
+    let default_return = (false, FilesystemUuid::nil().simple().to_string());
 
     match engine
         .get_mut_pool(PoolIdentifier::Uuid(uuid))
@@ -34,7 +34,7 @@ pub async fn set_name_method(
                 ),
                 Ok(RenameAction::Renamed(_)) => (
                     // FIXME: send signal
-                    (true, fs_uuid),
+                    (true, fs_uuid.simple().to_string()),
                     DbusErrorEnum::OK as u16,
                     OK_STRING.to_string(),
                 ),

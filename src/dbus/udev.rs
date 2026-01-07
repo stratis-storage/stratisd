@@ -8,7 +8,7 @@ use tokio::sync::{mpsc::UnboundedReceiver, RwLock};
 use zbus::Connection;
 
 use crate::{
-    dbus::{manager::Manager, pool::register_pool},
+    dbus::{manager::Manager, pool::register_pool, util::send_new_physical_size_signal},
     engine::{Engine, Lockable, PoolUuid, UdevEngineEvent},
     stratis::{StratisError, StratisResult},
 };
@@ -48,11 +48,22 @@ impl UdevHandler {
             events.push(event);
         }
 
-        let (pool_infos, _) = self.engine.handle_events(events).await;
+        let (pool_infos, dev_infos) = self.engine.handle_events(events).await;
         for guard in pool_infos {
             let (_, pool_uuid, _) = guard.as_tuple();
             if let Err(e) = self.register_pool(pool_uuid).await {
                 warn!("Failed to register pool: {e}");
+            }
+        }
+
+        for (dev_uuid, diff) in dev_infos {
+            if diff.size.is_changed() {
+                match self.manager.read().await.blockdev_get_path(&dev_uuid) {
+                    Some(p) => send_new_physical_size_signal(&self.connection, &p.as_ref()).await,
+                    None => {
+                        warn!("No path was found for blockdev UUID {dev_uuid}; cannot send blockdev physical size change signal");
+                    }
+                }
             }
         }
 

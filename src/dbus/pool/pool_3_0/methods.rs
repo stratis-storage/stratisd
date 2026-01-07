@@ -30,8 +30,8 @@ use crate::{
         },
     },
     engine::{
-        BlockDevTier, CreateAction, DeleteAction, Engine, EngineAction, FilesystemUuid,
-        KeyDescription, Lockable, OptionalTokenSlotInput, PoolIdentifier, PoolUuid, RenameAction,
+        BlockDevTier, CreateAction, DeleteAction, Engine, EngineAction, KeyDescription, Lockable,
+        OptionalTokenSlotInput, PoolIdentifier, PoolUuid, RenameAction,
     },
     stratis::StratisError,
 };
@@ -142,7 +142,7 @@ pub async fn destroy_filesystems_method(
     manager: &Lockable<Arc<RwLock<Manager>>>,
     pool_uuid: PoolUuid,
     filesystems: Vec<ObjectPath<'_>>,
-) -> ((bool, Vec<FilesystemUuid>), u16, String) {
+) -> ((bool, Vec<String>), u16, String) {
     let default_return = (false, (Vec::new()));
 
     let uuids = {
@@ -190,7 +190,14 @@ pub async fn destroy_filesystems_method(
                         }
                     }
                 }
-                ((true, v), DbusErrorEnum::OK as u16, OK_STRING.to_string())
+                (
+                    (
+                        true,
+                        v.into_iter().map(|u| u.simple().to_string()).collect(),
+                    ),
+                    DbusErrorEnum::OK as u16,
+                    OK_STRING.to_string(),
+                )
             }
             None => (
                 default_return,

@@ -81,7 +81,7 @@ impl FilesystemR4 {
 )]
 impl FilesystemR4 {
     #[zbus(out_args("result", "return_code", "return_string"))]
-    async fn set_name(&self, name: &str) -> ((bool, FilesystemUuid), u16, String) {
+    async fn set_name(&self, name: &str) -> ((bool, String), u16, String) {
         set_name_method(&self.engine, self.parent_uuid, self.uuid, name).await
     }
 

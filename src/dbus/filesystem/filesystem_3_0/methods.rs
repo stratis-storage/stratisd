@@ -4,14 +4,19 @@
 
 use std::sync::Arc;
 
+use tokio::sync::RwLock;
+use zbus::Connection;
+
 use crate::{
-    dbus::{consts::OK_STRING, types::DbusErrorEnum},
-    engine::{Engine, FilesystemUuid, PoolIdentifier, PoolUuid, RenameAction},
+    dbus::{consts::OK_STRING, manager::Manager, types::DbusErrorEnum, util::send_fs_name_signal},
+    engine::{Engine, FilesystemUuid, Lockable, PoolIdentifier, PoolUuid, RenameAction},
     stratis::StratisError,
 };
 
 pub async fn set_name_method(
     engine: &Arc<dyn Engine>,
+    connection: &Arc<Connection>,
+    manager: &Lockable<Arc<RwLock<Manager>>>,
     uuid: PoolUuid,
     fs_uuid: FilesystemUuid,
     name: &str,
@@ -32,12 +37,21 @@ pub async fn set_name_method(
                     DbusErrorEnum::ERROR as u16,
                     format!("pool doesn't know about filesystem {fs_uuid}"),
                 ),
-                Ok(RenameAction::Renamed(_)) => (
-                    // FIXME: send signal
-                    (true, fs_uuid.simple().to_string()),
-                    DbusErrorEnum::OK as u16,
-                    OK_STRING.to_string(),
-                ),
+                Ok(RenameAction::Renamed(_)) => {
+                    match manager.read().await.filesystem_get_path(&fs_uuid) {
+                        Some(p) => {
+                            send_fs_name_signal(connection, &p.as_ref()).await;
+                        }
+                        None => {
+                            warn!("No object path associated with pool UUID {uuid}; failed to send pool name change signals");
+                        }
+                    };
+                    (
+                        (true, fs_uuid.simple().to_string()),
+                        DbusErrorEnum::OK as u16,
+                        OK_STRING.to_string(),
+                    )
+                }
                 Ok(RenameAction::Identity) => (
                     default_return,
                     DbusErrorEnum::OK as u16,

@@ -540,8 +540,8 @@ pub async fn set_name_method(
     manager: &Lockable<Arc<RwLock<Manager>>>,
     pool_uuid: PoolUuid,
     name: &str,
-) -> ((bool, PoolUuid), u16, String) {
-    let default_return = (false, PoolUuid::default());
+) -> ((bool, String), u16, String) {
+    let default_return = (false, PoolUuid::default().simple().to_string());
 
     match engine.rename_pool(pool_uuid, name).await {
         Ok(RenameAction::NoSource) => {
@@ -566,7 +566,7 @@ pub async fn set_name_method(
                 }
             };
             (
-                (true, pool_uuid),
+                (true, pool_uuid.simple().to_string()),
                 DbusErrorEnum::OK as u16,
                 OK_STRING.to_string(),
             )

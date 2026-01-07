@@ -14,6 +14,9 @@ use devicemapper::DmError;
 
 use crate::{
     dbus::{
+        blockdev::{
+            BlockdevR3, BlockdevR4, BlockdevR5, BlockdevR6, BlockdevR7, BlockdevR8, BlockdevR9,
+        },
         consts::STRATIS_BASE_PATH,
         filesystem::{
             FilesystemR0, FilesystemR1, FilesystemR2, FilesystemR3, FilesystemR4, FilesystemR5,
@@ -1294,5 +1297,64 @@ pub async fn send_fs_name_signal(connection: &Arc<Connection>, path: &ObjectPath
         name_changed,
         "filesystem name",
         "filesystem.r9"
+    );
+}
+
+pub async fn send_new_physical_size_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    send_signal!(
+        connection,
+        BlockdevR3,
+        path,
+        new_physical_size_changed,
+        "blockdev physical size",
+        "blockdev.r3"
+    );
+    send_signal!(
+        connection,
+        BlockdevR4,
+        path,
+        new_physical_size_changed,
+        "blockdev physical size",
+        "blockdev.r4"
+    );
+    send_signal!(
+        connection,
+        BlockdevR5,
+        path,
+        new_physical_size_changed,
+        "blockdev physical size",
+        "blockdev.r5"
+    );
+    send_signal!(
+        connection,
+        BlockdevR6,
+        path,
+        new_physical_size_changed,
+        "blockdev physical size",
+        "blockdev.r6"
+    );
+    send_signal!(
+        connection,
+        BlockdevR7,
+        path,
+        new_physical_size_changed,
+        "blockdev physical size",
+        "blockdev.r7"
+    );
+    send_signal!(
+        connection,
+        BlockdevR8,
+        path,
+        new_physical_size_changed,
+        "blockdev physical size",
+        "blockdev.r8"
+    );
+    send_signal!(
+        connection,
+        BlockdevR9,
+        path,
+        new_physical_size_changed,
+        "blockdev physical size",
+        "blockdev.r9"
     );
 }

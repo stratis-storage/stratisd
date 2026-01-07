@@ -20,9 +20,7 @@ use crate::{
         manager::Manager,
         pool::shared::{pool_prop, try_pool_prop},
     },
-    engine::{
-        self, ActionAvailability, Engine, FilesystemUuid, KeyDescription, Lockable, PoolUuid,
-    },
+    engine::{self, ActionAvailability, Engine, KeyDescription, Lockable, PoolUuid},
     stratis::StratisResult,
 };
 
@@ -114,7 +112,7 @@ impl PoolR0 {
     async fn destroy_filesystems(
         &self,
         filesystems: Vec<ObjectPath<'_>>,
-    ) -> ((bool, Vec<FilesystemUuid>), u16, String) {
+    ) -> ((bool, Vec<String>), u16, String) {
         destroy_filesystems_method(
             &self.engine,
             &self.connection,

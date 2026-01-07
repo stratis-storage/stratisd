@@ -34,6 +34,7 @@ pub use props::{merge_scheduled_prop, origin_prop, set_merge_scheduled_prop};
 
 pub struct FilesystemR7 {
     engine: Arc<dyn Engine>,
+    connection: Arc<Connection>,
     manager: Lockable<Arc<RwLock<Manager>>>,
     parent_uuid: PoolUuid,
     uuid: FilesystemUuid,
@@ -42,12 +43,14 @@ pub struct FilesystemR7 {
 impl FilesystemR7 {
     fn new(
         engine: Arc<dyn Engine>,
+        connection: Arc<Connection>,
         manager: Lockable<Arc<RwLock<Manager>>>,
         parent_uuid: PoolUuid,
         uuid: FilesystemUuid,
     ) -> Self {
         FilesystemR7 {
             engine,
+            connection,
             manager,
             parent_uuid,
             uuid,
@@ -62,7 +65,13 @@ impl FilesystemR7 {
         parent_uuid: PoolUuid,
         uuid: FilesystemUuid,
     ) -> StratisResult<()> {
-        let filesystem = Self::new(engine, manager.clone(), parent_uuid, uuid);
+        let filesystem = Self::new(
+            engine,
+            Arc::clone(connection),
+            manager.clone(),
+            parent_uuid,
+            uuid,
+        );
 
         connection.object_server().at(path, filesystem).await?;
         Ok(())
@@ -87,7 +96,15 @@ impl FilesystemR7 {
 impl FilesystemR7 {
     #[zbus(out_args("result", "return_code", "return_string"))]
     async fn set_name(&self, name: &str) -> ((bool, String), u16, String) {
-        set_name_method(&self.engine, self.parent_uuid, self.uuid, name).await
+        set_name_method(
+            &self.engine,
+            &self.connection,
+            &self.manager,
+            self.parent_uuid,
+            self.uuid,
+            name,
+        )
+        .await
     }
 
     #[zbus(property(emits_changed_signal = "const"))]

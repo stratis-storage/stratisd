@@ -706,10 +706,191 @@ pub async fn send_pool_foreground_signals(
 
 #[allow(clippy::implicit_hasher)]
 pub async fn send_fs_background_signals(
-    _manager: Lockable<Arc<RwLock<Manager>>>,
-    _connection: &Arc<Connection>,
-    _diffs: HashMap<FilesystemUuid, StratFilesystemDiff>,
+    manager: Lockable<Arc<RwLock<Manager>>>,
+    connection: &Arc<Connection>,
+    diffs: HashMap<FilesystemUuid, StratFilesystemDiff>,
 ) {
+    for (fs_uuid, diff) in diffs {
+        match manager.read().await.filesystem_get_path(&fs_uuid) {
+            Some(path) => {
+                if diff.size.is_changed() {
+                    send_fs_size_signal(connection, &path.as_ref()).await;
+                }
+                if diff.used.is_changed() {
+                    send_fs_used_signal(connection, &path.as_ref()).await;
+                }
+            }
+            None => {
+                warn!("No filesystem path associated with filesystem UUID {fs_uuid}; cannot send background property change signals");
+            }
+        }
+    }
+}
+
+pub async fn send_fs_size_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    send_signal!(
+        connection,
+        FilesystemR0,
+        path,
+        size_changed,
+        "total size",
+        "filesystem.r0"
+    );
+    send_signal!(
+        connection,
+        FilesystemR1,
+        path,
+        size_changed,
+        "total size",
+        "filesystem.r1"
+    );
+    send_signal!(
+        connection,
+        FilesystemR2,
+        path,
+        size_changed,
+        "total size",
+        "filesystem.r2"
+    );
+    send_signal!(
+        connection,
+        FilesystemR3,
+        path,
+        size_changed,
+        "total size",
+        "filesystem.r3"
+    );
+    send_signal!(
+        connection,
+        FilesystemR4,
+        path,
+        size_changed,
+        "total size",
+        "filesystem.r4"
+    );
+    send_signal!(
+        connection,
+        FilesystemR5,
+        path,
+        size_changed,
+        "total size",
+        "filesystem.r5"
+    );
+    send_signal!(
+        connection,
+        FilesystemR6,
+        path,
+        size_changed,
+        "total size",
+        "filesystem.r6"
+    );
+    send_signal!(
+        connection,
+        FilesystemR7,
+        path,
+        size_changed,
+        "total size",
+        "filesystem.r7"
+    );
+    send_signal!(
+        connection,
+        FilesystemR8,
+        path,
+        size_changed,
+        "total size",
+        "filesystem.r8"
+    );
+    send_signal!(
+        connection,
+        FilesystemR9,
+        path,
+        size_changed,
+        "total size",
+        "filesystem.r9"
+    );
+}
+
+pub async fn send_fs_used_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    send_signal!(
+        connection,
+        FilesystemR0,
+        path,
+        used_changed,
+        "used size",
+        "filesystem.r0"
+    );
+    send_signal!(
+        connection,
+        FilesystemR1,
+        path,
+        used_changed,
+        "used size",
+        "filesystem.r1"
+    );
+    send_signal!(
+        connection,
+        FilesystemR2,
+        path,
+        used_changed,
+        "used size",
+        "filesystem.r2"
+    );
+    send_signal!(
+        connection,
+        FilesystemR3,
+        path,
+        used_changed,
+        "used size",
+        "filesystem.r3"
+    );
+    send_signal!(
+        connection,
+        FilesystemR4,
+        path,
+        used_changed,
+        "used size",
+        "filesystem.r4"
+    );
+    send_signal!(
+        connection,
+        FilesystemR5,
+        path,
+        used_changed,
+        "used size",
+        "filesystem.r5"
+    );
+    send_signal!(
+        connection,
+        FilesystemR6,
+        path,
+        used_changed,
+        "used size",
+        "filesystem.r6"
+    );
+    send_signal!(
+        connection,
+        FilesystemR7,
+        path,
+        used_changed,
+        "used size",
+        "filesystem.r7"
+    );
+    send_signal!(
+        connection,
+        FilesystemR8,
+        path,
+        used_changed,
+        "used size",
+        "filesystem.r8"
+    );
+    send_signal!(
+        connection,
+        FilesystemR9,
+        path,
+        used_changed,
+        "used size",
+        "filesystem.r9"
+    );
 }
 
 pub async fn send_locked_pools_signals(connection: &Arc<Connection>) {

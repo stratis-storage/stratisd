@@ -16,7 +16,7 @@ pub fn name_prop(guard: SomeLockReadGuard<PoolUuid, dyn Pool>) -> Name {
 }
 
 pub fn size_prop(guard: SomeLockReadGuard<PoolUuid, dyn Pool>) -> String {
-    (*guard.total_physical_size()).to_string()
+    (*guard.total_physical_size().bytes()).to_string()
 }
 
 pub fn used_prop(guard: SomeLockReadGuard<PoolUuid, dyn Pool>) -> (bool, String) {
@@ -28,7 +28,7 @@ pub fn used_prop(guard: SomeLockReadGuard<PoolUuid, dyn Pool>) -> (bool, String)
 }
 
 pub fn allocated_prop(guard: SomeLockReadGuard<PoolUuid, dyn Pool>) -> String {
-    (*guard.total_allocated_size()).to_string()
+    (*guard.total_allocated_size().bytes()).to_string()
 }
 
 pub fn encrypted_prop(guard: SomeLockReadGuard<PoolUuid, dyn Pool>) -> bool {

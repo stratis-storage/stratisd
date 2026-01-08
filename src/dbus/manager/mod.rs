@@ -82,14 +82,14 @@ impl Manager {
                 if uuid == *u && path == &p.as_ref() {
                     Ok(())
                 } else {
-                    Err(StratisError::Msg(format!("Attempted to add path {path}, UUID {uuid} but entry path {p}, UUID {u} already exists")))
+                    Err(StratisError::Msg(format!("Attempted to add path {path}, UUID {uuid} for pool but path {p}, UUID {u} pair already exists")))
                 }
             }
             (Some(u), _) => Err(StratisError::Msg(format!(
-                "Attempted to add UUID {uuid} but entry UUID {u} already exists"
+                "Attempted to add path {path}, UUID {uuid} for pool but path {path}, UUID {u} pair already exists"
             ))),
             (_, Some(p)) => Err(StratisError::Msg(format!(
-                "Attempted to add path {path} but entry path {p} already exists"
+                "Attempted to add path {path}, UUID {uuid} for pool but path {p}, UUID {uuid} pair already exists"
             ))),
             (None, None) => {
                 self.pool_path_to_uuid
@@ -114,14 +114,14 @@ impl Manager {
                 if uuid == *u && path == &p.as_ref() {
                     Ok(())
                 } else {
-                    Err(StratisError::Msg(format!("Attempted to add path {path}, UUID {uuid} but entry path {p}, UUID {u} already exists")))
+                    Err(StratisError::Msg(format!("Attempted to add path {path}, UUID {uuid} for filesystem but path {p}, UUID {u} pair already exists")))
                 }
             }
             (Some(u), _) => Err(StratisError::Msg(format!(
-                "Attempted to add UUID {uuid} but entry UUID {u} already exists"
+                "Attempted to add path {path}, UUID {uuid} for filesystem but path {path}, UUID {u} pair already exists"
             ))),
             (_, Some(p)) => Err(StratisError::Msg(format!(
-                "Attempted to add path {path} but entry path {p} already exists"
+                "Attempted to add path {path}, UUID {uuid} for filesystem  but path {p}, UUID {uuid} pair already exists"
             ))),
             (None, None) => {
                 self.filesystem_path_to_uuid
@@ -142,14 +142,14 @@ impl Manager {
                 if uuid == *u && path == &p.as_ref() {
                     Ok(())
                 } else {
-                    Err(StratisError::Msg(format!("Attempted to add path {path}, UUID {uuid} but entry path {p}, UUID {u} already exists")))
+                    Err(StratisError::Msg(format!("Attempted to add path {path}, UUID {uuid} for blockdev but path {p}, UUID {u} pair already exists")))
                 }
             }
             (Some(u), _) => Err(StratisError::Msg(format!(
-                "Attempted to add UUID {uuid} but entry UUID {u} already exists"
+                "Attempted to add path {path}, UUID {uuid} for blockdev but path {path}, UUID {u} pair already exists"
             ))),
             (_, Some(p)) => Err(StratisError::Msg(format!(
-                "Attempted to add path {path} but entry path {p} already exists"
+                "Attempted to add path {path}, UUID {uuid} for blockdev but path {p}, UUID {uuid} pair already exists"
             ))),
             (None, None) => {
                 self.blockdev_path_to_uuid

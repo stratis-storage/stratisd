@@ -19,6 +19,7 @@ use crate::{
     dbus::{
         blockdev::unregister_blockdev,
         consts::OK_STRING,
+        filesystem::unregister_filesystem,
         manager::Manager,
         pool::{register_pool, unregister_pool},
         types::DbusErrorEnum,
@@ -185,9 +186,12 @@ pub async fn destroy_pool_method(
         }
     };
 
-    let dev_uuids = match engine.get_pool(PoolIdentifier::Uuid(uuid)).await {
-        Some(p) => p.blockdevs().into_iter().map(|(u, _, _)| u).collect(),
-        None => vec![],
+    let (dev_uuids, fs_uuids) = match engine.get_pool(PoolIdentifier::Uuid(uuid)).await {
+        Some(p) => (
+            p.blockdevs().into_iter().map(|(u, _, _)| u).collect(),
+            p.filesystems().into_iter().map(|(_, u, _)| u).collect(),
+        ),
+        None => (vec![], vec![]),
     };
 
     match engine.destroy_pool(uuid).await {
@@ -198,6 +202,16 @@ pub async fn destroy_pool_method(
                     if let Err(e) = unregister_blockdev(connection, manager, &dev_path).await {
                         warn!(
                             "Failed to unregister {dev_path} representing blockdev {dev_uuid}: {e}"
+                        );
+                    }
+                }
+            }
+            for fs_uuid in fs_uuids {
+                let maybe_fs_path = manager.write().await.filesystem_get_path(&fs_uuid).cloned();
+                if let Some(fs_path) = maybe_fs_path {
+                    if let Err(e) = unregister_filesystem(connection, manager, &fs_path).await {
+                        warn!(
+                            "Failed to unregister {fs_path} representing filesystem {fs_uuid}: {e}"
                         );
                     }
                 }

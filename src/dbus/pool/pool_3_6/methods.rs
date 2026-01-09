@@ -32,6 +32,14 @@ pub async fn create_filesystems_method(
 ) -> ((bool, Vec<OwnedObjectPath>), u16, String) {
     let default_return = (false, (Vec::new()));
 
+    if filesystems.len() > 1 {
+        return (
+            default_return,
+            DbusErrorEnum::ERROR as u16,
+            "no more than one filesystem allowed on filesystem creation".into(),
+        );
+    }
+
     let filesystem_specs = match filesystems
         .into_iter()
         .map(|(name, size_opt, size_limit_opt)| {

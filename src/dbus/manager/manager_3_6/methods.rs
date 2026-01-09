@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use tokio::sync::RwLock;
 use zbus::Connection;
@@ -55,26 +55,50 @@ pub async fn stop_pool_method(
         None => (vec![], vec![]),
     };
 
-    let action = handle_action!(engine.stop_pool(id, true).await);
+    let action = handle_action!(engine.stop_pool(id.clone(), true).await);
+
+    match action {
+        Ok(StopAction::Stopped(_) | StopAction::Partial(_)) | Err(_) => {
+            let (dev_uuids_rem, fs_uuids_rem) = match engine.get_pool(id).await {
+                Some(p) => (
+                    p.blockdevs()
+                        .into_iter()
+                        .map(|(u, _, _)| u)
+                        .collect::<HashSet<_>>(),
+                    p.filesystems()
+                        .into_iter()
+                        .map(|(_, u, _)| u)
+                        .collect::<HashSet<_>>(),
+                ),
+                None => (HashSet::default(), HashSet::default()),
+            };
+
+            for fs_uuid in fs_uuids.into_iter().filter(|u| !fs_uuids_rem.contains(u)) {
+                let maybe_fs_path = manager.write().await.filesystem_get_path(&fs_uuid).cloned();
+                if let Some(fs_path) = maybe_fs_path {
+                    if let Err(e) = unregister_filesystem(connection, manager, &fs_path).await {
+                        warn!(
+                            "Failed to unregister {fs_path} representing filesystem {fs_uuid}: {e}"
+                        );
+                    }
+                }
+            }
+
+            for dev_uuid in dev_uuids.into_iter().filter(|u| !dev_uuids_rem.contains(u)) {
+                let maybe_dev_path = manager.write().await.blockdev_get_path(&dev_uuid).cloned();
+                if let Some(dev_path) = maybe_dev_path {
+                    if let Err(e) = unregister_blockdev(connection, manager, &dev_path).await {
+                        warn!(
+                            "Failed to unregister {dev_path} representing blockdev {dev_uuid}: {e}"
+                        );
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
 
     if let Ok(StopAction::Stopped(pool_uuid) | StopAction::Partial(pool_uuid)) = action {
-        for dev_uuid in dev_uuids {
-            let maybe_dev_path = manager.write().await.blockdev_get_path(&dev_uuid).cloned();
-            if let Some(dev_path) = maybe_dev_path {
-                if let Err(e) = unregister_blockdev(connection, manager, &dev_path).await {
-                    warn!("Failed to unregister {dev_path} representing blockdev {dev_uuid}: {e}");
-                }
-            }
-        }
-
-        for fs_uuid in fs_uuids {
-            let maybe_fs_path = manager.write().await.filesystem_get_path(&fs_uuid).cloned();
-            if let Some(fs_path) = maybe_fs_path {
-                if let Err(e) = unregister_filesystem(connection, manager, &fs_path).await {
-                    warn!("Failed to unregister {fs_path} representing filesystem {fs_uuid}: {e}");
-                }
-            }
-        }
         let path = manager.read().await.pool_get_path(&pool_uuid).cloned();
         match path {
             Some(pool) => {

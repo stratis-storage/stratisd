@@ -85,9 +85,16 @@ impl Manager {
                     Err(StratisError::Msg(format!("Attempted to add path {path}, UUID {uuid} for pool but path {p}, UUID {u} pair already exists")))
                 }
             }
-            (Some(u), _) => Err(StratisError::Msg(format!(
-                "Attempted to add path {path}, UUID {uuid} for pool but path {path}, UUID {u} pair already exists"
-            ))),
+            (Some(u), _) => {
+                warn!(
+                    "Attempted to add path {path}, UUID {uuid} for pool but UUID {u} already exists"
+                );
+                self.pool_path_to_uuid
+                    .insert(OwnedObjectPath::from(path.clone()), uuid);
+                self.pool_uuid_to_path
+                    .insert(uuid, OwnedObjectPath::from(path.clone()));
+                Ok(())
+            },
             (_, Some(p)) => Err(StratisError::Msg(format!(
                 "Attempted to add path {path}, UUID {uuid} for pool but path {p}, UUID {uuid} pair already exists"
             ))),
@@ -117,9 +124,16 @@ impl Manager {
                     Err(StratisError::Msg(format!("Attempted to add path {path}, UUID {uuid} for filesystem but path {p}, UUID {u} pair already exists")))
                 }
             }
-            (Some(u), _) => Err(StratisError::Msg(format!(
-                "Attempted to add path {path}, UUID {uuid} for filesystem but path {path}, UUID {u} pair already exists"
-            ))),
+            (Some(u), _) => {
+                warn!(
+                    "Attempted to add path {path}, UUID {uuid} for filesystem but UUID {u} already exists"
+                );
+                self.filesystem_path_to_uuid
+                    .insert(OwnedObjectPath::from(path.clone()), uuid);
+                self.filesystem_uuid_to_path
+                    .insert(uuid, OwnedObjectPath::from(path.clone()));
+                Ok(())
+            },
             (_, Some(p)) => Err(StratisError::Msg(format!(
                 "Attempted to add path {path}, UUID {uuid} for filesystem  but path {p}, UUID {uuid} pair already exists"
             ))),
@@ -145,9 +159,16 @@ impl Manager {
                     Err(StratisError::Msg(format!("Attempted to add path {path}, UUID {uuid} for blockdev but path {p}, UUID {u} pair already exists")))
                 }
             }
-            (Some(u), _) => Err(StratisError::Msg(format!(
-                "Attempted to add path {path}, UUID {uuid} for blockdev but path {path}, UUID {u} pair already exists"
-            ))),
+            (Some(u), _) => {
+                warn!(
+                    "Attempted to add path {path}, UUID {uuid} for blockdev but UUID {u} already exists"
+                );
+                self.blockdev_path_to_uuid
+                    .insert(OwnedObjectPath::from(path.clone()), uuid);
+                self.blockdev_uuid_to_path
+                    .insert(uuid, OwnedObjectPath::from(path.clone()));
+                Ok(())
+            },
             (_, Some(p)) => Err(StratisError::Msg(format!(
                 "Attempted to add path {path}, UUID {uuid} for blockdev but path {p}, UUID {uuid} pair already exists"
             ))),

@@ -15,9 +15,10 @@ use crate::{
         strat_engine::pool::{v1, v2},
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name,
-            OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolUuid, PropChangeAction,
-            RegenAction, RenameAction, SetCreateAction, SetDeleteAction, StratSigblockVersion,
+            EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo, Key,
+            KeyDescription, Name, OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolUuid,
+            PropChangeAction, ReencryptedDevice, RegenAction, RenameAction, SetCreateAction,
+            SetDeleteAction, SizedKeyMemory, StratSigblockVersion,
         },
     },
     stratis::StratisResult,
@@ -108,12 +109,12 @@ impl Pool for AnyPool {
         }
     }
 
-    fn create_filesystems<'a>(
+    fn create_filesystems(
         &mut self,
         pool_name: &str,
         pool_uuid: PoolUuid,
-        specs: &[(&'a str, Option<Bytes>, Option<Bytes>)],
-    ) -> StratisResult<SetCreateAction<(&'a str, FilesystemUuid, Sectors)>> {
+        specs: &[(&str, Option<Bytes>, Option<Bytes>)],
+    ) -> StratisResult<SetCreateAction<(Name, FilesystemUuid, Sectors)>> {
         match self {
             AnyPool::V1(p) => p.create_filesystems(pool_name, pool_uuid, specs),
             AnyPool::V2(p) => p.create_filesystems(pool_name, pool_uuid, specs),
@@ -350,6 +351,89 @@ impl Pool for AnyPool {
         }
     }
 
+    fn start_encrypt_pool(
+        &mut self,
+        pool_uuid: PoolUuid,
+        encryption_info: &InputEncryptionInfo,
+    ) -> StratisResult<CreateAction<(u32, (u32, SizedKeyMemory))>> {
+        match self {
+            AnyPool::V1(p) => p.start_encrypt_pool(pool_uuid, encryption_info),
+            AnyPool::V2(p) => p.start_encrypt_pool(pool_uuid, encryption_info),
+        }
+    }
+
+    fn do_encrypt_pool(
+        &self,
+        pool_uuid: PoolUuid,
+        sector_size: u32,
+        key_info: (u32, SizedKeyMemory),
+    ) -> StratisResult<()> {
+        match self {
+            AnyPool::V1(p) => p.do_encrypt_pool(pool_uuid, sector_size, key_info),
+            AnyPool::V2(p) => p.do_encrypt_pool(pool_uuid, sector_size, key_info),
+        }
+    }
+
+    fn finish_encrypt_pool(&mut self, name: &Name, pool_uuid: PoolUuid) -> StratisResult<()> {
+        match self {
+            AnyPool::V1(p) => p.finish_encrypt_pool(name, pool_uuid),
+            AnyPool::V2(p) => p.finish_encrypt_pool(name, pool_uuid),
+        }
+    }
+
+    fn start_reencrypt_pool(&mut self) -> StratisResult<Vec<(u32, SizedKeyMemory, u32)>> {
+        match self {
+            AnyPool::V1(p) => p.start_reencrypt_pool(),
+            AnyPool::V2(p) => p.start_reencrypt_pool(),
+        }
+    }
+
+    fn do_reencrypt_pool(
+        &self,
+        pool_uuid: PoolUuid,
+        key_info: Vec<(u32, SizedKeyMemory, u32)>,
+    ) -> StratisResult<()> {
+        match self {
+            AnyPool::V1(p) => p.do_reencrypt_pool(pool_uuid, key_info),
+            AnyPool::V2(p) => p.do_reencrypt_pool(pool_uuid, key_info),
+        }
+    }
+
+    fn finish_reencrypt_pool(
+        &mut self,
+        name: &Name,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<ReencryptedDevice> {
+        match self {
+            AnyPool::V1(p) => p.finish_reencrypt_pool(name, pool_uuid),
+            AnyPool::V2(p) => p.finish_reencrypt_pool(name, pool_uuid),
+        }
+    }
+
+    fn decrypt_pool_idem_check(
+        &mut self,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<DeleteAction<EncryptedDevice>> {
+        match self {
+            AnyPool::V1(p) => p.decrypt_pool_idem_check(pool_uuid),
+            AnyPool::V2(p) => p.decrypt_pool_idem_check(pool_uuid),
+        }
+    }
+
+    fn do_decrypt_pool(&self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        match self {
+            AnyPool::V1(p) => p.do_decrypt_pool(pool_uuid),
+            AnyPool::V2(p) => p.do_decrypt_pool(pool_uuid),
+        }
+    }
+
+    fn finish_decrypt_pool(&mut self, pool_uuid: PoolUuid, name: &Name) -> StratisResult<()> {
+        match self {
+            AnyPool::V1(p) => p.finish_decrypt_pool(pool_uuid, name),
+            AnyPool::V2(p) => p.finish_decrypt_pool(pool_uuid, name),
+        }
+    }
+
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {
         match self {
             AnyPool::V1(p) => p.current_metadata(pool_name),
@@ -414,6 +498,13 @@ impl Pool for AnyPool {
         match self {
             AnyPool::V1(p) => p.load_volume_key(uuid),
             AnyPool::V2(p) => p.load_volume_key(uuid),
+        }
+    }
+
+    fn last_reencrypt(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+        match self {
+            AnyPool::V1(p) => p.last_reencrypt(),
+            AnyPool::V2(p) => p.last_reencrypt(),
         }
     }
 }

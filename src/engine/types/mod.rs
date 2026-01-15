@@ -15,9 +15,10 @@ use std::{
 
 use libudev::EventType;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use strum_macros::{self, AsRefStr, EnumString, FromRepr, VariantNames};
 use uuid::Uuid;
+#[cfg(feature = "dbus_enabled")]
+use zbus::zvariant::{Type, Value};
 
 use devicemapper::{Bytes, Sectors, IEC};
 
@@ -27,10 +28,10 @@ pub use crate::{
         structures::Lockable,
         types::{
             actions::{
-                Clevis, CreateAction, DeleteAction, EngineAction, GrowAction, Key,
-                MappingCreateAction, MappingDeleteAction, PropChangeAction, RegenAction,
-                RenameAction, SetCreateAction, SetDeleteAction, SetUnlockAction, StartAction,
-                StopAction, ToDisplay,
+                Clevis, CreateAction, DeleteAction, EncryptedDevice, EngineAction, GrowAction, Key,
+                MappingCreateAction, MappingDeleteAction, PropChangeAction, ReencryptedDevice,
+                RegenAction, RenameAction, SetCreateAction, SetDeleteAction, SetUnlockAction,
+                StartAction, StopAction, ToDisplay,
             },
             diff::{
                 Compare, Diff, PoolDiff, StratBlockDevDiff, StratFilesystemDiff, StratPoolDiff,
@@ -56,6 +57,12 @@ mod keys;
 
 macro_rules! uuid {
     ($vis:vis $ident:ident) => {
+        #[cfg(feature = "dbus_enabled")]
+        #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Default, Deserialize, Serialize, zbus::zvariant::Type)]
+        #[zvariant(signature = "s")]
+        $vis struct $ident(pub uuid::Uuid);
+
+        #[cfg(not(feature = "dbus_enabled"))]
         #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Deserialize, Serialize)]
         $vis struct $ident(pub uuid::Uuid);
 
@@ -88,11 +95,18 @@ macro_rules! uuid {
         }
 
         impl $crate::engine::types::AsUuid for $ident {}
+
+        #[cfg(feature = "dbus_enabled")]
+        impl<'a> From<$ident> for zbus::zvariant::Value<'a> {
+            fn from(uuid: $ident) -> Self {
+                zbus::zvariant::Value::from(uuid.simple().to_string())
+            }
+        }
     }
 }
 
 /// Value representing Clevis config information.
-pub type ClevisInfo = (String, Value);
+pub type ClevisInfo = (String, serde_json::Value);
 
 pub trait AsUuid:
     Copy
@@ -151,6 +165,12 @@ pub enum BlockDevTier {
     Cache = 1,
 }
 
+#[cfg(feature = "dbus_enabled")]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, Type, Value)]
+#[zvariant(signature = "s")]
+pub struct Name(String);
+
+#[cfg(not(feature = "dbus_enabled"))]
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct Name(String);
 
@@ -486,6 +506,37 @@ impl UuidOrConflict {
 pub enum StratSigblockVersion {
     V1 = 1,
     V2 = 2,
+}
+
+impl TryFrom<u8> for StratSigblockVersion {
+    type Error = StratisError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            1u8 => Ok(StratSigblockVersion::V1),
+            2u8 => Ok(StratSigblockVersion::V2),
+            _ => Err(StratisError::Msg(format!(
+                "Unknown sigblock version: {value}"
+            ))),
+        }
+    }
+}
+
+impl From<StratSigblockVersion> for u8 {
+    fn from(version: StratSigblockVersion) -> Self {
+        match version {
+            StratSigblockVersion::V1 => 1u8,
+            StratSigblockVersion::V2 => 2u8,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum OffsetDirection {
+    /// Subtract the offset from the current offset.
+    Backwards,
+    /// Add the offset to the current offset.
+    Forwards,
 }
 
 /// A way to specify an integrity tag size. It is possible for the specification

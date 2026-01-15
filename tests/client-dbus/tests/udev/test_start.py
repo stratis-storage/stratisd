@@ -135,7 +135,7 @@ class TestRemoveCache(UdevTest):
         * Readd the cache device that should have been wiped in the last step
         """
 
-        device_tokens = self._lb_mgr.create_devices(3)
+        device_tokens = self._lb_mgr.create_devices(4)
         devnodes = self._lb_mgr.device_files(device_tokens)
 
         with OptionalKeyServiceContextManager(key_spec=key_spec):
@@ -172,7 +172,7 @@ class TestRemoveCache(UdevTest):
             assert not bool(Pool.Properties.HasCache.Get(get_object(pool_object_path)))
 
             (_, rc, message) = Pool.Methods.InitCache(
-                get_object(pool_object_path), {"devices": [devnodes[2]]}
+                get_object(pool_object_path), {"devices": [devnodes[3]]}
             )
             self.assertEqual(rc, StratisdErrors.OK, msg=message)
 

@@ -20,25 +20,10 @@ use crate::engine::types::{DevUuid, Features, FilesystemUuid, ValidatedIntegrity
 
 const MAXIMUM_STRING_SIZE: usize = 255;
 
-// Find the largest index which occurs on a char boundary of value which is no
-// greater than len.
-// TODO: Replace this method with String::floor_char_boundary when
-// possible.
-fn our_floor_char_boundary(value: &str, len: usize) -> usize {
-    let len = std::cmp::min(len, value.len());
-
-    let mut new_index = len;
-    while !value.is_char_boundary(new_index) && new_index != 0 {
-        new_index -= 1;
-    }
-
-    new_index
-}
-
 // Return a new String, split at the highest index which lies on a char
 // boundary of value which is no greater than len.
 fn safe_split_at(value: &str, len: usize) -> &str {
-    value.split_at(our_floor_char_boundary(value, len)).0
+    value.split_at(value.floor_char_boundary(len)).0
 }
 
 // Serialize a string. Only the first MAXIMUM_STRING_SIZE bytes of the string

@@ -37,6 +37,7 @@ use crate::{
                 ProcessedPathInfos,
             },
             crypt::{handle::v1::CryptHandle, CLEVIS_LUKS_TOKEN_ID, LUKS2_TOKEN_ID},
+            keys::{search_key_persistent, validate_key_descs},
             liminal::DeviceSet,
             metadata::disown_device,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
@@ -189,6 +190,10 @@ impl StratPool {
         devices: UnownedDevices,
         encryption_info: Option<&InputEncryptionInfo>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
+        if let Some(ei) = encryption_info {
+            validate_key_descs(ei.key_descs())?;
+        }
+
         let pool_uuid = PoolUuid::new_v4();
 
         // FIXME: Initializing with the minimum MDA size is not necessarily
@@ -769,6 +774,13 @@ impl Pool for StratPool {
             return Err(StratisError::Msg("Specifying the token slot for binding is not supported in V1 pools; please migrate to V2 pools to use this feature".to_string()));
         }
 
+        search_key_persistent(key_description)?.ok_or_else(|| {
+            StratisError::Msg(format!(
+                "Key with key description {} not found in keyring",
+                key_description.as_application_str()
+            ))
+        })?;
+
         let changed = self.backstore.bind_keyring(key_description)?;
         if changed {
             Ok(CreateAction::Created((Key, LUKS2_TOKEN_ID)))
@@ -787,6 +799,23 @@ impl Pool for StratPool {
         if token_slot.is_some() {
             return Err(StratisError::Msg("Specifying the token slot for rebinding is not supported in V1 pools; please migrate to V2 pools to use this feature".to_string()));
         }
+
+        if let Some(ei) = self.encryption_info_legacy() {
+            if let Some(kd) = ei.key_description()? {
+                search_key_persistent(kd)?.ok_or_else(|| {
+                    StratisError::Msg(format!(
+                        "Key with key description {} not found in keyring",
+                        kd.as_application_str()
+                    ))
+                })?;
+            }
+        }
+        search_key_persistent(new_key_desc)?.ok_or_else(|| {
+            StratisError::Msg(format!(
+                "Key with key description {} not found in keyring",
+                new_key_desc.as_application_str()
+            ))
+        })?;
 
         match self.backstore.rebind_keyring(new_key_desc)? {
             Some(true) => Ok(RenameAction::Renamed(Key)),
@@ -1367,6 +1396,18 @@ impl Pool for StratPool {
 
     #[pool_mutating_action("NoRequests")]
     fn start_reencrypt_pool(&mut self) -> StratisResult<Vec<(u32, SizedKeyMemory, u32)>> {
+        validate_key_descs(match self.encryption_info() {
+            Some(Either::Left(ref ei)) => Box::new(ei.all_key_descriptions().map(|(_, kd)| kd))
+                as Box<dyn Iterator<Item = &KeyDescription>>,
+            Some(Either::Right(ref pei)) => Box::new(pei.key_description()?.into_iter())
+                as Box<dyn Iterator<Item = &KeyDescription>>,
+            None => {
+                return Err(StratisError::Msg(
+                    "Cannot reencrypt an unencrypted pool".to_string(),
+                ))
+            }
+        })?;
+
         self.backstore.prepare_reencrypt()
     }
 

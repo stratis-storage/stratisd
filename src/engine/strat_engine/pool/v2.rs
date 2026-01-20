@@ -30,6 +30,7 @@ use crate::{
                 ProcessedPathInfos, UnownedDevices,
             },
             crypt::DEFAULT_CRYPT_DATA_OFFSET_V2,
+            keys::{search_key_persistent, validate_key_descs},
             liminal::DeviceSet,
             metadata::{disown_device, MDADataSize},
             serde_structs::{FlexDevsSave, PoolFeatures, PoolSave, Recordable},
@@ -41,7 +42,8 @@ use crate::{
             Key, KeyDescription, Name, OffsetDirection, OptionalTokenSlotInput, PoolDiff,
             PoolEncryptionInfo, PoolUuid, PropChangeAction, ReencryptedDevice, RegenAction,
             RenameAction, SetCreateAction, SetDeleteAction, SizedKeyMemory, StratFilesystemDiff,
-            StratPoolDiff, StratSigblockVersion, TokenUnlockMethod, ValidatedIntegritySpec,
+            StratPoolDiff, StratSigblockVersion, TokenUnlockMethod, UnlockMechanism,
+            ValidatedIntegritySpec,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -158,6 +160,10 @@ impl StratPool {
         encryption_info: Option<&InputEncryptionInfo>,
         integrity_spec: ValidatedIntegritySpec,
     ) -> StratisResult<(PoolUuid, StratPool)> {
+        if let Some(ei) = encryption_info {
+            validate_key_descs(ei.key_descs())?;
+        }
+
         let pool_uuid = PoolUuid::new_v4();
 
         // FIXME: Initializing with the minimum MDA size is not necessarily
@@ -692,6 +698,8 @@ impl Pool for StratPool {
         token_slot: OptionalTokenSlotInput,
         key_description: &KeyDescription,
     ) -> StratisResult<CreateAction<(Key, u32)>> {
+        search_key_persistent(key_description)?;
+
         let changed = self.backstore.bind_keyring(token_slot, key_description)?;
         match changed {
             Some(t) => {
@@ -708,6 +716,41 @@ impl Pool for StratPool {
         token_slot: Option<u32>,
         new_key_desc: &KeyDescription,
     ) -> StratisResult<RenameAction<Key>> {
+        if let Some(e) = self.encryption_info() {
+            match e {
+                Either::Left(ei) => match token_slot {
+                    Some(t) => {
+                        let info = ei.get_info(t).ok_or_else(|| {
+                            StratisError::Msg(format!(
+                                "Failed to find key description for token slot {t}"
+                            ))
+                        })?;
+                        match info {
+                            UnlockMechanism::KeyDesc(kd) => {
+                                search_key_persistent(kd)?;
+                            }
+                            _ => {
+                                return Err(StratisError::Msg(format!(
+                                    "Token slot {t} is associated with a Clevis binding"
+                                )));
+                            }
+                        }
+                    }
+                    None => {
+                        if let Some((_, kd)) = ei.single_key_description() {
+                            search_key_persistent(kd)?;
+                        }
+                    }
+                },
+                Either::Right(pei) => {
+                    if let Some(kd) = pei.key_description()? {
+                        search_key_persistent(kd)?;
+                    }
+                }
+            }
+        }
+        search_key_persistent(new_key_desc)?;
+
         match self.backstore.rebind_keyring(token_slot, new_key_desc)? {
             Some(true) => Ok(RenameAction::Renamed(Key)),
             Some(false) => Ok(RenameAction::Identity),
@@ -1216,6 +1259,8 @@ impl Pool for StratPool {
         pool_uuid: PoolUuid,
         encryption_info: &InputEncryptionInfo,
     ) -> StratisResult<CreateAction<(u32, (u32, SizedKeyMemory))>> {
+        validate_key_descs(encryption_info.key_descs())?;
+
         match self.backstore.encryption_info() {
             Some(_) => Ok(CreateAction::Identity),
             None => {

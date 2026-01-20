@@ -20,6 +20,7 @@ use stratisd_proc_macros::strat_pool_impl_gen;
 #[cfg(any(test, feature = "extras"))]
 use crate::engine::strat_engine::{
     backstore::UnownedDevices,
+    keys::validate_key_descs,
     metadata::MDADataSize,
     thinpool::{ThinPoolSizeParams, DATA_BLOCK_SIZE},
 };
@@ -37,6 +38,7 @@ use crate::{
                 ProcessedPathInfos,
             },
             crypt::{handle::v1::CryptHandle, CLEVIS_LUKS_TOKEN_ID, LUKS2_TOKEN_ID},
+            keys::search_key_persistent,
             liminal::DeviceSet,
             metadata::disown_device,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
@@ -189,6 +191,10 @@ impl StratPool {
         devices: UnownedDevices,
         encryption_info: Option<&InputEncryptionInfo>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
+        if let Some(ei) = encryption_info {
+            validate_key_descs(ei.key_descs())?;
+        }
+
         let pool_uuid = PoolUuid::new_v4();
 
         // FIXME: Initializing with the minimum MDA size is not necessarily
@@ -769,6 +775,8 @@ impl Pool for StratPool {
             return Err(StratisError::Msg("Specifying the token slot for binding is not supported in V1 pools; please migrate to V2 pools to use this feature".to_string()));
         }
 
+        search_key_persistent(key_description)?;
+
         let changed = self.backstore.bind_keyring(key_description)?;
         if changed {
             Ok(CreateAction::Created((Key, LUKS2_TOKEN_ID)))
@@ -787,6 +795,13 @@ impl Pool for StratPool {
         if token_slot.is_some() {
             return Err(StratisError::Msg("Specifying the token slot for rebinding is not supported in V1 pools; please migrate to V2 pools to use this feature".to_string()));
         }
+
+        if let Some(ei) = self.encryption_info_legacy() {
+            if let Some(kd) = ei.key_description()? {
+                search_key_persistent(kd)?;
+            }
+        }
+        search_key_persistent(new_key_desc)?;
 
         match self.backstore.rebind_keyring(new_key_desc)? {
             Some(true) => Ok(RenameAction::Renamed(Key)),

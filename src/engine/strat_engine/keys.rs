@@ -32,6 +32,19 @@ pub(super) fn search_key_persistent(key_desc: &KeyDescription) -> StratisResult<
     search_key(keyring_id, key_desc.to_system_string())
 }
 
+/// Validate that all key descriptions are in the persistent kernel keyring.
+pub fn validate_key_descs<'a>(iter: impl Iterator<Item = &'a KeyDescription>) -> StratisResult<()> {
+    for key_desc in iter {
+        search_key_persistent(key_desc)?.ok_or_else(|| {
+            StratisError::Msg(format!(
+                "Key with key description {} not found in kernel keyring",
+                key_desc.as_application_str()
+            ))
+        })?;
+    }
+    Ok(())
+}
+
 /// Search the process keyring for the given key description.
 pub(super) fn search_key_process(
     key_desc: &VolumeKeyKeyDescription,

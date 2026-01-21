@@ -6,9 +6,6 @@ adjust:
   enabled: false
 
 prepare:
-  - name: Start TPM2 emulation kernel module
-    how: shell
-    script: modprobe tpm_vtpm_proxy
   - name: Install packages
     how: install
     package:
@@ -23,14 +20,8 @@ prepare:
      - ncurses
      - rust
      - systemd
-     - swtpm
-     - swtpm-tools
-     - tpm2-tools
      - systemd-devel
      - tang
-  - name: Start TPM2 emulation
-    how: shell
-    script: mkdir /var/tmp/swtpm; swtpm_setup --tpm-state /var/tmp/swtpm --tpm2; swtpm chardev --vtpm-proxy --tpmstate dir=/var/tmp/swtpm --tpm2 &> /var/log/swtpm &
   - name: Start tang server
     how: shell
     script: systemctl enable tangd.socket --now
@@ -47,6 +38,11 @@ discover:
 execute:
   how: tmt
   exit-first: false
+
+provision:
+  hardware:
+    tpm:
+      version: '2.0'
 
 /python:
   prepare+:

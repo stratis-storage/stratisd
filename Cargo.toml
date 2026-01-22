@@ -316,7 +316,6 @@ cast_precision_loss = { level = "deny", priority = 4 }
 cast_ptr_alignment = { level = "deny", priority = 4 }
 checked_conversions = { level = "deny", priority = 4 }
 copy_iterator = { level = "deny", priority = 4 }
-empty_enum = { level = "deny", priority = 4 }
 enum_glob_use = { level = "deny", priority = 4 }
 expl_impl_clone_on_copy = { level = "deny", priority = 4 }
 explicit_deref_methods = { level = "deny", priority = 4 }

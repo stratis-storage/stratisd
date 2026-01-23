@@ -130,6 +130,7 @@ jobs:
           apt-get install -y
           asciidoc
           clang
+          cryptsetup
           curl
           git
           libblkid-dev

@@ -111,7 +111,6 @@ const CLEVIS_EXEC_NAMES: &[&str] = &[
     CLEVIS_REGEN,
     JOSE,
     JQ,
-    CRYPTSETUP,
     CURL,
     TPM2_CREATEPRIMARY,
     TPM2_UNSEAL,
@@ -132,6 +131,7 @@ static EXECUTABLES: LazyLock<HashMap<String, Option<PathBuf>>> = LazyLock::new(|
             THIN_METADATA_SIZE.to_string(),
             find_executable(THIN_METADATA_SIZE),
         ),
+        (CRYPTSETUP.to_string(), find_executable(CRYPTSETUP)),
     ]
     .iter()
     .cloned()
@@ -578,4 +578,39 @@ pub fn thin_metadata_size(
             "thin_metadata_size failed: {output}"
         )))
     }
+}
+
+pub fn run_encrypt(path: &Path) -> StratisResult<()> {
+    get_persistent_keyring()?;
+    let mut cmd = Command::new(CRYPTSETUP);
+    cmd.arg("reencrypt")
+        .arg("--encrypt")
+        .arg("--resume-only")
+        .arg("--token-only")
+        .arg(path);
+
+    execute_cmd(&mut cmd)
+}
+
+pub fn run_reencrypt(path: &Path) -> StratisResult<()> {
+    get_persistent_keyring()?;
+    let mut cmd = Command::new(CRYPTSETUP);
+    cmd.arg("reencrypt")
+        .arg("--resume-only")
+        .arg("--token-only")
+        .arg(path);
+
+    execute_cmd(&mut cmd)
+}
+
+pub fn run_decrypt(path: &Path) -> StratisResult<()> {
+    get_persistent_keyring()?;
+    let mut cmd = Command::new(CRYPTSETUP);
+    cmd.arg("reencrypt")
+        .arg("--decrypt")
+        .arg("--resume-only")
+        .arg("--token-only")
+        .arg(path);
+
+    execute_cmd(&mut cmd)
 }

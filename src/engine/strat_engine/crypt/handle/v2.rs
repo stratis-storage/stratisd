@@ -35,7 +35,9 @@ use crate::{
         engine::MAX_STRATIS_PASS_SIZE,
         strat_engine::{
             backstore::{backstore::v2, get_devno_from_path, get_logical_sector_size},
-            cmd::{clevis_luks_bind, clevis_luks_regen, clevis_luks_unbind},
+            cmd::{
+                clevis_luks_bind, clevis_luks_regen, clevis_luks_unbind, run_decrypt, run_encrypt,
+            },
             crypt::{
                 consts::{
                     DEFAULT_CRYPT_DATA_OFFSET_V2, DEFAULT_CRYPT_KEYSLOTS_SIZE,
@@ -818,38 +820,43 @@ impl CryptHandle {
         sector_size: u32,
         key_info: (u32, SizedKeyMemory),
     ) -> StratisResult<()> {
-        let mut device = acquire_crypt_device(unencrypted_path)?;
-        let activation_name = &format_crypt_backstore_name(&pool_uuid).to_string();
-        let (keyslot, key) = key_info;
-        device.reencrypt_handle().reencrypt_init_by_passphrase(
-            Some(activation_name),
-            key.as_ref(),
-            None,
-            Some(keyslot),
-            Some(("aes", "xts-plain64")),
-            CryptParamsReencrypt {
-                mode: CryptReencryptModeInfo::Encrypt,
-                direction: CryptReencryptDirectionInfo::Forward,
-                resilience: "checksum".to_string(),
-                hash: "sha256".to_string(),
-                data_shift: 0,
-                max_hotzone_size: 0,
-                device_size: 0,
-                luks2: Some(CryptParamsLuks2 {
-                    data_alignment: 0,
-                    data_device: None,
-                    integrity: None,
-                    integrity_params: None,
-                    pbkdf: None,
-                    label: None,
-                    sector_size,
-                    subsystem: None,
-                }),
-                flags: CryptReencrypt::RESUME_ONLY,
-            },
-        )?;
+        {
+            let mut device = acquire_crypt_device(unencrypted_path)?;
+            let activation_name = &format_crypt_backstore_name(&pool_uuid).to_string();
+            let (keyslot, key) = key_info;
+            device.reencrypt_handle().reencrypt_init_by_passphrase(
+                Some(activation_name),
+                key.as_ref(),
+                None,
+                Some(keyslot),
+                Some(("aes", "xts-plain64")),
+                CryptParamsReencrypt {
+                    mode: CryptReencryptModeInfo::Encrypt,
+                    direction: CryptReencryptDirectionInfo::Forward,
+                    resilience: "checksum".to_string(),
+                    hash: "sha256".to_string(),
+                    data_shift: 0,
+                    max_hotzone_size: 0,
+                    device_size: 0,
+                    luks2: Some(CryptParamsLuks2 {
+                        data_alignment: 0,
+                        data_device: None,
+                        integrity: None,
+                        integrity_params: None,
+                        pbkdf: None,
+                        label: None,
+                        sector_size,
+                        subsystem: None,
+                    }),
+                    flags: CryptReencrypt::RESUME_ONLY,
+                },
+            )?;
+        }
+
         info!("Starting encryption operation on pool with UUID {pool_uuid}; may take a while");
-        device.reencrypt_handle().reencrypt2::<()>(None, None)?;
+        // The corresponding libcryptsetup call is device.reencrypt_handle().reencrypt2::<()>(None, None)?;
+        run_encrypt(unencrypted_path)?;
+
         Ok(())
     }
 
@@ -894,31 +901,35 @@ impl CryptHandle {
 
     /// Decrypt the crypt device for an encrypted pool.
     pub fn decrypt(&self, pool_uuid: PoolUuid) -> StratisResult<()> {
-        let activation_name = format_crypt_backstore_name(&pool_uuid);
-        let mut device = acquire_crypt_device(self.luks2_device_path())?;
-        let (keyslot, key) = get_passphrase(&mut device, self.encryption_info())?
-            .either(|(keyslot, _, key)| (keyslot, key), |tup| tup);
+        {
+            let activation_name = format_crypt_backstore_name(&pool_uuid);
+            let mut device = acquire_crypt_device(self.luks2_device_path())?;
+            let (keyslot, key) = get_passphrase(&mut device, self.encryption_info())?
+                .either(|(keyslot, _, key)| (keyslot, key), |tup| tup);
 
-        device.reencrypt_handle().reencrypt_init_by_passphrase(
-            Some(&activation_name.to_string()),
-            key.as_ref(),
-            Some(keyslot),
-            None,
-            None,
-            CryptParamsReencrypt {
-                mode: CryptReencryptModeInfo::Decrypt,
-                direction: CryptReencryptDirectionInfo::Forward,
-                resilience: "checksum".to_string(),
-                hash: "sha256".to_string(),
-                data_shift: 0,
-                max_hotzone_size: 0,
-                device_size: 0,
-                luks2: None,
-                flags: CryptReencrypt::empty(),
-            },
-        )?;
+            device.reencrypt_handle().reencrypt_init_by_passphrase(
+                Some(&activation_name.to_string()),
+                key.as_ref(),
+                Some(keyslot),
+                None,
+                None,
+                CryptParamsReencrypt {
+                    mode: CryptReencryptModeInfo::Decrypt,
+                    direction: CryptReencryptDirectionInfo::Forward,
+                    resilience: "checksum".to_string(),
+                    hash: "sha256".to_string(),
+                    data_shift: 0,
+                    max_hotzone_size: 0,
+                    device_size: 0,
+                    luks2: None,
+                    flags: CryptReencrypt::empty(),
+                },
+            )?;
+        }
+
         info!("Starting decryption operation on pool with UUID {pool_uuid}; may take a while");
-        device.reencrypt_handle().reencrypt2::<()>(None, None)?;
+        // the corresponding libcryptsetup call is device.reencrypt_handle().reencrypt2::<()>(None, None)?;
+        run_decrypt(self.luks2_device_path())?;
         Ok(())
     }
 

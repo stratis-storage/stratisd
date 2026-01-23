@@ -1101,6 +1101,33 @@ pub fn handle_setup_reencrypt(
     luks2_path: &Path,
     encryption_info: &EncryptionInfo,
 ) -> StratisResult<(u32, SizedKeyMemory, u32)> {
+    fn set_up_reencryption_token(
+        device: &mut CryptDevice,
+        new_keyslot: u32,
+        ts: u32,
+        mut token_contents: Value,
+    ) -> StratisResult<()> {
+        if let Some(obj) = token_contents.as_object_mut() {
+            let tokens = match obj.remove(TOKEN_KEYSLOTS_KEY) {
+                Some(Value::Array(mut v)) => {
+                    v.push(Value::String(new_keyslot.to_string()));
+                    Value::Array(v)
+                }
+                Some(_) | None => {
+                    return Err(StratisError::Msg(format!(
+                        "Could not find appropriate formatted value for {TOKEN_KEYSLOTS_KEY}"
+                    )));
+                }
+            };
+            obj.insert(TOKEN_KEYSLOTS_KEY.to_string(), tokens);
+        }
+        device
+            .token_handle()
+            .json_set(TokenInput::ReplaceToken(ts, &token_contents))?;
+
+        Ok(())
+    }
+
     let mut device = acquire_crypt_device(luks2_path)?;
 
     let mut keys = get_all_passphrases(&mut device, encryption_info)?;
@@ -1113,7 +1140,7 @@ pub fn handle_setup_reencrypt(
     let (single_ts, single_key) = keys
         .pop()
         .ok_or_else(|| StratisError::Msg("No unlock methods found".to_string()))?;
-    let mut single_token_contents = device.token_handle().json_get(single_ts)?;
+    let single_token_contents = device.token_handle().json_get(single_ts)?;
     let single_keyslot = get_keyslot_number(&mut device, single_ts)?.ok_or_else(|| {
         StratisError::Msg(format!(
             "Could not find keyslot associated with token slot {single_ts}"
@@ -1126,16 +1153,13 @@ pub fn handle_setup_reencrypt(
         single_key.as_ref(),
         CryptVolumeKey::NO_SEGMENT,
     )?;
-    if let Some(obj) = single_token_contents.as_object_mut() {
-        obj.remove(TOKEN_KEYSLOTS_KEY);
-        obj.insert(
-            TOKEN_KEYSLOTS_KEY.to_string(),
-            Value::Array(vec![Value::String(single_new_keyslot.to_string())]),
-        );
-    }
-    device
-        .token_handle()
-        .json_set(TokenInput::ReplaceToken(single_ts, &single_token_contents))?;
+
+    set_up_reencryption_token(
+        &mut device,
+        single_new_keyslot,
+        single_ts,
+        single_token_contents,
+    )?;
 
     let mut new_vk = SafeMemHandle::alloc(STRATIS_MEK_SIZE)?;
     device.volume_key_handle().get(
@@ -1145,7 +1169,7 @@ pub fn handle_setup_reencrypt(
     )?;
 
     for (ts, key) in other_keys {
-        let mut token_contents = device.token_handle().json_get(ts)?;
+        let token_contents = device.token_handle().json_get(ts)?;
 
         let new_keyslot = device.keyslot_handle().add_by_key(
             None,
@@ -1153,16 +1177,7 @@ pub fn handle_setup_reencrypt(
             key.as_ref(),
             CryptVolumeKey::NO_SEGMENT | CryptVolumeKey::DIGEST_REUSE,
         )?;
-        if let Some(obj) = token_contents.as_object_mut() {
-            obj.remove(TOKEN_KEYSLOTS_KEY);
-            obj.insert(
-                TOKEN_KEYSLOTS_KEY.to_string(),
-                Value::Array(vec![Value::String(new_keyslot.to_string())]),
-            );
-        }
-        device
-            .token_handle()
-            .json_set(TokenInput::ReplaceToken(ts, &token_contents))?;
+        set_up_reencryption_token(&mut device, new_keyslot, ts, token_contents)?;
     }
 
     Ok((single_keyslot, single_key, single_new_keyslot))
@@ -1179,41 +1194,44 @@ pub fn handle_do_reencrypt(
     single_key: SizedKeyMemory,
     single_new_keyslot: u32,
 ) -> StratisResult<()> {
-    let mut device = acquire_crypt_device(luks2_path)?;
+    {
+        let mut device = acquire_crypt_device(luks2_path)?;
 
-    let cipher = device.status_handle().get_cipher()?;
-    let cipher_mode = device.status_handle().get_cipher_mode()?;
-    let sector_size = convert_int!(get_sector_size(Some(&mut device)), i32, u32)?;
-    device.reencrypt_handle().reencrypt_init_by_passphrase(
-        Some(device_name),
-        single_key.as_ref(),
-        Some(single_keyslot),
-        Some(single_new_keyslot),
-        Some((&cipher, &cipher_mode)),
-        CryptParamsReencrypt {
-            mode: CryptReencryptModeInfo::Reencrypt,
-            direction: CryptReencryptDirectionInfo::Forward,
-            resilience: "checksum".to_string(),
-            hash: "sha256".to_string(),
-            data_shift: 0,
-            max_hotzone_size: 0,
-            device_size: 0,
-            luks2: Some(CryptParamsLuks2 {
-                data_alignment: 0,
-                data_device: None,
-                integrity: None,
-                integrity_params: None,
-                pbkdf: None,
-                label: None,
-                sector_size,
-                subsystem: None,
-            }),
-            flags: CryptReencrypt::empty(),
-        },
-    )?;
+        let cipher = device.status_handle().get_cipher()?;
+        let cipher_mode = device.status_handle().get_cipher_mode()?;
+        let sector_size = convert_int!(get_sector_size(Some(&mut device)), i32, u32)?;
+        device.reencrypt_handle().reencrypt_init_by_passphrase(
+            Some(device_name),
+            single_key.as_ref(),
+            Some(single_keyslot),
+            Some(single_new_keyslot),
+            Some((&cipher, &cipher_mode)),
+            CryptParamsReencrypt {
+                mode: CryptReencryptModeInfo::Reencrypt,
+                direction: CryptReencryptDirectionInfo::Forward,
+                resilience: "checksum".to_string(),
+                hash: "sha256".to_string(),
+                data_shift: 0,
+                max_hotzone_size: 0,
+                device_size: 0,
+                luks2: Some(CryptParamsLuks2 {
+                    data_alignment: 0,
+                    data_device: None,
+                    integrity: None,
+                    integrity_params: None,
+                    pbkdf: None,
+                    label: None,
+                    sector_size,
+                    subsystem: None,
+                }),
+                flags: CryptReencrypt::empty(),
+            },
+        )?;
+    }
 
     info!("Starting reencryption operation on pool with UUID {pool_uuid}; may take a while");
-    device.reencrypt_handle().reencrypt2::<()>(None, None)?;
+    // The corresponding libcryptsetup call is device.reencrypt_handle().reencrypt2::<()>(None, None)?;
+    cmd::run_reencrypt(luks2_path)?;
 
     Ok(())
 }

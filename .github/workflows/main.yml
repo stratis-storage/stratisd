@@ -149,6 +149,7 @@ jobs:
           dnf install -y
           asciidoc
           clang
+          cryptsetup
           cryptsetup-devel
           dbus-daemon
           dbus-tools

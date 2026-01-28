@@ -305,8 +305,11 @@ install-daemons:
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd-min
 
+## Install all stratisd programs and config files
+install-programs: install-udev-cfg install-dbus-cfg install-dracut-cfg install-systemd-cfg install-scripts install-binaries install-udev-binaries install-fstab-script install-daemons
+
 ## Install all stratisd files
-install: install-udev-cfg install-man-cfg install-dbus-cfg install-dracut-cfg install-systemd-cfg install-scripts install-binaries install-udev-binaries install-fstab-script install-daemons
+install: install-programs install-man-cfg
 
 ## Build all Rust artifacts
 build-all-rust: build build-min build-utils build-udev-utils stratisd-tools

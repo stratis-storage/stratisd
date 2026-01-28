@@ -18,13 +18,11 @@ use devicemapper::{Bytes, DmNameBuf, Sectors};
 use stratisd_proc_macros::strat_pool_impl_gen;
 
 #[cfg(any(test, feature = "extras"))]
-use crate::engine::{
-    strat_engine::{
-        backstore::UnownedDevices,
-        metadata::MDADataSize,
-        thinpool::{ThinPoolSizeParams, DATA_BLOCK_SIZE},
-    },
-    types::InputEncryptionInfo,
+use crate::engine::strat_engine::{
+    backstore::UnownedDevices,
+    keys::validate_key_descs,
+    metadata::MDADataSize,
+    thinpool::{ThinPoolSizeParams, DATA_BLOCK_SIZE},
 };
 use crate::{
     engine::{
@@ -40,6 +38,7 @@ use crate::{
                 ProcessedPathInfos,
             },
             crypt::{handle::v1::CryptHandle, CLEVIS_LUKS_TOKEN_ID, LUKS2_TOKEN_ID},
+            keys::search_key_persistent,
             liminal::DeviceSet,
             metadata::disown_device,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
@@ -47,12 +46,12 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            Diff, FilesystemUuid, GrowAction, Key, KeyDescription, Name, OptionalTokenSlotInput,
-            PoolDiff, PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction, StratFilesystemDiff, StratPoolDiff, StratSigblockVersion,
-            TokenUnlockMethod,
+            Diff, EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo,
+            Key, KeyDescription, Name, OffsetDirection, OptionalTokenSlotInput, PoolDiff,
+            PoolEncryptionInfo, PoolUuid, PropChangeAction, ReencryptedDevice, RegenAction,
+            RenameAction, SetCreateAction, SetDeleteAction, SizedKeyMemory, StratFilesystemDiff,
+            StratPoolDiff, StratSigblockVersion, TokenUnlockMethod,
         },
-        EncryptionInfo, PropChangeAction,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -177,6 +176,7 @@ pub struct StratPool {
     thin_pool: ThinPool<Backstore>,
     action_avail: ActionAvailability,
     metadata_size: Sectors,
+    last_reencrypt: Option<DateTime<Utc>>,
 }
 
 #[strat_pool_impl_gen]
@@ -191,6 +191,10 @@ impl StratPool {
         devices: UnownedDevices,
         encryption_info: Option<&InputEncryptionInfo>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
+        if let Some(ei) = encryption_info {
+            validate_key_descs(ei.key_descs())?;
+        }
+
         let pool_uuid = PoolUuid::new_v4();
 
         // FIXME: Initializing with the minimum MDA size is not necessarily
@@ -243,6 +247,7 @@ impl StratPool {
             thin_pool: thinpool,
             action_avail: ActionAvailability::Full,
             metadata_size,
+            last_reencrypt: None,
         };
 
         pool.write_metadata(&Name::new(name.to_owned()))?;
@@ -280,8 +285,8 @@ impl StratPool {
 
         if action_avail != ActionAvailability::Full {
             warn!(
-                "Disabling some actions for pool {pool_name} with UUID {uuid}; pool is designated {action_avail}"
-            );
+            "Disabling some actions for pool {pool_name} with UUID {uuid}; pool is designated {action_avail}"
+        );
         }
 
         let thinpool = ThinPool::setup(
@@ -303,6 +308,7 @@ impl StratPool {
             thin_pool: thinpool,
             action_avail,
             metadata_size,
+            last_reencrypt: metadata.last_reencrypt,
         };
 
         // The value of the started field in the pool metadata needs to be
@@ -429,6 +435,7 @@ impl StratPool {
             thinpool_dev: self.thin_pool.record(),
             started: Some(true),
             features: vec![],
+            last_reencrypt: self.last_reencrypt,
         }
     }
 
@@ -695,10 +702,14 @@ impl Pool for StratPool {
                 )
                 .and_then(|bdi| {
                     self.thin_pool
-                        .set_device(self.backstore.device().expect(
-                            "Since thin pool exists, space must have been allocated \
+                        .set_device(
+                            self.backstore.device().expect(
+                                "Since thin pool exists, space must have been allocated \
                              from the backstore, so backstore must have a cap device",
-                        ))
+                            ),
+                            Sectors(0),
+                            OffsetDirection::Forwards,
+                        )
                         .and(Ok(bdi))
                 });
             self.thin_pool.resume()?;
@@ -764,6 +775,8 @@ impl Pool for StratPool {
             return Err(StratisError::Msg("Specifying the token slot for binding is not supported in V1 pools; please migrate to V2 pools to use this feature".to_string()));
         }
 
+        search_key_persistent(key_description)?;
+
         let changed = self.backstore.bind_keyring(key_description)?;
         if changed {
             Ok(CreateAction::Created((Key, LUKS2_TOKEN_ID)))
@@ -782,6 +795,13 @@ impl Pool for StratPool {
         if token_slot.is_some() {
             return Err(StratisError::Msg("Specifying the token slot for rebinding is not supported in V1 pools; please migrate to V2 pools to use this feature".to_string()));
         }
+
+        if let Some(ei) = self.encryption_info_legacy() {
+            if let Some(kd) = ei.key_description()? {
+                search_key_persistent(kd)?;
+            }
+        }
+        search_key_persistent(new_key_desc)?;
 
         match self.backstore.rebind_keyring(new_key_desc)? {
             Some(true) => Ok(RenameAction::Renamed(Key)),
@@ -843,12 +863,12 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action("NoRequests")]
-    fn create_filesystems<'a>(
+    fn create_filesystems(
         &mut self,
         pool_name: &str,
         pool_uuid: PoolUuid,
-        specs: &[(&'a str, Option<Bytes>, Option<Bytes>)],
-    ) -> StratisResult<SetCreateAction<(&'a str, FilesystemUuid, Sectors)>> {
+        specs: &[(&str, Option<Bytes>, Option<Bytes>)],
+    ) -> StratisResult<SetCreateAction<(Name, FilesystemUuid, Sectors)>> {
         self.check_fs_limit(specs.len())?;
 
         let spec_map = validate_filesystem_size_specs(specs)?;
@@ -887,7 +907,7 @@ impl Pool for StratPool {
                 let fs_uuid = self
                     .thin_pool
                     .create_filesystem(pool_name, pool_uuid, name, size, size_limit)?;
-                result.push((name, fs_uuid, size));
+                result.push((Name::new(name.to_string()), fs_uuid, size));
             }
         }
 
@@ -1335,6 +1355,80 @@ impl Pool for StratPool {
         }
     }
 
+    #[pool_mutating_action("NoRequests")]
+    fn start_encrypt_pool(
+        &mut self,
+        _: PoolUuid,
+        _: &InputEncryptionInfo,
+    ) -> StratisResult<CreateAction<(u32, (u32, SizedKeyMemory))>> {
+        Err(StratisError::Msg(
+            "Encrypting an unencrypted device is only supported in V2 of the metadata".to_string(),
+        ))
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn do_encrypt_pool(&self, _: PoolUuid, _: u32, _: (u32, SizedKeyMemory)) -> StratisResult<()> {
+        Err(StratisError::Msg(
+            "Encrypting an unencrypted device is only supported in V2 of the metadata".to_string(),
+        ))
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn finish_encrypt_pool(&mut self, _: &Name, _: PoolUuid) -> StratisResult<()> {
+        Err(StratisError::Msg(
+            "Encrypting an unencrypted device is only supported in V2 of the metadata".to_string(),
+        ))
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn start_reencrypt_pool(&mut self) -> StratisResult<Vec<(u32, SizedKeyMemory, u32)>> {
+        self.backstore.prepare_reencrypt()
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn do_reencrypt_pool(
+        &self,
+        pool_uuid: PoolUuid,
+        key_info: Vec<(u32, SizedKeyMemory, u32)>,
+    ) -> StratisResult<()> {
+        self.backstore.reencrypt(pool_uuid, key_info)
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn finish_reencrypt_pool(
+        &mut self,
+        name: &Name,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<ReencryptedDevice> {
+        self.last_reencrypt = Some(Utc::now());
+        self.write_metadata(name)?;
+        Ok(ReencryptedDevice(pool_uuid))
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn decrypt_pool_idem_check(
+        &mut self,
+        _: PoolUuid,
+    ) -> StratisResult<DeleteAction<EncryptedDevice>> {
+        Err(StratisError::Msg(
+            "Decrypting an encrypted device is only supported in V2 of the metadata".to_string(),
+        ))
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn do_decrypt_pool(&self, _: PoolUuid) -> StratisResult<()> {
+        Err(StratisError::Msg(
+            "Decrypting an encrypted device is only supported in V2 of the metadata".to_string(),
+        ))
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn finish_decrypt_pool(&mut self, _: PoolUuid, _: &Name) -> StratisResult<()> {
+        Err(StratisError::Msg(
+            "Decrypting an encrypted device is only supported in V2 of the metadata".to_string(),
+        ))
+    }
+
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {
         serde_json::to_string(&self.record(pool_name)).map_err(|e| e.into())
     }
@@ -1385,11 +1479,16 @@ impl Pool for StratPool {
     fn load_volume_key(&mut self, _: PoolUuid) -> StratisResult<bool> {
         Ok(false)
     }
+
+    fn last_reencrypt(&self) -> Option<DateTime<Utc>> {
+        self.last_reencrypt
+    }
 }
 
 pub struct StratPoolState {
     metadata_size: Bytes,
     out_of_alloc_space: bool,
+    total_physical_size: Bytes,
 }
 
 impl StateDiff for StratPoolState {
@@ -1399,6 +1498,7 @@ impl StateDiff for StratPoolState {
         StratPoolDiff {
             metadata_size: self.metadata_size.compare(&other.metadata_size),
             out_of_alloc_space: self.out_of_alloc_space.compare(&other.out_of_alloc_space),
+            total_physical_size: self.total_physical_size.compare(&other.total_physical_size),
         }
     }
 
@@ -1406,6 +1506,7 @@ impl StateDiff for StratPoolState {
         StratPoolDiff {
             metadata_size: Diff::Unchanged(self.metadata_size),
             out_of_alloc_space: Diff::Unchanged(self.out_of_alloc_space),
+            total_physical_size: Diff::Unchanged(self.total_physical_size),
         }
     }
 }
@@ -1418,6 +1519,7 @@ impl DumpState<'_> for StratPool {
         StratPoolState {
             metadata_size: self.metadata_size.bytes(),
             out_of_alloc_space: self.thin_pool.out_of_alloc_space(),
+            total_physical_size: self.total_physical_size().bytes(),
         }
     }
 
@@ -1426,6 +1528,7 @@ impl DumpState<'_> for StratPool {
         StratPoolState {
             metadata_size: self.metadata_size.bytes(),
             out_of_alloc_space: self.thin_pool.out_of_alloc_space(),
+            total_physical_size: self.total_physical_size().bytes(),
         }
     }
 }
@@ -1433,6 +1536,7 @@ impl DumpState<'_> for StratPool {
 #[cfg(test)]
 mod tests {
     use std::{
+        env,
         fs::OpenOptions,
         io::{BufWriter, Read, Write},
     };
@@ -1446,7 +1550,7 @@ mod tests {
         strat_engine::{
             cmd::udev_settle,
             pool::AnyPool,
-            tests::{loopbacked, real},
+            tests::{crypt, loopbacked, real},
             thinpool::ThinPoolStatusDigest,
         },
         types::{EngineAction, IntegritySpec, PoolIdentifier, TokenUnlockMethod},
@@ -2007,6 +2111,78 @@ mod tests {
         real::test_with_spec(
             &real::DeviceLimits::Exactly(2, None, None),
             test_remove_cache,
+        );
+    }
+
+    /// Tests online reencryption functionality by performing online reencryption and then stopping and
+    /// starting the pool.
+    fn clevis_test_online_reencrypt(paths: &[&Path]) {
+        fn test_online_encrypt_with_key(paths: &[&Path], key_desc: &KeyDescription) {
+            let (send, _recv) = unbounded_channel();
+            let engine = StratEngine::initialize(send).unwrap();
+
+            let pool_uuid = test_async!(engine.create_pool_legacy(
+                "encrypt_with_both",
+                paths,
+                InputEncryptionInfo::new(
+                    vec![(Some(LUKS2_TOKEN_ID), key_desc.to_owned())],
+                    vec![(
+                        Some(CLEVIS_LUKS_TOKEN_ID),
+                        (
+                            "tang".to_string(),
+                            json!({
+                                "url": env::var("TANG_URL").expect("TANG_URL env var required"),
+                                "stratis:tang:trust_url": true,
+                            }),
+                        )
+                    )]
+                )
+                .unwrap()
+                .as_ref(),
+            ))
+            .unwrap()
+            .changed()
+            .unwrap();
+
+            {
+                let mut handle =
+                    test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid))).unwrap();
+                let (_, _, pool) = handle.as_mut_tuple();
+                assert!(pool.is_encrypted());
+                let key_info = pool.start_reencrypt_pool().unwrap();
+                pool.do_reencrypt_pool(pool_uuid, key_info).unwrap();
+                pool.finish_reencrypt_pool(&Name::new("encrypt_with_both".to_string()), pool_uuid)
+                    .unwrap();
+                assert!(pool.is_encrypted());
+            }
+
+            test_async!(engine.stop_pool(PoolIdentifier::Uuid(pool_uuid), true)).unwrap();
+            test_async!(engine.start_pool(
+                PoolIdentifier::Uuid(pool_uuid),
+                TokenUnlockMethod::Any,
+                None,
+                false,
+            ))
+            .unwrap();
+            test_async!(engine.destroy_pool(pool_uuid)).unwrap();
+        }
+
+        crypt::insert_and_cleanup_key(paths, test_online_encrypt_with_key);
+    }
+
+    #[test]
+    fn clevis_loop_test_online_reencrypt() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(2, None),
+            clevis_test_online_reencrypt,
+        );
+    }
+
+    #[test]
+    fn clevis_real_test_online_reencrypt() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(2, None, None),
+            clevis_test_online_reencrypt,
         );
     }
 }

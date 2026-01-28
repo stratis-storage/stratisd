@@ -108,12 +108,12 @@ impl Pool for AnyPool {
         }
     }
 
-    fn create_filesystems<'a>(
+    fn create_filesystems(
         &mut self,
         pool_name: &str,
         pool_uuid: PoolUuid,
-        specs: &[(&'a str, Option<Bytes>, Option<Bytes>)],
-    ) -> StratisResult<SetCreateAction<(&'a str, FilesystemUuid, Sectors)>> {
+        specs: &[(&str, Option<Bytes>, Option<Bytes>)],
+    ) -> StratisResult<SetCreateAction<(Name, FilesystemUuid, Sectors)>> {
         match self {
             AnyPool::V1(p) => p.create_filesystems(pool_name, pool_uuid, specs),
             AnyPool::V2(p) => p.create_filesystems(pool_name, pool_uuid, specs),

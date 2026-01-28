@@ -843,12 +843,12 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action("NoRequests")]
-    fn create_filesystems<'a>(
+    fn create_filesystems(
         &mut self,
         pool_name: &str,
         pool_uuid: PoolUuid,
-        specs: &[(&'a str, Option<Bytes>, Option<Bytes>)],
-    ) -> StratisResult<SetCreateAction<(&'a str, FilesystemUuid, Sectors)>> {
+        specs: &[(&str, Option<Bytes>, Option<Bytes>)],
+    ) -> StratisResult<SetCreateAction<(Name, FilesystemUuid, Sectors)>> {
         self.check_fs_limit(specs.len())?;
 
         let spec_map = validate_filesystem_size_specs(specs)?;
@@ -887,7 +887,7 @@ impl Pool for StratPool {
                 let fs_uuid = self
                     .thin_pool
                     .create_filesystem(pool_name, pool_uuid, name, size, size_limit)?;
-                result.push((name, fs_uuid, size));
+                result.push((Name::new(name.to_string()), fs_uuid, size));
             }
         }
 
@@ -1390,6 +1390,7 @@ impl Pool for StratPool {
 pub struct StratPoolState {
     metadata_size: Bytes,
     out_of_alloc_space: bool,
+    total_physical_size: Bytes,
 }
 
 impl StateDiff for StratPoolState {
@@ -1399,6 +1400,7 @@ impl StateDiff for StratPoolState {
         StratPoolDiff {
             metadata_size: self.metadata_size.compare(&other.metadata_size),
             out_of_alloc_space: self.out_of_alloc_space.compare(&other.out_of_alloc_space),
+            total_physical_size: self.total_physical_size.compare(&other.total_physical_size),
         }
     }
 
@@ -1406,6 +1408,7 @@ impl StateDiff for StratPoolState {
         StratPoolDiff {
             metadata_size: Diff::Unchanged(self.metadata_size),
             out_of_alloc_space: Diff::Unchanged(self.out_of_alloc_space),
+            total_physical_size: Diff::Unchanged(self.total_physical_size),
         }
     }
 }
@@ -1418,6 +1421,7 @@ impl DumpState<'_> for StratPool {
         StratPoolState {
             metadata_size: self.metadata_size.bytes(),
             out_of_alloc_space: self.thin_pool.out_of_alloc_space(),
+            total_physical_size: self.total_physical_size().bytes(),
         }
     }
 
@@ -1426,6 +1430,7 @@ impl DumpState<'_> for StratPool {
         StratPoolState {
             metadata_size: self.metadata_size.bytes(),
             out_of_alloc_space: self.thin_pool.out_of_alloc_space(),
+            total_physical_size: self.total_physical_size().bytes(),
         }
     }
 }

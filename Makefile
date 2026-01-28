@@ -442,6 +442,7 @@ test-stratisd-tools:
 yamllint:
 	yamllint --strict .github/workflows/*.yml
 	yamllint --strict .packit.yaml
+	yamllint --strict .yamllint.yaml
 
 ## Run tmt lint
 tmtlint:

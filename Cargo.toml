@@ -17,6 +17,7 @@ exclude = [
     "/.github",
     "/.gitignore",
     "/.packit.yaml",
+    "/.yamlint.yaml",
     "/_typos.toml",
     "/Makefile",
     "/README_tests.md",

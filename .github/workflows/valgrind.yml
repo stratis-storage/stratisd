@@ -9,7 +9,6 @@ on:
   workflow_dispatch:
 
 # cancel the in-progress workflow when PR is refreshed.
-# yamllint disable rule:line-length
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}
   cancel-in-progress: true
@@ -177,7 +176,6 @@ jobs:
       options: --privileged -v /dev:/dev --userns=host --ipc=host -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1 -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev
     services:
       tang:
-        # yamllint disable rule:line-length
         image: ghcr.io/stratis-storage/stratisd/tang:38
         credentials:
           username: ${{ github.actor }}

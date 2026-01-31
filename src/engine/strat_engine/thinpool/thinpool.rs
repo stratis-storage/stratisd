@@ -1632,16 +1632,7 @@ where
             }
         }
 
-        if 2u64 * meta_growth > backstore.available_in_backstore() {
-            self.out_of_meta_space = true;
-            (
-                self.set_error_mode(),
-                Err(StratisError::Msg(
-                    "Not enough unallocated space available on the pool to extend metadata device"
-                        .to_string(),
-                )),
-            )
-        } else if meta_growth > Sectors(0) {
+        if meta_growth > Sectors(0) {
             let ext = do_extend(
                 &mut self.thin_pool,
                 backstore,
@@ -1651,7 +1642,19 @@ where
                 meta_growth,
             );
 
-            (ext.is_ok(), ext)
+            match ext {
+                Ok(Sectors(0)) => {
+                    self.out_of_meta_space = true;
+                    (
+                        self.set_error_mode(),
+                        Err(StratisError::Msg(
+                            "Not enough unallocated space available on the pool to extend metadata device".to_string(),
+                        )),
+                    )
+                }
+                Ok(_) => (true, ext),
+                Err(_) => (false, ext),
+            }
         } else {
             (false, Ok(Sectors(0)))
         }

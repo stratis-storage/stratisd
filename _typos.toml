@@ -3,6 +3,7 @@
 Strat = "Strat"
 strat = "strat"
 STRAT = "STRAT"
+consts = "consts"
 
 # Misidentified as misspelling of "ME"
 MEK = "MEK"

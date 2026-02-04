@@ -13,7 +13,7 @@ use zbus::{
 };
 mod props;
 
-pub use props::{set_size_limit_prop, size_limit_prop};
+pub use props::{send_size_limit_signal_on_change, set_size_limit_prop, size_limit_prop};
 
 use crate::{
     dbus::{
@@ -139,10 +139,13 @@ impl FilesystemR6 {
     async fn set_size_limit(&self, value: (bool, String)) -> Result<(), zbus::Error> {
         set_filesystem_prop(
             &self.engine,
+            &self.connection,
+            &self.manager,
             self.parent_uuid,
             self.uuid,
             value,
             set_size_limit_prop,
+            send_size_limit_signal_on_change,
         )
         .await
     }

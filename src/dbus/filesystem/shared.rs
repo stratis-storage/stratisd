@@ -2,31 +2,49 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::sync::Arc;
+use std::{future::Future, sync::Arc};
 
-use zbus::fdo::Error;
+use tokio::sync::RwLock;
+use zbus::{fdo::Error, Connection};
 
-use crate::engine::{
-    Engine, Filesystem, FilesystemUuid, Name, Pool, PoolIdentifier, PoolUuid, SomeLockWriteGuard,
+use crate::{
+    dbus::manager::Manager,
+    engine::{
+        Engine, Filesystem, FilesystemUuid, Lockable, Name, Pool, PoolIdentifier, PoolUuid,
+        SomeLockWriteGuard,
+    },
 };
 
-pub async fn set_filesystem_prop<V>(
+#[allow(clippy::too_many_arguments)]
+pub async fn set_filesystem_prop<'a, 'b, V, F, Fut, S, SFut>(
     engine: &Arc<dyn Engine>,
+    connection: &'a Arc<Connection>,
+    manager: &'b Lockable<Arc<RwLock<Manager>>>,
     uuid: PoolUuid,
     fs_uuid: FilesystemUuid,
     value: V,
-    f: impl Fn(
-        &mut SomeLockWriteGuard<PoolUuid, dyn Pool>,
-        FilesystemUuid,
-        V,
-    ) -> Result<(), zbus::Error>,
-) -> Result<(), zbus::Error> {
-    let mut guard = engine
+    f: F,
+    send_signal: S,
+) -> Result<(), zbus::Error>
+where
+    F: FnOnce(SomeLockWriteGuard<PoolUuid, dyn Pool>, FilesystemUuid, V) -> Fut,
+    Fut: Future<Output = Result<bool, zbus::Error>>,
+    S: FnOnce(&'a Arc<Connection>, &'b Lockable<Arc<RwLock<Manager>>>, FilesystemUuid) -> SFut,
+    SFut: Future<Output = ()>,
+{
+    let guard = engine
         .get_mut_pool(PoolIdentifier::Uuid(uuid))
         .await
         .ok_or_else(|| zbus::Error::Failure(format!("No pool associated with UUID {uuid}")))?;
 
-    f(&mut guard, fs_uuid, value)
+    let changed = f(guard, fs_uuid, value).await?;
+    // Guard is dropped here, lock is released
+
+    if changed {
+        send_signal(connection, manager, fs_uuid).await;
+    }
+
+    Ok(())
 }
 
 pub async fn filesystem_prop<R>(

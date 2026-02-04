@@ -26,10 +26,13 @@ use crate::{
     stratis::StratisResult,
 };
 
-use crate::dbus::blockdev::blockdev_3_3::{new_physical_size_prop, set_user_info_prop};
+use crate::dbus::blockdev::blockdev_3_3::{
+    new_physical_size_prop, send_user_info_signal_on_change, set_user_info_prop,
+};
 
 pub struct BlockdevR9 {
     engine: Arc<dyn Engine>,
+    connection: Arc<Connection>,
     manager: Lockable<Arc<RwLock<Manager>>>,
     parent_uuid: PoolUuid,
     uuid: DevUuid,
@@ -38,12 +41,14 @@ pub struct BlockdevR9 {
 impl BlockdevR9 {
     fn new(
         engine: Arc<dyn Engine>,
+        connection: Arc<Connection>,
         manager: Lockable<Arc<RwLock<Manager>>>,
         parent_uuid: PoolUuid,
         uuid: DevUuid,
     ) -> Self {
         BlockdevR9 {
             engine,
+            connection,
             manager,
             parent_uuid,
             uuid,
@@ -58,7 +63,13 @@ impl BlockdevR9 {
         parent_uuid: PoolUuid,
         uuid: DevUuid,
     ) -> StratisResult<()> {
-        let blockdev = Self::new(engine, manager.clone(), parent_uuid, uuid);
+        let blockdev = Self::new(
+            engine,
+            Arc::clone(connection),
+            manager.clone(),
+            parent_uuid,
+            uuid,
+        );
 
         connection.object_server().at(path, blockdev).await?;
         Ok(())
@@ -103,10 +114,13 @@ impl BlockdevR9 {
     async fn set_user_info(&self, value: (bool, String)) -> Result<(), zbus::Error> {
         set_blockdev_prop(
             &self.engine,
+            &self.connection,
+            &self.manager,
             self.parent_uuid,
             self.uuid,
             value,
             set_user_info_prop,
+            send_user_info_signal_on_change,
         )
         .await
     }

@@ -19,7 +19,9 @@ use crate::{
                 created_prop, devnode_prop, name_prop, pool_prop, set_name_method, size_prop,
                 used_prop,
             },
-            filesystem_3_6::{set_size_limit_prop, size_limit_prop},
+            filesystem_3_6::{
+                send_size_limit_signal_on_change, set_size_limit_prop, size_limit_prop,
+            },
             shared::{filesystem_prop, set_filesystem_prop},
         },
         manager::Manager,
@@ -30,7 +32,10 @@ use crate::{
 
 mod props;
 
-pub use props::{merge_scheduled_prop, origin_prop, set_merge_scheduled_prop};
+pub use props::{
+    merge_scheduled_prop, origin_prop, send_merge_scheduled_signal_on_change,
+    set_merge_scheduled_prop,
+};
 
 pub struct FilesystemR7 {
     engine: Arc<dyn Engine>,
@@ -132,10 +137,13 @@ impl FilesystemR7 {
     async fn set_merge_scheduled(&self, value: bool) -> Result<(), zbus::Error> {
         set_filesystem_prop(
             &self.engine,
+            &self.connection,
+            &self.manager,
             self.parent_uuid,
             self.uuid,
             value,
             set_merge_scheduled_prop,
+            send_merge_scheduled_signal_on_change,
         )
         .await
     }
@@ -169,10 +177,13 @@ impl FilesystemR7 {
     async fn set_size_limit(&self, value: (bool, String)) -> Result<(), zbus::Error> {
         set_filesystem_prop(
             &self.engine,
+            &self.connection,
+            &self.manager,
             self.parent_uuid,
             self.uuid,
             value,
             set_size_limit_prop,
+            send_size_limit_signal_on_change,
         )
         .await
     }

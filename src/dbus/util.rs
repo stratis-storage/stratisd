@@ -1548,6 +1548,68 @@ pub async fn send_origin_signal(connection: &Arc<Connection>, path: &ObjectPath<
     );
 }
 
+pub async fn send_size_limit_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    send_signal!(
+        connection,
+        FilesystemR6,
+        path,
+        size_limit_changed,
+        "size limit",
+        "filesystem.r6"
+    );
+    send_signal!(
+        connection,
+        FilesystemR7,
+        path,
+        size_limit_changed,
+        "size limit",
+        "filesystem.r7"
+    );
+    send_signal!(
+        connection,
+        FilesystemR8,
+        path,
+        size_limit_changed,
+        "size limit",
+        "filesystem.r8"
+    );
+    send_signal!(
+        connection,
+        FilesystemR9,
+        path,
+        size_limit_changed,
+        "size limit",
+        "filesystem.r9"
+    );
+}
+
+pub async fn send_merge_scheduled_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    send_signal!(
+        connection,
+        FilesystemR7,
+        path,
+        merge_scheduled_changed,
+        "merge scheduled",
+        "filesystem.r7"
+    );
+    send_signal!(
+        connection,
+        FilesystemR8,
+        path,
+        merge_scheduled_changed,
+        "merge scheduled",
+        "filesystem.r8"
+    );
+    send_signal!(
+        connection,
+        FilesystemR9,
+        path,
+        merge_scheduled_changed,
+        "merge scheduled",
+        "filesystem.r9"
+    );
+}
+
 pub async fn send_fs_name_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
     send_signal!(
         connection,

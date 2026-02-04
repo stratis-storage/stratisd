@@ -1751,3 +1751,62 @@ pub async fn send_new_physical_size_signal(connection: &Arc<Connection>, path: &
         "blockdev.r9"
     );
 }
+
+pub async fn send_user_info_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    send_signal!(
+        connection,
+        BlockdevR3,
+        path,
+        user_info_changed,
+        "user info",
+        "blockdev.r3"
+    );
+    send_signal!(
+        connection,
+        BlockdevR4,
+        path,
+        user_info_changed,
+        "user info",
+        "blockdev.r4"
+    );
+    send_signal!(
+        connection,
+        BlockdevR5,
+        path,
+        user_info_changed,
+        "user info",
+        "blockdev.r5"
+    );
+    send_signal!(
+        connection,
+        BlockdevR6,
+        path,
+        user_info_changed,
+        "user info",
+        "blockdev.r6"
+    );
+    send_signal!(
+        connection,
+        BlockdevR7,
+        path,
+        user_info_changed,
+        "user info",
+        "blockdev.r7"
+    );
+    send_signal!(
+        connection,
+        BlockdevR8,
+        path,
+        user_info_changed,
+        "user info",
+        "blockdev.r8"
+    );
+    send_signal!(
+        connection,
+        BlockdevR9,
+        path,
+        user_info_changed,
+        "user info",
+        "blockdev.r9"
+    );
+}

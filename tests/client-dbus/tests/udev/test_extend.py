@@ -65,6 +65,13 @@ class TestExtendOnAddData(UdevTest):
             allocs = metadata_dct["backstore"]["cap"]["allocs"]
 
         with OptionalKeyServiceContextManager(key_spec=[("testkey", "testkey")]):
+            key_loaded = False
+            while not key_loaded:
+                key_loaded = bool(
+                    Pool.Properties.VolumeKeyLoaded.Get(get_object(pool_object_path))
+                )
+                sleep(1)
+
             (_, rc, message) = Manager.Methods.UnsetKey(
                 get_object(TOP_OBJECT), {"key_desc": "testkey"}
             )

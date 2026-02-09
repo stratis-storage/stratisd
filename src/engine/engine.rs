@@ -19,16 +19,20 @@ use devicemapper::{Bytes, Sectors};
 
 use crate::{
     engine::{
-        structures::{AllLockReadGuard, AllLockWriteGuard, SomeLockReadGuard, SomeLockWriteGuard},
+        structures::{
+            AllLockReadAvailableGuard, AllLockReadGuard, AllLockWriteAvailableGuard,
+            AllLockWriteGuard, SomeLockReadGuard, SomeLockWriteGuard,
+        },
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo, IntegritySpec, Key,
-            KeyDescription, LockedPoolsInfo, MappingCreateAction, MappingDeleteAction, Name,
-            OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolIdentifier, PoolUuid,
-            PropChangeAction, RegenAction, RenameAction, ReportType, SetCreateAction,
-            SetDeleteAction, SetUnlockAction, StartAction, StopAction, StoppedPoolsInfo,
-            StratBlockDevDiff, StratFilesystemDiff, StratSigblockVersion, TokenUnlockMethod,
-            UdevEngineEvent, UnlockMethod,
+            EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo,
+            IntegritySpec, Key, KeyDescription, LockedPoolsInfo, MappingCreateAction,
+            MappingDeleteAction, Name, OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo,
+            PoolIdentifier, PoolUuid, PropChangeAction, ReencryptedDevice, RegenAction,
+            RenameAction, ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction,
+            SizedKeyMemory, StartAction, StopAction, StoppedPoolsInfo, StratBlockDevDiff,
+            StratFilesystemDiff, StratSigblockVersion, TokenUnlockMethod, UdevEngineEvent,
+            UnlockMethod,
         },
     },
     stratis::StratisResult,
@@ -159,12 +163,12 @@ pub trait Pool: Debug + Send + Sync {
     /// Returns an error if any of the specified names are already in use
     /// for filesystems in this pool. If the same name is passed multiple
     /// times, the size associated with the last item is used.
-    fn create_filesystems<'b>(
+    fn create_filesystems(
         &mut self,
         pool_name: &str,
         pool_uuid: PoolUuid,
-        specs: &[(&'b str, Option<Bytes>, Option<Bytes>)],
-    ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid, Sectors)>>;
+        specs: &[(&str, Option<Bytes>, Option<Bytes>)],
+    ) -> StratisResult<SetCreateAction<(Name, FilesystemUuid, Sectors)>>;
 
     /// Adds blockdevs specified by paths to pool.
     /// Returns a list of uuids corresponding to devices actually added.
@@ -398,6 +402,60 @@ pub trait Pool: Debug + Send + Sync {
         limit: Option<Bytes>,
     ) -> StratisResult<PropChangeAction<Option<Sectors>>>;
 
+    /// Setup pool encryption operation and check for idempotence.
+    fn start_encrypt_pool(
+        &mut self,
+        pool_uuid: PoolUuid,
+        encryption_info: &InputEncryptionInfo,
+    ) -> StratisResult<CreateAction<(u32, (u32, SizedKeyMemory))>>;
+
+    /// Encrypt an unencrypted pool.
+    fn do_encrypt_pool(
+        &self,
+        pool_uuid: PoolUuid,
+        sector_size: u32,
+        key_info: (u32, SizedKeyMemory),
+    ) -> StratisResult<()>;
+
+    /// Update internal data structures with the result of the encryption operation.
+    fn finish_encrypt_pool(&mut self, name: &Name, pool_uuid: PoolUuid) -> StratisResult<()>;
+
+    /// Start reencryption of an encrypted pool.
+    ///
+    /// Sets up the reencryption process.
+    fn start_reencrypt_pool(&mut self) -> StratisResult<Vec<(u32, SizedKeyMemory, u32)>>;
+
+    /// Perform reencryption of an encrypted pool.
+    ///
+    /// Acquires a read lock during the duration of the reencryption.
+    fn do_reencrypt_pool(
+        &self,
+        pool_uuid: PoolUuid,
+        key_info: Vec<(u32, SizedKeyMemory, u32)>,
+    ) -> StratisResult<()>;
+
+    /// Finish reencryption of an encrypted pool.
+    fn finish_reencrypt_pool(
+        &mut self,
+        name: &Name,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<ReencryptedDevice>;
+
+    /// Check idempotence of a pool decrypt command.
+    ///
+    /// This method does not require interior mutability, but a write lock is required
+    /// to ensure that no other decryption operations have already started.
+    fn decrypt_pool_idem_check(
+        &mut self,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<DeleteAction<EncryptedDevice>>;
+
+    /// Decrypt an encrypted pool.
+    fn do_decrypt_pool(&self, pool_uuid: PoolUuid) -> StratisResult<()>;
+
+    /// Finish pool decryption operation.
+    fn finish_decrypt_pool(&mut self, pool_uuid: PoolUuid, name: &Name) -> StratisResult<()>;
+
     /// Return the metadata that would be written if metadata were written.
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String>;
 
@@ -430,6 +488,9 @@ pub trait Pool: Debug + Send + Sync {
     ///
     /// Returns true if the key was newly loaded and false if the key was already loaded.
     fn load_volume_key(&mut self, uuid: PoolUuid) -> StratisResult<bool>;
+
+    /// Get the timestamp of the last online reencryption operation.
+    fn last_reencrypt(&self) -> Option<DateTime<Utc>>;
 }
 
 pub type HandleEvents<P> = (
@@ -483,6 +544,15 @@ pub trait Engine: Debug + Report + Send + Sync {
         token_slot: UnlockMethod,
     ) -> StratisResult<SetUnlockAction<DevUuid>>;
 
+    /// Upgrade the read lock on a given pool to a write lock.
+    ///
+    /// This method will prioritize the given lock over all other queued operations to preserve
+    /// atomic operations that need to switch between read and write locks.
+    async fn upgrade_pool(
+        &self,
+        lock: SomeLockReadGuard<PoolUuid, dyn Pool>,
+    ) -> SomeLockWriteGuard<PoolUuid, dyn Pool>;
+
     /// Find the pool designated by name or UUID.
     async fn get_pool(
         &self,
@@ -506,8 +576,16 @@ pub trait Engine: Debug + Report + Send + Sync {
     /// Get all pools belonging to this engine.
     async fn pools(&self) -> AllLockReadGuard<PoolUuid, dyn Pool>;
 
+    /// Get all pools belonging to this engine that are currently available and will not block on
+    /// locking.
+    async fn available_pools(&self) -> Option<AllLockReadAvailableGuard<PoolUuid, dyn Pool>>;
+
     /// Get mutable references to all pools belonging to this engine.
     async fn pools_mut(&self) -> AllLockWriteGuard<PoolUuid, dyn Pool>;
+
+    /// Get mutable references to all pools belonging to this engine that are currently available
+    /// and will not block on locking.
+    async fn available_pools_mut(&self) -> Option<AllLockWriteAvailableGuard<PoolUuid, dyn Pool>>;
 
     /// Get the UUIDs of all pools that experienced an event.
     async fn get_events(&self) -> StratisResult<HashSet<PoolUuid>>;

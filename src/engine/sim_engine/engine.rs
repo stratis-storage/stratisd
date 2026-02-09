@@ -18,17 +18,18 @@ use crate::{
     engine::{
         engine::{Engine, HandleEvents, KeyActions, Pool, Report},
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
-        sim_engine::{keys::SimKeyActions, pool::SimPool},
+        sim_engine::{keys::SimKeyActions, pool::SimPool, shared::convert_encryption_info},
         structures::{
-            AllLockReadGuard, AllLockWriteGuard, AllOrSomeLock, Lockable, SomeLockReadGuard,
-            SomeLockWriteGuard, Table,
+            AllLockReadAvailableGuard, AllLockReadGuard, AllLockWriteAvailableGuard,
+            AllLockWriteGuard, AllOrSomeLock, Lockable, SomeLockReadGuard, SomeLockWriteGuard,
+            Table,
         },
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, Features, FilesystemUuid,
-            InputEncryptionInfo, IntegritySpec, LockedPoolsInfo, Name, PoolDevice, PoolDiff,
-            PoolIdentifier, PoolUuid, RenameAction, ReportType, SetUnlockAction, StartAction,
-            StopAction, StoppedPoolInfo, StoppedPoolsInfo, StratFilesystemDiff, TokenUnlockMethod,
-            UdevEngineEvent, UnlockMechanism, UnlockMethod, ValidatedIntegritySpec,
+            CreateAction, DeleteAction, DevUuid, Features, FilesystemUuid, InputEncryptionInfo,
+            IntegritySpec, LockedPoolsInfo, Name, PoolDevice, PoolDiff, PoolIdentifier, PoolUuid,
+            RenameAction, ReportType, SetUnlockAction, StartAction, StopAction, StoppedPoolInfo,
+            StoppedPoolsInfo, StratFilesystemDiff, TokenUnlockMethod, UdevEngineEvent,
+            UnlockMethod, ValidatedIntegritySpec,
         },
         StratSigblockVersion,
     },
@@ -139,30 +140,7 @@ impl Engine for SimEngine {
 
         let integrity_spec = ValidatedIntegritySpec::try_from(integrity_spec)?;
 
-        let converted_ei = encryption_info
-            .cloned()
-            .map(|ei| {
-                ei.into_iter().try_fold(
-                    EncryptionInfo::new(),
-                    |mut info, (token_slot, unlock_mechanism)| {
-                        let ts = match token_slot {
-                            Some(t) => t,
-                            None => info.free_token_slot(),
-                        };
-                        if let UnlockMechanism::KeyDesc(ref kd) = unlock_mechanism {
-                            if !self.key_handler.contains_key(kd) {
-                                return Err(StratisError::Msg(format!(
-                                    "Key {} was not found in the keyring",
-                                    kd.as_application_str()
-                                )));
-                            }
-                        }
-                        info.add_info(ts, unlock_mechanism)?;
-                        Ok(info)
-                    },
-                )
-            })
-            .transpose()?;
+        let converted_ei = convert_encryption_info(encryption_info, Some(&self.key_handler))?;
 
         let guard = self.pools.read(PoolIdentifier::Name(name.clone())).await;
         match guard.as_ref().map(|g| g.as_tuple()) {
@@ -240,6 +218,13 @@ impl Engine for SimEngine {
         Ok(SetUnlockAction::empty())
     }
 
+    async fn upgrade_pool(
+        &self,
+        lock: SomeLockReadGuard<PoolUuid, dyn Pool>,
+    ) -> SomeLockWriteGuard<PoolUuid, dyn Pool> {
+        self.pools.upgrade(lock).await.into_dyn()
+    }
+
     async fn get_pool(
         &self,
         key: PoolIdentifier<PoolUuid>,
@@ -301,8 +286,16 @@ impl Engine for SimEngine {
         self.pools.read_all().await.into_dyn()
     }
 
+    async fn available_pools(&self) -> Option<AllLockReadAvailableGuard<PoolUuid, dyn Pool>> {
+        self.pools.read_all_available().await.map(|l| l.into_dyn())
+    }
+
     async fn pools_mut(&self) -> AllLockWriteGuard<PoolUuid, dyn Pool> {
         self.pools.write_all().await.into_dyn()
+    }
+
+    async fn available_pools_mut(&self) -> Option<AllLockWriteAvailableGuard<PoolUuid, dyn Pool>> {
+        self.pools.write_all_available().await.map(|l| l.into_dyn())
     }
 
     async fn get_events(&self) -> StratisResult<HashSet<PoolUuid>> {

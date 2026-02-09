@@ -14,7 +14,7 @@ use devicemapper::Sectors;
 
 use crate::engine::{
     engine::Filesystem,
-    types::{DevUuid, FilesystemUuid, PoolUuid},
+    types::{DevUuid, FilesystemUuid, Name, PoolUuid},
 };
 
 /// Return value indicating key operation
@@ -22,6 +22,9 @@ pub struct Key;
 
 /// Return value indicating clevis operation
 pub struct Clevis;
+
+/// Return value indicating an encrypt operation on the pool
+pub struct EncryptedDevice(pub PoolUuid);
 
 /// A trait for a generic kind of action. Defines the type of the thing to
 /// be changed, and also a method to indicate what changed.
@@ -132,6 +135,22 @@ where
                     f,
                     "The snapshot requested for creation is already present; no action taken"
                 )
+            }
+        }
+    }
+}
+
+impl Display for CreateAction<EncryptedDevice> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CreateAction::Created(EncryptedDevice(uuid)) => {
+                write!(
+                    f,
+                    "Unencrypted pool with UUID {uuid} successfully encrypted"
+                )
+            }
+            CreateAction::Identity => {
+                write!(f, "The requested pool was already encrypted")
             }
         }
     }
@@ -301,7 +320,7 @@ impl Display for SetUnlockAction<DevUuid> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 /// An action which may create multiple things.
 pub struct SetCreateAction<T> {
     changed: Vec<T>,
@@ -333,7 +352,7 @@ impl<T> EngineAction for SetCreateAction<T> {
     }
 }
 
-impl Display for SetCreateAction<(&str, FilesystemUuid, Sectors)> {
+impl Display for SetCreateAction<(Name, FilesystemUuid, Sectors)> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.changed.is_empty() {
             write!(
@@ -574,6 +593,19 @@ impl Display for DeleteAction<Key> {
     }
 }
 
+impl Display for DeleteAction<EncryptedDevice> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DeleteAction::Deleted(EncryptedDevice(uuid)) => {
+                write!(f, "Encrypted pool with UUID {uuid} successfully decrypted")
+            }
+            DeleteAction::Identity => {
+                write!(f, "The requested pool was already decrypted")
+            }
+        }
+    }
+}
+
 /// An action which may delete multiple things.
 /// This action may also cause other values to require updating.
 #[derive(Debug, PartialEq, Eq)]
@@ -730,6 +762,7 @@ impl<T> EngineAction for StopAction<T> {
 }
 
 /// Action indicating the result of growing a block device or block devices in a pool.
+#[derive(Clone)]
 pub enum GrowAction<T> {
     Identity,
     Grown(T),
@@ -831,5 +864,18 @@ impl<T> EngineAction for PropChangeAction<T> {
             PropChangeAction::NewValue(t) => Some(t),
             PropChangeAction::Identity => None,
         }
+    }
+}
+
+/// Return value indicating a successful reencrypt operation on the pool
+pub struct ReencryptedDevice(pub PoolUuid);
+
+impl Display for ReencryptedDevice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let uuid = self.0;
+        write!(
+            f,
+            "Reencryption operation on pool with UUID {uuid} was completed successfully"
+        )
     }
 }

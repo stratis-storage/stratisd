@@ -1,0 +1,249 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+use std::sync::Arc;
+
+use futures::executor::block_on;
+use serde_json::from_str;
+use tokio::sync::RwLock;
+use zbus::Connection;
+
+use crate::{
+    dbus::{
+        consts::OK_STRING,
+        manager::Manager,
+        types::DbusErrorEnum,
+        util::{
+            engine_to_dbus_err_tuple, send_clevis_info_signal, send_encrypted_signal,
+            send_keyring_signal, send_last_reencrypted_signal, tuple_to_option,
+        },
+    },
+    engine::{
+        CreateAction, DeleteAction, EncryptedDevice, Engine, InputEncryptionInfo, KeyDescription,
+        Lockable, PoolIdentifier, PoolUuid,
+    },
+    stratis::StratisError,
+};
+
+pub async fn encrypt_pool_method(
+    engine: &Arc<dyn Engine>,
+    connection: &Arc<Connection>,
+    manager: &Lockable<Arc<RwLock<Manager>>>,
+    pool_uuid: PoolUuid,
+    key_descs: Vec<((bool, u32), KeyDescription)>,
+    clevis_infos: Vec<((bool, u32), &str, &str)>,
+) -> (bool, u16, String) {
+    let default_return = false;
+
+    let key_descs_parsed =
+        match key_descs
+            .into_iter()
+            .try_fold(Vec::new(), |mut vec, (ts_opt, kd)| {
+                let token_slot = tuple_to_option(ts_opt);
+                vec.push((token_slot, kd));
+                Ok(vec)
+            }) {
+            Ok(kds) => kds,
+            Err(e) => {
+                let (rc, rs) = engine_to_dbus_err_tuple(&e);
+                return (default_return, rc, rs);
+            }
+        };
+
+    let clevis_infos_parsed =
+        match clevis_infos
+            .into_iter()
+            .try_fold(Vec::new(), |mut vec, (ts_opt, pin, json_str)| {
+                let token_slot = tuple_to_option(ts_opt);
+                let json = from_str(json_str)?;
+                vec.push((token_slot, (pin.to_owned(), json)));
+                Ok(vec)
+            }) {
+            Ok(cis) => cis,
+            Err(e) => {
+                let (rc, rs) = engine_to_dbus_err_tuple(&e);
+                return (default_return, rc, rs);
+            }
+        };
+
+    let iei = match InputEncryptionInfo::new(key_descs_parsed, clevis_infos_parsed) {
+        Ok(Some(info)) => info,
+        Ok(None) => {
+            return (
+                default_return,
+                DbusErrorEnum::ERROR as u16,
+                "No unlock methods provided".to_string(),
+            );
+        }
+        Err(e) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&e);
+            return (default_return, rc, rs);
+        }
+    };
+
+    let guard_res = engine
+        .get_mut_pool(PoolIdentifier::Uuid(pool_uuid))
+        .await
+        .ok_or_else(|| StratisError::Msg(format!("No pool associated with uuid {pool_uuid}")));
+    let cloned_engine = Arc::clone(engine);
+    match tokio::task::spawn_blocking(move || {
+        let mut guard = guard_res?;
+
+        handle_action!(guard
+            .start_encrypt_pool(pool_uuid, &iei)
+            .and_then(|action| match action {
+                CreateAction::Identity => Ok(CreateAction::Identity),
+                CreateAction::Created((sector_size, key_info)) => {
+                    let guard = guard.downgrade();
+                    guard
+                        .do_encrypt_pool(pool_uuid, sector_size, key_info)
+                        .map(|_| guard)
+                        .and_then(|guard| {
+                            let mut guard = block_on(cloned_engine.upgrade_pool(guard));
+                            let (name, _, _) = guard.as_mut_tuple();
+                            guard.finish_encrypt_pool(&name, pool_uuid)
+                        })
+                        .map(|_| CreateAction::Created(EncryptedDevice(pool_uuid)))
+                }
+            }))
+    })
+    .await
+    {
+        Ok(Ok(CreateAction::Created(_))) => {
+            match manager.read().await.pool_get_path(&pool_uuid) {
+                Some(p) => {
+                    send_keyring_signal(connection, &p.as_ref(), true).await;
+                    send_clevis_info_signal(connection, &p.as_ref(), true).await;
+                    send_encrypted_signal(connection, &p.as_ref()).await;
+                }
+                None => {
+                    warn!("No pool path associated with UUID {pool_uuid}; failed to send encryption related signals");
+                }
+            }
+            (true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
+        Ok(Ok(CreateAction::Identity)) => (false, DbusErrorEnum::OK as u16, OK_STRING.to_string()),
+        Ok(Err(e)) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&e);
+            (default_return, rc, rs)
+        }
+        Err(e) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::from(e));
+            (default_return, rc, rs)
+        }
+    }
+}
+
+pub async fn reencrypt_pool_method(
+    engine: &Arc<dyn Engine>,
+    connection: &Arc<Connection>,
+    manager: &Lockable<Arc<RwLock<Manager>>>,
+    pool_uuid: PoolUuid,
+) -> (bool, u16, String) {
+    let default_return = false;
+
+    let guard_res = engine
+        .get_mut_pool(PoolIdentifier::Uuid(pool_uuid))
+        .await
+        .ok_or_else(|| StratisError::Msg(format!("No pool associated with uuid {pool_uuid}")));
+    let cloned_engine = Arc::clone(engine);
+    match tokio::task::spawn_blocking(move || {
+        let mut guard = guard_res?;
+
+        let (name, _, _) = guard.as_mut_tuple();
+
+        let result = guard.start_reencrypt_pool();
+        let result = result.and_then(|key_info| {
+            let guard = guard.downgrade();
+            let result = guard.do_reencrypt_pool(pool_uuid, key_info);
+            result.map(|inner| (guard, inner))
+        });
+        let result = result.and_then(|(guard, _)| {
+            let mut guard = block_on(cloned_engine.upgrade_pool(guard));
+            guard.finish_reencrypt_pool(&name, pool_uuid)
+        });
+        handle_action!(result)
+    })
+    .await
+    {
+        Ok(Ok(_)) => {
+            match manager.read().await.pool_get_path(&pool_uuid) {
+                Some(p) => {
+                    send_last_reencrypted_signal(connection, &p.as_ref()).await;
+                }
+                None => {
+                    warn!("No pool path associated with UUID {pool_uuid}; failed to send encryption related signals");
+                }
+            }
+            (true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
+        Ok(Err(e)) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&e);
+            (default_return, rc, rs)
+        }
+        Err(e) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::from(e));
+            (default_return, rc, rs)
+        }
+    }
+}
+
+pub async fn decrypt_pool_method(
+    engine: &Arc<dyn Engine>,
+    connection: &Arc<Connection>,
+    manager: &Lockable<Arc<RwLock<Manager>>>,
+    pool_uuid: PoolUuid,
+) -> (bool, u16, String) {
+    let default_return = false;
+
+    let guard_res = engine
+        .get_mut_pool(PoolIdentifier::Uuid(pool_uuid))
+        .await
+        .ok_or_else(|| StratisError::Msg(format!("No pool associated with uuid {pool_uuid}")));
+    let cloned_engine = Arc::clone(engine);
+    match tokio::task::spawn_blocking(move || {
+        let mut guard = guard_res?;
+
+        handle_action!(match guard.decrypt_pool_idem_check(pool_uuid) {
+            Ok(DeleteAction::Identity) => Ok(DeleteAction::Identity),
+            Ok(DeleteAction::Deleted(d)) => {
+                let guard = guard.downgrade();
+                guard
+                    .do_decrypt_pool(pool_uuid)
+                    .and_then(|_| {
+                        let mut guard = block_on(cloned_engine.upgrade_pool(guard));
+                        let (name, _, _) = guard.as_mut_tuple();
+                        guard.finish_decrypt_pool(pool_uuid, &name)
+                    })
+                    .map(|_| DeleteAction::Deleted(d))
+            }
+            Err(e) => Err(e),
+        })
+    })
+    .await
+    {
+        Ok(Ok(DeleteAction::Deleted(_))) => {
+            match manager.read().await.pool_get_path(&pool_uuid) {
+                Some(p) => {
+                    send_keyring_signal(connection, &p.as_ref(), true).await;
+                    send_clevis_info_signal(connection, &p.as_ref(), true).await;
+                    send_encrypted_signal(connection, &p.as_ref()).await;
+                }
+                None => {
+                    warn!("No pool path associated with UUID {pool_uuid}; failed to send encryption related signals");
+                }
+            }
+            (true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
+        Ok(Ok(DeleteAction::Identity)) => (false, DbusErrorEnum::OK as u16, OK_STRING.to_string()),
+        Ok(Err(e)) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&e);
+            (default_return, rc, rs)
+        }
+        Err(e) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::from(e));
+            (default_return, rc, rs)
+        }
+    }
+}

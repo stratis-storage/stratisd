@@ -21,12 +21,14 @@ use devicemapper::{DevId, DmName, DmOptions, Sectors, SECTOR_SIZE};
 use libcryptsetup_rs::{
     c_uint,
     consts::{
-        flags::{CryptActivate, CryptVolumeKey, CryptWipe},
+        flags::{CryptActivate, CryptReencrypt, CryptVolumeKey, CryptWipe},
         vals::{
-            CryptDebugLevel, CryptLogLevel, CryptStatusInfo, CryptWipePattern, EncryptionFormat,
+            CryptDebugLevel, CryptLogLevel, CryptReencryptDirectionInfo, CryptReencryptModeInfo,
+            CryptStatusInfo, CryptWipePattern, EncryptionFormat,
         },
     },
-    register, set_debug_level, set_log_callback, CryptDevice, CryptInit,
+    get_sector_size, register, set_debug_level, set_log_callback, CryptDevice, CryptInit,
+    CryptParamsLuks2, CryptParamsReencrypt, SafeMemHandle, TokenInput,
 };
 
 use crate::{
@@ -36,20 +38,22 @@ use crate::{
             crypt::consts::{
                 CLEVIS_RECURSION_LIMIT, CLEVIS_TANG_TRUST_URL, CLEVIS_TOKEN_NAME,
                 CLEVIS_TOKEN_TYPE, LUKS2_SECTOR_SIZE, LUKS2_TOKEN_ID, LUKS2_TOKEN_TYPE,
-                TOKEN_KEYSLOTS_KEY, TOKEN_TYPE_KEY,
+                STRATIS_MEK_SIZE, TOKEN_KEYSLOTS_KEY, TOKEN_TYPE_KEY,
             },
             dm::get_dm,
             keys,
         },
         types::{
-            KeyDescription, PoolUuid, SizedKeyMemory, UnlockMechanism, VolumeKeyKeyDescription,
+            EncryptionInfo, KeyDescription, PoolUuid, SizedKeyMemory, UnlockMechanism,
+            VolumeKeyKeyDescription,
         },
-        EncryptionInfo,
     },
     stratis::{StratisError, StratisResult},
 };
 
 static CLEVIS_ERROR: OnceLock<Mutex<Option<StratisError>>> = OnceLock::new();
+
+type PassphraseInfo = Either<(u32, u32, SizedKeyMemory), (u32, SizedKeyMemory)>;
 
 /// Set up crypt logging to log cryptsetup debug information at the trace level.
 pub fn set_up_crypt_logging() {
@@ -992,6 +996,244 @@ pub fn clevis_decrypt(
             ))
         })?;
     cmd::clevis_decrypt(&jwe).map(Some)
+}
+
+/// Get one of the passphrases for the encrypted device.
+pub fn get_passphrase(
+    device: &mut CryptDevice,
+    encryption_info: &EncryptionInfo,
+) -> StratisResult<PassphraseInfo> {
+    for (ts, mech) in encryption_info.all_infos() {
+        let keyslot = match get_keyslot_number(device, *ts) {
+            Ok(Some(ks)) => ks,
+            Ok(None) => {
+                warn!("Unable to find associated keyslot for token slot");
+                continue;
+            }
+            Err(e) => {
+                warn!("Error while querying associated keyslot for token slot: {e}");
+                continue;
+            }
+        };
+        match mech {
+            UnlockMechanism::KeyDesc(kd) => match read_key(kd) {
+                Ok(Some(key)) => {
+                    return Ok(Either::Left((keyslot, *ts, key)));
+                }
+                Ok(None) => {
+                    info!("Key description was not in keyring; trying next unlock mechanism")
+                }
+                Err(e) => info!("Error searching keyring: {e}"),
+            },
+            UnlockMechanism::ClevisInfo(_) => match clevis_decrypt(device, *ts) {
+                Ok(Some(pass)) => {
+                    return Ok(Either::Right((keyslot, pass)));
+                }
+                Ok(None) => {
+                    info!("Failed to find the given token; trying next unlock method");
+                }
+                Err(e) => info!("Error attempting to unlock with clevis: {e}"),
+            },
+        }
+    }
+
+    Err(StratisError::Msg(
+        "Unable to get passphrase for any available token slots".to_string(),
+    ))
+}
+
+/// Get all of the passphrases for the encrypted device for online reencryption.
+pub fn get_all_passphrases(
+    device: &mut CryptDevice,
+    encryption_info: &EncryptionInfo,
+) -> StratisResult<Vec<(c_uint, SizedKeyMemory)>> {
+    let mut passphrases = Vec::new();
+    for (ts, mech) in encryption_info.all_infos() {
+        match mech {
+            UnlockMechanism::KeyDesc(kd) => match read_key(kd) {
+                Ok(Some(pass)) => {
+                    passphrases.push((*ts, pass));
+                }
+                Ok(None) => {
+                    return Err(StratisError::Msg(format!(
+                        "Key description {} was not in keyring",
+                        kd.as_application_str(),
+                    )))
+                }
+                Err(e) => {
+                    return Err(StratisError::Chained(
+                        "Error searching keyring".to_string(),
+                        Box::new(e),
+                    ))
+                }
+            },
+            UnlockMechanism::ClevisInfo(_) => match clevis_decrypt(device, *ts) {
+                Ok(Some(pass)) => {
+                    passphrases.push((*ts, pass));
+                }
+                Ok(None) => {
+                    return Err(StratisError::Msg(
+                        "Error getting Clevis passphrase".to_string(),
+                    ))
+                }
+                Err(e) => {
+                    return Err(StratisError::Chained(
+                        "Error getting Clevis passphrase".to_string(),
+                        Box::new(e),
+                    ))
+                }
+            },
+        }
+    }
+
+    Ok(passphrases)
+}
+
+/// Sets up a reencryption operation.
+///
+/// The setup includes:
+/// * Generating a new volume key with no data segment associated
+/// * Duplicating all of the existing keyslots and tokens to point at this volume key
+/// * Returning a single existing key and new keyslot to use in the online reencryption operation
+///
+/// Can be rolled back.
+pub fn handle_setup_reencrypt(
+    luks2_path: &Path,
+    encryption_info: &EncryptionInfo,
+) -> StratisResult<(u32, SizedKeyMemory, u32)> {
+    fn set_up_reencryption_token(
+        device: &mut CryptDevice,
+        new_keyslot: u32,
+        ts: u32,
+        mut token_contents: Value,
+    ) -> StratisResult<()> {
+        if let Some(obj) = token_contents.as_object_mut() {
+            let tokens = match obj.remove(TOKEN_KEYSLOTS_KEY) {
+                Some(Value::Array(mut v)) => {
+                    v.push(Value::String(new_keyslot.to_string()));
+                    Value::Array(v)
+                }
+                Some(_) | None => {
+                    return Err(StratisError::Msg(format!(
+                        "Could not find appropriate formatted value for {TOKEN_KEYSLOTS_KEY}"
+                    )));
+                }
+            };
+            obj.insert(TOKEN_KEYSLOTS_KEY.to_string(), tokens);
+        }
+        device
+            .token_handle()
+            .json_set(TokenInput::ReplaceToken(ts, &token_contents))?;
+
+        Ok(())
+    }
+
+    let mut device = acquire_crypt_device(luks2_path)?;
+
+    let mut keys = get_all_passphrases(&mut device, encryption_info)?;
+    // Check required to avoid panic if there is only one unlock mechanism
+    let other_keys = if keys.len() < 2 {
+        vec![]
+    } else {
+        keys.split_off(1)
+    };
+    let (single_ts, single_key) = keys
+        .pop()
+        .ok_or_else(|| StratisError::Msg("No unlock methods found".to_string()))?;
+    let single_token_contents = device.token_handle().json_get(single_ts)?;
+    let single_keyslot = get_keyslot_number(&mut device, single_ts)?.ok_or_else(|| {
+        StratisError::Msg(format!(
+            "Could not find keyslot associated with token slot {single_ts}"
+        ))
+    })?;
+
+    let single_new_keyslot = device.keyslot_handle().add_by_key(
+        None,
+        Some(Either::Right(STRATIS_MEK_SIZE)),
+        single_key.as_ref(),
+        CryptVolumeKey::NO_SEGMENT,
+    )?;
+
+    set_up_reencryption_token(
+        &mut device,
+        single_new_keyslot,
+        single_ts,
+        single_token_contents,
+    )?;
+
+    let mut new_vk = SafeMemHandle::alloc(STRATIS_MEK_SIZE)?;
+    device.volume_key_handle().get(
+        Some(single_new_keyslot),
+        new_vk.as_mut(),
+        Some(single_key.as_ref()),
+    )?;
+
+    for (ts, key) in other_keys {
+        let token_contents = device.token_handle().json_get(ts)?;
+
+        let new_keyslot = device.keyslot_handle().add_by_key(
+            None,
+            Some(Either::Left(new_vk.as_ref())),
+            key.as_ref(),
+            CryptVolumeKey::NO_SEGMENT | CryptVolumeKey::DIGEST_REUSE,
+        )?;
+        set_up_reencryption_token(&mut device, new_keyslot, ts, token_contents)?;
+    }
+
+    Ok((single_keyslot, single_key, single_new_keyslot))
+}
+
+/// Perform the online reencryption operation.
+///
+/// Cannot be rolled back.
+pub fn handle_do_reencrypt(
+    device_name: &str,
+    pool_uuid: PoolUuid,
+    luks2_path: &Path,
+    single_keyslot: u32,
+    single_key: SizedKeyMemory,
+    single_new_keyslot: u32,
+) -> StratisResult<()> {
+    {
+        let mut device = acquire_crypt_device(luks2_path)?;
+
+        let cipher = device.status_handle().get_cipher()?;
+        let cipher_mode = device.status_handle().get_cipher_mode()?;
+        let sector_size = convert_int!(get_sector_size(Some(&mut device)), i32, u32)?;
+        device.reencrypt_handle().reencrypt_init_by_passphrase(
+            Some(device_name),
+            single_key.as_ref(),
+            Some(single_keyslot),
+            Some(single_new_keyslot),
+            Some((&cipher, &cipher_mode)),
+            CryptParamsReencrypt {
+                mode: CryptReencryptModeInfo::Reencrypt,
+                direction: CryptReencryptDirectionInfo::Forward,
+                resilience: "checksum".to_string(),
+                hash: "sha256".to_string(),
+                data_shift: 0,
+                max_hotzone_size: 0,
+                device_size: 0,
+                luks2: Some(CryptParamsLuks2 {
+                    data_alignment: 0,
+                    data_device: None,
+                    integrity: None,
+                    integrity_params: None,
+                    pbkdf: None,
+                    label: None,
+                    sector_size,
+                    subsystem: None,
+                }),
+                flags: CryptReencrypt::empty(),
+            },
+        )?;
+    }
+
+    info!("Starting reencryption operation on pool with UUID {pool_uuid}; may take a while");
+    // The corresponding libcryptsetup call is device.reencrypt_handle().reencrypt2::<()>(None, None)?;
+    cmd::run_reencrypt(luks2_path)?;
+
+    Ok(())
 }
 
 #[cfg(test)]

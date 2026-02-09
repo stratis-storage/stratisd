@@ -15,7 +15,9 @@ pub use self::{
         StratEngine, StratKeyActions, ThinPoolSizeParams, BDA, CLEVIS_TANG_TRUST_URL,
         DEFAULT_CRYPT_DATA_OFFSET_V2,
     },
-    structures::{AllLockReadGuard, ExclusiveGuard, SharedGuard, Table},
+    structures::{
+        AllLockReadGuard, ExclusiveGuard, SharedGuard, SomeLockReadGuard, SomeLockWriteGuard, Table,
+    },
     types::{
         ActionAvailability, BlockDevTier, ClevisInfo, CreateAction, DeleteAction, DevUuid, Diff,
         EncryptionInfo, EngineAction, Features, FilesystemUuid, GrowAction, InputEncryptionInfo,

@@ -12,11 +12,16 @@ use std::{
 
 use nix::fcntl::{fcntl, FcntlArg, OFlag};
 #[cfg(feature = "dbus_enabled")]
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::RwLock;
 use tokio::{io::unix::AsyncFd, task::spawn};
+#[cfg(feature = "dbus_enabled")]
+use zbus::Connection;
 
 #[cfg(feature = "dbus_enabled")]
-use crate::dbus_api::DbusAction;
+use crate::{
+    dbus::{send_fs_background_signals, send_pool_background_signals, Manager},
+    engine::Lockable,
+};
 use crate::{
     engine::{get_dm, get_dm_init, Engine},
     stratis::errors::{StratisError, StratisResult},
@@ -29,12 +34,14 @@ const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 // Accepts None as an argument; this indicates that devicemapper events are
 // to be ignored.
 pub async fn dm_event_thread(
+    #[cfg(feature = "dbus_enabled")] connection: Arc<Connection>,
+    #[cfg(feature = "dbus_enabled")] manager: Lockable<Arc<RwLock<Manager>>>,
     engine: Option<Arc<dyn Engine>>,
-    #[cfg(feature = "dbus_enabled")] sender: UnboundedSender<DbusAction>,
 ) -> StratisResult<()> {
     async fn process_dm_event(
+        #[cfg(feature = "dbus_enabled")] connection: &Arc<Connection>,
+        #[cfg(feature = "dbus_enabled")] manager: Lockable<Arc<RwLock<Manager>>>,
         engine: &Arc<dyn Engine>,
-        #[cfg(feature = "dbus_enabled")] sender: &UnboundedSender<DbusAction>,
         fd: &AsyncFd<RawFd>,
     ) -> StratisResult<()> {
         {
@@ -56,17 +63,9 @@ pub async fn dm_event_thread(
         #[cfg(feature = "dbus_enabled")]
         {
             let pool_diffs = engine.pool_evented(Some(&evented)).await;
-            for action in DbusAction::from_pool_diffs(pool_diffs) {
-                if let Err(e) = sender.send(action) {
-                    warn!("Failed to update D-Bus layer with changed engine properties: {e}");
-                }
-            }
+            send_pool_background_signals(manager.clone(), connection, pool_diffs).await;
             let fs_diffs = engine.fs_evented(Some(&evented)).await;
-            for action in DbusAction::from_fs_diffs(fs_diffs) {
-                if let Err(e) = sender.send(action) {
-                    warn!("Failed to update D-Bus layer with changed engine properties: {e}");
-                }
-            }
+            send_fs_background_signals(manager, connection, fs_diffs).await;
         }
 
         Ok(())
@@ -79,9 +78,11 @@ pub async fn dm_event_thread(
                 loop {
                     trace!("Starting handling of devicemapper event");
                     if let Err(e) = process_dm_event(
-                        &engine,
                         #[cfg(feature = "dbus_enabled")]
-                        &sender,
+                        &connection,
+                        #[cfg(feature = "dbus_enabled")]
+                        manager.clone(),
+                        &engine,
                         &fd,
                     )
                     .await

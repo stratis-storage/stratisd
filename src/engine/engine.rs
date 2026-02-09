@@ -19,7 +19,10 @@ use devicemapper::{Bytes, Sectors};
 
 use crate::{
     engine::{
-        structures::{AllLockReadGuard, AllLockWriteGuard, SomeLockReadGuard, SomeLockWriteGuard},
+        structures::{
+            AllLockReadAvailableGuard, AllLockReadGuard, AllLockWriteAvailableGuard,
+            AllLockWriteGuard, SomeLockReadGuard, SomeLockWriteGuard,
+        },
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
             EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo, IntegritySpec, Key,
@@ -159,12 +162,12 @@ pub trait Pool: Debug + Send + Sync {
     /// Returns an error if any of the specified names are already in use
     /// for filesystems in this pool. If the same name is passed multiple
     /// times, the size associated with the last item is used.
-    fn create_filesystems<'b>(
+    fn create_filesystems(
         &mut self,
         pool_name: &str,
         pool_uuid: PoolUuid,
-        specs: &[(&'b str, Option<Bytes>, Option<Bytes>)],
-    ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid, Sectors)>>;
+        specs: &[(&str, Option<Bytes>, Option<Bytes>)],
+    ) -> StratisResult<SetCreateAction<(Name, FilesystemUuid, Sectors)>>;
 
     /// Adds blockdevs specified by paths to pool.
     /// Returns a list of uuids corresponding to devices actually added.
@@ -506,8 +509,16 @@ pub trait Engine: Debug + Report + Send + Sync {
     /// Get all pools belonging to this engine.
     async fn pools(&self) -> AllLockReadGuard<PoolUuid, dyn Pool>;
 
+    /// Get all pools belonging to this engine that are currently available and will not block on
+    /// locking.
+    async fn available_pools(&self) -> Option<AllLockReadAvailableGuard<PoolUuid, dyn Pool>>;
+
     /// Get mutable references to all pools belonging to this engine.
     async fn pools_mut(&self) -> AllLockWriteGuard<PoolUuid, dyn Pool>;
+
+    /// Get mutable references to all pools belonging to this engine that are currently available
+    /// and will not block on locking.
+    async fn available_pools_mut(&self) -> Option<AllLockWriteAvailableGuard<PoolUuid, dyn Pool>>;
 
     /// Get the UUIDs of all pools that experienced an event.
     async fn get_events(&self) -> StratisResult<HashSet<PoolUuid>>;

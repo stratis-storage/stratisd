@@ -78,7 +78,7 @@ impl BlockdevR0 {
 #[interface(name = "org.storage.stratis3.blockdev.r0", introspection_docs = false)]
 impl BlockdevR0 {
     #[zbus(out_args("changed", "return_code", "return_string"))]
-    async fn set_user_info(&self, id: (bool, &str)) -> ((bool, DevUuid), u16, String) {
+    async fn set_user_info(&self, id: (bool, &str)) -> ((bool, String), u16, String) {
         set_user_info_method(&self.engine, self.parent_uuid, self.uuid, id).await
     }
 
@@ -116,8 +116,8 @@ impl BlockdevR0 {
     }
 
     #[zbus(property(emits_changed_signal = "const"))]
-    fn uuid(&self) -> DevUuid {
-        self.uuid
+    fn uuid(&self) -> String {
+        self.uuid.simple().to_string()
     }
 
     #[zbus(property(emits_changed_signal = "false"))]

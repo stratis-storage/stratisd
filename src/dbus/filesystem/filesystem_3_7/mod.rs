@@ -154,7 +154,7 @@ impl FilesystemR7 {
     }
 
     #[zbus(property)]
-    async fn origin(&self) -> Result<(bool, FilesystemUuid), Error> {
+    async fn origin(&self) -> Result<(bool, String), Error> {
         filesystem_prop(&self.engine, self.parent_uuid, self.uuid, origin_prop).await
     }
 
@@ -194,7 +194,7 @@ impl FilesystemR7 {
     }
 
     #[zbus(property(emits_changed_signal = "const"))]
-    fn uuid(&self) -> FilesystemUuid {
-        self.uuid
+    fn uuid(&self) -> String {
+        self.uuid.simple().to_string()
     }
 }

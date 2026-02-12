@@ -18,13 +18,9 @@ use crate::{
     },
 };
 
-pub fn origin_prop(
-    _: Name,
-    _: Name,
-    _: FilesystemUuid,
-    fs: &dyn Filesystem,
-) -> (bool, FilesystemUuid) {
-    option_to_tuple(fs.origin(), FilesystemUuid::nil())
+pub fn origin_prop(_: Name, _: Name, _: FilesystemUuid, fs: &dyn Filesystem) -> (bool, String) {
+    let (has_origin, uuid) = option_to_tuple(fs.origin(), FilesystemUuid::nil());
+    (has_origin, uuid.simple().to_string())
 }
 
 pub fn merge_scheduled_prop(_: Name, _: Name, _: FilesystemUuid, fs: &dyn Filesystem) -> bool {

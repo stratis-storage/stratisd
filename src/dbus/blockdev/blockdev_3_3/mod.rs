@@ -139,8 +139,8 @@ impl BlockdevR3 {
     }
 
     #[zbus(property(emits_changed_signal = "const"))]
-    fn uuid(&self) -> DevUuid {
-        self.uuid
+    fn uuid(&self) -> String {
+        self.uuid.simple().to_string()
     }
 
     #[zbus(property(emits_changed_signal = "false"))]

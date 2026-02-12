@@ -15,8 +15,8 @@ pub async fn set_user_info_method(
     uuid: PoolUuid,
     bd_uuid: DevUuid,
     new_id_spec: (bool, &str),
-) -> ((bool, DevUuid), u16, String) {
-    let default_return = (false, DevUuid::nil());
+) -> ((bool, String), u16, String) {
+    let default_return = (false, DevUuid::nil().simple().to_string());
 
     match engine
         .get_mut_pool(PoolIdentifier::Uuid(uuid))
@@ -37,7 +37,7 @@ pub async fn set_user_info_method(
                     format!("pool doesn't know about block device {bd_uuid}"),
                 ),
                 Ok(RenameAction::Renamed(_)) => (
-                    (true, bd_uuid),
+                    (true, bd_uuid.simple().to_string()),
                     DbusErrorEnum::OK as u16,
                     OK_STRING.to_string(),
                 ),

@@ -133,7 +133,7 @@ impl FilesystemR2 {
     }
 
     #[zbus(property(emits_changed_signal = "const"))]
-    fn uuid(&self) -> FilesystemUuid {
-        self.uuid
+    fn uuid(&self) -> String {
+        self.uuid.simple().to_string()
     }
 }

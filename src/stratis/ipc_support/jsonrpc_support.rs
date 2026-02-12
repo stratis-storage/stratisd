@@ -2,9 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{sync::Arc, task::Poll};
+use std::sync::Arc;
 
-use futures::{pin_mut, poll};
 use tokio::{select, sync::mpsc::UnboundedReceiver, task::JoinHandle};
 
 use crate::{
@@ -27,17 +26,8 @@ fn handle_udev(
                     return;
                 }
             };
-            loop {
-                let recv = recv.recv();
-                pin_mut!(recv);
-                match poll!(recv) {
-                    Poll::Ready(Some(event)) => events.push(event),
-                    Poll::Ready(None) => {
-                        error!("Channel from udev handler to JSON RPC handler was shut");
-                        return;
-                    }
-                    Poll::Pending => break,
-                }
+            while let Ok(event) = recv.try_recv() {
+                events.push(event);
             }
             // Return value should be ignored as JSON RPC does not keep a record
             // of data structure information in the IPC layer.

@@ -14,7 +14,7 @@ use devicemapper::Sectors;
 
 use crate::engine::{
     engine::Filesystem,
-    types::{DevUuid, FilesystemUuid, PoolUuid},
+    types::{DevUuid, FilesystemUuid, Name, PoolUuid},
 };
 
 /// Return value indicating key operation
@@ -301,7 +301,7 @@ impl Display for SetUnlockAction<DevUuid> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 /// An action which may create multiple things.
 pub struct SetCreateAction<T> {
     changed: Vec<T>,
@@ -333,7 +333,7 @@ impl<T> EngineAction for SetCreateAction<T> {
     }
 }
 
-impl Display for SetCreateAction<(&str, FilesystemUuid, Sectors)> {
+impl Display for SetCreateAction<(Name, FilesystemUuid, Sectors)> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.changed.is_empty() {
             write!(
@@ -730,6 +730,7 @@ impl<T> EngineAction for StopAction<T> {
 }
 
 /// Action indicating the result of growing a block device or block devices in a pool.
+#[derive(Clone)]
 pub enum GrowAction<T> {
     Identity,
     Grown(T),

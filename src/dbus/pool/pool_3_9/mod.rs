@@ -414,7 +414,7 @@ impl PoolR9 {
         pool_prop(&self.engine, self.uuid, volume_key_loaded_prop).await
     }
 
-    #[zbus(property(emits_changed_signal = "false"))]
+    #[zbus(property(emits_changed_signal = "const"))]
     async fn metadata_version(&self) -> Result<u64, Error> {
         pool_prop(&self.engine, self.uuid, metadata_version_prop).await
     }

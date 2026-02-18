@@ -15,9 +15,10 @@ use std::{
 
 use libudev::EventType;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use strum_macros::{self, AsRefStr, EnumString, FromRepr, VariantNames};
 use uuid::Uuid;
+#[cfg(feature = "dbus_enabled")]
+use zbus::zvariant::{Type, Value};
 
 use devicemapper::{Bytes, Sectors, IEC};
 
@@ -56,7 +57,7 @@ mod keys;
 
 macro_rules! uuid {
     ($vis:vis $ident:ident) => {
-        #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Deserialize, Serialize)]
+        #[derive(Copy, Clone, Debug, Default, Hash, Eq, PartialEq, Deserialize, Serialize)]
         $vis struct $ident(pub uuid::Uuid);
 
         impl $ident {
@@ -92,7 +93,7 @@ macro_rules! uuid {
 }
 
 /// Value representing Clevis config information.
-pub type ClevisInfo = (String, Value);
+pub type ClevisInfo = (String, serde_json::Value);
 
 pub trait AsUuid:
     Copy
@@ -151,6 +152,12 @@ pub enum BlockDevTier {
     Cache = 1,
 }
 
+#[cfg(feature = "dbus_enabled")]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, Type, Value)]
+#[zvariant(signature = "s")]
+pub struct Name(String);
+
+#[cfg(not(feature = "dbus_enabled"))]
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct Name(String);
 

@@ -88,10 +88,12 @@ impl ManagerR2 {
         stopped_pools_prop(&self.engine).await
     }
 
+    #[zbus(out_args("result", "return_code", "return_string"))]
     async fn list_keys(&self) -> (Vec<KeyDescription>, u16, String) {
         list_keys_method(&self.engine).await
     }
 
+    #[zbus(out_args("result", "return_code", "return_string"))]
     async fn set_key(
         &self,
         key_desc: KeyDescription,
@@ -100,11 +102,13 @@ impl ManagerR2 {
         set_key_method(&self.engine, &key_desc, key_fd).await
     }
 
+    #[zbus(out_args("result", "return_code", "return_string"))]
     async fn unset_key(&self, key_desc: KeyDescription) -> (bool, u16, String) {
         unset_key_method(&self.engine, &key_desc).await
     }
 
     #[allow(clippy::too_many_arguments)]
+    #[zbus(out_args("result", "return_code", "return_string"))]
     async fn create_pool(
         &self,
         name: &str,
@@ -119,17 +123,19 @@ impl ManagerR2 {
             &self.manager,
             &self.counter,
             name,
-            devs,
+            devices,
             key_desc,
             clevis_info,
         )
         .await
     }
 
+    #[zbus(out_args("result", "return_code", "return_string"))]
     async fn destroy_pool(&self, pool: ObjectPath<'_>) -> ((bool, String), u16, String) {
         destroy_pool_method(&self.engine, &self.connection, &self.manager, pool).await
     }
 
+    #[zbus(out_args("result", "return_code", "return_string"))]
     async fn start_pool(
         &self,
         pool_uuid: &str,
@@ -153,14 +159,17 @@ impl ManagerR2 {
         .await
     }
 
+    #[zbus(out_args("result", "return_code", "return_string"))]
     async fn stop_pool(&self, pool: ObjectPath<'_>) -> ((bool, String), u16, String) {
         stop_pool_method(&self.engine, &self.connection, &self.manager, pool).await
     }
 
+    #[zbus(out_args("return_code", "return_string"))]
     async fn refresh_state(&self) -> (u16, String) {
         refresh_state_method(&self.engine).await
     }
 
+    #[zbus(out_args("result", "return_code", "return_string"))]
     fn engine_state_report(&self) -> (String, u16, String) {
         engine_state_report_method(&self.engine)
     }

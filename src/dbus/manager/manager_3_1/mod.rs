@@ -128,6 +128,7 @@ impl ManagerR1 {
         destroy_pool_method(&self.engine, &self.connection, &self.manager, pool).await
     }
 
+    #[zbus(out_args("result", "return_code", "return_string"))]
     async fn unlock_pool(
         &self,
         pool_uuid: &str,

@@ -161,8 +161,7 @@ impl ManagerR7 {
         refresh_state_method(&self.engine).await
     }
 
-    #[allow(non_snake_case)]
-    fn EngineStateReport(&self) -> (String, u16, String) {
+    fn engine_state_report(&self) -> (String, u16, String) {
         engine_state_report_method(&self.engine)
     }
 }

@@ -133,8 +133,7 @@ impl ManagerR0 {
         unlock_pool_method(&self.engine, &self.connection, pool_uuid, unlock_method).await
     }
 
-    #[allow(non_snake_case)]
-    fn EngineStateReport(&self) -> (String, u16, String) {
+    fn engine_state_report(&self) -> (String, u16, String) {
         engine_state_report_method(&self.engine)
     }
 }

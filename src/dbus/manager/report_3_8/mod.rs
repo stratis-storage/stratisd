@@ -32,6 +32,7 @@ impl ReportR8 {
 
 #[interface(name = "org.storage.stratis3.Report.r8", introspection_docs = false)]
 impl ReportR8 {
+    #[zbus(out_args("result", "return_code", "return_string"))]
     fn get_report(&self, name: &str) -> (String, u16, String) {
         get_report_method(&self.engine, name)
     }

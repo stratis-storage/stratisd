@@ -104,7 +104,7 @@ impl ManagerR0 {
         &self,
         name: &str,
         #[allow(unused_variables)] redundancy: (bool, u16),
-        devs: Vec<PathBuf>,
+        devices: Vec<PathBuf>,
         key_desc: (bool, KeyDescription),
         clevis_info: (bool, (&str, &str)),
     ) -> ((bool, (OwnedObjectPath, Vec<OwnedObjectPath>)), u16, String) {

@@ -110,7 +110,7 @@ impl ManagerR6 {
     async fn create_pool(
         &self,
         name: &str,
-        devs: Vec<PathBuf>,
+        devices: Vec<PathBuf>,
         key_desc: (bool, KeyDescription),
         clevis_info: (bool, (&str, &str)),
     ) -> ((bool, (OwnedObjectPath, Vec<OwnedObjectPath>)), u16, String) {

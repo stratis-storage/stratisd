@@ -112,7 +112,7 @@ impl ManagerR8 {
     async fn create_pool(
         &self,
         name: &str,
-        devs: Vec<PathBuf>,
+        devices: Vec<PathBuf>,
         key_desc: Vec<((bool, u32), KeyDescription)>,
         clevis_info: Vec<((bool, u32), &str, &str)>,
         journal_size: (bool, u64),

@@ -98,6 +98,7 @@ impl PoolR1 {
 
 #[interface(name = "org.storage.stratis3.pool.r1")]
 impl PoolR1 {
+    #[zbus(out_args("results", "return_code", "return_string"))]
     async fn create_filesystems(
         &self,
         specs: Vec<(&str, (bool, &str))>,
@@ -113,6 +114,7 @@ impl PoolR1 {
         .await
     }
 
+    #[zbus(out_args("results", "return_code", "return_string"))]
     async fn destroy_filesystems(
         &self,
         filesystems: Vec<ObjectPath<'_>>,
@@ -127,6 +129,7 @@ impl PoolR1 {
         .await
     }
 
+    #[zbus(out_args("result", "return_code", "return_string"))]
     async fn snapshot_filesystem(
         &self,
         origin: ObjectPath<'_>,
@@ -144,6 +147,7 @@ impl PoolR1 {
         .await
     }
 
+    #[zbus(out_args("results", "return_code", "return_string"))]
     async fn add_data_devs(
         &self,
         devices: Vec<PathBuf>,
@@ -159,6 +163,7 @@ impl PoolR1 {
         .await
     }
 
+    #[zbus(out_args("results", "return_code", "return_string"))]
     async fn init_cache(
         &self,
         devices: Vec<PathBuf>,
@@ -174,6 +179,7 @@ impl PoolR1 {
         .await
     }
 
+    #[zbus(out_args("results", "return_code", "return_string"))]
     async fn add_cache_devs(
         &self,
         devices: Vec<PathBuf>,
@@ -189,6 +195,7 @@ impl PoolR1 {
         .await
     }
 
+    #[zbus(out_args("result", "return_code", "return_string"))]
     async fn set_name(&self, name: &str) -> ((bool, String), u16, String) {
         set_name_method(
             &self.engine,
@@ -200,6 +207,7 @@ impl PoolR1 {
         .await
     }
 
+    #[zbus(out_args("results", "return_code", "return_string"))]
     async fn bind_clevis(&self, pin: String, json: &str) -> (bool, u16, String) {
         bind_clevis_method(
             &self.engine,
@@ -212,6 +220,7 @@ impl PoolR1 {
         .await
     }
 
+    #[zbus(out_args("results", "return_code", "return_string"))]
     async fn bind_keyring(&self, key_desc: KeyDescription) -> (bool, u16, String) {
         bind_keyring_method(
             &self.engine,
@@ -223,10 +232,12 @@ impl PoolR1 {
         .await
     }
 
+    #[zbus(out_args("results", "return_code", "return_string"))]
     async fn rebind_clevis(&self) -> (bool, u16, String) {
         rebind_clevis_method(&self.engine, &self.connection, &self.manager, self.uuid).await
     }
 
+    #[zbus(out_args("results", "return_code", "return_string"))]
     async fn rebind_keyring(&self, key_desc: KeyDescription) -> (bool, u16, String) {
         rebind_keyring_method(
             &self.engine,
@@ -238,10 +249,12 @@ impl PoolR1 {
         .await
     }
 
+    #[zbus(out_args("results", "return_code", "return_string"))]
     async fn unbind_clevis(&self) -> (bool, u16, String) {
         unbind_clevis_method(&self.engine, &self.connection, &self.manager, self.uuid).await
     }
 
+    #[zbus(out_args("results", "return_code", "return_string"))]
     async fn unbind_keyring(&self) -> (bool, u16, String) {
         unbind_keyring_method(&self.engine, &self.connection, &self.manager, self.uuid).await
     }

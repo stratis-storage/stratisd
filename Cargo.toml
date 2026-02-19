@@ -72,7 +72,7 @@ name = "stratis-utils"
 required-features = ["engine"]
 
 [dependencies.async-trait]
-version = "0.1.51"
+version = "0.1.80"
 optional = true
 
 [dependencies.byteorder]

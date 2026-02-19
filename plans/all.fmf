@@ -16,7 +16,6 @@ prepare:
      - clang
      - cryptsetup-devel
      - curl
-     - dbus-devel
      - device-mapper-devel
      - libblkid-devel
      - make

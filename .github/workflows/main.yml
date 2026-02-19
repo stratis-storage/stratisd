@@ -54,7 +54,6 @@ jobs:
           clang
           curl
           cryptsetup-devel
-          dbus-devel
           device-mapper-devel
           git
           libblkid-devel
@@ -89,7 +88,6 @@ jobs:
           cryptsetup-devel
           dbus-daemon
           dbus-tools
-          dbus-devel
           device-mapper-devel
           git
           glibc-static
@@ -154,7 +152,6 @@ jobs:
           cryptsetup-devel
           dbus-daemon
           dbus-tools
-          dbus-devel
           device-mapper-devel
           device-mapper-persistent-data
           git
@@ -244,7 +241,6 @@ jobs:
           clang
           cryptsetup-devel
           curl
-          dbus-devel
           dbus-tools
           device-mapper-devel
           device-mapper-persistent-data

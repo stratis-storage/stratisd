@@ -420,7 +420,7 @@ where
         // TODO: consider making selection not entirely random, i.e, ensuring
         // distribution of metadata over different paths.
         let saved = candidates
-            .choose_multiple(&mut rng(), MAX_NUM_TO_WRITE)
+            .sample(&mut rng(), MAX_NUM_TO_WRITE)
             .iter_mut()
             .fold(false, |acc, b| {
                 acc | b.save_state(&stamp_time, metadata).is_ok()

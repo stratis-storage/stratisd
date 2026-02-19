@@ -37,7 +37,6 @@ jobs:
           clang
           curl
           cryptsetup-devel
-          dbus-devel
           device-mapper-persistent-data
           git
           jq
@@ -77,7 +76,6 @@ jobs:
           cryptsetup-devel
           curl
           device-mapper-persistent-data
-          dbus-devel
           git
           glibc-static
           jq
@@ -192,7 +190,6 @@ jobs:
           cracklib-dicts
           cryptsetup-devel
           curl
-          dbus-devel
           device-mapper-persistent-data
           git
           glibc-static

@@ -85,7 +85,6 @@ jobs:
           clang
           curl
           cryptsetup-devel
-          dbus-devel
           device-mapper-persistent-data
           device-mapper-devel
           git
@@ -126,7 +125,6 @@ jobs:
           clang
           cryptsetup-devel
           curl
-          dbus-devel
           git
           glibc-static
           device-mapper-devel
@@ -179,7 +177,6 @@ jobs:
           clevis
           cryptsetup-devel
           curl
-          dbus-devel
           git
           glibc-static
           device-mapper-devel

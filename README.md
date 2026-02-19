@@ -116,18 +116,6 @@ run them, see [`README_tests.md`](README_tests.md).
 For a description of the D-Bus-based tests see
 [`tests/client-dbus/README.rst`](tests/client-dbus/README.rst).
 
-## Allowed Bugs
-`stratisd` has some bugs; most of these we intend to address in due course.
-
-There is one bug that we have chosen not to fix. This is a bug in our D-Bus
-layer that will allow incorrect un-marshalling of certain D-Bus values if
-a D-Bus method is invoked with arguments that do not conform to the expected
-signature of the method.  See
-[the GitHub issue](https://github.com/stratis-storage/project/issues/11) for
-additional details about this bug. Behavior of `stratisd` is undefined if a
-method is called under the particular circumstances that allow the bug to
-manifest.
-
 ## Licensing
 
 [MPL 2.0](https://www.mozilla.org/en-US/MPL/2.0/). All

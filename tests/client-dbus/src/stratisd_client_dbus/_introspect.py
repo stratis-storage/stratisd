@@ -2,8 +2,16 @@ SPECS = {
     "org.freedesktop.DBus.ObjectManager": """
 <interface name="org.freedesktop.DBus.ObjectManager">
     <method name="GetManagedObjects">
-      <arg name="objpath_interfaces_and_properties" type="a{oa{sa{sv}}}" direction="out" />
+      <arg type="a{oa{sa{sv}}}" direction="out" />
     </method>
+    <signal name="InterfacesAdded">
+      <arg name="object_path" type="o" />
+      <arg name="interfaces_and_properties" type="a{sa{sv}}" />
+    </signal>
+    <signal name="InterfacesRemoved">
+      <arg name="object_path" type="o" />
+      <arg name="interfaces" type="as" />
+    </signal>
   </interface>
 """,
     "org.storage.stratis3.Manager.r9": """

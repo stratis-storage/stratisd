@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 mod cmds;
+mod decode_dm;
 #[cfg(feature = "systemd_compat")]
 mod generators;
 mod predict_usage;

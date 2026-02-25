@@ -10,7 +10,7 @@ use std::{
 };
 
 use either::Either;
-use rand::{distr::Alphanumeric, rng, Rng};
+use rand::{distr::Alphanumeric, rng, RngExt};
 use serde_json::Value;
 
 use devicemapper::{Device, DmName, DmNameBuf, Sectors};

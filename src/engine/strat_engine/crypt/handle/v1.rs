@@ -8,7 +8,7 @@ use std::{
 };
 
 use either::Either;
-use rand::{distr::Alphanumeric, rng, Rng};
+use rand::{distr::Alphanumeric, rng, RngExt};
 use serde::{
     de::{Error, MapAccess, Visitor},
     ser::SerializeMap,

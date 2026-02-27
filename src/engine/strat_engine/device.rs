@@ -4,35 +4,44 @@
 
 // Functions for dealing with devices.
 
-use std::{fs::File, os::unix::prelude::AsRawFd};
+use std::{fs::File, os::unix::prelude::AsRawFd, sync::LazyLock};
 
-use iocuddle::{Group, Ioctl, Read};
 use libc::c_int;
+use linux_raw_sys::ioctl::{BLKGETSIZE64, BLKPBSZGET, BLKSSZGET};
 
 use devicemapper::Bytes;
 
 use crate::stratis::{StratisError, StratisResult};
 
-// BLKSSZGET is actually a Read ioctl which was accidentally defined
-// using _IO. So, we must use the special _bad macro defined in nix.
-// See: https://github.com/nix-rust/nix/issues/1006
-// We have already tried and failed to use the available iocuddle functionality.
-// The same holds true for BLKPBSZGET.
-// If a new version of iocuddle were released, we could probably use the lie()
-// function to get the correct functionality. See:
-// https://github.com/stratis-storage/project/issues/533
-ioctl_read_bad!(blksszget, 0x1268, c_int);
-ioctl_read_bad!(blkpbszget, 0x127b, c_int);
+const NUM_SHIFT: u32 = linux_raw_sys::general::_IOC_NRSHIFT;
+const TYPE_SHIFT: u32 = linux_raw_sys::general::_IOC_TYPEBITS;
+const NUM_MASK: u32 = linux_raw_sys::general::_IOC_NRMASK;
+const TYPE_MASK: u32 = linux_raw_sys::general::_IOC_TYPEMASK;
 
-const BLK: Group = Group::new(0x12);
+static BLKGETSIZE64_GROUP: LazyLock<u8> = LazyLock::new(|| {
+    convert_int!((BLKGETSIZE64 >> TYPE_SHIFT) & TYPE_MASK, u32, u8).expect("Constant conversion")
+});
+static BLKGETSIZE64_NR: LazyLock<u8> = LazyLock::new(|| {
+    convert_int!((BLKGETSIZE64 >> NUM_SHIFT) & NUM_MASK, u32, u8).expect("Constant conversion")
+});
 
-const BLKGETSIZE64: Ioctl<Read, &u64> = unsafe { BLK.read(114) };
+ioctl_read!(
+    blkgetsize64,
+    *LazyLock::force(&BLKGETSIZE64_GROUP),
+    *LazyLock::force(&BLKGETSIZE64_NR),
+    u64
+);
+ioctl_read_bad!(blksszget, BLKSSZGET, c_int);
+ioctl_read_bad!(blkpbszget, BLKPBSZGET, c_int);
 
 pub fn blkdev_size(file: &File) -> StratisResult<Bytes> {
-    BLKGETSIZE64
-        .ioctl(file)
-        .map(|(_, res)| Bytes::from(res))
-        .map_err(|e| e.into())
+    let mut val = 0u64; // util-linux uses int* as out-arg for ioctl
+    unsafe { blkgetsize64(file.as_raw_fd(), &mut val) }.map_err(|e| {
+        StratisError::Msg(format!(
+            "Error reading logical sector size (BLKGETSIZE64): {e}"
+        ))
+    })?;
+    Ok(Bytes::from(val))
 }
 
 pub fn blkdev_logical_sector_size(file: &File) -> StratisResult<Bytes> {

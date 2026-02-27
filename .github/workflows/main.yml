@@ -184,6 +184,8 @@ jobs:
         run: make test-stratis-min-root
       - name: Run stratis-tools tests
         run: make test-stratisd-tools
+      - name: Run stratis-utils tests
+        run: make test-stratis-utils
 
   shell-checks:
     runs-on: ubuntu-24.04

@@ -433,6 +433,10 @@ test-stratis-min:
 test-stratisd-tools:
 	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test --no-default-features --features "engine,extras" test_stratisd_tools
 
+## Test stratis-utils
+test-stratis-utils:
+	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test --no-default-features --features "dbus_enabled,engine" test_stratis_utils
+
 ## Run yamllint on workflow files
 yamllint:
 	yamllint --strict .github/workflows/*.yml
@@ -554,6 +558,7 @@ check-fedora-versions: test-compare-fedora-versions
 	test-stratis-min-root
 	test-stratisd-min
 	test-stratisd-min-root
+	test-stratis-utils
 	tmtlint
 	yamllint
 

@@ -18,7 +18,7 @@ use zbus::{
     zvariant::OwnedValue,
 };
 
-const REVISION_NUMBER: u8 = 9;
+const REVISION_NUMBER: &str = env!("CARGO_PKG_VERSION_MINOR");
 const BUS_NAME: &str = "org.storage.stratis3";
 const TOP_OBJECT: &str = "/org/storage/stratis3";
 

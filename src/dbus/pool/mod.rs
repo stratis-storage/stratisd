@@ -11,7 +11,7 @@ use tokio::sync::RwLock;
 use zbus::{zvariant::ObjectPath, Connection};
 
 use crate::{
-    dbus::{consts, register_blockdev, Manager},
+    dbus::{consts, register_blockdev, register_filesystem, Manager},
     engine::{Engine, Lockable, PoolIdentifier, PoolUuid},
     stratis::{StratisError, StratisResult},
 };
@@ -177,6 +177,16 @@ pub async fn register_pool<'a>(
             }
 
             manager.write().await.add_pool(&path, pool_uuid)?;
+
+            let fs_uuids = pool.filesystems().into_iter().map(|(_, u, _)| u).collect::<Vec<_>>();
+            for fs_uuid in fs_uuids {
+                match register_filesystem(engine, connection, manager, counter, pool_uuid, fs_uuid).await {
+                    Ok(_) => (),
+                    Err(_) => {
+                        warn!("Unable to register object path for filesystem with UUID {fs_uuid} belonging to pool {pool_uuid} on the D-Bus");
+                    },
+                }
+            }
 
             let mut bd_paths = Vec::new();
             let bd_uuids = pool.blockdevs().into_iter().map(|(u, _, _)| u).collect::<Vec<_>>();

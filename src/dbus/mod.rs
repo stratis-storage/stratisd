@@ -9,6 +9,7 @@ use zbus::{connection::Builder, Connection};
 
 pub use crate::dbus::{
     blockdev::register_blockdev,
+    filesystem::register_filesystem,
     manager::Manager,
     udev::UdevHandler,
     util::{send_fs_background_signals, send_pool_background_signals},

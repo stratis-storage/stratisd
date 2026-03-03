@@ -35,6 +35,7 @@ jobs:
           - copr://packit/stratis-storage-libcryptsetup-rs-master
       targets:
           - fedora-all
+          - fedora-all-ppc64le
 
     - job: copr_build
       identifier: copr_commit

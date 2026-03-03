@@ -118,6 +118,8 @@ class TestRevert(UdevTest):
             if return_code != 0:
                 raise RuntimeError(f"Failed to create requested snapshot: {message}")
 
+            settle()
+
             file2 = "file2.txt"
             write_file(mountdir, file2)
 
@@ -230,6 +232,8 @@ class TestRevert(UdevTest):
 
             if return_code != 0:
                 raise RuntimeError(f"Failed to create requested snapshot: {message}")
+
+            settle()
 
             file2 = "file2.txt"
             write_file(mountdir, file2)

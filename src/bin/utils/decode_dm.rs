@@ -4,6 +4,7 @@
 
 use std::{
     collections::HashMap,
+    ops::ControlFlow,
     path::{Path, PathBuf},
     sync::LazyLock,
 };
@@ -114,34 +115,34 @@ fn get_symlink_by_uuids(
         pool_uuid.simple().to_string(),
         filesystem_uuid.simple().to_string(),
     );
-    match managed_objects.values().fold(
+    match managed_objects.values().try_fold(
         (None::<String>, None::<String>),
         |(pool_name, filesystem_name), ifaces| match (pool_name, filesystem_name) {
-            (Some(pool_name), Some(filesystem_name)) => (Some(pool_name), Some(filesystem_name)),
-            (Some(pool_name), None) => (
+            (Some(pool_name), Some(filesystem_name)) => ControlFlow::Break((Some(pool_name), Some(filesystem_name))),
+            (Some(pool_name), None) => ControlFlow::Continue((
                 Some(pool_name),
                 get_name_by_uuid_and_intf(ifaces, &FILESYSTEM_INTERFACE, &filesystem_uuid_str),
-            ),
-            (None, Some(filesystem_name)) => (
+            )),
+            (None, Some(filesystem_name)) => ControlFlow::Continue((
                 get_name_by_uuid_and_intf(ifaces, &POOL_INTERFACE, &pool_uuid_str),
                 Some(filesystem_name),
-            ),
-            (None, None) => (
+            )),
+            (None, None) => ControlFlow::Continue((
                 get_name_by_uuid_and_intf(ifaces, &POOL_INTERFACE, &pool_uuid_str),
                 get_name_by_uuid_and_intf(ifaces, &FILESYSTEM_INTERFACE, &filesystem_uuid_str),
-            ),
+            )),
         },
     ) {
-        (Some(pool_name), Some(filesystem_name)) => {
+        ControlFlow::Break((Some(pool_name), Some(filesystem_name))) | ControlFlow::Continue((Some(pool_name), Some(filesystem_name))) => {
             Ok(["/", "dev", "stratis", &pool_name, &filesystem_name]
                 .iter()
                 .collect::<PathBuf>())
         }
-        (Some(_), None) => Err(
+        ControlFlow::Continue((Some(_), None)) => Err(
             "Filesystem name could not be found; can not synthesize Stratis filesystem symlink"
                 .to_string(),
         ),
-        (None, Some(_)) => Err(
+        ControlFlow::Continue((None, Some(_))) => Err(
             "Pool name could not be found; can not synthesize Stratis filesystem symlink"
                 .to_string(),
         ),

@@ -20,8 +20,9 @@ use crate::{
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         sim_engine::{keys::SimKeyActions, pool::SimPool},
         structures::{
-            AllLockReadGuard, AllLockWriteGuard, AllOrSomeLock, Lockable, SomeLockReadGuard,
-            SomeLockWriteGuard, Table,
+            AllLockReadAvailableGuard, AllLockReadGuard, AllLockWriteAvailableGuard,
+            AllLockWriteGuard, AllOrSomeLock, Lockable, SomeLockReadGuard, SomeLockWriteGuard,
+            Table,
         },
         types::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, Features, FilesystemUuid,
@@ -301,8 +302,16 @@ impl Engine for SimEngine {
         self.pools.read_all().await.into_dyn()
     }
 
+    async fn available_pools(&self) -> Option<AllLockReadAvailableGuard<PoolUuid, dyn Pool>> {
+        self.pools.read_all_available().await.map(|l| l.into_dyn())
+    }
+
     async fn pools_mut(&self) -> AllLockWriteGuard<PoolUuid, dyn Pool> {
         self.pools.write_all().await.into_dyn()
+    }
+
+    async fn available_pools_mut(&self) -> Option<AllLockWriteAvailableGuard<PoolUuid, dyn Pool>> {
+        self.pools.write_all_available().await.map(|l| l.into_dyn())
     }
 
     async fn get_events(&self) -> StratisResult<HashSet<PoolUuid>> {

@@ -966,12 +966,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "iocuddle"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8972d5be69940353d5347a1344cb375d9b457d6809b428b05bb1ca2fb9ce007"
-
-[[package]]
 name = "itertools"
 version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1117,6 +1111,12 @@ name = "linux-raw-sys"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df1d3c3b53da64cf5760482273a98e575c651a67eec7f77df96b5b642de8f039"
+
+[[package]]
+name = "linux-raw-sys"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 
 [[package]]
 name = "log"
@@ -1718,13 +1718,13 @@ dependencies = [
  "env_logger",
  "futures",
  "indexmap",
- "iocuddle",
  "itertools 0.14.0",
  "libblkid-rs",
  "libc",
  "libcryptsetup-rs",
  "libcryptsetup-rs-sys",
  "libudev",
+ "linux-raw-sys 0.12.1",
  "log",
  "loopdev-3",
  "nix 0.31.1",

@@ -8,7 +8,8 @@ use std::{
     sync::LazyLock,
 };
 
-use uuid::Uuid;
+use stratisd::engine::{FilesystemUuid, PoolUuid};
+
 use zbus::{
     blocking::{fdo::ObjectManagerProxy, Connection},
     fdo::{Error, ManagedObjects},
@@ -63,7 +64,7 @@ fn extract_dm_name(dmpath: &Path) -> Result<String, String> {
 }
 
 // Parse a Stratis filesystem devicemapper name.
-fn parse_dm_name(dmname: &str) -> Result<(Uuid, Uuid), String> {
+fn parse_dm_name(dmname: &str) -> Result<(PoolUuid, FilesystemUuid), String> {
     match dmname.split('-').collect::<Vec<_>>().as_slice() {
         [stratis, format_version, pool_uuid, thin, fs, filesystem_uuid]
             if *stratis == "stratis"
@@ -72,8 +73,8 @@ fn parse_dm_name(dmname: &str) -> Result<(Uuid, Uuid), String> {
                 && *fs == "fs" =>
         {
             Ok((
-                Uuid::parse_str(pool_uuid).map_err(|e| e.to_string())?,
-                Uuid::parse_str(filesystem_uuid).map_err(|e| e.to_string())?,
+                PoolUuid::parse_str(pool_uuid).map_err(|e| e.to_string())?,
+                FilesystemUuid::parse_str(filesystem_uuid).map_err(|e| e.to_string())?,
             ))
         }
         _ => Err(format!(
@@ -106,8 +107,8 @@ fn get_name_by_uuid_and_intf(
 // Given value of Uuid property for filesystem and pool, generate symlink.
 fn get_symlink_by_uuids(
     managed_objects: &ManagedObjects,
-    pool_uuid: Uuid,
-    filesystem_uuid: Uuid,
+    pool_uuid: PoolUuid,
+    filesystem_uuid: FilesystemUuid,
 ) -> Result<PathBuf, String> {
     let (pool_uuid_str, filesystem_uuid_str) = (
         pool_uuid.simple().to_string(),

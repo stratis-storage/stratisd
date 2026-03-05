@@ -313,6 +313,11 @@ where
     /// Determines whether two requests conflict.
     fn conflicts(already_woken: &WaitType<U>, ty: &WaitType<U>) -> bool {
         match (already_woken, ty) {
+            (
+                WaitType::Upgrade(uuid1),
+                WaitType::SomeRead(uuid2) | WaitType::SomeWrite(uuid2) | WaitType::Upgrade(uuid2),
+            ) => uuid1 == uuid2,
+            (WaitType::Upgrade(_), WaitType::AllRead | WaitType::AllWrite) => true,
             (WaitType::SomeRead(_), WaitType::SomeRead(_) | WaitType::AllRead) => false,
             (WaitType::SomeRead(uuid1), WaitType::SomeWrite(uuid2)) => uuid1 == uuid2,
             (WaitType::SomeRead(_), _) => true,
@@ -343,6 +348,12 @@ where
             WaitType::SomeRead(uuid) => self.write_locked.contains(uuid) || self.all_write_locked,
             WaitType::SomeWrite(uuid) => {
                 self.read_locked.contains_key(uuid)
+                    || self.write_locked.contains(uuid)
+                    || self.all_read_locked > 0
+                    || self.all_write_locked
+            }
+            WaitType::Upgrade(uuid) => {
+                self.read_locked.get(uuid).unwrap_or(&0) > &1
                     || self.write_locked.contains(uuid)
                     || self.all_read_locked > 0
                     || self.all_write_locked
@@ -435,6 +446,7 @@ where
 /// A record of the type of a waiting request.
 #[derive(Debug, PartialEq)]
 enum WaitType<U> {
+    Upgrade(U),
     SomeRead(U),
     SomeWrite(U),
     AllRead,
@@ -582,6 +594,15 @@ where
         guard
     }
 
+    /// Upgrade a read lock to a write lock.
+    pub async fn upgrade(&self, lock: SomeLockReadGuard<U, dyn Pool>) -> SomeLockWriteGuard<U, T> {
+        trace!("Upgrading single read lock to write lock");
+        let idx = self.next_idx();
+        let guard = Upgrade(self.clone(), lock, idx).await;
+        trace!("Read lock upgraded");
+        guard
+    }
+
     /// Issue a write on a single element identified by a name or UUID.
     pub async fn write(&self, key: PoolIdentifier<U>) -> Option<SomeLockWriteGuard<U, T>> {
         trace!("Acquiring write lock on pool {key:?}");
@@ -628,6 +649,60 @@ where
 {
     fn default() -> Self {
         AllOrSomeLock::new(Table::default())
+    }
+}
+
+/// Future returned by AllOrSomeLock::upgrade().
+struct Upgrade<U: AsUuid, T>(AllOrSomeLock<U, T>, SomeLockReadGuard<U, dyn Pool>, u64);
+
+impl<U, T> Future for Upgrade<U, T>
+where
+    U: AsUuid,
+{
+    type Output = SomeLockWriteGuard<U, T>;
+
+    fn poll(self: Pin<&mut Self>, cxt: &mut Context<'_>) -> Poll<Self::Output> {
+        let (mut lock_record, inner) = self.0.acquire_mutex();
+
+        let wait_type = WaitType::Upgrade(self.1 .1);
+        let poll = if lock_record.should_wait(&wait_type, self.2) {
+            lock_record.add_waiter(
+                &AtomicBool::new(true),
+                wait_type,
+                cxt.waker().clone(),
+                self.2,
+            );
+            Poll::Pending
+        } else {
+            lock_record.add_write_lock(self.1 .1, Some(self.2));
+            let (_, rf) = unsafe { inner.get().as_mut() }
+                .expect("cannot be null")
+                .get_mut_by_uuid(self.1 .1)
+                .expect("Checked above");
+            Poll::Ready(SomeLockWriteGuard(
+                Arc::clone(&self.1 .0),
+                self.1 .1,
+                self.1 .2.clone(),
+                rf,
+                true,
+            ))
+        };
+
+        poll
+    }
+}
+
+impl<U, T> Drop for Upgrade<U, T>
+where
+    U: AsUuid,
+{
+    fn drop(&mut self) {
+        let mut lock_record = self
+            .0
+            .lock_record
+            .lock()
+            .expect("Mutex only locked internally");
+        lock_record.cancel(self.2);
     }
 }
 
@@ -847,6 +922,15 @@ where
             self.1,
             unsafe { self.3.as_mut() }.expect("Cannot create null pointer from Rust references"),
         )
+    }
+
+    pub fn downgrade(mut self) -> SomeLockReadGuard<U, T> {
+        let mut lock_record = self.0.lock().unwrap();
+        lock_record.write_locked.remove(&self.1);
+        lock_record.read_locked.insert(self.1, 1);
+        lock_record.wake();
+        self.4 = false;
+        SomeLockReadGuard(Arc::clone(&self.0), self.1, self.2.clone(), self.3, true)
     }
 }
 

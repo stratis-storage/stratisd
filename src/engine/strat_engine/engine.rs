@@ -27,7 +27,7 @@ use crate::{
             backstore::ProcessedPathInfos,
             cmd::verify_executables,
             dm::get_dm,
-            keys::StratKeyActions,
+            keys::{validate_key_descs, StratKeyActions},
             liminal::{find_all, DeviceSet, LiminalDevices},
             names::KeyDescription,
             ns::MemoryFilesystem,
@@ -108,6 +108,10 @@ impl StratEngine {
         blockdev_paths: &[&Path],
         encryption_info: Option<&InputEncryptionInfo>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
+        if let Some(ei) = encryption_info {
+            validate_key_descs(ei.key_descs())?;
+        }
+
         validate_name(name)?;
         let name = Name::new(name.to_owned());
 
@@ -183,6 +187,13 @@ impl StratEngine {
 
             Ok(CreateAction::Created(pool_uuid))
         }
+    }
+
+    async fn upgrade_pool(
+        &self,
+        lock: SomeLockReadGuard<PoolUuid, dyn Pool>,
+    ) -> SomeLockWriteGuard<PoolUuid, AnyPool> {
+        self.pools.upgrade(lock).await
     }
 
     pub async fn get_pool(
@@ -519,6 +530,10 @@ impl Engine for StratEngine {
         encryption_info: Option<&InputEncryptionInfo>,
         integrity_spec: IntegritySpec,
     ) -> StratisResult<CreateAction<PoolUuid>> {
+        if let Some(ei) = encryption_info {
+            validate_key_descs(ei.key_descs())?;
+        }
+
         validate_name(name)?;
         let name = Name::new(name.to_owned());
         let integrity_spec = ValidatedIntegritySpec::try_from(integrity_spec)?;
@@ -729,6 +744,13 @@ impl Engine for StratEngine {
             })??;
             Ok(SetUnlockAction::new(unlocked_uuids))
         }
+    }
+
+    async fn upgrade_pool(
+        &self,
+        lock: SomeLockReadGuard<PoolUuid, dyn Pool>,
+    ) -> SomeLockWriteGuard<PoolUuid, dyn Pool> {
+        self.upgrade_pool(lock).await.into_dyn()
     }
 
     async fn get_pool(

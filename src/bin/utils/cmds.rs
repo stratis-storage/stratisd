@@ -5,10 +5,11 @@
 use std::{
     error::Error,
     fmt::{self, Display},
+    path::PathBuf,
     str::FromStr,
 };
 
-use clap::{builder::PossibleValuesParser, Arg, ArgAction, Command};
+use clap::{builder::PossibleValuesParser, Arg, ArgAction, Command, ValueEnum};
 
 #[cfg(feature = "systemd_compat")]
 use clap::builder::Str;
@@ -22,7 +23,7 @@ use stratisd::engine::{
     DEFAULT_INTEGRITY_TAG_SPEC,
 };
 
-use crate::utils::predict_usage;
+use crate::utils::{decode_dm, predict_usage};
 
 #[cfg(feature = "systemd_compat")]
 use crate::utils::generators::{stratis_clevis_setup_generator, stratis_setup_generator};
@@ -200,6 +201,76 @@ impl<'a> UtilCommand<'a> for StratisPredictUsage {
     }
 }
 
+struct StratisDecodeDm;
+
+#[derive(Copy, Clone, PartialEq, Eq, ValueEnum)]
+enum OutputMode {
+    FilesystemName,
+    PoolName,
+    Symlink,
+}
+
+impl StratisDecodeDm {
+    fn cmd() -> Command {
+        Command::new("stratis-decode-dm")
+            .about("Utility that maps from Stratis filesystem devicemapper path to a Stratis value")
+            .arg(
+                Arg::new("path")
+                    .help("The absolute path of the devicemapper device ('/dev/mapper/<devicemapper-name>')")
+                    .required(true)
+                    .value_parser(
+                        |s: &str| -> Result<PathBuf, String> {
+                            let p = PathBuf::from(s);
+                            if p.is_absolute() {
+                                Ok(p)
+                            } else {
+                                Err(format!("'{}' must be specified as an absolute path", s))
+                            }
+                        }
+                    )
+
+            )
+            .arg(
+                Arg::new("output")
+                    .long("output")
+                    .help("Stratis value to print")
+                    .required(true)
+                    .value_parser(clap::value_parser!(OutputMode)),
+            )
+    }
+}
+
+impl<'a> UtilCommand<'a> for StratisDecodeDm {
+    fn name(&self) -> &'a str {
+        "stratis-decode-dm"
+    }
+
+    fn run(&self, command_line_args: Vec<String>) -> Result<(), Box<dyn Error>> {
+        let matches = StratisDecodeDm::cmd().get_matches_from(command_line_args);
+
+        let path = matches
+            .get_one::<PathBuf>("path")
+            .expect("Parser ensures path argument is present.");
+        let output_mode = matches
+            .get_one::<OutputMode>("output")
+            .expect("Parser ensures output argument is present.");
+        match output_mode {
+            OutputMode::Symlink => {
+                println!("{}", decode_dm::symlink(path)?.display());
+                Ok(())
+            }
+            OutputMode::FilesystemName => {
+                println!("{}", decode_dm::filesystem_name(path)?);
+                Ok(())
+            }
+            OutputMode::PoolName => {
+                println!("{}", decode_dm::pool_name(path)?);
+                Ok(())
+            }
+        }
+    }
+}
+
 #[cfg(feature = "systemd_compat")]
 fn stratis_setup_generator_cmd(generator: impl Into<Str>) -> Command {
     Command::new(generator)
@@ -281,6 +352,7 @@ pub fn cmds<'a>() -> Vec<Box<dyn UtilCommand<'a>>> {
         Box::new(StratisPredictUsage),
         Box::new(StratisSetupGenerator),
         Box::new(StratisClevisSetupGenerator),
+        Box::new(StratisDecodeDm),
     ]
 }
 

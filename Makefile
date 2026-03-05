@@ -77,7 +77,7 @@ NO_IPC_FEATURES = --no-default-features --features engine
 SYSTEMD_FEATURES = --no-default-features --features engine,min,systemd_compat
 EXTRAS_FEATURES =  --no-default-features --features engine,extras
 UDEV_FEATURES = --no-default-features --features udev_scripts
-UTILS_FEATURES = --no-default-features --features engine,systemd_compat
+UTILS_FEATURES = --no-default-features --features dbus_enabled,engine,systemd_compat
 
 STATIC_FLAG = -C target-feature=+crt-static
 
@@ -107,14 +107,10 @@ check-typos:
 ## Run cargo fmt
 fmt: fmt-macros
 	cargo fmt
-	isort ./src/bin/utils/stratis-decode-dm
-	black ./src/bin/utils/stratis-decode-dm
 
 ## Run cargo fmt for CI jobs
 fmt-ci: fmt-macros-ci
 	cargo fmt -- --check
-	isort --diff --check-only ./src/bin/utils/stratis-decode-dm
-	black ./src/bin/utils/stratis-decode-dm --check
 
 ## Run cargo fmt for stratisd_proc_macros
 fmt-macros:
@@ -269,11 +265,6 @@ install-systemd-cfg:
 	sed 's|@UNITEXECDIR@|$(UNITEXECDIR)|' systemd/stratis-fstab-setup@.service.in > $(DESTDIR)$(UNITDIR)/stratis-fstab-setup@.service
 	sed 's|@UNITEXECDIR@|$(UNITEXECDIR)|' systemd/stratis-fstab-setup-with-network@.service.in > $(DESTDIR)$(UNITDIR)/stratis-fstab-setup-with-network@.service
 
-## Install scripts
-install-scripts:
-	mkdir -p $(DESTDIR)$(BINDIR)
-	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) src/bin/utils/stratis-decode-dm
-
 ## Install binaries
 install-binaries:
 	mkdir -p $(DESTDIR)$(BINDIR)
@@ -287,6 +278,7 @@ install-binaries:
 	mv --force --verbose $(DESTDIR)$(BINDIR)/stratis-utils $(DESTDIR)$(BINDIR)/stratis-predict-usage
 	ln --force --verbose $(DESTDIR)$(BINDIR)/stratis-predict-usage $(DESTDIR)$(UNITGENDIR)/stratis-clevis-setup-generator
 	ln --force --verbose $(DESTDIR)$(BINDIR)/stratis-predict-usage $(DESTDIR)$(UNITGENDIR)/stratis-setup-generator
+	ln --force --verbose $(DESTDIR)$(BINDIR)/stratis-predict-usage $(DESTDIR)$(BINDIR)/stratis-decode-dm
 
 ## Install udev binaries
 install-udev-binaries:
@@ -306,7 +298,7 @@ install-daemons:
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd-min
 
 ## Install all stratisd programs and config files
-install-programs: install-udev-cfg install-dbus-cfg install-dracut-cfg install-systemd-cfg install-scripts install-binaries install-udev-binaries install-fstab-script install-daemons
+install-programs: install-udev-cfg install-dbus-cfg install-dracut-cfg install-systemd-cfg install-binaries install-udev-binaries install-fstab-script install-daemons
 
 ## Install all stratisd files
 install: install-programs install-man-cfg
@@ -441,6 +433,10 @@ test-stratis-min:
 test-stratisd-tools:
 	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test --no-default-features --features "engine,extras" test_stratisd_tools
 
+## Test stratis-utils
+test-stratis-utils:
+	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test --no-default-features --features "dbus_enabled,engine" test_stratis_utils
+
 ## Run yamllint on workflow files
 yamllint:
 	yamllint --strict .github/workflows/*.yml
@@ -486,12 +482,6 @@ clippy-no-ipc:
 ## Run clippy on the current source tree
 clippy: clippy-macros clippy-min clippy-udev-utils clippy-no-ipc clippy-utils
 	cargo ${CLIPPY} ${CLIPPY_OPTS}
-
-## Lint Python parts of the source code
-lint:
-	pylint --disable=invalid-name ./src/bin/utils/stratis-decode-dm
-	bandit ./src/bin/utils/stratis-decode-dm --skip B101
-	pyright ./src/bin/utils/stratis-decode-dm
 
 COMPARE_FEDORA_VERSIONS ?=
 ## Verify that a script for comparing version specs with Fedora is available
@@ -541,12 +531,10 @@ check-fedora-versions: test-compare-fedora-versions
 	install-dracut-cfg
 	install-fstab-script
 	install-man-cfg
-	install-scripts
 	install-systemd-cfg
 	install-udev-binaries
 	install-udev-cfg
 	license
-	lint
 	test
 	test-valgrind
 	test-loop
@@ -570,6 +558,7 @@ check-fedora-versions: test-compare-fedora-versions
 	test-stratis-min-root
 	test-stratisd-min
 	test-stratisd-min-root
+	test-stratis-utils
 	tmtlint
 	yamllint
 

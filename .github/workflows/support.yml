@@ -59,12 +59,13 @@ jobs:
             task: make -f Makefile yamllint tmtlint
             working-directory: .
     runs-on: ubuntu-24.04
-    container: fedora:41  # CURRENT DEVELOPMENT ENVIRONMENT
+    container: fedora:42  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - name: Install dependencies
         run: >
           dnf install -y
           git
+          libatomic
           make
           ncurses
           pip

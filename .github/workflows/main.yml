@@ -292,11 +292,11 @@ jobs:
           git
           libblkid-dev
           libcryptsetup-dev
-          libdbus-1-dev
           libdevmapper-dev
           libsystemd-dev
           libudev-dev
           make
+          pkg-config
           thin-provisioning-tools
           udev
           xfsprogs

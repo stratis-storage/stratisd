@@ -580,10 +580,25 @@ pub async fn set_name_method(
             OK_STRING.to_string(),
         ),
         Ok(RenameAction::Renamed(uuid)) => {
-            match manager.read().await.pool_get_path(&pool_uuid) {
-                Some(p) => {
-                    send_pool_name_signal(connection, &p.as_ref()).await;
-                }
+            let read_lock = manager.read().await;
+            match read_lock.pool_get_path(&pool_uuid) {
+                Some(p) => match engine.get_pool(PoolIdentifier::Uuid(pool_uuid)).await {
+                    Some(pool) => {
+                        let fs_paths = pool.filesystems().into_iter().filter_map(|(_, fs_uuid, _)| match read_lock.filesystem_get_path(&fs_uuid) {
+                                Some(p) => Some(p),
+                                None => {
+                                    warn!("Could not find filesystem path for filesystem with UUID {fs_uuid}; cannot send devnode invalidate signal");
+                                    None
+                                }
+                            })
+                            .collect::<Vec<_>>();
+                        send_pool_name_signal(connection, &p.as_ref(), fs_paths).await;
+                    }
+                    None => {
+                        warn!("Could not find filesystems associated with pool with UUID {uuid}; cannot send devnode invalidate signal");
+                        send_pool_name_signal(connection, &p.as_ref(), vec![]).await;
+                    }
+                },
                 None => {
                     warn!("No object path associated with pool UUID {uuid}; failed to send pool name change signals");
                 }

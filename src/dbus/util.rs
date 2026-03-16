@@ -6,7 +6,7 @@ use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use tokio::sync::RwLock;
 use zbus::{
-    zvariant::{ObjectPath, Value},
+    zvariant::{ObjectPath, OwnedObjectPath, Value},
     Connection,
 };
 
@@ -995,7 +995,11 @@ pub async fn send_stopped_pools_signals(connection: &Arc<Connection>) {
     );
 }
 
-pub async fn send_pool_name_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+pub async fn send_pool_name_signal(
+    connection: &Arc<Connection>,
+    path: &ObjectPath<'_>,
+    fs_paths: Vec<&OwnedObjectPath>,
+) {
     send_signal!(connection, PoolR0, path, name_changed, "name", "pool.r0");
     send_signal!(connection, PoolR1, path, name_changed, "name", "pool.r1");
     send_signal!(connection, PoolR2, path, name_changed, "name", "pool.r2");
@@ -1006,6 +1010,90 @@ pub async fn send_pool_name_signal(connection: &Arc<Connection>, path: &ObjectPa
     send_signal!(connection, PoolR7, path, name_changed, "name", "pool.r7");
     send_signal!(connection, PoolR8, path, name_changed, "name", "pool.r8");
     send_signal!(connection, PoolR9, path, name_changed, "name", "pool.r9");
+
+    for fs_path_owned in fs_paths {
+        let fs_path = &fs_path_owned.as_ref();
+        send_signal!(
+            connection,
+            FilesystemR0,
+            fs_path,
+            devnode_invalidate,
+            "devnode",
+            "filesystem.r0"
+        );
+        send_signal!(
+            connection,
+            FilesystemR1,
+            fs_path,
+            devnode_invalidate,
+            "devnode",
+            "filesystem.r1"
+        );
+        send_signal!(
+            connection,
+            FilesystemR2,
+            fs_path,
+            devnode_invalidate,
+            "devnode",
+            "filesystem.r2"
+        );
+        send_signal!(
+            connection,
+            FilesystemR3,
+            fs_path,
+            devnode_invalidate,
+            "devnode",
+            "filesystem.r3"
+        );
+        send_signal!(
+            connection,
+            FilesystemR4,
+            fs_path,
+            devnode_invalidate,
+            "devnode",
+            "filesystem.r4"
+        );
+        send_signal!(
+            connection,
+            FilesystemR5,
+            fs_path,
+            devnode_invalidate,
+            "devnode",
+            "filesystem.r5"
+        );
+        send_signal!(
+            connection,
+            FilesystemR6,
+            fs_path,
+            devnode_invalidate,
+            "devnode",
+            "filesystem.r6"
+        );
+        send_signal!(
+            connection,
+            FilesystemR7,
+            fs_path,
+            devnode_invalidate,
+            "devnode",
+            "filesystem.r7"
+        );
+        send_signal!(
+            connection,
+            FilesystemR8,
+            fs_path,
+            devnode_invalidate,
+            "devnode",
+            "filesystem.r8"
+        );
+        send_signal!(
+            connection,
+            FilesystemR9,
+            fs_path,
+            devnode_invalidate,
+            "devnode",
+            "filesystem.r9"
+        );
+    }
 }
 
 pub async fn send_overprovisioning_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {

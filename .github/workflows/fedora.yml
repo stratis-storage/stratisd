@@ -132,10 +132,13 @@ jobs:
           libblkid-devel
           make
           ncurses
+          rng-tools
           sudo
           systemd-devel
           systemd-udev
           xfsprogs
+      - name: Start rngd
+        run: rngd -r /dev/urandom
       - uses: dtolnay/rust-toolchain@master
         with:
           components: ${{ matrix.components }}
@@ -184,10 +187,13 @@ jobs:
           libblkid-devel
           make
           ncurses
+          rng-tools
           sudo
           systemd-devel
           systemd-udev
           xfsprogs
+      - name: Start rngd
+        run: rngd -r /dev/urandom
       - uses: dtolnay/rust-toolchain@master
         with:
           components: ${{ matrix.components }}

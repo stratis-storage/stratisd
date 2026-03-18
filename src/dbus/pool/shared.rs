@@ -44,16 +44,6 @@ pub async fn pool_prop<R>(
     Ok(f(guard))
 }
 
-pub async fn try_pool_prop<R>(
-    engine: &Arc<dyn Engine>,
-    uuid: PoolUuid,
-    f: impl Fn(SomeLockReadGuard<PoolUuid, dyn Pool>) -> R,
-) -> Result<R, Error> {
-    let guard = get_pool(engine, uuid).await?;
-
-    Ok(f(guard))
-}
-
 pub async fn set_pool_prop<'a, 'b, I, F, Fut, S, SFut>(
     engine: &Arc<dyn Engine>,
     connection: &'a Arc<Connection>,

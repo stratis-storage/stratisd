@@ -16,10 +16,7 @@ use zbus::{
 };
 
 use crate::{
-    dbus::{
-        manager::Manager,
-        pool::shared::{pool_prop, try_pool_prop},
-    },
+    dbus::{manager::Manager, pool::shared::pool_prop},
     engine::{self, ActionAvailability, Engine, KeyDescription, Lockable, PoolUuid},
     stratis::StratisResult,
 };
@@ -297,7 +294,7 @@ impl PoolR0 {
 
     #[zbus(property(emits_changed_signal = "true"))]
     async fn total_physical_used(&self) -> Result<(bool, String), Error> {
-        try_pool_prop(&self.engine, self.uuid, used_prop).await
+        pool_prop(&self.engine, self.uuid, used_prop).await
     }
 
     #[zbus(property(emits_changed_signal = "true"))]

@@ -32,7 +32,7 @@ use crate::{
                 send_enable_overprovisioning_signal_on_change, send_fs_limit_signal_on_change,
                 set_enable_overprovisioning_prop, set_fs_limit_prop,
             },
-            shared::{pool_prop, set_pool_prop, try_pool_prop},
+            shared::{pool_prop, set_pool_prop},
         },
     },
     engine::{self, ActionAvailability, Engine, KeyDescription, Lockable, PoolUuid},
@@ -314,7 +314,7 @@ impl PoolR3 {
 
     #[zbus(property(emits_changed_signal = "true"))]
     async fn total_physical_used(&self) -> Result<(bool, String), Error> {
-        try_pool_prop(&self.engine, self.uuid, used_prop).await
+        pool_prop(&self.engine, self.uuid, used_prop).await
     }
 
     #[zbus(property(emits_changed_signal = "true"))]

@@ -39,7 +39,7 @@ use crate::{
                 key_descs_prop, metadata_version_prop, rebind_clevis_method, rebind_keyring_method,
                 unbind_clevis_method, unbind_keyring_method, volume_key_loaded_prop,
             },
-            shared::{pool_prop, set_pool_prop, try_pool_prop},
+            shared::{pool_prop, set_pool_prop},
         },
         types::FilesystemSpec,
     },
@@ -369,7 +369,7 @@ impl PoolR9 {
 
     #[zbus(property(emits_changed_signal = "true"))]
     async fn total_physical_used(&self) -> Result<(bool, String), Error> {
-        try_pool_prop(&self.engine, self.uuid, used_prop).await
+        pool_prop(&self.engine, self.uuid, used_prop).await
     }
 
     #[zbus(property(emits_changed_signal = "true"))]

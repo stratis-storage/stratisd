@@ -27,7 +27,7 @@ use crate::{
                 name_prop, rebind_clevis_method, rebind_keyring_method, set_name_method, size_prop,
                 snapshot_filesystem_method, unbind_clevis_method, unbind_keyring_method, used_prop,
             },
-            shared::{pool_prop, set_pool_prop, try_pool_prop},
+            shared::{pool_prop, set_pool_prop},
         },
     },
     engine::{self, ActionAvailability, Engine, KeyDescription, Lockable, PoolUuid},
@@ -301,7 +301,7 @@ impl PoolR1 {
 
     #[zbus(property(emits_changed_signal = "true"))]
     async fn total_physical_used(&self) -> Result<(bool, String), Error> {
-        try_pool_prop(&self.engine, self.uuid, used_prop).await
+        pool_prop(&self.engine, self.uuid, used_prop).await
     }
 
     #[zbus(property(emits_changed_signal = "true"))]

@@ -35,7 +35,7 @@ use crate::{
             pool_3_3::grow_physical_device_method,
             pool_3_5::init_cache_method,
             pool_3_6::create_filesystems_method,
-            shared::{pool_prop, set_pool_prop, try_pool_prop},
+            shared::{pool_prop, set_pool_prop},
         },
         types::FilesystemSpec,
     },
@@ -332,7 +332,7 @@ impl PoolR7 {
 
     #[zbus(property(emits_changed_signal = "true"))]
     async fn total_physical_used(&self) -> Result<(bool, String), Error> {
-        try_pool_prop(&self.engine, self.uuid, used_prop).await
+        pool_prop(&self.engine, self.uuid, used_prop).await
     }
 
     #[zbus(property(emits_changed_signal = "true"))]

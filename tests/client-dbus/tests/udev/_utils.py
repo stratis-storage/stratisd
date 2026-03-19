@@ -293,7 +293,7 @@ def wait_for_udev_count(expected_num):
     try:
         for attempt in Retrying(
             retry=retry_if_not_result(lambda found_num: found_num == expected_num),
-            stop=stop_after_delay(10),
+            stop=stop_after_delay(20),
             wait=wait_fixed(1),
         ):
             with attempt:

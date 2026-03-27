@@ -11,7 +11,6 @@ make fmt-ci &&
 	make clippy &&
 	make yamllint &&
 	make tmtlint &&
-	make lint &&
 	make check-typos || exit 1
 
 export PYTHONPATH=$PWD/tests/client-dbus/src

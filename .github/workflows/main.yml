@@ -184,6 +184,8 @@ jobs:
         run: make test-stratis-min-root
       - name: Run stratis-tools tests
         run: make test-stratisd-tools
+      - name: Run stratis-utils tests
+        run: make test-stratis-utils
 
   shell-checks:
     runs-on: ubuntu-24.04
@@ -202,31 +204,6 @@ jobs:
           persist-credentials: false
       - name: Run shell check
         run: make -f Makefile fmt-shell-ci
-
-  pylint:
-    runs-on: ubuntu-24.04
-    container:
-      image: fedora:42  # CURRENT DEVELOPMENT ENVIRONMENT
-    steps:
-      - name: Install dependencies
-        run: >
-          dnf install -y
-          bandit
-          git
-          libatomic
-          make
-          pip
-          pylint
-          python3-dbus
-      - name: Install pyright
-        run: pip install --user pyright
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - name: Run lint
-        run: >
-          PATH=${PATH}:/github/home/.local/bin
-          make -f Makefile lint
 
   python-based-tests:
     runs-on: ubuntu-24.04

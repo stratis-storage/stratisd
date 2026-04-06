@@ -371,7 +371,7 @@ where
         table
     }
 
-    /// Get a list of all writeable pools in the current lock.
+    /// Get a list of all writable pools in the current lock.
     fn get_available_write<T>(&mut self, inner: &mut Table<U, T>) -> Table<U, *mut T> {
         let mut table = Table::default();
         for (n, u, p) in inner.iter_mut() {

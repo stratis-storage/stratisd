@@ -280,7 +280,7 @@ impl MDARegions {
 /// A type representing the actual size of variable length metadata written within this metadata
 /// region. This amount must never be greater than the size of the region allocated for the variable
 /// length metadata, which has `MDADataSize` type.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct MetaDataSize(Bytes);
 
 impl MetaDataSize {
@@ -293,7 +293,7 @@ impl MetaDataSize {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct MDAHeader {
     last_updated: DateTime<Utc>,
 
@@ -302,20 +302,6 @@ pub struct MDAHeader {
     used: MetaDataSize,
 
     data_crc: u32,
-}
-
-// Implementing Default explicitly because DateTime<Utc> does not implement
-// Default. Implement Default for MDAHeader in order to overwrite MDAHeader
-// locations with values that represent no MDAHeader but where the data has
-// the correct CRC, so can be read without an error.
-impl Default for MDAHeader {
-    fn default() -> MDAHeader {
-        MDAHeader {
-            last_updated: DateTime::default(),
-            used: MetaDataSize::new(Bytes(0)),
-            data_crc: 0,
-        }
-    }
 }
 
 impl MDAHeader {

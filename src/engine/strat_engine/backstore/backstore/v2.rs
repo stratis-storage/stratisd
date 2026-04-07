@@ -4,7 +4,11 @@
 
 // Code to handle the backing store of a pool.
 
-use std::{cmp, iter::once, path::PathBuf};
+use std::{
+    cmp,
+    iter::once,
+    path::{Path, PathBuf},
+};
 
 use chrono::{DateTime, Utc};
 use either::Either;
@@ -37,6 +41,7 @@ use crate::{
             metadata::MDADataSize,
             names::{format_backstore_ids, format_crypt_backstore_name, CacheRole},
             serde_structs::{BackstoreSave, CapSave, PoolFeatures, PoolSave, Recordable},
+            shared::shift_allocation_offset,
             thinpool::ThinPool,
             writing::wipe_sectors,
         },
@@ -405,17 +410,32 @@ impl CapDevice {
     }
 
     /// Shift alloc offset when the cap device has changed.
-    fn shift_alloc_offset(&mut self, offset: Sectors, direction: OffsetDirection) {
-        for (start, _) in self.allocs.iter_mut() {
-            match direction {
-                OffsetDirection::Forwards => {
-                    *start += offset;
-                }
-                OffsetDirection::Backwards => {
-                    *start -= offset;
-                }
+    fn shift_alloc_offset(
+        &mut self,
+        offset: Sectors,
+        direction: OffsetDirection,
+    ) -> StratisResult<Vec<(Sectors, Sectors)>> {
+        shift_allocation_offset(self.allocs.iter(), |&(start, len)| match direction {
+            OffsetDirection::Forwards => {
+                start.checked_add(offset).map(|s| (s, len)).ok_or_else(|| {
+                    StratisError::Msg(format!(
+                        "Allocation shift would overflow integer, start: {start}, offset: {offset}"
+                    ))
+                })
             }
-        }
+            OffsetDirection::Backwards => start
+                .checked_sub(*offset)
+                .map(|s| (Sectors(s), len))
+                .ok_or_else(|| {
+                    StratisError::Msg(format!(
+                        "Allocation shift would underflow integer, start: {start}, offset: {offset}"
+                    ))
+                }),
+        })
+    }
+
+    fn apply_alloc_offset(&mut self, allocs: Vec<(Sectors, Sectors)>) {
+        self.allocs = allocs;
     }
 }
 
@@ -1301,20 +1321,70 @@ impl Backstore {
     ) -> StratisResult<(u32, (u32, SizedKeyMemory))> {
         let (dm_name, _) = format_backstore_ids(pool_uuid, CacheRole::Cache);
         let unencrypted_path = PathBuf::from(DEVICEMAPPER_PATH).join(dm_name.to_string());
-        let (sector_size, key_info) =
-            CryptHandle::setup_encrypt(pool_uuid, thinpool, &unencrypted_path, encryption_info)?;
 
-        thinpool.suspend()?;
-        let set_device_res = get_devno_from_path(
-            &PathBuf::from(DEVICEMAPPER_PATH)
-                .join(format_crypt_backstore_name(&pool_uuid).to_string()),
-        )
-        .and_then(|devno| thinpool.set_device(devno, offset, offset_direction));
-        thinpool.resume()?;
-        set_device_res?;
-        self.shift_alloc_offset(offset, offset_direction);
+        fn fallible(
+            backstore: &mut Backstore,
+            unencrypted_path: &Path,
+            pool_uuid: PoolUuid,
+            thinpool: &mut ThinPool<Backstore>,
+            offset: Sectors,
+            offset_direction: OffsetDirection,
+            encryption_info: &InputEncryptionInfo,
+        ) -> StratisResult<(u32, (u32, SizedKeyMemory))> {
+            let (sector_size, key_info) =
+                CryptHandle::setup_encrypt(pool_uuid, thinpool, unencrypted_path, encryption_info)?;
 
-        Ok((sector_size, key_info))
+            let allocs = backstore.shift_alloc_offset(offset, offset_direction)?;
+
+            thinpool.suspend()?;
+            let set_device_res = get_devno_from_path(
+                &PathBuf::from(DEVICEMAPPER_PATH)
+                    .join(format_crypt_backstore_name(&pool_uuid).to_string()),
+            )
+            .and_then(|devno| thinpool.set_device(devno, offset, offset_direction));
+            thinpool.resume()?;
+            set_device_res?;
+
+            backstore.apply_alloc_offset(allocs);
+
+            Ok((sector_size, key_info))
+        }
+
+        match fallible(
+            self,
+            unencrypted_path.as_path(),
+            pool_uuid,
+            thinpool,
+            offset,
+            offset_direction,
+            encryption_info,
+        ) {
+            Ok(ret) => Ok(ret),
+            Err(e) => match CryptHandle::setup(
+                unencrypted_path.as_path(),
+                pool_uuid,
+                TokenUnlockMethod::None,
+                None,
+            ) {
+                Ok(Some(h)) => {
+                    if let Err(rollback_e) = h.wipe() {
+                        Err(StratisError::RollbackError {
+                            rollback_error: Box::new(rollback_e),
+                            causal_error: Box::new(e),
+                            level: ActionAvailability::NoRequests,
+                        })
+                    } else {
+                        Err(e)
+                    }
+                }
+                Ok(None) => Err(e),
+                Err(rollback_e) => Err(StratisError::RollbackError {
+                    rollback_error: Box::new(rollback_e),
+                    causal_error: Box::new(e),
+                    level: ActionAvailability::NoRequests,
+                }),
+            },
+        }
     }
 
     pub fn do_encrypt(
@@ -1324,7 +1394,13 @@ impl Backstore {
     ) -> StratisResult<()> {
         let (dm_name, _) = format_backstore_ids(pool_uuid, CacheRole::Cache);
         let unencrypted_path = PathBuf::from(DEVICEMAPPER_PATH).join(dm_name.to_string());
-        CryptHandle::do_encrypt(&unencrypted_path, pool_uuid, sector_size, key_info)
+        match CryptHandle::do_encrypt(&unencrypted_path, pool_uuid, sector_size, key_info) {
+            Ok(()) => Ok(()),
+            Err(e) => Err(StratisError::ActionAvailabilityError {
+                level: ActionAvailability::NoPoolChanges,
+                error: Box::new(e),
+            }),
+        }
     }
 
     pub fn finish_encrypt(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
@@ -1374,7 +1450,12 @@ impl Backstore {
         let (slot, key, new_slot) = key_info.remove(0);
         match self.cap_device.enc {
             Some(Either::Right(ref handle)) => {
-                handle.do_reencrypt(pool_uuid, slot, key, new_slot)?;
+                if let Err(e) = handle.do_reencrypt(pool_uuid, slot, key, new_slot) {
+                    return Err(StratisError::ActionAvailabilityError {
+                        level: ActionAvailability::NoPoolChanges,
+                        error: Box::new(e),
+                    });
+                }
             }
             _ => unreachable!("Should have called prepare_reencrypt"),
         }
@@ -1394,7 +1475,12 @@ impl Backstore {
             })?;
         let luks2_path = handle.luks2_device_path().to_owned();
 
-        handle.decrypt(pool_uuid)?;
+        if let Err(e) = handle.decrypt(pool_uuid) {
+            return Err(StratisError::ActionAvailabilityError {
+                level: ActionAvailability::NoPoolChanges,
+                error: Box::new(e),
+            });
+        }
         manual_wipe(&luks2_path, Sectors(0), DEFAULT_CRYPT_DATA_OFFSET_V2)?;
         Ok(())
     }
@@ -1408,12 +1494,15 @@ impl Backstore {
     ) -> StratisResult<()> {
         thinpool.suspend()?;
         let (dm_name, _) = format_backstore_ids(pool_uuid, CacheRole::Cache);
+        let allocs = self.shift_alloc_offset(offset, direction)?;
+
         let set_device_res =
             get_devno_from_path(&PathBuf::from(DEVICEMAPPER_PATH).join(dm_name.to_string()))
                 .and_then(|devno| thinpool.set_device(devno, offset, direction));
         thinpool.resume()?;
-        self.shift_alloc_offset(offset, direction);
         set_device_res?;
+
+        self.apply_alloc_offset(allocs);
         self.cap_device.enc = None;
         Ok(())
     }
@@ -1477,8 +1566,17 @@ impl Backstore {
     }
 
     /// Shift the allocations in the backstore by the requested offset in the requested direction.
-    pub fn shift_alloc_offset(&mut self, offset: Sectors, direction: OffsetDirection) {
+    pub fn shift_alloc_offset(
+        &mut self,
+        offset: Sectors,
+        direction: OffsetDirection,
+    ) -> StratisResult<Vec<(Sectors, Sectors)>> {
         self.cap_device.shift_alloc_offset(offset, direction)
+    }
+
+    /// Apply the shifted offset in the requested direction.
+    pub fn apply_alloc_offset(&mut self, allocs: Vec<(Sectors, Sectors)>) {
+        self.cap_device.apply_alloc_offset(allocs)
     }
 }
 

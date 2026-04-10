@@ -255,7 +255,7 @@ fn process_item(mut item: Item) -> Item {
     };
 
     for impl_item in i.items.iter_mut() {
-        if let ImplItem::Fn(ref mut f) = impl_item {
+        if let ImplItem::Fn(f) = impl_item {
             if let Some(level) = get_attr_level(&mut f.attrs) {
                 add_method_guards(f, level);
             }

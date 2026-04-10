@@ -299,6 +299,17 @@ future_incompatible = { level = "deny", priority = 1 }
 unused = { level = "deny", priority = 2}
 rust_2018_idioms = { level = "deny", priority = 3 }
 nonstandard_style = { level = "deny", priority = 4 }
+boxed-slice-into-iter = { level = "deny", priority = 5}
+dependency-on-unit-never-type-fallback = { level = "deny", priority = 5}
+deprecated-safe-2024 = { level = "deny", priority = 5 }
+impl-trait-overcaptures = { level = "deny", priority = 5 }
+keyword-idents-2024 = { level = "deny", priority = 5 }
+missing-unsafe-on-extern = { level = "deny", priority = 5 }
+never-type-fallback-flowing-into-unsafe = { level = "deny", priority = 5}
+rust-2024-guarded-string-incompatible-syntax = { level = "deny", priority = 5}
+rust-2024-prelude-collisions = { level = "deny", priority = 5}
+static-mut-refs = { level = "deny", priority = 5}
+unsafe-attr-outside-unsafe = { level = "deny", priority = 5}
 
 [lints.clippy]
 all = { level = "deny" }

@@ -558,18 +558,17 @@ checksum = "c2e66c9d817f1720209181c316d28635c050fa304f9c79e47a520882661b7308"
 
 [[package]]
 name = "devicemapper"
-version = "0.34.5"
+version = "0.34.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8ca2baf05e507adafc3524fb687aa15f2f9953de808c6a4cbd57a7f2e5aa883"
+checksum = "607791a4633fca6e032a66614f4fe96a721dd8641ebe98438283e53d361503cd"
 dependencies = [
  "bitflags",
  "cfg-if",
  "devicemapper-sys",
  "env_logger",
  "log",
- "nix 0.30.1",
- "once_cell",
- "rand 0.9.0",
+ "nix",
+ "rand 0.10.0",
  "retry",
  "semver",
  "serde",
@@ -1191,18 +1190,6 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.30.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74523f3a35e05aba87a1d978330aef40f67b0304ac79c1c00b294c9830543db6"
-dependencies = [
- "bitflags",
- "cfg-if",
- "cfg_aliases",
- "libc",
-]
-
-[[package]]
-name = "nix"
 version = "0.31.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "225e7cfe711e0ba79a68baeddb2982723e4235247aefce1482f2f16c27865b66"
@@ -1740,7 +1727,7 @@ dependencies = [
  "linux-raw-sys 0.12.1",
  "log",
  "loopdev-3",
- "nix 0.31.1",
+ "nix",
  "pkg-config",
  "predicates",
  "pretty-hex",

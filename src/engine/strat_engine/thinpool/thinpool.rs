@@ -17,7 +17,8 @@ use serde_json::{Map, Value};
 
 use devicemapper::{
     device_exists, message, Bytes, DataBlocks, Device, DmDevice, DmName, DmNameBuf, DmOptions,
-    LinearDev, MetaBlocks, Sectors, ThinDevId, ThinPoolDev, ThinPoolStatus, IEC,
+    FlakeyTargetParams, LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors,
+    TargetLine, ThinDevId, ThinPoolDev, ThinPoolStatus, IEC,
 };
 
 use crate::{
@@ -32,7 +33,7 @@ use crate::{
                 ThinRole,
             },
             serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave},
-            shared::merge,
+            shared::{merge, shift_allocation_offset},
             thinpool::{
                 dm_structs::{
                     linear_table, thin_pool_status_parser, thin_table, ThinPoolStatusDigest,
@@ -45,8 +46,8 @@ use crate::{
         },
         structures::Table,
         types::{
-            Compare, Diff, FilesystemUuid, Name, PoolUuid, SetDeleteAction, StratFilesystemDiff,
-            ThinPoolDiff,
+            ActionAvailability, Compare, Diff, FilesystemUuid, Name, OffsetDirection, PoolUuid,
+            SetDeleteAction, StratFilesystemDiff, ThinPoolDiff,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -682,6 +683,17 @@ impl<B> ThinPool<B> {
         )
         .map_err(|e| e.into())
     }
+
+    /// Get the minimum logical sector size for all filesystems in the thin pool or return None if
+    /// there are no filesystems.
+    pub fn min_logical_sector_size(&self) -> StratisResult<Option<Bytes>> {
+        let sectors = self
+            .filesystems()
+            .iter()
+            .map(|(_, _, fs)| fs.logical_sector_size())
+            .collect::<StratisResult<Vec<Bytes>>>()?;
+        Ok(sectors.iter().min().cloned())
+    }
 }
 
 impl ThinPool<v1::Backstore> {
@@ -803,28 +815,6 @@ impl ThinPool<v1::Backstore> {
             out_of_meta_space: false,
             backstore: PhantomData,
         })
-    }
-
-    /// Set the device on all DM devices
-    pub fn set_device(&mut self, backstore_device: Device) -> StratisResult<bool> {
-        if backstore_device == self.backstore_device {
-            return Ok(false);
-        }
-
-        let meta_table =
-            linear_table::set_target_device(self.thin_pool.meta_dev().table(), backstore_device);
-        let data_table =
-            linear_table::set_target_device(self.thin_pool.data_dev().table(), backstore_device);
-        let mdv_table =
-            linear_table::set_target_device(self.mdv.device().table(), backstore_device);
-
-        self.thin_pool.set_meta_table(get_dm(), meta_table)?;
-        self.thin_pool.set_data_table(get_dm(), data_table)?;
-        self.mdv.set_table(mdv_table)?;
-
-        self.backstore_device = backstore_device;
-
-        Ok(true)
     }
 }
 
@@ -1918,6 +1908,153 @@ where
 
         Ok(SetDeleteAction::new(removed, updated_origins))
     }
+
+    /// Set the device on all DM devices
+    pub fn set_device(
+        &mut self,
+        backstore_device: Device,
+        offset: Sectors,
+        offset_direction: OffsetDirection,
+    ) -> StratisResult<bool> {
+        if backstore_device == self.backstore_device {
+            return Ok(false);
+        }
+
+        let line_mapping =
+            |line: &TargetLine<LinearDevTargetParams>| -> StratisResult<TargetLine<LinearDevTargetParams>> {
+                let new_params = match line.params {
+                    LinearDevTargetParams::Linear(ref params) => {
+                        LinearDevTargetParams::Linear(LinearTargetParams::new(
+                            backstore_device,
+                            match offset_direction {
+                                OffsetDirection::Forwards => {
+                                    params.start_offset.checked_add(offset).ok_or_else(|| {
+                                        StratisError::Msg(format!(
+                                            "Allocation shift would overflow integer, start: {}, offset: {offset}",
+                                            params.start_offset,
+                                        ))
+                                    })?
+                                }
+                                OffsetDirection::Backwards =>  {
+                                    Sectors(params.start_offset.checked_sub(*offset).ok_or_else(|| {
+                                        StratisError::Msg(format!(
+                                            "Allocation shift would underflow integer, start: {}, offset: {offset}",
+                                            params.start_offset,
+                                        ))
+                                    })?)
+                                }
+                            }
+                        ))
+                    }
+                    LinearDevTargetParams::Flakey(ref params) => {
+                        let feature_args = params.feature_args.iter().cloned().collect::<Vec<_>>();
+                        LinearDevTargetParams::Flakey(FlakeyTargetParams::new(
+                            backstore_device,
+                            match offset_direction {
+                                OffsetDirection::Forwards => {
+                                    params.start_offset.checked_add(offset).ok_or_else(|| {
+                                        StratisError::Msg(format!(
+                                            "Allocation shift would overflow integer, start: {}, offset: {offset}",
+                                            params.start_offset,
+                                        ))
+                                    })?
+                                }
+                                OffsetDirection::Backwards =>  {
+                                    Sectors(params.start_offset.checked_sub(*offset).ok_or_else(|| {
+                                        StratisError::Msg(format!(
+                                            "Allocation shift would underflow integer, start: {}, offset: {offset}",
+                                            params.start_offset,
+                                        ))
+                                    })?)
+                                }
+                            },
+                            params.up_interval,
+                            params.down_interval,
+                            feature_args,
+                        ))
+                    }
+                };
+
+                Ok(TargetLine::new(line.start, line.length, new_params))
+        };
+
+        let offset_map = |(start, len): &(Sectors, Sectors)| match offset_direction {
+            OffsetDirection::Forwards => {
+                start.checked_add(offset).map(|s| (s, *len)).ok_or_else(|| {
+                    StratisError::Msg(format!(
+                        "Allocation shift would overflow integer, start: {start}, offset: {offset}"
+                    ))
+                })
+            }
+            OffsetDirection::Backwards => start
+                .checked_sub(*offset)
+                .map(|s| (Sectors(s), *len))
+                .ok_or_else(|| {
+                    StratisError::Msg(format!(
+                        "Allocation shift would underflow integer, start: {start}, offset: {offset}"
+                    ))
+                }),
+        };
+
+        let original_meta = self.thin_pool.meta_dev().table().clone();
+        let original_data = self.thin_pool.data_dev().table().clone();
+        let original_mdv = self.mdv.device().table();
+
+        let new_meta_table = shift_allocation_offset(original_meta.table.iter(), line_mapping)?;
+        let new_data_table = shift_allocation_offset(original_data.table.iter(), line_mapping)?;
+        let new_mdv_table = shift_allocation_offset(original_mdv.table.iter(), line_mapping)?;
+
+        let new_meta_segments =
+            shift_allocation_offset(self.segments.meta_segments.iter(), offset_map)?;
+        let new_meta_spare_segments =
+            shift_allocation_offset(self.segments.meta_spare_segments.iter(), offset_map)?;
+        let new_data_segments =
+            shift_allocation_offset(self.segments.data_segments.iter(), offset_map)?;
+        let new_mdv_segments =
+            shift_allocation_offset(self.segments.mdv_segments.iter(), offset_map)?;
+
+        self.thin_pool.set_meta_table(get_dm(), new_meta_table)?;
+        if let Err(e) = self.thin_pool.set_data_table(get_dm(), new_data_table) {
+            match self.thin_pool.set_meta_table(get_dm(), original_meta.table) {
+                Ok(_) => return Err(StratisError::from(e)),
+                Err(rollback_e) => {
+                    return Err(StratisError::RollbackError {
+                        causal_error: Box::new(StratisError::from(e)),
+                        rollback_error: Box::new(StratisError::from(rollback_e)),
+                        level: ActionAvailability::NoPoolChanges,
+                    })
+                }
+            }
+        }
+        if let Err(e) = self.mdv.set_table(new_mdv_table) {
+            if let Err(rollback_e) = self.thin_pool.set_meta_table(get_dm(), original_meta.table) {
+                return Err(StratisError::RollbackError {
+                    causal_error: Box::new(e),
+                    rollback_error: Box::new(StratisError::from(rollback_e)),
+                    level: ActionAvailability::NoPoolChanges,
+                });
+            }
+            match self.thin_pool.set_data_table(get_dm(), original_data.table) {
+                Ok(_) => return Err(e),
+                Err(rollback_e) => {
+                    return Err(StratisError::RollbackError {
+                        causal_error: Box::new(e),
+                        rollback_error: Box::new(StratisError::from(rollback_e)),
+                        level: ActionAvailability::NoPoolChanges,
+                    })
+                }
+            }
+        }
+
+        self.segments.mdv_segments = new_mdv_segments;
+        self.segments.data_segments = new_data_segments;
+        self.segments.meta_segments = new_meta_segments;
+        self.segments.meta_spare_segments = new_meta_spare_segments;
+
+        self.backstore_device = backstore_device;
+
+        Ok(true)
+    }
 }
 
 impl<B> Into<Value> for &ThinPool<B> {
@@ -2868,7 +3005,8 @@ mod tests {
                 .device()
                 .expect("Space already allocated from backstore, backstore must have device");
             assert_ne!(old_device, new_device);
-            pool.set_device(new_device).unwrap();
+            pool.set_device(new_device, Sectors(0), OffsetDirection::Forwards)
+                .unwrap();
             pool.resume().unwrap();
 
             let mut buf = [0u8; 10];

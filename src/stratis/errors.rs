@@ -29,6 +29,10 @@ pub enum StratisError {
         rollback_error: Box<StratisError>,
         level: ActionAvailability,
     },
+    ActionAvailabilityError {
+        error: Box<StratisError>,
+        level: ActionAvailability,
+    },
     /// This variant should be used for failed roll back that does not
     /// prompt any action in stratisd but needs to be reported to the user.
     NoActionRollbackError {
@@ -63,13 +67,23 @@ impl StratisError {
     fn error_to_all_available_actions(&self) -> HashSet<ActionAvailability> {
         match self {
             StratisError::Chained(_, c) => c.error_to_all_available_actions(),
+            StratisError::ActionAvailabilityError { level, error } => once(level)
+                .cloned()
+                .chain(error.error_to_all_available_actions())
+                .collect::<HashSet<_>>(),
             StratisError::BestEffortError(_, errs) => errs
                 .iter()
                 .flat_map(|e| e.error_to_all_available_actions())
                 .collect::<HashSet<_>>(),
-            StratisError::RollbackError { level, .. } => {
-                once(level).cloned().collect::<HashSet<_>>()
-            }
+            StratisError::RollbackError {
+                level,
+                causal_error,
+                rollback_error,
+            } => once(level)
+                .cloned()
+                .chain(causal_error.error_to_all_available_actions())
+                .chain(rollback_error.error_to_all_available_actions())
+                .collect::<HashSet<_>>(),
             StratisError::NoActionRollbackError {
                 causal_error,
                 rollback_error,
@@ -130,6 +144,15 @@ impl fmt::Display for StratisError {
             }
             StratisError::ActionDisabled(ref level) => {
                 write!(f, "Pool is in state {level:?} where this action cannot be performed until the issue is resolved manually")
+            }
+            StratisError::ActionAvailabilityError {
+                ref error,
+                ref level,
+            } => {
+                write!(
+                    f,
+                    "Error that set action availability state {level}: {error}"
+                )
             }
             StratisError::Io(ref err) => write!(f, "IO error: {err}"),
             StratisError::Nix(ref err) => write!(f, "Nix error: {err}"),

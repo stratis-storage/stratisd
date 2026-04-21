@@ -978,6 +978,13 @@ where
     }
 }
 
+/// Use libblkid to probe for logical sector size of the device specified by path.
+pub fn get_logical_sector_size(path: &Path) -> StratisResult<Bytes> {
+    let mut probe = BlkidProbe::new_from_filename(path)?;
+    let top = probe.get_topology()?;
+    Ok(Bytes::from(top.get_logical_sector_size()))
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs::OpenOptions;

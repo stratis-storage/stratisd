@@ -75,10 +75,7 @@ pub mod thin_table {
 
 pub mod linear_table {
 
-    use devicemapper::{
-        Device, FlakeyTargetParams, LinearDevTargetParams, LinearDevTargetTable,
-        LinearTargetParams, Sectors, TargetLine,
-    };
+    use devicemapper::{Device, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine};
 
     /// Transform a list of segments belonging to a single device into a
     /// list of target lines for a linear device.
@@ -100,39 +97,5 @@ pub mod linear_table {
             logical_start_offset += length;
         }
         table
-    }
-
-    /// Set the device on all lines in a linear table.
-    pub fn set_target_device(
-        table: &LinearDevTargetTable,
-        device: Device,
-    ) -> Vec<TargetLine<LinearDevTargetParams>> {
-        let xform_target_line =
-            |line: &TargetLine<LinearDevTargetParams>| -> TargetLine<LinearDevTargetParams> {
-                let new_params = match line.params {
-                    LinearDevTargetParams::Linear(ref params) => LinearDevTargetParams::Linear(
-                        LinearTargetParams::new(device, params.start_offset),
-                    ),
-                    LinearDevTargetParams::Flakey(ref params) => {
-                        let feature_args = params.feature_args.iter().cloned().collect::<Vec<_>>();
-                        LinearDevTargetParams::Flakey(FlakeyTargetParams::new(
-                            device,
-                            params.start_offset,
-                            params.up_interval,
-                            params.down_interval,
-                            feature_args,
-                        ))
-                    }
-                };
-
-                TargetLine::new(line.start, line.length, new_params)
-            };
-
-        table
-            .table
-            .clone()
-            .iter()
-            .map(&xform_target_line)
-            .collect::<Vec<_>>()
     }
 }

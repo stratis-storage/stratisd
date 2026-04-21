@@ -47,6 +47,12 @@ use crate::{
     stratis::StratisResult,
 };
 
+mod methods;
+mod props;
+
+pub use methods::{decrypt_pool_method, encrypt_pool_method, reencrypt_pool_method};
+pub use props::last_reencrypted_timestamp_prop;
+
 pub struct PoolR9 {
     connection: Arc<Connection>,
     engine: Arc<dyn Engine>,
@@ -327,6 +333,30 @@ impl PoolR9 {
         filesystem_metadata_method(&self.engine, self.uuid, fs_name, current).await
     }
 
+    async fn encrypt_pool(
+        &self,
+        key_descs: Vec<((bool, u32), KeyDescription)>,
+        clevis_infos: Vec<((bool, u32), &str, &str)>,
+    ) -> (bool, u16, String) {
+        encrypt_pool_method(
+            &self.engine,
+            &self.connection,
+            &self.manager,
+            self.uuid,
+            key_descs,
+            clevis_infos,
+        )
+        .await
+    }
+
+    async fn reencrypt_pool(&self) -> (bool, u16, String) {
+        reencrypt_pool_method(&self.engine, &self.connection, &self.manager, self.uuid).await
+    }
+
+    async fn decrypt_pool(&self) -> (bool, u16, String) {
+        decrypt_pool_method(&self.engine, &self.connection, &self.manager, self.uuid).await
+    }
+
     #[zbus(property(emits_changed_signal = "const"))]
     fn uuid(&self) -> String {
         self.uuid.simple().to_string()
@@ -337,7 +367,7 @@ impl PoolR9 {
         pool_prop(&self.engine, self.uuid, name_prop).await
     }
 
-    #[zbus(property(emits_changed_signal = "const"))]
+    #[zbus(property(emits_changed_signal = "true"))]
     async fn encrypted(&self) -> Result<bool, Error> {
         pool_prop(&self.engine, self.uuid, encrypted_prop).await
     }
@@ -433,5 +463,10 @@ impl PoolR9 {
     #[zbus(property(emits_changed_signal = "const"))]
     async fn metadata_version(&self) -> Result<u64, Error> {
         pool_prop(&self.engine, self.uuid, metadata_version_prop).await
+    }
+
+    #[zbus(property(emits_changed_signal = "true"))]
+    async fn last_reencrypted_timestamp(&self) -> Result<(bool, String), Error> {
+        pool_prop(&self.engine, self.uuid, last_reencrypted_timestamp_prop).await
     }
 }

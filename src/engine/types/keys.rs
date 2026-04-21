@@ -245,6 +245,15 @@ impl InputEncryptionInfo {
             clevis_infos_with_token_id,
         ))
     }
+
+    pub fn key_descs(&self) -> impl Iterator<Item = &KeyDescription> {
+        self.encryption_infos
+            .iter()
+            .filter_map(|(_, enc)| match enc {
+                UnlockMechanism::KeyDesc(k) => Some(k),
+                _ => None,
+            })
+    }
 }
 
 impl From<EncryptionInfo> for InputEncryptionInfo {

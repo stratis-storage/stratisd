@@ -325,7 +325,7 @@ impl PoolR4 {
     }
 
     #[zbus(property)]
-    async fn set_fs_limit(&self, fs_limit: u64) -> Result<(), zbus::Error> {
+    async fn set_fs_limit(&self, fs_limit: u64) -> Result<(), Error> {
         set_pool_prop(
             &self.engine,
             &self.connection,
@@ -344,7 +344,7 @@ impl PoolR4 {
     }
 
     #[zbus(property)]
-    async fn set_overprovisioning(&self, overprov: bool) -> Result<(), zbus::Error> {
+    async fn set_overprovisioning(&self, overprov: bool) -> Result<(), Error> {
         set_pool_prop(
             &self.engine,
             &self.connection,

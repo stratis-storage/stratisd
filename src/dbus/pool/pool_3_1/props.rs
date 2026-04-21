@@ -5,7 +5,7 @@
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
-use zbus::{Connection, Error};
+use zbus::{fdo::Error, Connection};
 
 use crate::{
     dbus::{
@@ -27,7 +27,7 @@ pub async fn set_fs_limit_prop(
     let (name, _, p) = guard.as_mut_tuple();
     p.set_fs_limit(&name, uuid, fs_limit)
         .map(|_| true)
-        .map_err(|e| Error::Failure(e.to_string()))
+        .map_err(|e| Error::Failed(e.to_string()))
 }
 
 pub async fn send_fs_limit_signal_on_change(
@@ -55,7 +55,7 @@ pub async fn set_enable_overprovisioning_prop(
     let (name, _, p) = guard.as_mut_tuple();
     p.set_overprov_mode(&name, enable_overprov)
         .map(|_| true)
-        .map_err(|e| Error::Failure(e.to_string()))
+        .map_err(|e| Error::Failed(e.to_string()))
 }
 
 pub async fn send_enable_overprovisioning_signal_on_change(

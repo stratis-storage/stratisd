@@ -134,7 +134,7 @@ impl FilesystemR7 {
     }
 
     #[zbus(property)]
-    async fn set_merge_scheduled(&self, value: bool) -> Result<(), zbus::Error> {
+    async fn set_merge_scheduled(&self, value: bool) -> Result<(), Error> {
         set_filesystem_prop(
             &self.engine,
             &self.connection,
@@ -174,7 +174,7 @@ impl FilesystemR7 {
     }
 
     #[zbus(property)]
-    async fn set_size_limit(&self, value: (bool, String)) -> Result<(), zbus::Error> {
+    async fn set_size_limit(&self, value: (bool, String)) -> Result<(), Error> {
         set_filesystem_prop(
             &self.engine,
             &self.connection,

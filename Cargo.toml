@@ -233,6 +233,8 @@ features = ["serde", "v4"]
 version = "5.12.0"
 optional = true
 features = ["tokio"]
+git = "https://github.com/zeenix/zbus"
+branch = "property-setter-fdo-error"
 
 [build-dependencies]
 pkg-config = "0.3.31"

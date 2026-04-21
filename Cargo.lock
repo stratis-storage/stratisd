@@ -1852,7 +1852,7 @@ dependencies = [
  "indexmap",
  "toml_datetime",
  "toml_parser",
- "winnow",
+ "winnow 0.7.14",
 ]
 
 [[package]]
@@ -1861,7 +1861,7 @@ version = "1.0.6+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a3198b4b0a8e11f09dd03e133c0280504d0801269e9afa46362ffde1cbeebf44"
 dependencies = [
- "winnow",
+ "winnow 0.7.14",
 ]
 
 [[package]]
@@ -2279,6 +2279,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "winnow"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09dac053f1cd375980747450bfc7250c264eaae0583872e845c0c7cd578872b5"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "wit-bindgen"
 version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2377,9 +2386,8 @@ dependencies = [
 
 [[package]]
 name = "zbus"
-version = "5.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17f79257df967b6779afa536788657777a0001f5b42524fcaf5038d4344df40b"
+version = "5.15.0"
+source = "git+https://github.com/zeenix/zbus?branch=property-setter-fdo-error#962c1159d7e249127434ab93aa9da78e59766b35"
 dependencies = [
  "async-broadcast",
  "async-executor",
@@ -2405,7 +2413,7 @@ dependencies = [
  "uds_windows",
  "uuid",
  "windows-sys 0.61.2",
- "winnow",
+ "winnow 1.0.1",
  "zbus_macros",
  "zbus_names",
  "zvariant",
@@ -2413,9 +2421,8 @@ dependencies = [
 
 [[package]]
 name = "zbus_macros"
-version = "5.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aad23e2d2f91cae771c7af7a630a49e755f1eb74f8a46e9f6d5f7a146edf5a37"
+version = "5.15.0"
+source = "git+https://github.com/zeenix/zbus?branch=property-setter-fdo-error#962c1159d7e249127434ab93aa9da78e59766b35"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -2429,11 +2436,10 @@ dependencies = [
 [[package]]
 name = "zbus_names"
 version = "4.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffd8af6d5b78619bab301ff3c560a5bd22426150253db278f164d6cf3b72c50f"
+source = "git+https://github.com/zeenix/zbus?branch=property-setter-fdo-error#962c1159d7e249127434ab93aa9da78e59766b35"
 dependencies = [
  "serde",
- "winnow",
+ "winnow 1.0.1",
  "zvariant",
 ]
 
@@ -2459,23 +2465,21 @@ dependencies = [
 
 [[package]]
 name = "zvariant"
-version = "5.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "326aaed414f04fe839777b4c443d4e94c74e7b3621093bd9c5e649ac8aa96543"
+version = "5.10.0"
+source = "git+https://github.com/zeenix/zbus?branch=property-setter-fdo-error#962c1159d7e249127434ab93aa9da78e59766b35"
 dependencies = [
  "endi",
  "enumflags2",
  "serde",
- "winnow",
+ "winnow 1.0.1",
  "zvariant_derive",
  "zvariant_utils",
 ]
 
 [[package]]
 name = "zvariant_derive"
-version = "5.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba44e1f8f4da9e6e2d25d2a60b116ef8b9d0be174a7685e55bb12a99866279a7"
+version = "5.10.0"
+source = "git+https://github.com/zeenix/zbus?branch=property-setter-fdo-error#962c1159d7e249127434ab93aa9da78e59766b35"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -2487,12 +2491,11 @@ dependencies = [
 [[package]]
 name = "zvariant_utils"
 version = "3.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f75c23a64ef8f40f13a6989991e643554d9bef1d682a281160cf0c1bc389c5e9"
+source = "git+https://github.com/zeenix/zbus?branch=property-setter-fdo-error#962c1159d7e249127434ab93aa9da78e59766b35"
 dependencies = [
  "proc-macro2",
  "quote",
  "serde",
  "syn",
- "winnow",
+ "winnow 1.0.1",
 ]

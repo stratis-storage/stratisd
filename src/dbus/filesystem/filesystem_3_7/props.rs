@@ -5,7 +5,7 @@
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
-use zbus::{Connection, Error};
+use zbus::{fdo::Error, Connection};
 
 use crate::{
     dbus::{
@@ -36,7 +36,7 @@ pub async fn set_merge_scheduled_prop(
     match pool.set_fs_merge_scheduled(fs_uuid, scheduled) {
         Ok(PropChangeAction::NewValue(_v)) => Ok(true),
         Ok(PropChangeAction::Identity) => Ok(false),
-        Err(e) => Err(Error::Failure(e.to_string())),
+        Err(e) => Err(Error::Failed(e.to_string())),
     }
 }
 

@@ -38,7 +38,6 @@ jobs:
       matrix:
         include:
           - dependencies: >
-              bandit
               libatomic
               pylint
               python3-dbus-client-gen
@@ -47,6 +46,7 @@ jobs:
               python3-psutil
               python3-pyudev
               python3-semantic_version
+              python3-setuptools
               python3-tenacity
             task: >
               PATH=${PATH}:/github/home/.local/bin

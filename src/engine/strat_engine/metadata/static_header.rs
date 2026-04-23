@@ -9,7 +9,7 @@ use std::{
 };
 
 use byteorder::{ByteOrder, LittleEndian};
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use crc::{Crc, CRC_32_ISCSI};
 use serde_json::Value;
 
@@ -154,10 +154,8 @@ impl StaticHeader {
             mda_size: mda_data_size.region_size().mda_size(),
             reserved_size: ReservedSize::new(RESERVED_SECTORS),
             flags: 0,
-            // Must succeed, since seconds must be valid
-            initialization_time: Utc
-                .timestamp_opt(initialization_time.timestamp(), 0)
-                .unwrap(),
+            initialization_time: DateTime::from_timestamp(initialization_time.timestamp(), 0)
+                .expect("DateTime::timestamp() always returns valid seconds value"),
         }
     }
 
@@ -572,7 +570,7 @@ pub mod tests {
 
     use proptest::{option, prelude::BoxedStrategy, strategy::Strategy};
 
-    use chrono::{TimeZone, Utc};
+    use chrono::Utc;
 
     use devicemapper::{Bytes, Sectors, IEC};
 
@@ -748,7 +746,8 @@ pub mod tests {
             ..sh
         };
         let sh_newer = StaticHeader {
-            initialization_time: Utc.timestamp_opt(ts.timestamp() + 1, 0).unwrap(),
+            initialization_time: DateTime::from_timestamp(ts.timestamp() + 1, 0)
+                .expect("DateTime::timestamp() always returns valid seconds value"),
             ..sh
         };
         assert_ne!(sh_older, sh_newer);

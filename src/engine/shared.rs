@@ -14,7 +14,7 @@ use std::{
     sync::LazyLock,
 };
 
-use chrono::{DateTime, LocalResult, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use nix::poll::{poll, PollFd, PollFlags};
 use regex::Regex;
 
@@ -349,11 +349,10 @@ pub fn total_allocated(allocated: &Diff<Bytes>, metadata_size: &Diff<Bytes>) -> 
 /// Convert a u64 value representing seconds, and a u32 value representing
 /// nanoseconds to a timestamp.
 pub fn unsigned_to_timestamp(secs: u64, nanos: u32) -> StratisResult<DateTime<Utc>> {
-    let secs_arg = secs.try_into();
-    match secs_arg {
-        Ok(val) => match Utc.timestamp_opt(val, nanos) {
-            LocalResult::Single(timestamp) => Ok(timestamp),
-            _ => Err(StratisError::Msg(format!(
+    match secs.try_into() {
+        Ok(val) => match DateTime::from_timestamp(val, nanos) {
+            Some(timestamp) => Ok(timestamp),
+            None => Err(StratisError::Msg(format!(
                 "{val} (for seconds) and {nanos} (for nanoseconds) are not valid timestamp args"
             ))),
         },
@@ -366,7 +365,8 @@ pub fn unsigned_to_timestamp(secs: u64, nanos: u32) -> StratisResult<DateTime<Ut
 /// Return a timestamp which is equal to Utc::now() truncated to the nearest
 /// second.
 pub fn now_to_timestamp() -> DateTime<Utc> {
-    Utc.timestamp_opt(Utc::now().timestamp(), 0).unwrap()
+    DateTime::from_timestamp(Utc::now().timestamp(), 0)
+        .expect("DateTime::timestamp() always returns valid seconds value")
 }
 
 #[cfg(test)]

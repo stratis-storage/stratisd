@@ -399,7 +399,7 @@ impl MDAHeader {
 mod tests {
     use std::io::Cursor;
 
-    use chrono::{TimeZone, Utc};
+    use chrono::Utc;
     use proptest::{collection, num};
 
     use super::*;
@@ -457,8 +457,7 @@ mod tests {
                       nsec in 0..UTC_TIMESTAMP_NSECS_BOUND) {
 
             let header = MDAHeader {
-                // Argument values are correct by construction
-                last_updated: Utc.timestamp_opt(sec, nsec).unwrap(),
+                last_updated: DateTime::from_timestamp(sec, nsec).expect("values are correct by construction"),
                 used: MetaDataSize::new(Bytes::from(data.len())),
                 data_crc: CASTAGNOLI.checksum(data),
             };

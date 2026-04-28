@@ -58,7 +58,7 @@ def _call_predict_usage_pool(
         if command.returncode != 0:
             raise RuntimeError(
                 f"Invocation of {_STRATIS_PREDICT_USAGE} returned an error: "
-                f"{command.returncode,}, {errs}"
+                f"{command.returncode}, {errs}"
             )
         prediction = json.loads(outs)
 

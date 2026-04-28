@@ -118,11 +118,7 @@ def create_pool(  # noqa: PLR0915
                     else:
                         cmdline.extend(["--thumbprint", thp])
 
-            with subprocess.Popen(
-                cmdline,
-                text=True,
-                stdin=subprocess.PIPE,
-            ) as process:
+            with subprocess.Popen(cmdline, text=True, stdin=subprocess.PIPE) as process:
                 process.stdin.write(  # pyright: ignore [reportOptionalMemberAccess]
                     f"Yes{os.linesep}"
                 )
@@ -457,10 +453,7 @@ class KernelKey:
                 with open(temp_file.name, "r", encoding="utf-8") as fd_for_dbus:
                     (_, return_code, message) = Manager.Methods.SetKey(
                         get_object(TOP_OBJECT),
-                        {
-                            "key_desc": key_desc,
-                            "key_fd": fd_for_dbus.fileno(),
-                        },
+                        {"key_desc": key_desc, "key_fd": fd_for_dbus.fileno()},
                     )
 
                 if return_code != StratisdErrors.OK:

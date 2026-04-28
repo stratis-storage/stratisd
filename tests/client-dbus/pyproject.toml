@@ -8,3 +8,6 @@ select = ["PL"]
 [tool.ruff.lint.isort]
 known-first-party = ["dbus_client_gen", "dbus_python_client_gen"]
 split-on-trailing-comma = false
+
+[tool.ruff.format]
+skip-magic-trailing-comma = true

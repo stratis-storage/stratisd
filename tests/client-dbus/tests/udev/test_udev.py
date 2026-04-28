@@ -564,10 +564,7 @@ class UdevTest5(UdevTest):
                 ],
             )
 
-            wait_for_udev(
-                CRYPTO_LUKS_FS_TYPE,
-                self._lb_mgr.device_files(luks_tokens),
-            )
+            wait_for_udev(CRYPTO_LUKS_FS_TYPE, self._lb_mgr.device_files(luks_tokens))
             wait_for_udev(STRATIS_FS_TYPE, self._lb_mgr.device_files(non_luks_tokens))
 
             variant_pool_uuids = Manager.Properties.StoppedPools.Get(
@@ -714,23 +711,17 @@ class UdevTest6(UdevTest):
         with OptionalKeyServiceContextManager():
             self.wait_for_pools(2)
             self.assertEqual(
-                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))),
-                0,
+                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))), 0
             )
 
             ((changed, _), exit_code, message) = Manager.Methods.StopPool(
-                get_object(TOP_OBJECT),
-                {
-                    "id": pool_name1,
-                    "id_type": "name",
-                },
+                get_object(TOP_OBJECT), {"id": pool_name1, "id_type": "name"}
             )
             self.assertEqual(exit_code, StratisdErrors.OK, msg=message)
             self.assertEqual(changed, True)
 
             self.assertEqual(
-                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))),
-                1,
+                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))), 1
             )
 
         remove_stratis_setup()
@@ -738,15 +729,13 @@ class UdevTest6(UdevTest):
         with OptionalKeyServiceContextManager():
             self.wait_for_pools(1)
             self.assertEqual(
-                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))),
-                1,
+                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))), 1
             )
             self._lb_mgr.generate_synthetic_udev_events(
                 device_tokens[:1], UDEV_ADD_EVENT
             )
             self.assertEqual(
-                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))),
-                1,
+                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))), 1
             )
 
     def test_simple_stop(self):
@@ -798,14 +787,12 @@ class UdevTest7(UdevTest):
             self.wait_for_pools(2)
 
             ((changed, _), exit_code, _) = Manager.Methods.StopPool(
-                get_object(TOP_OBJECT),
-                {"id": "encrypted", "id_type": "name"},
+                get_object(TOP_OBJECT), {"id": "encrypted", "id_type": "name"}
             )
             self.assertEqual(exit_code, 0)
             self.assertEqual(changed, True)
             ((changed, _), exit_code, message) = Manager.Methods.StopPool(
-                get_object(TOP_OBJECT),
-                {"id": "unencrypted", "id_type": "name"},
+                get_object(TOP_OBJECT), {"id": "unencrypted", "id_type": "name"}
             )
             self.assertEqual(exit_code, StratisdErrors.OK, msg=message)
             self.assertEqual(changed, True)
@@ -813,8 +800,7 @@ class UdevTest7(UdevTest):
             self.wait_for_pools(0)
 
             self.assertEqual(
-                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))),
-                2,
+                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))), 2
             )
 
             self._lb_mgr.generate_synthetic_udev_events(
@@ -847,8 +833,7 @@ class UdevTest7(UdevTest):
             self.assertFalse(changed)
             self.assertEqual(exit_code, 1)
             self.assertEqual(
-                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))),
-                2,
+                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))), 2
             )
 
             ((changed, _), exit_code, _) = Manager.Methods.StartPool(
@@ -864,8 +849,7 @@ class UdevTest7(UdevTest):
             self.assertFalse(changed)
             self.assertEqual(exit_code, 1)
             self.assertEqual(
-                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))),
-                2,
+                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))), 2
             )
 
             self._lb_mgr.generate_synthetic_udev_events(
@@ -898,8 +882,7 @@ class UdevTest7(UdevTest):
             self.assertTrue(changed)
             self.assertEqual(exit_code, StratisdErrors.OK, msg=message)
             self.assertEqual(
-                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))),
-                1,
+                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))), 1
             )
             ((changed, _), exit_code, message) = Manager.Methods.StartPool(
                 get_object(TOP_OBJECT),
@@ -914,8 +897,7 @@ class UdevTest7(UdevTest):
             self.assertTrue(changed)
             self.assertEqual(exit_code, StratisdErrors.OK, msg=message)
             self.assertEqual(
-                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))),
-                0,
+                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))), 0
             )
 
     def test_simple_start_by_name(self):

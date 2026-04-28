@@ -55,9 +55,7 @@ class TestFailedStart(UdevTest):
 
             self.wait_for_pools(0)
             (_, (pool_object_path, _)) = create_pool(
-                "testpool",
-                devnodes[:2],
-                key_description=([(key_description, None)]),
+                "testpool", devnodes[:2], key_description=([(key_description, None)])
             )
             self.wait_for_pools(1)
 
@@ -67,20 +65,13 @@ class TestFailedStart(UdevTest):
             self.assertEqual(rc, StratisdErrors.OK, msg=message)
 
             ((b, _), rc, message) = Manager.Methods.StopPool(
-                get_object(TOP_OBJECT),
-                {
-                    "id": "testpool",
-                    "id_type": "name",
-                },
+                get_object(TOP_OBJECT), {"id": "testpool", "id_type": "name"}
             )
             self.assertEqual(b, True)
             self.assertEqual(rc, StratisdErrors.OK, msg=message)
 
             (_, rc, message) = Manager.Methods.UnsetKey(
-                get_object(TOP_OBJECT),
-                {
-                    "key_desc": "testkey",
-                },
+                get_object(TOP_OBJECT), {"key_desc": "testkey"}
             )
             self.assertEqual(rc, StratisdErrors.OK, msg=message)
 
@@ -99,11 +90,7 @@ class TestFailedStart(UdevTest):
             (out_side, in_side) = os.pipe()
             os.write(in_side, b"testkey")
             (_, rc, message) = Manager.Methods.SetKey(
-                get_object(TOP_OBJECT),
-                {
-                    "key_desc": "testkey",
-                    "key_fd": out_side,
-                },
+                get_object(TOP_OBJECT), {"key_desc": "testkey", "key_fd": out_side}
             )
             self.assertEqual(rc, StratisdErrors.OK, msg=message)
 
@@ -148,11 +135,7 @@ class TestRemoveCache(UdevTest):
             assert bool(Pool.Properties.HasCache.Get(get_object(pool_object_path)))
 
             ((b, _), rc, message) = Manager.Methods.StopPool(
-                get_object(TOP_OBJECT),
-                {
-                    "id": "testpool",
-                    "id_type": "name",
-                },
+                get_object(TOP_OBJECT), {"id": "testpool", "id_type": "name"}
             )
             self.assertEqual(b, True)
             self.assertEqual(rc, StratisdErrors.OK, msg=message)

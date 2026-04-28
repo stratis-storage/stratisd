@@ -145,11 +145,7 @@ class TestRevert(UdevTest):
 
             # Now stop the pool, which should tear down the devices
             (_, return_code, message) = Manager.Methods.StopPool(
-                get_object(TOP_OBJECT),
-                {
-                    "id": pool_name,
-                    "id_type": "name",
-                },
+                get_object(TOP_OBJECT), {"id": pool_name, "id_type": "name"}
             )
 
             if return_code != 0:
@@ -266,11 +262,7 @@ class TestRevert(UdevTest):
 
             # Now stop the pool, which should tear down the devices
             (_, return_code, message) = Manager.Methods.StopPool(
-                get_object(TOP_OBJECT),
-                {
-                    "id": pool_name,
-                    "id_type": "name",
-                },
+                get_object(TOP_OBJECT), {"id": pool_name, "id_type": "name"}
             )
 
             if return_code != 0:

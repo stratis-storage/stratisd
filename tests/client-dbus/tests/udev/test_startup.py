@@ -48,11 +48,7 @@ class TestStarting(UdevTest):
             env = dict(os.environ)
             env["RUST_LOG"] = env.get("RUST_LOG", "") + ",nix::fcntl=debug"
             with subprocess.Popen(
-                [STRATISD],
-                stderr=subprocess.STDOUT,
-                text=True,
-                close_fds=True,
-                env=env,
+                [STRATISD], stderr=subprocess.STDOUT, text=True, close_fds=True, env=env
             ) as process:
                 (_, _) = process.communicate()
                 self.assertEqual(process.returncode, 1)

@@ -112,10 +112,7 @@ class TestSpaceUsagePrediction(unittest.TestCase):
             encrypted, device_sizes, fs_sizes=None, overprovision=overprovisioned
         )
         pool_result_post = _call_predict_usage_pool(
-            encrypted,
-            device_sizes,
-            fs_sizes=fs_sizes,
-            overprovision=overprovisioned,
+            encrypted, device_sizes, fs_sizes=fs_sizes, overprovision=overprovisioned
         )
 
         filesystem_result = _call_predict_usage_filesystem(

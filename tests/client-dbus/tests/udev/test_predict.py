@@ -94,8 +94,7 @@ def _call_blockdev_size(dev):
     :rtype: str
     """
     with subprocess.Popen(
-        ["/usr/sbin/blockdev", "--getsize64", dev],
-        stdout=subprocess.PIPE,
+        ["/usr/sbin/blockdev", "--getsize64", dev], stdout=subprocess.PIPE
     ) as command:
         outs, _ = command.communicate()
 
@@ -121,11 +120,7 @@ def _possibly_add_filesystems(pool_object_path, *, fs_specs=None):
         if not real:
             raise RuntimeError("Failed to get pool usage before creating filesystems.")
 
-        (
-            _,
-            return_code,
-            message,
-        ) = Pool.Methods.CreateFilesystems(
+        (_, return_code, message) = Pool.Methods.CreateFilesystems(
             pool_proxy,
             {
                 "specs": map(
@@ -214,10 +209,7 @@ class TestSpaceUsagePrediction(UdevTest):
         if not success:
             raise RuntimeError("Pool's TotalPhysicalUsed property was invalid.")
 
-        (used_prediction, total_prediction) = (
-            prediction["used"],
-            prediction["total"],
-        )
+        (used_prediction, total_prediction) = (prediction["used"], prediction["total"])
 
         self.assertEqual(
             mopool.TotalPhysicalSize(),

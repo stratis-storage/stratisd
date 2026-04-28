@@ -99,7 +99,4 @@ class TestDumpMetadata(UdevTest):
             result = _call_stratis_dumpmetadata(
                 devnodes[2], print_bytes=True, only="pool"
             )
-            self.assertGreater(
-                len(json.loads(result)),
-                0,
-            )
+            self.assertGreater(len(json.loads(result)), 0)

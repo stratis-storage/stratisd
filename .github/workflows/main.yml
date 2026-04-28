@@ -7,9 +7,6 @@ on:
     branches:
       - master
     paths-ignore:
-      - 'CHANGES.txt'
-      - '**/README.md'
-      - 'README_tests.md'
       - '.packit.yaml'
       - 'plans/**'
       - 'tests-fmf/**'
@@ -17,9 +14,6 @@ on:
     branches:
       - master
     paths-ignore:
-      - 'CHANGES.txt'
-      - '**/README.md'
-      - 'README_tests.md'
       - '.packit.yaml'
       - 'plans/**'
       - 'tests-fmf/**'

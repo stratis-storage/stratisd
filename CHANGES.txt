@@ -68,7 +68,7 @@ Recommended development platform for Python development: Fedora 43
 * Derive BDA::clone and simplify error handling:
   https://github.com/stratis-storage/stratisd/pull/3885
 
-* Make StratisError clonable:
+* Make StratisError cloneable:
   https://github.com/stratis-storage/stratisd/pull/3872
 
 * Make ordering consistent for blockdevs and blockdevs_mut call:
@@ -84,7 +84,7 @@ Recommended development platform for Python development: Fedora 43
 - Sort pools in report by pool UUID:
   https://github.com/stratis-storage/stratisd/pull/3914
 
-- Follow the recommmended dracut module ordering for out of tree modules:
+- Follow the recommended dracut module ordering for out of tree modules:
   https://github.com/stratis-storage/stratisd/pull/3908
 
 - Fix assertion error when calculating error message:

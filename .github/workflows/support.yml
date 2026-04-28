@@ -39,7 +39,6 @@ jobs:
         include:
           - dependencies: >
               libatomic
-              pylint
               python3-dbus-client-gen
               python3-dbus-python-client-gen
               python3-justbytes
@@ -48,11 +47,12 @@ jobs:
               python3-semantic_version
               python3-setuptools
               python3-tenacity
+              ruff
             task: >
               PATH=${PATH}:/github/home/.local/bin
               PYTHONPATH=./src make -f Makefile lint
             working-directory: ./tests/client-dbus
-          - dependencies: black python3-isort
+          - dependencies: ruff
             task: make -f Makefile fmt-ci
             working-directory: ./tests/client-dbus
           - dependencies: yamllint tmt

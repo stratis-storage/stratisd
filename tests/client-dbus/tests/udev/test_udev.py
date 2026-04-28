@@ -225,9 +225,7 @@ class UdevTest3(UdevTest):
     daemon, brings it up again, and allows it to discover the existing pool.
     """
 
-    def _simple_initial_discovery_test(
-        self, *, key_spec=None, take_down_dm=False
-    ):  # pylint: disable=too-many-locals
+    def _simple_initial_discovery_test(self, *, key_spec=None, take_down_dm=False):
         """
         A simple test of discovery on start up.
 
@@ -331,9 +329,7 @@ class UdevTest4(UdevTest):
     in, and it is verified that the daemon has recreated the pool.
     """
 
-    # pylint: disable=too-many-statements
-    # pylint: disable=too-many-locals
-    def _simple_event_test(self, *, key_spec=None):  # pylint: disable=too-many-locals
+    def _simple_event_test(self, *, key_spec=None):
         """
         A simple test of event-based discovery.
 
@@ -490,11 +486,7 @@ class UdevTest5(UdevTest):
     so forth. Eventually, all pools should have been set up.
     """
 
-    # pylint: disable=too-many-locals
-    # pylint: disable=too-many-branches
-    def test_duplicate_pool_name(
-        self,
-    ):  # pylint: disable=too-many-locals, too-many-statements
+    def test_duplicate_pool_name(self):  # noqa: PLR0912,PLR0915
         """
         Create more than one pool with the same name, then dynamically fix it
         :return: None

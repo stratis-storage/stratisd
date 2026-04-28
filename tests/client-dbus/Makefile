@@ -2,8 +2,7 @@ UNITTEST_OPTS = --verbose
 
 .PHONY: lint
 lint:
-	pylint src/stratisd_client_dbus --ignore=_introspect.py
-	pylint tests --disable=R0801
+	ruff check
 	pyright
 
 .PHONY: startup-tests
@@ -20,13 +19,13 @@ extend-tests:
 
 .PHONY: fmt
 fmt:
-	isort src tests
-	black .
+	ruff check --fix --select I
+	ruff format
 
 .PHONY: fmt-ci
 fmt-ci:
-	isort --diff --check-only src tests
-	black . --check
+	ruff check --select I
+	ruff format --check
 
 .PHONY: tang-tests
 tang-tests:

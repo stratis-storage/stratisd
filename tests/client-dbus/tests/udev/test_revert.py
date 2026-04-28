@@ -66,7 +66,7 @@ class TestRevert(UdevTest):
         with open(os.path.join(mountdir, filename), encoding="utf-8") as fd:
             self.assertEqual(fd.read(), filename)
 
-    def test_revert(self):  # pylint: disable=too-many-locals
+    def test_revert(self):
         """
         Schedule a revert and verify that it has succeeded when the pool is
         restarted.
@@ -182,7 +182,7 @@ class TestRevert(UdevTest):
 
             subprocess.check_call([_UMOUNT, mountdir])
 
-    def test_revert_snapshot_chain(self):  # pylint: disable=too-many-locals
+    def test_revert_snapshot_chain(self):
         """
         Make a chain of snapshots, schedule excess reverts and verify that
         those yield an error, and then revert the middle link.

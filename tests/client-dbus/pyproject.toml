@@ -1,0 +1,10 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["PL"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["dbus_client_gen", "dbus_python_client_gen"]
+split-on-trailing-comma = false

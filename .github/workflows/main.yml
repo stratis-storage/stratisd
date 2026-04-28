@@ -44,7 +44,6 @@ jobs:
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
-          black
           clang
           curl
           cryptsetup-devel
@@ -53,7 +52,6 @@ jobs:
           libblkid-devel
           make
           ncurses
-          python3-isort
           systemd-devel
       - uses: dtolnay/rust-toolchain@master
         with:

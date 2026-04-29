@@ -48,9 +48,7 @@ jobs:
               python3-setuptools
               python3-tenacity
               ruff
-            task: >
-              PATH=${PATH}:/github/home/.local/bin
-              PYTHONPATH=./src make -f Makefile lint
+            task: PATH=${PATH}:/github/home/.local/bin make -f Makefile lint
             working-directory: ./tests/client-dbus
           - dependencies: ruff
             task: make -f Makefile fmt-ci

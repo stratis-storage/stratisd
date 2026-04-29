@@ -13,6 +13,4 @@ make fmt-ci &&
 	make tmtlint &&
 	make check-typos || exit 1
 
-export PYTHONPATH=$PWD/tests/client-dbus/src
-
 cd tests/client-dbus && make fmt-ci && make lint || exit 1

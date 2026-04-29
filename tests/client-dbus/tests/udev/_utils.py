@@ -73,11 +73,10 @@ def random_string(length):
     :param length: Length of random part of string
     :return: String
     """
-    return f'stratis_{"".join(random.choice(string.ascii_uppercase) for _ in range(length))}'
+    return f"stratis_{''.join(random.choice(string.ascii_uppercase) for _ in range(length))}"
 
 
-# pylint: disable=too-many-statements
-def create_pool(
+def create_pool(  # noqa: PLR0915
     name, devices, *, key_description=None, clevis_info=None, overprovision=True
 ):
     """
@@ -119,11 +118,7 @@ def create_pool(
                     else:
                         cmdline.extend(["--thumbprint", thp])
 
-            with subprocess.Popen(
-                cmdline,
-                text=True,
-                stdin=subprocess.PIPE,
-            ) as process:
+            with subprocess.Popen(cmdline, text=True, stdin=subprocess.PIPE) as process:
                 process.stdin.write(  # pyright: ignore [reportOptionalMemberAccess]
                     f"Yes{os.linesep}"
                 )
@@ -137,7 +132,7 @@ def create_pool(
             newly_created = True
 
         i = 0
-        while get_pools(name) == [] and i < 5:
+        while get_pools(name) == [] and i < 5:  # noqa PLR2004
             i += 1
             time.sleep(1)
         (pool_object_path, _) = next(iter(get_pools(name)))
@@ -165,13 +160,10 @@ def create_pool(
                 dbus_slot = (True, slot)
 
             if pin == "tang":
-                (pin, config) = (
-                    "tang",
-                    json.dumps(
-                        {"url": tang_url, "stratis:tang:trust_url": True}
-                        if thp is None
-                        else {"url": tang_url, "thp": thp}
-                    ),
+                config = json.dumps(
+                    {"url": tang_url, "stratis:tang:trust_url": True}
+                    if thp is None
+                    else {"url": tang_url, "thp": thp}
                 )
             else:
                 raise RuntimeError(
@@ -350,8 +342,8 @@ def wait_for_udev(fs_type, expected_paths):
 
     except RetryError as err:
         raise RuntimeError(
-            f'Found unexpected devnodes: expected devnodes: {", ".join(expected_devnodes)} '
-            f'!= found_devnodes: {", ".join(err.last_attempt.result())}'
+            f"Found unexpected devnodes: expected devnodes: {', '.join(expected_devnodes)} "
+            f"!= found_devnodes: {', '.join(err.last_attempt.result())}"
         ) from err
 
 
@@ -389,9 +381,8 @@ class _Service:
         if next(processes("stratisd"), None) is not None:
             raise RuntimeError("A stratisd process is already running")
 
-        service = subprocess.Popen(  # pylint: disable=consider-using-with
-            [x for x in _STRATISD.split(" ") if x != ""],
-            text=True,
+        service = subprocess.Popen(
+            [x for x in _STRATISD.split(" ") if x != ""], text=True
         )
 
         try:
@@ -462,10 +453,7 @@ class KernelKey:
                 with open(temp_file.name, "r", encoding="utf-8") as fd_for_dbus:
                     (_, return_code, message) = Manager.Methods.SetKey(
                         get_object(TOP_OBJECT),
-                        {
-                            "key_desc": key_desc,
-                            "key_fd": fd_for_dbus.fileno(),
-                        },
+                        {"key_desc": key_desc, "key_fd": fd_for_dbus.fileno()},
                     )
 
                 if return_code != StratisdErrors.OK:

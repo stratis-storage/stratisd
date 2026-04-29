@@ -52,9 +52,7 @@ class TestExtendOnAddData(UdevTest):
 
             self.wait_for_pools(0)
             (_, (pool_object_path, _)) = create_pool(
-                "testpool",
-                devnodes[:2],
-                key_description=([(key_description, None)]),
+                "testpool", devnodes[:2], key_description=([(key_description, None)])
             )
             self.wait_for_pools(1)
 

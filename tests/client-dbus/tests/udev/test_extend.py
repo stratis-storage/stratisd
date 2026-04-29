@@ -16,11 +16,9 @@
 Test extending an encrypted pool.
 """
 
-# isort: STDLIB
 import json
 from time import sleep
 
-# isort: LOCAL
 from stratisd_client_dbus import Manager, Pool, StratisdErrors, get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
 

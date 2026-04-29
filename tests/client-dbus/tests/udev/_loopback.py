@@ -15,13 +15,11 @@
 Class to handle loop back devices.
 """
 
-# isort: STDLIB
 import os
 import subprocess
 import time
 import uuid
 
-# isort: THIRDPARTY
 import pyudev
 
 UDEV_ADD_EVENT = "add"

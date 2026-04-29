@@ -17,13 +17,11 @@ Test that predictions of space usage via different subcommands of
 straits-predict-usage match.
 """
 
-# isort: STDLIB
 import json
 import os
 import subprocess
 import unittest
 
-# isort: THIRDPARTY
 from justbytes import GiB, Range, TiB
 
 _STRATIS_PREDICT_USAGE = os.environ["STRATIS_PREDICT_USAGE"]

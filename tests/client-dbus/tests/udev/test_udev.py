@@ -15,11 +15,9 @@
 Used to test behavior of the udev device discovery mechanism.
 """
 
-# isort: STDLIB
 import logging
 import random
 
-# isort: LOCAL
 from stratisd_client_dbus import Manager, Pool, StratisdErrors, get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
 

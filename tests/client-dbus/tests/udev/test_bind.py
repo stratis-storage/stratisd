@@ -16,11 +16,9 @@
 Test binding and unbinding in sequence with other actions.
 """
 
-# isort: STDLIB
 import json
 import os
 
-# isort: LOCAL
 from stratisd_client_dbus import Pool, StratisdErrors, get_object
 
 from ._utils import (

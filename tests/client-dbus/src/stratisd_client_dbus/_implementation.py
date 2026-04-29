@@ -15,10 +15,8 @@
 Classes to implement dbus interface.
 """
 
-# isort: STDLIB
 import xml.etree.ElementTree as ET
 
-# isort: FIRSTPARTY
 from dbus_client_gen import managed_object_class, mo_query_builder
 from dbus_python_client_gen import make_class
 

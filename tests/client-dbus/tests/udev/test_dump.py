@@ -16,7 +16,6 @@
 Test that stratis-dumpmetadata can do its job.
 """
 
-# isort: STDLIB
 import json
 import os
 import subprocess

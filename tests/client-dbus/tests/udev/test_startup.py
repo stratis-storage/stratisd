@@ -16,7 +16,6 @@
 Test starting additional stratisd processes.
 """
 
-# isort: STDLIB
 import os
 import subprocess
 import time

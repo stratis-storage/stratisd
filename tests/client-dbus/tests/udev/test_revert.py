@@ -16,18 +16,13 @@
 Test reverting a filesystem.
 """
 
-# isort: STDLIB
 import os
 import subprocess
 import tempfile
 
-# isort: THIRDPARTY
 from justbytes import Range
 
-# isort: FIRSTPARTY
 from dbus_python_client_gen import DPClientInvocationError
-
-# isort: LOCAL
 from stratisd_client_dbus import Filesystem
 from stratisd_client_dbus._constants import TOP_OBJECT
 

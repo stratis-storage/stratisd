@@ -15,7 +15,6 @@
 Support for testing udev device discovery.
 """
 
-# isort: STDLIB
 import json
 import logging
 import os
@@ -27,7 +26,6 @@ import time
 import unittest
 from tempfile import NamedTemporaryFile
 
-# isort: THIRDPARTY
 import dbus
 import psutil
 import pyudev
@@ -41,7 +39,6 @@ from tenacity import (
     wait_fixed,
 )
 
-# isort: LOCAL
 from stratisd_client_dbus import (
     Blockdev,
     Manager,

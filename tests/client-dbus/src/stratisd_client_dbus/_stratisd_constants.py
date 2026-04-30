@@ -15,7 +15,6 @@
 Representing stratisd constants.
 """
 
-# isort: STDLIB
 from enum import Enum, IntEnum
 
 

@@ -16,10 +16,8 @@
 Test starting additional stratisd processes.
 """
 
-# isort: STDLIB
 import os
 
-# isort: LOCAL
 from stratisd_client_dbus import Manager, Pool, StratisdErrors, get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
 

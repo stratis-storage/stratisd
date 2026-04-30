@@ -15,7 +15,6 @@
 Functionality pertaining to device mapper
 """
 
-# isort: STDLIB
 import os
 import subprocess
 

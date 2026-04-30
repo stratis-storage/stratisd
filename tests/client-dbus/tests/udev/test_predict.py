@@ -16,15 +16,12 @@
 Test that predictions of space usage match the actual.
 """
 
-# isort: STDLIB
 import json
 import os
 import subprocess
 
-# isort: THIRDPARTY
 from justbytes import GiB, Range, TiB
 
-# isort: LOCAL
 from stratisd_client_dbus import (
     MOBlockDev,
     MOPool,

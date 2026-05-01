@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use devicemapper::Bytes;
 use tokio::sync::RwLock;
-use zbus::{Connection, Error};
+use zbus::{fdo::Error, Connection};
 
 use crate::{
     dbus::{
@@ -34,7 +34,7 @@ pub async fn set_size_limit_prop(
     let size_limit_str = tuple_to_option(size_limit_tuple);
     let size_limit = match size_limit_str {
         Some(lim) => Some(Bytes(lim.parse::<u128>().map_err(|e| {
-            Error::Failure(format!("Failed to parse {lim} as unsigned integer: {e}"))
+            Error::Failed(format!("Failed to parse {lim} as unsigned integer: {e}"))
         })?)),
         None => None,
     };
@@ -42,7 +42,7 @@ pub async fn set_size_limit_prop(
     match pool.set_fs_size_limit(fs_uuid, size_limit) {
         Ok(PropChangeAction::NewValue(_v)) => Ok(true),
         Ok(PropChangeAction::Identity) => Ok(false),
-        Err(e) => Err(Error::Failure(e.to_string())),
+        Err(e) => Err(Error::Failed(e.to_string())),
     }
 }
 

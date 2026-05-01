@@ -25,17 +25,17 @@ pub async fn set_filesystem_prop<'a, 'b, V, F, Fut, S, SFut>(
     value: V,
     f: F,
     send_signal: S,
-) -> Result<(), zbus::Error>
+) -> Result<(), Error>
 where
     F: FnOnce(SomeLockWriteGuard<PoolUuid, dyn Pool>, FilesystemUuid, V) -> Fut,
-    Fut: Future<Output = Result<bool, zbus::Error>>,
+    Fut: Future<Output = Result<bool, Error>>,
     S: FnOnce(&'a Arc<Connection>, &'b Lockable<Arc<RwLock<Manager>>>, FilesystemUuid) -> SFut,
     SFut: Future<Output = ()>,
 {
     let guard = engine
         .get_mut_pool(PoolIdentifier::Uuid(uuid))
         .await
-        .ok_or_else(|| zbus::Error::Failure(format!("No pool associated with UUID {uuid}")))?;
+        .ok_or_else(|| Error::Failed(format!("No pool associated with UUID {uuid}")))?;
 
     let changed = f(guard, fs_uuid, value).await?;
     // Guard is dropped here, lock is released

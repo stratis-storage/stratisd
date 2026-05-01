@@ -27,11 +27,11 @@ async fn get_pool(
 async fn get_pool_mut(
     engine: &Arc<dyn Engine>,
     uuid: PoolUuid,
-) -> Result<SomeLockWriteGuard<PoolUuid, dyn Pool>, zbus::Error> {
+) -> Result<SomeLockWriteGuard<PoolUuid, dyn Pool>, Error> {
     engine
         .get_mut_pool(PoolIdentifier::Uuid(uuid))
         .await
-        .ok_or_else(|| zbus::Error::Failure(format!("No pool associated with UUID {uuid}")))
+        .ok_or_else(|| Error::Failed(format!("No pool associated with UUID {uuid}")))
 }
 
 pub async fn pool_prop<R>(
@@ -52,10 +52,10 @@ pub async fn set_pool_prop<'a, 'b, I, F, Fut, S, SFut>(
     f: F,
     input: I,
     send_signal: S,
-) -> Result<(), zbus::Error>
+) -> Result<(), Error>
 where
     F: FnOnce(SomeLockWriteGuard<PoolUuid, dyn Pool>, PoolUuid, I) -> Fut,
-    Fut: Future<Output = Result<bool, zbus::Error>>,
+    Fut: Future<Output = Result<bool, Error>>,
     S: FnOnce(&'a Arc<Connection>, &'b Lockable<Arc<RwLock<Manager>>>, PoolUuid) -> SFut,
     SFut: Future<Output = ()>,
 {

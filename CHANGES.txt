@@ -1,3 +1,45 @@
+stratisd 3.9.1
+==============
+Recommended development platform for Python development: Fedora 43
+
+- Include cryptsetup as a required executable in dracut:
+  https://github.com/stratis-storage/stratisd/pull/4031
+
+- Fix Pool property missing in signal for D-Bus filesystem interface added:
+  https://github.com/stratis-storage/stratisd/issues/4028
+  https://github.com/stratis-storage/stratisd/pull/4034
+
+- Fix missing signal for blockdev size on block device growth:
+  https://github.com/stratis-storage/stratisd/pull/4032
+
+- Change signature of devs's value:
+  https://github.com/stratis-storage/stratisd/pull/4030
+
+- Add out_args annotations for encryption methods:
+  https://github.com/stratis-storage/stratisd/pull/4020
+
+- Increase libcryptsetup-rs dependency lower bound to 0.16.1:
+  https://github.com/stratis-storage/stratisd/pull/4039
+  https://github.com/stratis-storage/stratisd/pull/4033
+
+- Increase sha2 dependency lower bound to 0.11.0:
+  https://github.com/stratis-storage/stratisd/pull/4038
+
+- Increase lowest supported rust toolchain to 1.87.0:
+  https://github.com/stratis-storage/stratisd/pull/4036
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/4037
+  https://github.com/stratis-storage/stratisd/pull/4035
+  https://github.com/stratis-storage/stratisd/pull/4025
+  https://github.com/stratis-storage/stratisd/pull/4024
+  https://github.com/stratis-storage/stratisd/pull/4021
+  https://github.com/stratis-storage/stratisd/pull/4018
+  https://github.com/stratis-storage/stratisd/pull/4017
+  https://github.com/stratis-storage/stratisd/pull/4016
+  https://github.com/stratis-storage/stratisd/pull/4015
+
+
 stratisd 3.9.0
 ==============
 Recommended Rust toolchain version: 1.95.0

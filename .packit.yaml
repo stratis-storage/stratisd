@@ -1,6 +1,5 @@
 ---
 
-# yamllint disable rule:line-length
 specfile_path: ../distro/stratisd.spec
 merge_pr_in_ci: false
 update_release: false

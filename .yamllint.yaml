@@ -3,3 +3,6 @@ extends: default
 
 rules:
   line-length: disable
+  truthy:
+    ignore:
+      .github/workflows/*.yml

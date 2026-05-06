@@ -2,7 +2,6 @@
 # linting and formatting for support code that is not part of the project
 name: stratisd support CI
 
-# yamllint disable-line rule:truthy
 on:
   push:
     branches:

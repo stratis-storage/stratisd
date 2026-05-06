@@ -1,7 +1,6 @@
 ---
 name: stratisd CI on fedora
 
-# yamllint disable-line rule:truthy
 on:
   push:
     branches:

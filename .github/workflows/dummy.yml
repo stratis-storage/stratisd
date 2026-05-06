@@ -1,7 +1,6 @@
 ---
 name: stratisd dummy CI
 
-# yamllint disable-line rule:truthy
 on:
   push:
     branches:

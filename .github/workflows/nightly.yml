@@ -1,7 +1,6 @@
 ---
 name: stratisd nightly
 
-# yamllint disable-line rule:truthy
 on:
   schedule:
     - cron: 15 3 * * *

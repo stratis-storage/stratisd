@@ -333,6 +333,7 @@ impl PoolR9 {
         filesystem_metadata_method(&self.engine, self.uuid, fs_name, current).await
     }
 
+    #[zbus(out_args("results", "return_code", "return_string"))]
     async fn encrypt_pool(
         &self,
         key_descs: Vec<((bool, u32), KeyDescription)>,
@@ -349,10 +350,12 @@ impl PoolR9 {
         .await
     }
 
+    #[zbus(out_args("results", "return_code", "return_string"))]
     async fn reencrypt_pool(&self) -> (bool, u16, String) {
         reencrypt_pool_method(&self.engine, &self.connection, &self.manager, self.uuid).await
     }
 
+    #[zbus(out_args("results", "return_code", "return_string"))]
     async fn decrypt_pool(&self) -> (bool, u16, String) {
         decrypt_pool_method(&self.engine, &self.connection, &self.manager, self.uuid).await
     }

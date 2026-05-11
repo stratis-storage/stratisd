@@ -185,9 +185,21 @@ SPECS = {
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
+    <method name="DecryptPool">
+      <arg name="results" type="b" direction="out" />
+      <arg name="return_code" type="q" direction="out" />
+      <arg name="return_string" type="s" direction="out" />
+    </method>
     <method name="DestroyFilesystems">
       <arg name="filesystems" type="ao" direction="in" />
       <arg name="results" type="(bas)" direction="out" />
+      <arg name="return_code" type="q" direction="out" />
+      <arg name="return_string" type="s" direction="out" />
+    </method>
+    <method name="EncryptPool">
+      <arg name="key_descs" type="a((bu)s)" direction="in" />
+      <arg name="clevis_infos" type="a((bu)ss)" direction="in" />
+      <arg name="results" type="b" direction="out" />
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
@@ -229,6 +241,11 @@ SPECS = {
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
+    <method name="ReencryptPool">
+      <arg name="results" type="b" direction="out" />
+      <arg name="return_code" type="q" direction="out" />
+      <arg name="return_string" type="s" direction="out" />
+    </method>
     <method name="SetName">
       <arg name="name" type="s" direction="in" />
       <arg name="result" type="(bs)" direction="out" />
@@ -257,13 +274,12 @@ SPECS = {
     <property name="AllocatedSize" type="s" access="read" />
     <property name="AvailableActions" type="s" access="read" />
     <property name="ClevisInfos" type="v" access="read" />
-    <property name="Encrypted" type="b" access="read">
-      <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
-    </property>
+    <property name="Encrypted" type="b" access="read" />
     <property name="FreeTokenSlots" type="(by)" access="read" />
     <property name="FsLimit" type="t" access="readwrite" />
     <property name="HasCache" type="b" access="read" />
     <property name="KeyDescriptions" type="v" access="read" />
+    <property name="LastReencryptedTimestamp" type="(bs)" access="read" />
     <property name="MetadataVersion" type="t" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>

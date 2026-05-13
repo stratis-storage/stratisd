@@ -39,3 +39,7 @@ environment:
 /v2/loop:
   summary: Run Python tests that use loopbacked device framework
   test: make -f Makefile tang-tests dump-metadata-tests startup-tests revert-tests start-tests extend-tests
+
+/systemd:
+  summary: Check systemd information
+  test: systemd-analyze verify /usr/lib/systemd/system/stratis*.service

@@ -44,7 +44,7 @@ jobs:
           sudo
           systemd-devel
           valgrind
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
@@ -86,7 +86,7 @@ jobs:
           systemd-udev
           valgrind
           xfsprogs
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
@@ -142,7 +142,7 @@ jobs:
           psutil
           pyudev
           tenacity
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: cargo
           toolchain: ${{ matrix.toolchain }}
@@ -206,7 +206,7 @@ jobs:
           systemd-udev
           valgrind
           xfsprogs
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: cargo
           toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN

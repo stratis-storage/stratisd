@@ -96,7 +96,7 @@ jobs:
           pkg-config
           sudo
           thin-provisioning-tools
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
@@ -144,7 +144,7 @@ jobs:
           thin-provisioning-tools
           udev
           xfsprogs
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
@@ -198,7 +198,7 @@ jobs:
           thin-provisioning-tools
           udev
           xfsprogs
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}

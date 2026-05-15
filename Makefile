@@ -531,6 +531,7 @@ check-fedora-versions: test-compare-fedora-versions
 	install-dracut-cfg
 	install-fstab-script
 	install-man-cfg
+	install-programs
 	install-systemd-cfg
 	install-udev-binaries
 	install-udev-cfg

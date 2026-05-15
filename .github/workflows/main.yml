@@ -91,14 +91,21 @@ jobs:
           python3-psutil
           python3-wcwidth
           systemd-devel
+          toml-cli
       - uses: actions/checkout@v6
         with:
           path: stratisd
           persist-credentials: false
+      - name: Get package MSRV
+        id: msrv
+        run: |
+          MSRV=$(toml get --toml-path Cargo.toml "workspace.package.rust-version")
+          echo "MSRV=$MSRV" >> "$GITHUB_OUTPUT"
+        working-directory: stratisd
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: cargo
-          toolchain: 1.85.0  # LOWEST SUPPORTED RUST TOOLCHAIN
+          toolchain: ${{ steps.msrv.outputs.MSRV }}
       - name: Overwrite stratisd dependencies as necessary
         uses: stratis-storage/github-actions/stratisd-modify@HEAD
         with:
@@ -260,6 +267,7 @@ jobs:
           libsystemd-dev
           libudev-dev
           make
+          pip
           pkg-config
           thin-provisioning-tools
           udev
@@ -271,14 +279,22 @@ jobs:
           dbus-python-client-gen
           justbytes
           psutil
+      - name: Install toml-cli
+        run: pip install --user toml-cli
       - uses: actions/checkout@v6
         with:
           path: stratisd
           persist-credentials: false
+      - name: Get package MSRV
+        id: msrv
+        run: |
+          PATH="$PATH:$(python3 -m site --user-base)/bin" MSRV=$(toml get --toml-path Cargo.toml "workspace.package.rust-version")
+          echo "MSRV=$MSRV" >> "$GITHUB_OUTPUT"
+        working-directory: stratisd
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: cargo
-          toolchain: 1.85.0  # LOWEST SUPPORTED RUST TOOLCHAIN
+          toolchain: ${{ steps.msrv.outputs.MSRV }}
       - name: Overwrite stratisd dependencies as necessary
         uses: stratis-storage/github-actions/stratisd-modify@HEAD
         with:

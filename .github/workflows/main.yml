@@ -30,10 +30,8 @@ jobs:
       matrix:
         include:
           - task: make -f Makefile fmt-ci
-            toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: rustfmt
           - task: make -f Makefile check-typos
-            toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-24.04
     container:
@@ -52,17 +50,16 @@ jobs:
           make
           ncurses
           systemd-devel
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          components: ${{ matrix.components }}
-          toolchain: ${{ matrix.toolchain }}
-      - uses: baptiste0928/cargo-install@v3
-        with:
-          crate: typos-cli
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: ${{ matrix.components }}
+      - uses: baptiste0928/cargo-install@v3
+        with:
+          crate: typos-cli
+      - name: Test ${{ matrix.task }} on CURRENT DEVELOPMENT RUST TOOLCHAIN
         run: ${{ matrix.task }}
 
   stratis-cli-checks:
@@ -94,14 +91,14 @@ jobs:
           python3-psutil
           python3-wcwidth
           systemd-devel
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          components: cargo
-          toolchain: 1.85.0  # LOWEST SUPPORTED RUST TOOLCHAIN
       - uses: actions/checkout@v6
         with:
           path: stratisd
           persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: cargo
+          toolchain: 1.85.0  # LOWEST SUPPORTED RUST TOOLCHAIN
       - name: Overwrite stratisd dependencies as necessary
         uses: stratis-storage/github-actions/stratisd-modify@HEAD
         with:
@@ -161,13 +158,12 @@ jobs:
           python3-wcwidth
           systemd-devel
           xfsprogs
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          components: cargo
-          toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: cargo
       - name: Overwrite stratisd dependencies as necessary
         uses: stratis-storage/github-actions/stratisd-modify@HEAD
       - name: Run stratisd-min cli tests
@@ -222,13 +218,12 @@ jobs:
           systemd-devel
           systemd-udev
           xfsprogs
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          components: cargo
-          toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: cargo
       - name: Overwrite stratisd dependencies as necessary
         uses: stratis-storage/github-actions/stratisd-modify@HEAD
       - name: Build stratisd
@@ -276,14 +271,14 @@ jobs:
           dbus-python-client-gen
           justbytes
           psutil
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          components: cargo
-          toolchain: 1.85.0  # LOWEST SUPPORTED RUST TOOLCHAIN
       - uses: actions/checkout@v6
         with:
           path: stratisd
           persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: cargo
+          toolchain: 1.85.0  # LOWEST SUPPORTED RUST TOOLCHAIN
       - name: Overwrite stratisd dependencies as necessary
         uses: stratis-storage/github-actions/stratisd-modify@HEAD
         with:

@@ -38,40 +38,28 @@ jobs:
       matrix:
         include:
           - task: make -f Makefile clippy
-            toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: clippy
           - task: PROFILEDIR=debug make -f Makefile build
-            toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: PROFILEDIR=debug make -f Makefile build-min
-            toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: PROFILEDIR=debug make -f Makefile build-min-no-systemd
-            toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: PROFILEDIR=debug make -f Makefile build-utils
-            toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: PROFILEDIR=debug make -f Makefile build-no-ipc
-            toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: PROFILEDIR=debug make -f Makefile stratisd-tools
-            toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile docs-ci
-            toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile test
-            toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile build
-            toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile build-min
-            toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile build-no-ipc
-            toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-24.04
     container:
@@ -96,16 +84,15 @@ jobs:
           pkg-config
           sudo
           thin-provisioning-tools
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          components: ${{ matrix.components }}
-          toolchain: ${{ matrix.toolchain }}
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: ${{ matrix.components }}
       - name: Overwrite stratisd dependencies as necessary
         uses: stratis-storage/github-actions/stratisd-modify@HEAD
-      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
+      - name: Test ${{ matrix.task }} on CURRENT DEVELOPMENT RUST TOOLCHAIN
         run: ${{ matrix.task }}
 
   # TESTS WITH UDEV
@@ -114,7 +101,6 @@ jobs:
       matrix:
         include:
           - task: RUST_LOG=stratisd=debug make -f Makefile test-loop-root
-            toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-24.04
     container:
@@ -144,13 +130,12 @@ jobs:
           thin-provisioning-tools
           udev
           xfsprogs
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          components: ${{ matrix.components }}
-          toolchain: ${{ matrix.toolchain }}
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: ${{ matrix.components }}
       - name: Overwrite stratisd dependencies as necessary
         uses: stratis-storage/github-actions/stratisd-modify@HEAD
       - name: Build stratisd
@@ -169,7 +154,6 @@ jobs:
           - task: >-
               TANG_URL=localhost
               make -f Makefile test-clevis-loop-should-fail-root
-            toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-24.04
     container:
@@ -198,13 +182,12 @@ jobs:
           thin-provisioning-tools
           udev
           xfsprogs
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          components: ${{ matrix.components }}
-          toolchain: ${{ matrix.toolchain }}
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: ${{ matrix.components }}
       - name: Overwrite stratisd dependencies as necessary
         uses: stratis-storage/github-actions/stratisd-modify@HEAD
       - name: Build stratisd

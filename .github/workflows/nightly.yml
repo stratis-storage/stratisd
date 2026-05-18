@@ -14,7 +14,6 @@ jobs:
       matrix:
         include:
           - task: cargo package
-            toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-24.04
     container:
@@ -35,14 +34,13 @@ jobs:
           python-requests
           python-semantic_version
           systemd-devel
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          components: ${{ matrix.components }}
-          toolchain: ${{ matrix.toolchain }}
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: ${{ matrix.components }}
+      - name: Test ${{ matrix.task }} on CURRENT DEVELOPMENT RUST TOOLCHAIN
         run: ${{ matrix.task }}
 
   check_future_dependencies:
@@ -64,16 +62,15 @@ jobs:
           ncurses
           openssl-devel
           systemd-devel
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          components: cargo
-          toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-      - uses: baptiste0928/cargo-install@v3
-        with:
-          crate: cargo-audit
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: cargo
+      - uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-audit
       - name: Run cargo-update
         run: cargo update
       - name: Build all targets
@@ -107,19 +104,18 @@ jobs:
           python-requests
           python-semantic_version
           systemd-devel
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: cargo
-          toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-audit
       - uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-auditable
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
       - name: Run matrix task
         run: ${{ matrix.task }}
 
@@ -143,14 +139,14 @@ jobs:
           python-requests
           python-semantic_version
           systemd-devel
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          components: cargo
-          toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - uses: actions/checkout@v6
         with:
           path: stratisd
           persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: cargo
+          rust-src-dir: stratisd
       - name: Check out ci repo
         uses: actions/checkout@v6
         with:
@@ -203,13 +199,12 @@ jobs:
           psutil
           pyudev
           tenacity
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          components: cargo
-          toolchain: 1.95.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: cargo
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd

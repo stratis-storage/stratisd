@@ -80,11 +80,8 @@ impl<'a> From<LockedPoolsInfo> for Value<'a> {
                         .iter()
                         .map(|d| {
                             let mut map = HashMap::new();
-                            map.insert(
-                                "devnode".to_string(),
-                                Value::from(d.devnode.display().to_string()),
-                            );
-                            map.insert("uuid".to_string(), Value::from(d.uuid));
+                            map.insert("devnode".to_string(), d.devnode.display().to_string());
+                            map.insert("uuid".to_string(), d.uuid.simple().to_string());
                             map
                         })
                         .collect::<Vec<_>>(),
@@ -137,11 +134,8 @@ fn stopped_pools_to_value<'b>(
                     .iter()
                     .map(|d| {
                         let mut map = HashMap::new();
-                        map.insert(
-                            "devnode".to_string(),
-                            Value::from(d.devnode.display().to_string()),
-                        );
-                        map.insert("uuid".to_string(), Value::from(d.uuid));
+                        map.insert("devnode".to_string(), d.devnode.display().to_string());
+                        map.insert("uuid".to_string(), d.uuid.simple().to_string());
                         map
                     })
                     .collect::<Vec<_>>(),

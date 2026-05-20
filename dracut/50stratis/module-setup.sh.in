@@ -2,7 +2,8 @@
 
 # called by dracut
 check() {
-	require_binaries stratis-min \
+	require_binaries cryptsetup \
+        stratis-min \
 		@LIBEXECDIR@/stratisd-min \
 		$systemdutildir/system-generators/stratis-setup-generator \
 		thin_check \
@@ -33,7 +34,8 @@ installkernel() {
 # called by dracut
 install() {
 	# Stratis dependencies
-	inst_multiple stratis-min \
+	inst_multiple cryptsetup \
+        stratis-min \
 		@LIBEXECDIR@/stratisd-min \
 		thin_check \
 		thin_repair \

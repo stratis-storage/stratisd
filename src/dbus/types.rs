@@ -8,9 +8,7 @@ use zbus::zvariant::{signature::Child, Basic, Signature, Type, Value};
 
 use crate::{
     dbus::util::result_option_to_tuple,
-    engine::{
-        ActionAvailability, DevUuid, FilesystemUuid, LockedPoolsInfo, PoolUuid, StoppedPoolsInfo,
-    },
+    engine::{ActionAvailability, LockedPoolsInfo, PoolUuid, StoppedPoolsInfo},
 };
 
 pub type FilesystemSpec<'a> = Vec<(&'a str, (bool, &'a str), (bool, &'a str))>;
@@ -80,11 +78,8 @@ impl<'a> From<LockedPoolsInfo> for Value<'a> {
                         .iter()
                         .map(|d| {
                             let mut map = HashMap::new();
-                            map.insert(
-                                "devnode".to_string(),
-                                Value::from(d.devnode.display().to_string()),
-                            );
-                            map.insert("uuid".to_string(), Value::from(d.uuid));
+                            map.insert("devnode".to_string(), d.devnode.display().to_string());
+                            map.insert("uuid".to_string(), d.uuid.simple().to_string());
                             map
                         })
                         .collect::<Vec<_>>(),
@@ -137,11 +132,8 @@ fn stopped_pools_to_value<'b>(
                     .iter()
                     .map(|d| {
                         let mut map = HashMap::new();
-                        map.insert(
-                            "devnode".to_string(),
-                            Value::from(d.devnode.display().to_string()),
-                        );
-                        map.insert("uuid".to_string(), Value::from(d.uuid));
+                        map.insert("devnode".to_string(), d.devnode.display().to_string());
+                        map.insert("uuid".to_string(), d.uuid.simple().to_string());
                         map
                     })
                     .collect::<Vec<_>>(),
@@ -251,36 +243,6 @@ impl Type for PoolUuid {
 
 impl<'a> From<PoolUuid> for Value<'a> {
     fn from(u: PoolUuid) -> Value<'a> {
-        Value::from(u.simple().to_string())
-    }
-}
-
-impl Basic for FilesystemUuid {
-    const SIGNATURE_CHAR: char = 's';
-    const SIGNATURE_STR: &str = "s";
-}
-
-impl Type for FilesystemUuid {
-    const SIGNATURE: &Signature = &Signature::Str;
-}
-
-impl<'a> From<FilesystemUuid> for Value<'a> {
-    fn from(u: FilesystemUuid) -> Value<'a> {
-        Value::from(u.simple().to_string())
-    }
-}
-
-impl Basic for DevUuid {
-    const SIGNATURE_CHAR: char = 's';
-    const SIGNATURE_STR: &str = "s";
-}
-
-impl Type for DevUuid {
-    const SIGNATURE: &Signature = &Signature::Str;
-}
-
-impl<'a> From<DevUuid> for Value<'a> {
-    fn from(u: DevUuid) -> Value<'a> {
         Value::from(u.simple().to_string())
     }
 }

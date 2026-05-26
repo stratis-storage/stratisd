@@ -15,7 +15,6 @@ use zbus::{
 
 use crate::{
     dbus::{
-        blockdev::unregister_blockdev,
         consts::OK_STRING,
         filesystem::unregister_filesystem,
         manager::Manager,
@@ -152,61 +151,48 @@ pub async fn stop_pool_method(
             .await
     );
 
-    match action {
-        Ok(StopAction::Stopped(_) | StopAction::Partial(_)) | Err(_) => {
-            let (dev_uuids_rem, fs_uuids_rem) =
-                match engine.get_pool(PoolIdentifier::Uuid(pool_uuid)).await {
-                    Some(p) => (
-                        p.blockdevs()
-                            .into_iter()
-                            .map(|(u, _, _)| u)
-                            .collect::<HashSet<_>>(),
-                        p.filesystems()
-                            .into_iter()
-                            .map(|(_, u, _)| u)
-                            .collect::<HashSet<_>>(),
-                    ),
-                    None => (HashSet::default(), HashSet::default()),
-                };
-
-            for fs_uuid in fs_uuids.into_iter().filter(|u| !fs_uuids_rem.contains(u)) {
-                let maybe_fs_path = manager.write().await.filesystem_get_path(&fs_uuid).cloned();
-                if let Some(fs_path) = maybe_fs_path {
-                    if let Err(e) = unregister_filesystem(connection, manager, &fs_path).await {
-                        warn!(
-                            "Failed to unregister {fs_path} representing filesystem {fs_uuid}: {e}"
-                        );
+    match &action {
+        Ok(StopAction::Stopped(_) | StopAction::Partial(_)) => {
+            if let Err(e) = unregister_pool(connection, manager, &pool, &fs_uuids, &dev_uuids).await
+            {
+                warn!("Failed to remove pool with path {pool} from the D-Bus: {e}");
+            }
+            send_stopped_pools_signals(connection).await;
+            let stopped_pools = engine.stopped_pools().await;
+            let stopped = stopped_pools
+                .stopped
+                .get(&pool_uuid)
+                .or_else(|| stopped_pools.partially_constructed.get(&pool_uuid));
+            if stopped.map(|s| s.info.is_some()).unwrap_or(false) {
+                send_locked_pools_signals(connection).await;
+            }
+        }
+        Err(_) => match engine.get_pool(PoolIdentifier::Uuid(pool_uuid)).await {
+            Some(g) => {
+                let rem_fs = g
+                    .filesystems()
+                    .into_iter()
+                    .map(|(_, uuid, _)| uuid)
+                    .collect::<HashSet<_>>();
+                for fs_uuid in fs_uuids.iter().filter(|u| !rem_fs.contains(u)) {
+                    match manager.read().await.filesystem_get_path(fs_uuid).cloned() {
+                        Some(p) => {
+                            if let Err(e) = unregister_filesystem(connection, manager, &p).await {
+                                warn!("Failed to unregister filesystem: {e}");
+                            }
+                        }
+                        None => {
+                            warn!("Could not find filesystem path for UUID {fs_uuid}");
+                        }
                     }
                 }
             }
-
-            for dev_uuid in dev_uuids.into_iter().filter(|u| !dev_uuids_rem.contains(u)) {
-                let maybe_dev_path = manager.write().await.blockdev_get_path(&dev_uuid).cloned();
-                if let Some(dev_path) = maybe_dev_path {
-                    if let Err(e) = unregister_blockdev(connection, manager, &dev_path).await {
-                        warn!(
-                            "Failed to unregister {dev_path} representing blockdev {dev_uuid}: {e}"
-                        );
-                    }
-                }
+            None => {
+                warn!("Failed to find pool with UUID {pool_uuid} even though pool failed to stop");
             }
-        }
-        _ => {}
-    }
-
-    if let Ok(StopAction::Stopped(_) | StopAction::Partial(_)) = action {
-        if let Err(e) = unregister_pool(connection, manager, &pool).await {
-            warn!("Failed to remove pool with path {pool} from the D-Bus: {e}");
-        }
-        send_stopped_pools_signals(connection).await;
-        let stopped_pools = engine.stopped_pools().await;
-        let stopped = stopped_pools
-            .stopped
-            .get(&pool_uuid)
-            .or_else(|| stopped_pools.partially_constructed.get(&pool_uuid));
-        if stopped.map(|s| s.info.is_some()).unwrap_or(false) {
-            send_locked_pools_signals(connection).await;
-        }
+        },
+        Ok(StopAction::Identity) => {}
+        Ok(StopAction::CleanedUp(_)) => unreachable!("!has_partially_constructed above"),
     }
 
     match action {

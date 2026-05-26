@@ -11,8 +11,11 @@ use tokio::sync::RwLock;
 use zbus::{zvariant::ObjectPath, Connection};
 
 use crate::{
-    dbus::{consts, register_blockdev, register_filesystem, Manager},
-    engine::{Engine, Lockable, PoolIdentifier, PoolUuid},
+    dbus::{
+        blockdev::unregister_blockdev, consts, filesystem::unregister_filesystem,
+        register_blockdev, register_filesystem, Manager,
+    },
+    engine::{DevUuid, Engine, FilesystemUuid, Lockable, PoolIdentifier, PoolUuid},
     stratis::{StratisError, StratisResult},
 };
 
@@ -211,7 +214,30 @@ pub async fn unregister_pool(
     connection: &Arc<Connection>,
     manager: &Lockable<Arc<RwLock<Manager>>>,
     path: &ObjectPath<'_>,
+    fs_uuids: &[FilesystemUuid],
+    dev_uuids: &[DevUuid],
 ) -> StratisResult<PoolUuid> {
+    // Unregister all filesystems
+    for fs_uuid in fs_uuids {
+        let maybe_fs_path = manager.write().await.filesystem_get_path(fs_uuid).cloned();
+        if let Some(fs_path) = maybe_fs_path {
+            if let Err(e) = unregister_filesystem(connection, manager, &fs_path).await {
+                warn!("Failed to unregister {fs_path} representing filesystem {fs_uuid}: {e}");
+            }
+        }
+    }
+
+    // Unregister all blockdevs
+    for dev_uuid in dev_uuids {
+        let maybe_dev_path = manager.write().await.blockdev_get_path(dev_uuid).cloned();
+        if let Some(dev_path) = maybe_dev_path {
+            if let Err(e) = unregister_blockdev(connection, manager, &dev_path).await {
+                warn!("Failed to unregister {dev_path} representing blockdev {dev_uuid}: {e}");
+            }
+        }
+    }
+
+    // Unregister the pool itself
     let uuid = {
         let mut lock = manager.write().await;
         let uuid = lock

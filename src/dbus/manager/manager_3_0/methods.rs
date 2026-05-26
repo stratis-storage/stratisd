@@ -17,9 +17,7 @@ use zbus::{
 
 use crate::{
     dbus::{
-        blockdev::unregister_blockdev,
         consts::OK_STRING,
-        filesystem::unregister_filesystem,
         manager::Manager,
         pool::{register_pool, unregister_pool},
         types::DbusErrorEnum,
@@ -196,27 +194,7 @@ pub async fn destroy_pool_method(
 
     match engine.destroy_pool(uuid).await {
         Ok(DeleteAction::Deleted(uuid)) => {
-            for dev_uuid in dev_uuids {
-                let maybe_dev_path = manager.write().await.blockdev_get_path(&dev_uuid).cloned();
-                if let Some(dev_path) = maybe_dev_path {
-                    if let Err(e) = unregister_blockdev(connection, manager, &dev_path).await {
-                        warn!(
-                            "Failed to unregister {dev_path} representing blockdev {dev_uuid}: {e}"
-                        );
-                    }
-                }
-            }
-            for fs_uuid in fs_uuids {
-                let maybe_fs_path = manager.write().await.filesystem_get_path(&fs_uuid).cloned();
-                if let Some(fs_path) = maybe_fs_path {
-                    if let Err(e) = unregister_filesystem(connection, manager, &fs_path).await {
-                        warn!(
-                            "Failed to unregister {fs_path} representing filesystem {fs_uuid}: {e}"
-                        );
-                    }
-                }
-            }
-            match unregister_pool(connection, manager, &pool).await {
+            match unregister_pool(connection, manager, &pool, &fs_uuids, &dev_uuids).await {
                 Ok(u) => {
                     assert_eq!(uuid, u);
                     (

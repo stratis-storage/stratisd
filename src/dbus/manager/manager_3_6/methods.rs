@@ -9,7 +9,6 @@ use zbus::Connection;
 
 use crate::{
     dbus::{
-        blockdev::unregister_blockdev,
         consts::OK_STRING,
         filesystem::unregister_filesystem,
         manager::Manager,
@@ -57,72 +56,61 @@ pub async fn stop_pool_method(
 
     let action = handle_action!(engine.stop_pool(id.clone(), true).await);
 
-    match action {
-        Ok(StopAction::Stopped(_) | StopAction::Partial(_)) | Err(_) => {
-            let (dev_uuids_rem, fs_uuids_rem) = match engine.get_pool(id).await {
-                Some(p) => (
-                    p.blockdevs()
-                        .into_iter()
-                        .map(|(u, _, _)| u)
-                        .collect::<HashSet<_>>(),
-                    p.filesystems()
-                        .into_iter()
-                        .map(|(_, u, _)| u)
-                        .collect::<HashSet<_>>(),
-                ),
-                None => (HashSet::default(), HashSet::default()),
+    match &action {
+        Ok(StopAction::Stopped(pool_uuid) | StopAction::Partial(pool_uuid)) => {
+            let path = manager.read().await.pool_get_path(pool_uuid).cloned();
+            match path {
+                Some(pool) => {
+                    if let Err(e) =
+                        unregister_pool(connection, manager, &pool.as_ref(), &fs_uuids, &dev_uuids)
+                            .await
+                    {
+                        warn!("Failed to remove pool with path {pool} from the D-Bus: {e}");
+                    }
+                }
+                None => {
+                    warn!("Failed to unregister the stopped pool from the D-Bus");
+                }
             };
-
-            for fs_uuid in fs_uuids.into_iter().filter(|u| !fs_uuids_rem.contains(u)) {
-                let maybe_fs_path = manager.write().await.filesystem_get_path(&fs_uuid).cloned();
-                if let Some(fs_path) = maybe_fs_path {
-                    if let Err(e) = unregister_filesystem(connection, manager, &fs_path).await {
-                        warn!(
-                            "Failed to unregister {fs_path} representing filesystem {fs_uuid}: {e}"
-                        );
-                    }
-                }
-            }
-
-            for dev_uuid in dev_uuids.into_iter().filter(|u| !dev_uuids_rem.contains(u)) {
-                let maybe_dev_path = manager.write().await.blockdev_get_path(&dev_uuid).cloned();
-                if let Some(dev_path) = maybe_dev_path {
-                    if let Err(e) = unregister_blockdev(connection, manager, &dev_path).await {
-                        warn!(
-                            "Failed to unregister {dev_path} representing blockdev {dev_uuid}: {e}"
-                        );
-                    }
-                }
+            send_stopped_pools_signals(connection).await;
+            let stopped = {
+                let stopped_pools = engine.stopped_pools().await;
+                stopped_pools
+                    .stopped
+                    .get(pool_uuid)
+                    .or_else(|| stopped_pools.partially_constructed.get(pool_uuid))
+                    .map(|s| s.info.is_some())
+                    .unwrap_or(false)
+            };
+            if stopped {
+                send_locked_pools_signals(connection).await;
             }
         }
-        _ => {}
-    }
-
-    if let Ok(StopAction::Stopped(pool_uuid) | StopAction::Partial(pool_uuid)) = action {
-        let path = manager.read().await.pool_get_path(&pool_uuid).cloned();
-        match path {
-            Some(pool) => {
-                if let Err(e) = unregister_pool(connection, manager, &pool.as_ref()).await {
-                    warn!("Failed to remove pool with path {pool} from the D-Bus: {e}");
+        Err(_) => match engine.get_pool(id.clone()).await {
+            Some(g) => {
+                let rem_fs = g
+                    .filesystems()
+                    .into_iter()
+                    .map(|(_, uuid, _)| uuid)
+                    .collect::<HashSet<_>>();
+                for fs_uuid in fs_uuids.iter().filter(|u| !rem_fs.contains(u)) {
+                    match manager.read().await.filesystem_get_path(fs_uuid).cloned() {
+                        Some(p) => {
+                            if let Err(e) = unregister_filesystem(connection, manager, &p).await {
+                                warn!("Failed to unregister filesystem: {e}");
+                            }
+                        }
+                        None => {
+                            warn!("Could not find filesystem path for UUID {fs_uuid}");
+                        }
+                    }
                 }
             }
             None => {
-                warn!("Failed to unregister the stopped pool from the D-Bus");
+                warn!("Failed to find pool with ID {id:?} even though pool failed to stop");
             }
-        };
-        send_stopped_pools_signals(connection).await;
-        let stopped = {
-            let stopped_pools = engine.stopped_pools().await;
-            stopped_pools
-                .stopped
-                .get(&pool_uuid)
-                .or_else(|| stopped_pools.partially_constructed.get(&pool_uuid))
-                .map(|s| s.info.is_some())
-                .unwrap_or(false)
-        };
-        if stopped {
-            send_locked_pools_signals(connection).await;
-        }
+        },
+        Ok(StopAction::Identity | StopAction::CleanedUp(_)) => {}
     }
 
     match action {
@@ -131,7 +119,7 @@ pub async fn stop_pool_method(
             DbusErrorEnum::OK as u16,
             OK_STRING.to_string(),
         ),
-        Ok(StopAction::Stopped(pool_uuid)) => (
+        Ok(StopAction::Stopped(pool_uuid) | StopAction::CleanedUp(pool_uuid)) => (
             (true, pool_uuid.simple().to_string()),
             DbusErrorEnum::OK as u16,
             OK_STRING.to_string(),
@@ -141,7 +129,6 @@ pub async fn stop_pool_method(
             DbusErrorEnum::ERROR as u16,
             "Pool was stopped, but some component devices were not torn down".to_string(),
         ),
-        Ok(StopAction::CleanedUp(_)) => unreachable!("!has_partially_constructed above"),
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e);
             (default_return, rc, rs)

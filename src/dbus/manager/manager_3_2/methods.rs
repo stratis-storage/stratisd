@@ -17,7 +17,7 @@ use crate::{
     dbus::{
         blockdev::unregister_blockdev,
         consts::OK_STRING,
-        filesystem::{register_filesystem, unregister_filesystem},
+        filesystem::unregister_filesystem,
         manager::Manager,
         pool::{register_pool, unregister_pool},
         types::DbusErrorEnum,
@@ -83,30 +83,11 @@ pub async fn start_pool_method(
                     );
                 }
             };
-            let mut fs_paths = Vec::default();
-            for fs_uuid in guard
-                .filesystems()
-                .into_iter()
-                .map(|(_, fs_uuid, _)| fs_uuid)
-                .collect::<Vec<_>>()
-            {
-                let fs_path = match register_filesystem(
-                    engine, connection, manager, counter, pool_uuid, fs_uuid,
-                )
-                .await
-                {
-                    Ok(fp) => fp,
-                    Err(e) => {
-                        let (rc, rs) = engine_to_dbus_err_tuple(&e);
-                        return (default_return, rc, rs);
-                    }
-                };
-                fs_paths.push(OwnedObjectPath::from(fs_path));
-            }
-            let (pool_path, dev_paths) =
+            let (pool_path, fs_paths, dev_paths) =
                 match register_pool(engine, connection, manager, counter, pool_uuid).await {
-                    Ok((pp, dp)) => (
+                    Ok((pp, fp, dp)) => (
                         OwnedObjectPath::from(pp),
+                        fp.into_iter().map(OwnedObjectPath::from).collect(),
                         dp.into_iter().map(OwnedObjectPath::from).collect(),
                     ),
                     Err(e) => {

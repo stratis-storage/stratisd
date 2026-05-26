@@ -45,10 +45,9 @@ pub async fn register_pool<'a>(
     manager: &Lockable<Arc<RwLock<Manager>>>,
     counter: &Arc<AtomicU64>,
     pool_uuid: PoolUuid,
-) -> StratisResult<(ObjectPath<'a>, Vec<ObjectPath<'a>>)> {
+) -> StratisResult<(ObjectPath<'a>, Vec<ObjectPath<'a>>, Vec<ObjectPath<'a>>)> {
     match engine.get_pool(PoolIdentifier::Uuid(pool_uuid)).await {
         Some(pool) => {
-
             let path = ObjectPath::try_from(format!(
                 "{}/{}",
                 consts::STRATIS_BASE_PATH,
@@ -178,10 +177,11 @@ pub async fn register_pool<'a>(
 
             manager.write().await.add_pool(&path, pool_uuid)?;
 
+            let mut fs_paths = Vec::new();
             let fs_uuids = pool.filesystems().into_iter().map(|(_, u, _)| u).collect::<Vec<_>>();
             for fs_uuid in fs_uuids {
                 match register_filesystem(engine, connection, manager, counter, pool_uuid, fs_uuid).await {
-                    Ok(_) => (),
+                    Ok(op) => fs_paths.push(op),
                     Err(_) => {
                         warn!("Unable to register object path for filesystem with UUID {fs_uuid} belonging to pool {pool_uuid} on the D-Bus");
                     },
@@ -198,7 +198,8 @@ pub async fn register_pool<'a>(
                     },
                 }
             }
-            Ok((path, bd_paths))
+
+            Ok((path, fs_paths, bd_paths))
         }
         None => {
             Err(StratisError::Msg(format!("Pool with {pool_uuid} was successfully started but appears to have been removed before it could be exposed on the D-Bus")))

@@ -20,7 +20,6 @@ use devicemapper::Bytes;
 use crate::{
     dbus::{
         consts::OK_STRING,
-        filesystem::register_filesystem,
         manager::Manager,
         pool::register_pool,
         types::DbusErrorEnum,
@@ -114,12 +113,12 @@ pub async fn create_pool_method(
     ) {
         Ok(CreateAction::Created(uuid)) => {
             match register_pool(engine, connection, manager, counter, uuid).await {
-                Ok((pool_path, fs_paths)) => (
+                Ok((pool_path, _, bd_paths)) => (
                     (
                         true,
                         (
                             OwnedObjectPath::from(pool_path),
-                            fs_paths.into_iter().map(OwnedObjectPath::from).collect(),
+                            bd_paths.into_iter().map(OwnedObjectPath::from).collect(),
                         ),
                     ),
                     DbusErrorEnum::OK as u16,
@@ -208,30 +207,11 @@ pub async fn start_pool_method(
                     );
                 }
             };
-            let mut fs_paths = Vec::default();
-            for fs_uuid in guard
-                .filesystems()
-                .into_iter()
-                .map(|(_, fs_uuid, _)| fs_uuid)
-                .collect::<Vec<_>>()
-            {
-                let fs_path = match register_filesystem(
-                    engine, connection, manager, counter, pool_uuid, fs_uuid,
-                )
-                .await
-                {
-                    Ok(fp) => fp,
-                    Err(e) => {
-                        let (rc, rs) = engine_to_dbus_err_tuple(&e);
-                        return (default_return, rc, rs);
-                    }
-                };
-                fs_paths.push(OwnedObjectPath::from(fs_path));
-            }
-            let (pool_path, dev_paths) =
+            let (pool_path, fs_paths, dev_paths) =
                 match register_pool(engine, connection, manager, counter, pool_uuid).await {
-                    Ok((pp, dp)) => (
+                    Ok((pp, fp, dp)) => (
                         OwnedObjectPath::from(pp),
+                        fp.into_iter().map(OwnedObjectPath::from).collect(),
                         dp.into_iter().map(OwnedObjectPath::from).collect(),
                     ),
                     Err(e) => {

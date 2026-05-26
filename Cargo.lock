@@ -1054,9 +1054,9 @@ checksum = "bcc35a38544a891a5f7c865aca548a982ccb3b8650a5b06d0fd33a10283c56fc"
 
 [[package]]
 name = "libcryptsetup-rs"
-version = "0.15.1"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "362fea7a92655943de241f1efef3348afbd22a34d7efa601e1d9cb8732c7e6b2"
+checksum = "f286fe4775a01b8a2d2481b0395e023439746afe9ccdca23ed9dfec39584f8c8"
 dependencies = [
  "bitflags",
  "either",

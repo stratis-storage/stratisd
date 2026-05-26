@@ -12,7 +12,10 @@ use crate::{
         consts::OK_STRING,
         manager::Manager,
         types::DbusErrorEnum,
-        util::{engine_to_dbus_err_tuple, send_pool_foreground_signals},
+        util::{
+            engine_to_dbus_err_tuple, send_blockdev_physical_size_signal,
+            send_pool_foreground_signals,
+        },
     },
     engine::{DevUuid, Engine, EngineAction, Lockable, PoolIdentifier, PoolUuid},
     stratis::StratisError,
@@ -56,9 +59,17 @@ pub async fn grow_physical_device_method(
     .await
     {
         Ok(Ok((action, diff))) => match action.changed() {
-            Some(_) => {
+            Some((_, dev_uuid)) => {
                 if let Some(d) = diff {
                     send_pool_foreground_signals(connection, manager, pool_uuid, d).await;
+                    match manager.read().await.blockdev_get_path(&dev_uuid) {
+                        Some(p) => {
+                            send_blockdev_physical_size_signal(connection, p).await;
+                        }
+                        None => {
+                            warn!("No path found for blockdev with UUID {dev_uuid}");
+                        }
+                    }
                 }
                 (true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
             }

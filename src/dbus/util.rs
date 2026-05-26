@@ -15,7 +15,8 @@ use devicemapper::DmError;
 use crate::{
     dbus::{
         blockdev::{
-            BlockdevR3, BlockdevR4, BlockdevR5, BlockdevR6, BlockdevR7, BlockdevR8, BlockdevR9,
+            BlockdevR0, BlockdevR1, BlockdevR2, BlockdevR3, BlockdevR4, BlockdevR5, BlockdevR6,
+            BlockdevR7, BlockdevR8, BlockdevR9,
         },
         consts::STRATIS_BASE_PATH,
         filesystem::{
@@ -1998,5 +1999,91 @@ pub async fn send_last_reencrypted_signal(connection: &Arc<Connection>, path: &O
         last_reencrypted_timestamp_changed,
         "last reencryption timestamp",
         "pool.r9"
+    );
+}
+
+pub async fn send_blockdev_physical_size_signal(
+    connection: &Arc<Connection>,
+    path: &ObjectPath<'_>,
+) {
+    send_signal!(
+        connection,
+        BlockdevR0,
+        path,
+        total_physical_size_changed,
+        "total physical size",
+        "blockdev.r0"
+    );
+    send_signal!(
+        connection,
+        BlockdevR1,
+        path,
+        total_physical_size_changed,
+        "total physical size",
+        "blockdev.r1"
+    );
+    send_signal!(
+        connection,
+        BlockdevR2,
+        path,
+        total_physical_size_changed,
+        "total physical size",
+        "blockdev.r2"
+    );
+    send_signal!(
+        connection,
+        BlockdevR3,
+        path,
+        total_physical_size_changed,
+        "total physical size",
+        "blockdev.r3"
+    );
+    send_signal!(
+        connection,
+        BlockdevR4,
+        path,
+        total_physical_size_changed,
+        "total physical size",
+        "blockdev.r4"
+    );
+    send_signal!(
+        connection,
+        BlockdevR5,
+        path,
+        total_physical_size_changed,
+        "total physical size",
+        "blockdev.r5"
+    );
+    send_signal!(
+        connection,
+        BlockdevR6,
+        path,
+        total_physical_size_changed,
+        "total physical size",
+        "blockdev.r6"
+    );
+    send_signal!(
+        connection,
+        BlockdevR7,
+        path,
+        total_physical_size_changed,
+        "total physical size",
+        "blockdev.r7"
+    );
+    send_signal!(
+        connection,
+        BlockdevR8,
+        path,
+        total_physical_size_changed,
+        "total physical size",
+        "blockdev.r8"
+    );
+    send_signal!(
+        connection,
+        BlockdevR9,
+        path,
+        total_physical_size_changed,
+        "total physical size",
+        "blockdev.r9"
     );
 }

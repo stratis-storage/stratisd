@@ -393,10 +393,7 @@ impl StratBlockDev {
                 };
 
                 if let Err(e) = needs_rollback(self, size) {
-                    return Err(rollback(
-                        e,
-                        info.and_then(|os| self.underlying_device.crypt_handle().map(|h| (h, os))),
-                    ));
+                    return Err(rollback(e, self.underlying_device.crypt_handle().zip(info)));
                 }
 
                 Ok(true)

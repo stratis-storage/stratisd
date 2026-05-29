@@ -316,9 +316,7 @@ impl CapDevice {
     ) -> StratisResult<()> {
         let create = match (
             self.cache.as_mut(),
-            self.placeholder
-                .as_mut()
-                .and_then(|p| self.origin.as_mut().map(|o| (p, o))),
+            self.placeholder.as_mut().zip(self.origin.as_mut()),
             self.enc.as_mut(),
         ) {
             (None, None, None) => true,

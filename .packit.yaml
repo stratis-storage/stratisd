@@ -32,7 +32,6 @@ jobs:
       trigger: pull_request
       additional_repos:
           - copr://packit/stratis-storage-libcryptsetup-rs-master
-          - copr://packit/stratis-storage-devicemapper-rs-master
       targets:
           - fedora-all
 
@@ -42,7 +41,6 @@ jobs:
       preserve_project: true
       additional_repos:
           - copr://packit/stratis-storage-libcryptsetup-rs-master
-          - copr://packit/stratis-storage-devicemapper-rs-master
       targets:
           - fedora-all
 

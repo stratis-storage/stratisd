@@ -1057,7 +1057,7 @@ dependencies = [
  "bitflags",
  "either",
  "libc",
- "libcryptsetup-rs-sys",
+ "libcryptsetup-rs-sys 0.6.1",
  "log",
  "per-thread-mutex",
  "pkg-config",
@@ -1071,6 +1071,18 @@ name = "libcryptsetup-rs-sys"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "376e4a1f481c5f0b8354d370cfaf9f1322d56e628e2954c6b59c9729e6f4d5ee"
+dependencies = [
+ "bindgen",
+ "cc",
+ "pkg-config",
+ "semver",
+]
+
+[[package]]
+name = "libcryptsetup-rs-sys"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c86d52c28c902102488f8ddfb7f23abc01e7a58004b998f9c6d74c5f5aed1c0"
 dependencies = [
  "bindgen",
  "cc",
@@ -1698,7 +1710,7 @@ dependencies = [
  "libblkid-rs",
  "libc",
  "libcryptsetup-rs",
- "libcryptsetup-rs-sys",
+ "libcryptsetup-rs-sys 0.7.0",
  "libudev",
  "linux-raw-sys 0.12.1",
  "log",

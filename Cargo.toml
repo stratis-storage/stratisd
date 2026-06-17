@@ -131,12 +131,12 @@ version = "0.2.180"
 optional = true
 
 [dependencies.libcryptsetup-rs]
-version = "0.16.0"
+version = "0.16.1"
 features = ["mutex"]
 optional = true
 
 [dependencies.libcryptsetup-rs-sys]
-version = "0.6.0"
+version = "0.7.0"
 optional = true
 
 [dependencies.libudev]

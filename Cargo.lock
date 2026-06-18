@@ -1050,9 +1050,9 @@ checksum = "bcc35a38544a891a5f7c865aca548a982ccb3b8650a5b06d0fd33a10283c56fc"
 
 [[package]]
 name = "libcryptsetup-rs"
-version = "0.16.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f286fe4775a01b8a2d2481b0395e023439746afe9ccdca23ed9dfec39584f8c8"
+checksum = "1d35d55399665da6c50ed2962e0942a3a6bcada0efdb709ec71d204ec950e48a"
 dependencies = [
  "bitflags",
  "either",
@@ -1068,9 +1068,9 @@ dependencies = [
 
 [[package]]
 name = "libcryptsetup-rs-sys"
-version = "0.6.1"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "376e4a1f481c5f0b8354d370cfaf9f1322d56e628e2954c6b59c9729e6f4d5ee"
+checksum = "2c86d52c28c902102488f8ddfb7f23abc01e7a58004b998f9c6d74c5f5aed1c0"
 dependencies = [
  "bindgen",
  "cc",

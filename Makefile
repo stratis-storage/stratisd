@@ -79,6 +79,8 @@ EXTRAS_FEATURES =  --no-default-features --features engine,extras
 UDEV_FEATURES = --no-default-features --features udev_scripts
 UTILS_FEATURES = --no-default-features --features dbus_enabled,engine,systemd_compat
 
+FEATURE_OPTIONS_LIST = "" MIN_FEATURES NO_IPC_FEATURES SYSTEMD_FEATURES EXTRAS_FEATURES UDEV_FEATURES UTILS_FEATURES
+
 STATIC_FLAG = -C target-feature=+crt-static
 
 ## Run cargo license
@@ -141,6 +143,10 @@ build-tests:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${RUSTFLAGS}" \
 	cargo ${TEST} --no-run ${RELEASE_FLAG} ${${FEATURES}} ${TARGET_ARGS}
+
+## Build tests with each defined feature set enabled
+build-all-tests:
+	@$(foreach var, $(FEATURE_OPTIONS_LIST), $(MAKE) build-tests FEATURES=$(var); )
 
 ## Build stratis-utils only
 build-utils:

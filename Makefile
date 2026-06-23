@@ -140,7 +140,7 @@ build:
 build-tests:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${RUSTFLAGS}" \
-	cargo ${TEST} --no-run ${RELEASE_FLAG} ${TARGET_ARGS}
+	cargo ${TEST} --no-run ${RELEASE_FLAG} ${${FEATURES}} ${TARGET_ARGS}
 
 ## Build stratis-utils only
 build-utils:

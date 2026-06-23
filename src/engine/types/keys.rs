@@ -687,13 +687,11 @@ where
 }
 
 /// A data type representing a key description for the kernel keyring
-#[cfg(feature = "dbus_enabled")]
-#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize, Type, Value)]
-#[zvariant(signature = "s")]
-pub struct KeyDescription(String);
-
-/// A data type representing a key description for the kernel keyring
-#[cfg(not(feature = "dbus_enabled"))]
+#[cfg_attr(
+    feature = "dbus_enabled",
+    derive(Type, Value),
+    zvariant(signature = "s")
+)]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct KeyDescription(String);
 
@@ -744,20 +742,11 @@ impl VolumeKeyKeyDescription {
 }
 
 /// Use Clevis or keyring to unlock LUKS volume.
-#[cfg(feature = "dbus_enabled")]
-#[derive(
-    Serialize, Deserialize, Clone, Copy, Eq, PartialEq, Debug, EnumString, VariantNames, Type, Value,
+#[cfg_attr(
+    feature = "dbus_enabled",
+    derive(Type, Value),
+    zvariant(signature = "s")
 )]
-#[zvariant(signature = "s")]
-#[strum(serialize_all = "snake_case")]
-pub enum UnlockMethod {
-    Clevis,
-    Keyring,
-    Any,
-}
-
-/// Use Clevis or keyring to unlock LUKS volume.
-#[cfg(not(feature = "dbus_enabled"))]
 #[derive(Serialize, Deserialize, Clone, Copy, Eq, PartialEq, Debug, EnumString, VariantNames)]
 #[strum(serialize_all = "snake_case")]
 pub enum UnlockMethod {

@@ -152,12 +152,11 @@ pub enum BlockDevTier {
     Cache = 1,
 }
 
-#[cfg(feature = "dbus_enabled")]
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, Type, Value)]
-#[zvariant(signature = "s")]
-pub struct Name(String);
-
-#[cfg(not(feature = "dbus_enabled"))]
+#[cfg_attr(
+    feature = "dbus_enabled",
+    derive(Type, Value),
+    zvariant(signature = "s")
+)]
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct Name(String);
 

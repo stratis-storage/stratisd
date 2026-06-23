@@ -421,27 +421,27 @@ test-clevis-loop-should-fail-valgrind:
 
 ## Test stratisd-min CLI as root
 test-stratisd-min-root:
-	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test --no-default-features --features "engine,min" test_stratisd_min
+	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test ${MIN_FEATURES} test_stratisd_min
 
 ## Test stratisd-min CLI
 test-stratisd-min:
-	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test --no-default-features --features "engine,min" test_stratisd_min
+	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test ${MIN_FEATURES} test_stratisd_min
 
 ## Test stratis-min CLI
 test-stratis-min-root:
-	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test --no-default-features --features "engine,min" test_stratis_min
+	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test ${MIN_FEATURES} test_stratis_min
 
 ## Test stratis-min CLI
 test-stratis-min:
-	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test --no-default-features --features "engine,min" test_stratis_min
+	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test ${MIN_FEATURES} test_stratis_min
 
 ## Test stratisd-tools CLI
 test-stratisd-tools:
-	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test --no-default-features --features "engine,extras" test_stratisd_tools
+	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test ${EXTRAS_FEATURES} test_stratisd_tools
 
 ## Test stratis-utils
 test-stratis-utils:
-	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test --no-default-features --features "dbus_enabled,engine" test_stratis_utils
+	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test ${UTILS_FEATURES} test_stratis_utils
 
 ## Run yamllint on workflow files
 yamllint:

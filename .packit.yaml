@@ -31,7 +31,7 @@ jobs:
       identifier: copr_pull
       trigger: pull_request
       additional_repos:
-          - copr://packit/stratis-storage-libcryptsetup-rs-master?priority=10
+          - copr://packit/stratis-storage-libcryptsetup-rs-493?priority=10
       targets:
           - fedora-all
 

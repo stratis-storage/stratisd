@@ -1,6 +1,9 @@
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+#![cfg(all(feature = "engine", feature = "min"))]
+
 use assert_cmd::prelude::{CommandCargoExt, OutputAssertExt};
 use std::process::Command;
 use std::{thread, time};

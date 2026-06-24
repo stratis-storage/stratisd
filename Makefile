@@ -79,6 +79,8 @@ EXTRAS_FEATURES =  --no-default-features --features engine,extras
 UDEV_FEATURES = --no-default-features --features udev_scripts
 UTILS_FEATURES = --no-default-features --features dbus_enabled,engine,systemd_compat
 
+FEATURE_OPTIONS_LIST = "" MIN_FEATURES NO_IPC_FEATURES SYSTEMD_FEATURES EXTRAS_FEATURES UDEV_FEATURES UTILS_FEATURES
+
 STATIC_FLAG = -C target-feature=+crt-static
 
 ## Run cargo license
@@ -140,7 +142,11 @@ build:
 build-tests:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${RUSTFLAGS}" \
-	cargo ${TEST} --no-run ${RELEASE_FLAG} ${TARGET_ARGS}
+	cargo ${TEST} --no-run ${RELEASE_FLAG} ${${FEATURES}} ${TARGET_ARGS}
+
+## Build tests with each defined feature set enabled
+build-all-tests:
+	@$(foreach var, $(FEATURE_OPTIONS_LIST), $(MAKE) build-tests FEATURES=$(var); )
 
 ## Build stratis-utils only
 build-utils:
@@ -415,27 +421,27 @@ test-clevis-loop-should-fail-valgrind:
 
 ## Test stratisd-min CLI as root
 test-stratisd-min-root:
-	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test --no-default-features --features "engine,min" test_stratisd_min
+	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test ${MIN_FEATURES} test_stratisd_min
 
 ## Test stratisd-min CLI
 test-stratisd-min:
-	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test --no-default-features --features "engine,min" test_stratisd_min
+	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test ${MIN_FEATURES} test_stratisd_min
 
 ## Test stratis-min CLI
 test-stratis-min-root:
-	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test --no-default-features --features "engine,min" test_stratis_min
+	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test ${MIN_FEATURES} test_stratis_min
 
 ## Test stratis-min CLI
 test-stratis-min:
-	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test --no-default-features --features "engine,min" test_stratis_min
+	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test ${MIN_FEATURES} test_stratis_min
 
 ## Test stratisd-tools CLI
 test-stratisd-tools:
-	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test --no-default-features --features "engine,extras" test_stratisd_tools
+	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test ${EXTRAS_FEATURES} test_stratisd_tools
 
 ## Test stratis-utils
 test-stratis-utils:
-	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test --no-default-features --features "dbus_enabled,engine" test_stratis_utils
+	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test ${UTILS_FEATURES} test_stratis_utils
 
 ## Run yamllint on workflow files
 yamllint:

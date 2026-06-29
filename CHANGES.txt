@@ -1,3 +1,33 @@
+stratisd 3.9.2
+==============
+Recommended development platform for Python development: Fedora 43
+
+- Take advantage of zbus bug fix:
+  https://github.com/stratis-storage/stratisd/pull/4055
+  https://github.com/stratis-storage/stratisd/pull/4008
+
+- Use cfg_attr to conditionally add D-Bus related attributes:
+  https://github.com/stratis-storage/stratisd/pull/4046
+
+- Increase itertools dependency lower bound to 0.15.0:
+  https://github.com/stratis-storage/stratisd/pull/4041
+
+- Increase loopdev-3 dependency lower bound to 0.5.3:
+  https://github.com/stratis-storage/stratisd/pull/4045
+
+- Increase assert_cmd dependency lower bound to 2.2.0:
+  https://github.com/stratis-storage/stratisd/pull/4044
+  https://github.com/stratis-storage/stratisd/pull/4042
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/4053
+  https://github.com/stratis-storage/stratisd/pull/4052
+  https://github.com/stratis-storage/stratisd/pull/4051
+  https://github.com/stratis-storage/stratisd/pull/4050
+  https://github.com/stratis-storage/stratisd/pull/4049
+  https://github.com/stratis-storage/stratisd/pull/4043
+
+
 stratisd 3.9.1
 ==============
 Recommended development platform for Python development: Fedora 43

@@ -1,3 +1,23 @@
+stratisd 3.9.2
+==============
+Recommended development platform for Python development: Fedora 43
+
+- Use cfg_attr to conditionally add D-Bus related attributes:
+  https://github.com/stratis-storage/stratisd/pull/4046
+
+- Increase itertools dependency lower bound to 0.15.0:
+  https://github.com/stratis-storage/stratisd/pull/4041
+
+- Increase loopdev-3 dependency lower bound to 0.5.3:
+  https://github.com/stratis-storage/stratisd/pull/4045
+
+- Increase assert_cmd dependency lower bound to 2.2.0:
+  https://github.com/stratis-storage/stratisd/pull/4044
+  https://github.com/stratis-storage/stratisd/pull/4042
+
+- Tidies and Maintenance:
+
+
 stratisd 3.9.1
 ==============
 Recommended development platform for Python development: Fedora 43

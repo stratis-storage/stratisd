@@ -321,7 +321,7 @@ impl StaticHeader {
     /// copies and if one validates but one does not, re-write the one that is incorrect or leave
     /// it be, depending on the closure parameter.  If both
     /// copies are valid, but one is newer than the other, rewrite the older one to match or leave
-    /// it be depending on the closure paraemter.
+    /// it be depending on the closure parameter.
     /// Return None if it's not a Stratis device.
     /// Return an error if the metadata seems to indicate that the device is
     /// a Stratis device, but no well-formed signature block could be read.

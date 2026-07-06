@@ -570,11 +570,14 @@ class UdevTest(unittest.TestCase):
         :rtype: list of (str * MOPool)
         """
         try:
+            known_pools = None
             for attempt in Retrying(
                 retry=(
                     retry_if_exception_type(dbus.exceptions.DBusException)
                     | retry_if_not_result(
-                        lambda known_pools: len(known_pools) == expected_num
+                        lambda known_pools: (
+                            known_pools is not None and len(known_pools) == expected_num
+                        )
                     )
                 ),
                 wait=wait_fixed(3),
@@ -583,7 +586,7 @@ class UdevTest(unittest.TestCase):
             ):
                 with attempt:
                     known_pools = get_pools(name=name)
-                attempt.retry_state.set_result(known_pools)
+                    attempt.retry_state.set_result(known_pools)
         except dbus.exceptions.DBusException as err:
             raise RuntimeError(
                 "Failed to obtain any information about pools from the D-Bus"

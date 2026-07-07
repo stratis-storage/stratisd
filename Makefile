@@ -190,6 +190,7 @@ clean-ancillary:
 	rm -fv $(DESTDIR)$(BINDIR)/stratis-predict-usage
 	rm -fv $(DESTDIR)$(BINDIR)/stratisd-tools
 	rm -fv $(DESTDIR)$(BINDIR)/stratis-dumpmetadata
+	rm -fv $(DESTDIR)$(BINDIR)/stratis-decode-dm
 	rm -fv $(DESTDIR)$(UNITGENDIR)/stratis-setup-generator
 	rm -fv $(DESTDIR)$(UNITGENDIR)/stratis-clevis-setup-generator
 	rm -fv $(DESTDIR)$(UNITEXECDIR)/stratis-fstab-setup

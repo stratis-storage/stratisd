@@ -39,7 +39,7 @@ jobs:
         include:
           - task: make -f Makefile clippy
             components: clippy
-          - task: PROFILEDIR=debug make -f Makefile build
+          - task: PROFILEDIR=debug make -f Makefile stratisd
             components: cargo
           - task: PROFILEDIR=debug make -f Makefile build-min
             components: cargo
@@ -55,7 +55,7 @@ jobs:
             components: cargo
           - task: make -f Makefile test
             components: cargo
-          - task: make -f Makefile build
+          - task: make -f Makefile stratisd
             components: cargo
           - task: make -f Makefile build-min
             components: cargo

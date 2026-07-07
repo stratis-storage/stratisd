@@ -523,7 +523,7 @@ test-stratis-min:
 	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test --no-default-features --features "engine,min" test_stratis_min
 
 .PHONY: test-stratis-min-root
-## Test stratis-min CLI
+## Test stratis-min CLI as root
 test-stratis-min-root:
 	RUSTFLAGS="${RUSTFLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test --no-default-features --features "engine,min" test_stratis_min
 

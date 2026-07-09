@@ -28,7 +28,7 @@ jobs:
           device-mapper-devel
           git
           libblkid-devel
-          make
+          just
           ncurses
           openssl-devel
           python-requests
@@ -58,7 +58,7 @@ jobs:
           glibc-static
           git
           libblkid-devel
-          make
+          just
           ncurses
           openssl-devel
           systemd-devel
@@ -74,17 +74,17 @@ jobs:
       - name: Run cargo-update
         run: cargo update
       - name: Build all targets
-        run: make -f Makefile build-all-rust
+        run: just -f justfile build-all-rust
       - name: Run cargo-audit
-        run: make -f Makefile audit
+        run: just -f justfile audit
 
   cargo-audit-checks:
     continue-on-error: true
     strategy:
       matrix:
         include:
-          - task: make -f Makefile audit
-          - task: AUDITABLE=1 PROFILEDIR=debug make -f Makefile audit-all-rust
+          - task: just -f justfile audit
+          - task: AUDITABLE=1 PROFILEDIR=debug just -f justfile audit-all-rust
     runs-on: ubuntu-24.04
     container:
       image: fedora:43  # CURRENT DEVELOPMENT ENVIRONMENT
@@ -98,7 +98,7 @@ jobs:
           git
           glibc-static
           libblkid-devel
-          make
+          just
           ncurses
           openssl-devel
           python-requests
@@ -133,7 +133,7 @@ jobs:
           device-mapper-devel
           git
           libblkid-devel
-          make
+          just
           ncurses
           openssl-devel
           python-requests
@@ -155,15 +155,15 @@ jobs:
           persist-credentials: false
       - name: Run comparisons of macro version specs with Fedora packages
         run: |
-          COMPARE_FEDORA_VERSIONS=$GITHUB_WORKSPACE/ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-high=libcryptsetup-rs --ignore-high=libcryptsetup-rs-sys --ignore-high=devicemapper --ignore-high=libblkid-rs" make -f ../Makefile check-fedora-versions
-          COMPARE_FEDORA_VERSIONS=$GITHUB_WORKSPACE/ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=f44 IGNORE_ARGS="--ignore-high=libcryptsetup-rs --ignore-high=libcryptsetup-rs-sys --ignore-high=devicemapper --ignore-high=libblkid-rs" make -f ../Makefile check-fedora-versions
-          COMPARE_FEDORA_VERSIONS=$GITHUB_WORKSPACE/ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=f43 IGNORE_ARGS="--ignore-high=libcryptsetup-rs --ignore-high=libcryptsetup-rs-sys --ignore-high=devicemapper --ignore-high=libblkid-rs" make -f ../Makefile check-fedora-versions
+          COMPARE_FEDORA_VERSIONS=$GITHUB_WORKSPACE/ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-high=libcryptsetup-rs --ignore-high=libcryptsetup-rs-sys --ignore-high=devicemapper --ignore-high=libblkid-rs" just -f ../Makefile check-fedora-versions
+          COMPARE_FEDORA_VERSIONS=$GITHUB_WORKSPACE/ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=f44 IGNORE_ARGS="--ignore-high=libcryptsetup-rs --ignore-high=libcryptsetup-rs-sys --ignore-high=devicemapper --ignore-high=libblkid-rs" just -f ../Makefile check-fedora-versions
+          COMPARE_FEDORA_VERSIONS=$GITHUB_WORKSPACE/ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=f43 IGNORE_ARGS="--ignore-high=libcryptsetup-rs --ignore-high=libcryptsetup-rs-sys --ignore-high=devicemapper --ignore-high=libblkid-rs" just -f ../Makefile check-fedora-versions
         working-directory: stratisd/stratisd_proc_macros
       - name: Run comparisons of version specs with available Fedora packages
         run: |
-          COMPARE_FEDORA_VERSIONS=$GITHUB_WORKSPACE/ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-high=libcryptsetup-rs --ignore-high=libcryptsetup-rs-sys --ignore-high=devicemapper --ignore-high=libblkid-rs" make -f Makefile check-fedora-versions
-          COMPARE_FEDORA_VERSIONS=$GITHUB_WORKSPACE/ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=f44 IGNORE_ARGS="--ignore-high=libcryptsetup-rs --ignore-high=libcryptsetup-rs-sys --ignore-high=devicemapper --ignore-high=libblkid-rs" make -f Makefile check-fedora-versions
-          COMPARE_FEDORA_VERSIONS=$GITHUB_WORKSPACE/ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=f43 IGNORE_ARGS="--ignore-high=libcryptsetup-rs --ignore-high=libcryptsetup-rs-sys --ignore-high=devicemapper --ignore-high=libblkid-rs" make -f Makefile check-fedora-versions
+          COMPARE_FEDORA_VERSIONS=$GITHUB_WORKSPACE/ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-high=libcryptsetup-rs --ignore-high=libcryptsetup-rs-sys --ignore-high=devicemapper --ignore-high=libblkid-rs" just -f justfile check-fedora-versions
+          COMPARE_FEDORA_VERSIONS=$GITHUB_WORKSPACE/ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=f44 IGNORE_ARGS="--ignore-high=libcryptsetup-rs --ignore-high=libcryptsetup-rs-sys --ignore-high=devicemapper --ignore-high=libblkid-rs" just -f justfile check-fedora-versions
+          COMPARE_FEDORA_VERSIONS=$GITHUB_WORKSPACE/ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=f43 IGNORE_ARGS="--ignore-high=libcryptsetup-rs --ignore-high=libcryptsetup-rs-sys --ignore-high=devicemapper --ignore-high=libblkid-rs" just -f justfile check-fedora-versions
         working-directory: stratisd
 
   python-based-tests:
@@ -184,7 +184,7 @@ jobs:
           libdevmapper-dev
           libsystemd-dev
           libudev-dev
-          make
+          just
           pkg-config
           thin-provisioning-tools
           udev
@@ -206,16 +206,16 @@ jobs:
         with:
           components: cargo
       - name: Build stratisd
-        run: PROFILEDIR=debug make -f Makefile build-all
+        run: PROFILEDIR=debug just -f justfile build-all
       - name: Install stratisd
-        run: sudo make PROFILEDIR=debug -f Makefile install
+        run: sudo just PROFILEDIR=debug -f Makefile install
       - name: Workaround for dbus inotify
         run: sudo cp stratisd.conf /usr/share/dbus-1/system.d
       - name: Reload udev
         run: sudo udevadm control --reload
       - name: Run some tests in client-dbus
         run: >
-          sudo make
+          sudo just
           RUST_LOG=stratisd=debug
           STRATISD=/usr/libexec/stratisd
           STRATIS_PREDICT_USAGE=/usr/bin/stratis-predict-usage

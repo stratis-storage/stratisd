@@ -47,13 +47,13 @@ jobs:
               python3-setuptools
               python3-tenacity
               ruff
-            task: PATH=${PATH}:/github/home/.local/bin make -f Makefile lint
+            task: PATH=${PATH}:/github/home/.local/bin just -f justfile lint
             working-directory: ./tests/client-dbus
           - dependencies: ruff
-            task: make -f Makefile fmt-ci
+            task: just -f justfile fmt-ci
             working-directory: ./tests/client-dbus
           - dependencies: yamllint tmt
-            task: make -f Makefile yamllint tmtlint
+            task: just -f justfile yamllint tmtlint
             working-directory: .
     runs-on: ubuntu-24.04
     container: fedora:43  # CURRENT DEVELOPMENT ENVIRONMENT
@@ -63,7 +63,7 @@ jobs:
           dnf install -y
           git
           libatomic
-          make
+          just
           ncurses
           pip
           ${{ matrix.dependencies }}

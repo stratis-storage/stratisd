@@ -1,0 +1,57 @@
+# Configuration
+UNITTEST_OPTS := '--verbose'
+
+# Default recipe shows available commands
+_default:
+    @just --list
+
+# Run linting checks
+lint:
+    ruff check
+    pyright
+
+# Run startup tests
+startup-tests:
+    python3 -m unittest {{UNITTEST_OPTS}} tests.udev.test_startup
+
+# Run start tests
+start-tests:
+    python3 -m unittest {{UNITTEST_OPTS}} tests.udev.test_start
+
+# Run extend tests
+extend-tests:
+    python3 -m unittest {{UNITTEST_OPTS}} tests.udev.test_extend
+
+# Format code
+fmt:
+    ruff check --fix --select I
+    ruff format
+
+# Check formatting for CI
+fmt-ci:
+    ruff check --select I
+    ruff format --check
+
+# Run tang tests
+tang-tests:
+    python3 -m unittest {{UNITTEST_OPTS}} tests.udev.test_bind
+
+# Run udev tests
+udev-tests:
+    python3 -m unittest {{UNITTEST_OPTS}} tests.udev.test_udev
+
+# Run predict tests
+predict-tests:
+    python3 -m unittest {{UNITTEST_OPTS}} tests.udev.test_predict
+
+# Run filesystem predict tests
+filesystem-predict-tests:
+    python3 -m unittest {{UNITTEST_OPTS}} tests.misc.test_predict
+
+# Run dump metadata tests
+dump-metadata-tests:
+    python3 -m unittest {{UNITTEST_OPTS}} tests.udev.test_dump
+
+# Run revert tests
+revert-tests:
+    python3 -m unittest {{UNITTEST_OPTS}} tests.udev.test_revert

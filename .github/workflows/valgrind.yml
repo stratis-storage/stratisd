@@ -17,11 +17,11 @@ jobs:
     strategy:
       matrix:
         include:
-          - task: make -f Makefile test-valgrind
+          - task: just -f justfile test-valgrind
             components: cargo
           - task: >-
               TANG_URL=localhost
-              make -f Makefile test-clevis-loop-should-fail-valgrind
+              just -f justfile test-clevis-loop-should-fail-valgrind
             components: cargo
     runs-on: ubuntu-24.04
     container:
@@ -38,7 +38,7 @@ jobs:
           git
           jq
           libblkid-devel
-          make
+          just
           sudo
           systemd-devel
           valgrind
@@ -56,7 +56,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - task: RUST_LOG=stratisd=debug make -f Makefile test-loop-valgrind
+          - task: RUST_LOG=stratisd=debug just -f justfile test-loop-valgrind
             components: cargo
     runs-on: ubuntu-24.04
     container:
@@ -76,7 +76,7 @@ jobs:
           glibc-static
           jq
           libblkid-devel
-          make
+          just
           sudo
           systemd-devel
           systemd-udev
@@ -89,9 +89,9 @@ jobs:
         with:
           components: ${{ matrix.components }}
       - name: Build stratisd
-        run: PROFILEDIR=debug make -f Makefile build-all
+        run: PROFILEDIR=debug just -f justfile build-all
       - name: Install stratisd
-        run: PROFILEDIR=debug make -f Makefile install
+        run: PROFILEDIR=debug just -f justfile install
       - name: Reload udev
         run: udevadm control --reload
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
@@ -115,7 +115,7 @@ jobs:
           libdevmapper-dev
           libsystemd-dev
           libudev-dev
-          make
+          just
           pkg-config
           thin-provisioning-tools
           udev
@@ -137,16 +137,16 @@ jobs:
         with:
           components: cargo
       - name: Build stratisd
-        run: PROFILEDIR=debug make -f Makefile build-all
+        run: PROFILEDIR=debug just -f justfile build-all
       - name: Install stratisd
-        run: sudo make PROFILEDIR=debug -f Makefile install
+        run: sudo just PROFILEDIR=debug -f Makefile install
       - name: Workaround for dbus inotify
         run: sudo cp stratisd.conf /usr/share/dbus-1/system.d
       - name: Reload udev
         run: sudo udevadm control --reload
       - name: Tests on ${{ matrix.image }} using Rust ${{ matrix.toolchain }}
         run: >
-          sudo make
+          sudo just
           RUST_LOG=stratisd=debug
           STRATISD="valgrind --leak-check=full --num-callers=500 /usr/libexec/stratisd"
           PYTHONPATH=./src
@@ -181,7 +181,7 @@ jobs:
           git
           glibc-static
           libblkid-devel
-          make
+          just
           ncurses
           python3-dbus
           python3-dbus-client-gen
@@ -200,9 +200,9 @@ jobs:
         with:
           components: cargo
       - name: Build stratisd
-        run: PROFILEDIR=debug make -f Makefile build-all
+        run: PROFILEDIR=debug just -f justfile build-all
       - name: Install stratisd
-        run: PROFILEDIR=debug make -f Makefile install
+        run: PROFILEDIR=debug just -f justfile install
       - name: Workaround for dbus inotify
         run: cp stratisd.conf /usr/share/dbus-1/system.d
       - name: Reload udev
@@ -213,5 +213,5 @@ jobs:
           RUST_LOG=stratisd=debug
           STRATISD="valgrind --leak-check=full --num-callers=500 /usr/libexec/stratisd"
           PYTHONPATH=./src
-          make -f Makefile tang-tests
+          just -f justfile tang-tests
         working-directory: ./tests/client-dbus

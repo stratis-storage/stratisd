@@ -229,17 +229,17 @@ where
 
         let meta_segments = {
             let ms = cache_tier_save.blockdev.allocs[1]
-            .iter()
-            .map(&mapper)
-            .collect::<StratisResult<Vec<_>>>()?;
+                .iter()
+                .map(&mapper)
+                .collect::<StratisResult<Vec<_>>>()?;
             AllocatedAbove { inner: ms }
         };
 
         let cache_segments = {
             let cs = cache_tier_save.blockdev.allocs[0]
-            .iter()
-            .map(&mapper)
-            .collect::<StratisResult<Vec<_>>>()?;
+                .iter()
+                .map(&mapper)
+                .collect::<StratisResult<Vec<_>>>()?;
             AllocatedAbove { inner: cs }
         };
 

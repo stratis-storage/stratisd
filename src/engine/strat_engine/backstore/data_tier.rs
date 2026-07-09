@@ -213,9 +213,9 @@ where
         };
         let segments = {
             let s = data_tier_save.blockdev.allocs[0]
-            .iter()
-            .map(&mapper)
-            .collect::<StratisResult<Vec<_>>>()?;
+                .iter()
+                .map(&mapper)
+                .collect::<StratisResult<Vec<_>>>()?;
             AllocatedAbove { inner: s }
         };
 

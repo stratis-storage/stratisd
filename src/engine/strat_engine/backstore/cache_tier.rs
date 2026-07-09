@@ -227,22 +227,20 @@ where
             metadata_to_segment(&uuid_to_devno, ld)
         };
 
-        let meta_segments = match cache_tier_save.blockdev.allocs[1]
+        let meta_segments = {
+            let ms = cache_tier_save.blockdev.allocs[1]
             .iter()
             .map(&mapper)
-            .collect::<StratisResult<Vec<_>>>()
-        {
-            Ok(ms) => AllocatedAbove { inner: ms },
-            Err(e) => return Err(e),
+            .collect::<StratisResult<Vec<_>>>()?;
+            AllocatedAbove { inner: ms }
         };
 
-        let cache_segments = match cache_tier_save.blockdev.allocs[0]
+        let cache_segments = {
+            let cs = cache_tier_save.blockdev.allocs[0]
             .iter()
             .map(&mapper)
-            .collect::<StratisResult<Vec<_>>>()
-        {
-            Ok(cs) => AllocatedAbove { inner: cs },
-            Err(e) => return Err(e),
+            .collect::<StratisResult<Vec<_>>>()?;
+            AllocatedAbove { inner: cs }
         };
 
         Ok(CacheTier {

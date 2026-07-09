@@ -582,17 +582,15 @@ impl Backstore {
         };
         let enc = match (metadata_enc_enabled, has_header, passphrase.as_ref()) {
             (true, true, pass) => {
-                match CryptHandle::setup(crypt_physical_path, pool_uuid, token_slot, pass) {
-                    Ok(opt) => {
-                        if let Some(h) = opt {
-                            Some(Either::Right(h))
-                        } else {
-                            return Err(StratisError::Msg(
-                                "Metadata reported that encryption is enabled but no crypt header was found".to_string()
-                            ));
-                        }
+                {
+                    let opt = CryptHandle::setup(crypt_physical_path, pool_uuid, token_slot, pass)?;
+                    if let Some(h) = opt {
+                        Some(Either::Right(h))
+                    } else {
+                        return Err(StratisError::Msg(
+                            "Metadata reported that encryption is enabled but no crypt header was found".to_string()
+                        ));
                     }
-                    Err(e) => return Err(e),
                 }
             }
             (true, _, _) => {

@@ -211,13 +211,12 @@ where
         let mapper = |ld: &BaseDevSave| -> StratisResult<BlkDevSegment> {
             metadata_to_segment(&uuid_to_devno, ld)
         };
-        let segments = match data_tier_save.blockdev.allocs[0]
-            .iter()
-            .map(&mapper)
-            .collect::<StratisResult<Vec<_>>>()
-        {
-            Ok(s) => AllocatedAbove { inner: s },
-            Err(e) => return Err(e),
+        let segments = {
+            let s = data_tier_save.blockdev.allocs[0]
+                .iter()
+                .map(&mapper)
+                .collect::<StratisResult<Vec<_>>>()?;
+            AllocatedAbove { inner: s }
         };
 
         Ok(DataTier {

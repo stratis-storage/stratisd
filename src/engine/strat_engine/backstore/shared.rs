@@ -305,7 +305,7 @@ pub fn metadata_to_segment(
         .ok_or_else(|| {
             StratisError::Msg(format!(
                 "No block device corresponding to stratisd UUID {:?} found",
-                &parent
+                parent
             ))
         })
         .map(|device| {

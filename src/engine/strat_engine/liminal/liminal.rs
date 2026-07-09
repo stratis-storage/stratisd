@@ -1323,7 +1323,7 @@ fn setup_pool_legacy(
             StratisError::Msg(format!(
                 "There is a pool name conflict. The devices currently being processed have been identified as belonging to the pool with UUID {} and name {}, but a pool with the same name and UUID {} is already active",
                 pool_uuid,
-                &metadata.name,
+                metadata.name,
                 uuid
             ))
         );
@@ -1335,7 +1335,7 @@ fn setup_pool_legacy(
                 format!(
                     "There was an error encountered when calculating the block devices for pool with UUID {} and name {}",
                     pool_uuid,
-                    &metadata.name,
+                    metadata.name,
                 ),
                 Box::new(err)
             )),
@@ -1354,7 +1354,7 @@ fn setup_pool_legacy(
                 StratisError::Msg(format!(
                         "Some data devices in the set belonging to pool with UUID {} and name {} appear to be encrypted devices managed by Stratis, and some do not",
                         pool_uuid,
-                        &metadata.name
+                        metadata.name
                 ))
             );
         }
@@ -1404,7 +1404,7 @@ fn setup_pool(
                 StratisError::Msg(format!(
                     "There is a pool name conflict. The devices currently being processed have been identified as belonging to the pool with UUID {} and name {}, but a pool with the same name and UUID {} is already active",
                     pool_uuid,
-                    &metadata.name,
+                    metadata.name,
                     uuid
                 )));
     }
@@ -1415,7 +1415,7 @@ fn setup_pool(
                     format!(
                         "There was an error encountered when calculating the block devices for pool with UUID {} and name {}",
                         pool_uuid,
-                        &metadata.name,
+                        metadata.name,
                     ),
                     Box::new(err)
                 )),

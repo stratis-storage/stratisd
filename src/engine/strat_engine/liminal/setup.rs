@@ -228,7 +228,7 @@ pub fn get_blockdevs_legacy(
 
     let (mut datadevs, mut cachedevs): (Vec<v1::StratBlockDev>, Vec<v1::StratBlockDev>) =
         (vec![], vec![]);
-    for (_, info) in infos.iter() {
+    for info in infos.values() {
         match get_blockdev_legacy(
             info,
             &recorded_data_map,
@@ -318,7 +318,7 @@ pub fn get_blockdevs(
 
     let (mut datadevs, mut cachedevs): (Vec<v2::StratBlockDev>, Vec<v2::StratBlockDev>) =
         (vec![], vec![]);
-    for (_, info) in infos.iter() {
+    for info in infos.values() {
         match get_blockdev(
             info,
             &recorded_data_map,

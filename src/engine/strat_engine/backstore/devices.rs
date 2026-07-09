@@ -667,7 +667,7 @@ pub fn initialize_devices_legacy(
             .map(|(handle, devno, devsize)| {
                 debug!(
                     "Info on physical device {}, logical device {}",
-                    &dev_info.devnode.display(),
+                    dev_info.devnode.display(),
                     handle.activated_device_path().display(),
                 );
                 debug!(

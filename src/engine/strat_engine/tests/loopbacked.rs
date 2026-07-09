@@ -105,7 +105,7 @@ fn get_devices(count: usize, size: Option<Sectors>, dir: &Path) -> Vec<LoopTestD
     let mut loop_devices = Vec::new();
 
     for index in 0..count {
-        let path = dir.join(format!("store{}", &index));
+        let path = dir.join(format!("store{}", index));
         loop_devices.push(LoopTestDev::new(&lc, &path, size));
     }
     loop_devices

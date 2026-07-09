@@ -34,7 +34,7 @@ impl fmt::Display for StratSectorSizes {
             f,
             "base: {}, crypt: {}",
             self.base,
-            &self
+            self
                 .crypt
                 .map(|sz| sz.to_string())
                 .unwrap_or("None".to_string())

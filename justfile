@@ -107,7 +107,7 @@ build-tests:
     cargo {{TEST}} --no-run {{RELEASE_FLAG}} {{TARGET_ARGS}}
 
 # Build stratis-base32-decode and stratis-str-cmp statically
-build-udev-utils: stratis-str-cmp stratis-base32-decode
+build-udev-utils: (build-udev-util 'stratis-str-cmp') (build-udev-util 'stratis-base32-decode')
 
 # Build stratis-utils only
 build-utils:
@@ -295,16 +295,22 @@ install-udev-cfg:
     mkdir -p {{UDEVDIR}}/rules.d
     {{INSTALL}} -Dpm0644 -t {{UDEVDIR}}/rules.d udev/61-stratisd.rules
 
-# Build stratis-base32-decode binary
-stratis-base32-decode:
+# Build a static udev utility binary
+build-udev-util binary:
     PKG_CONFIG_ALLOW_CROSS=1 \
     RUSTFLAGS="{{RUSTFLAGS}}" \
     cargo {{RUSTC}} {{RELEASE_FLAG}} \
-    --bin=stratis-base32-decode \
+    --bin={{binary}} \
     {{UDEV_FEATURES}} \
     {{TARGET_ARGS}} \
     -- {{STATIC_FLAG}}
-    @ldd target/{{PROFILEDIR}}/stratis-base32-decode | grep --quiet --silent "statically linked" || (echo "stratis-base32-decode is not statically linked" && exit 1)
+    @ldd target/{{PROFILEDIR}}/{{binary}} | grep --quiet --silent "statically linked" || (echo "{{binary}} is not statically linked" && exit 1)
+
+# Build stratis-base32-decode binary
+stratis-base32-decode: (build-udev-util 'stratis-base32-decode')
+
+# Build stratis-str-cmp binary
+stratis-str-cmp: (build-udev-util 'stratis-str-cmp')
 
 # Build stratis-min for early userspace
 stratis-min:
@@ -312,17 +318,6 @@ stratis-min:
     RUSTFLAGS="{{RUSTFLAGS}}" \
     cargo {{BUILD}} {{RELEASE_FLAG}} \
     --bin=stratis-min {{MIN_FEATURES}} {{TARGET_ARGS}}
-
-# Build stratis-str-cmp binary
-stratis-str-cmp:
-    PKG_CONFIG_ALLOW_CROSS=1 \
-    RUSTFLAGS="{{RUSTFLAGS}}" \
-    cargo {{RUSTC}} {{RELEASE_FLAG}} \
-    --bin=stratis-str-cmp \
-    {{UDEV_FEATURES}} \
-    {{TARGET_ARGS}} \
-    -- {{STATIC_FLAG}}
-    @ldd target/{{PROFILEDIR}}/stratis-str-cmp | grep --quiet --silent "statically linked" || (echo "stratis-str-cmp is not statically linked" && exit 1)
 
 # Build stratisd
 stratisd:

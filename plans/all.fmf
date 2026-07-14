@@ -62,3 +62,7 @@ execute:
   execute:
     how: tmt
     exit-first: false
+
+/systemd:
+  discover+:
+    filter: "tag:systemd"

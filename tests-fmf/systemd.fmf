@@ -1,0 +1,6 @@
+path: /
+tag: systemd
+
+/verify:
+  summary: Check systemd information
+  test: systemd-analyze verify $(ls /usr/lib/systemd/system/stratis*.service)

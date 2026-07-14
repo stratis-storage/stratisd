@@ -5,7 +5,7 @@
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
-use zbus::{Connection, Error};
+use zbus::{fdo::Error, Connection};
 
 use crate::{
     dbus::{
@@ -32,7 +32,7 @@ pub async fn set_user_info_prop(
     let (pool_name, _, pool) = guard.as_mut_tuple();
     if pool
         .get_blockdev(dev_uuid)
-        .ok_or_else(|| Error::Failure(format!("Blockdev with UUID {dev_uuid} not found")))?
+        .ok_or_else(|| Error::Failed(format!("Blockdev with UUID {dev_uuid} not found")))?
         .1
         .user_info()
         == user_info
@@ -40,7 +40,7 @@ pub async fn set_user_info_prop(
         Ok(false)
     } else {
         pool.set_blockdev_user_info(&pool_name, dev_uuid, user_info)
-            .map_err(|e| Error::Failure(e.to_string()))?;
+            .map_err(|e| Error::Failed(e.to_string()))?;
         Ok(true)
     }
 }

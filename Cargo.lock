@@ -1671,7 +1671,7 @@ dependencies = [
 
 [[package]]
 name = "stratisd"
-version = "3.9.2"
+version = "3.10.0"
 dependencies = [
  "assert_cmd",
  "assert_matches",

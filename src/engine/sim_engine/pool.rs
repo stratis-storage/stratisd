@@ -224,6 +224,20 @@ impl Pool for SimPool {
         }
     }
 
+    fn remove_cache(
+        &mut self,
+        _pool_uuid: PoolUuid,
+        _pool_name: &str,
+    ) -> StratisResult<SetDeleteAction<DevUuid, ()>> {
+        if self.has_cache() {
+            let uuids: Vec<_> = self.cache_devs.keys().cloned().collect();
+            self.cache_devs.clear();
+            Ok(SetDeleteAction::new(uuids, vec![]))
+        } else {
+            Ok(SetDeleteAction::empty())
+        }
+    }
+
     fn create_filesystems(
         &mut self,
         _pool_name: &str,

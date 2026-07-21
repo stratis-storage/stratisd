@@ -674,6 +674,28 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action("NoRequests")]
+    fn remove_cache(
+        &mut self,
+        pool_uuid: PoolUuid,
+        pool_name: &str,
+    ) -> StratisResult<SetDeleteAction<DevUuid, ()>> {
+        if !self.has_cache() {
+            return Ok(SetDeleteAction::empty());
+        }
+
+        let cache_uuids: Vec<_> = self
+            .backstore
+            .cachedevs()
+            .into_iter()
+            .map(|(uuid, _)| uuid)
+            .collect();
+
+        self.backstore.remove_cache(pool_uuid)?;
+        self.write_metadata(pool_name)?;
+        Ok(SetDeleteAction::new(cache_uuids, vec![]))
+    }
+
+    #[pool_mutating_action("NoRequests")]
     fn bind_clevis(
         &mut self,
         name: &Name,

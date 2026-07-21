@@ -18,6 +18,7 @@ use crate::{
 
 mod filesystem_3_0;
 mod filesystem_3_1;
+mod filesystem_3_10;
 mod filesystem_3_2;
 mod filesystem_3_3;
 mod filesystem_3_4;
@@ -30,6 +31,7 @@ mod shared;
 
 pub use filesystem_3_0::FilesystemR0;
 pub use filesystem_3_1::FilesystemR1;
+pub use filesystem_3_10::FilesystemR10;
 pub use filesystem_3_2::FilesystemR2;
 pub use filesystem_3_3::FilesystemR3;
 pub use filesystem_3_4::FilesystemR4;
@@ -145,6 +147,15 @@ pub async fn register_filesystem<'a>(
         uuid,
     )
     .await?;
+    FilesystemR10::register(
+        engine.clone(),
+        connection,
+        manager,
+        path.clone(),
+        pool_uuid,
+        uuid,
+    )
+    .await?;
 
     Ok(path)
 }
@@ -173,6 +184,7 @@ pub async fn unregister_filesystem(
     FilesystemR7::unregister(connection, path.clone()).await?;
     FilesystemR8::unregister(connection, path.clone()).await?;
     FilesystemR9::unregister(connection, path.clone()).await?;
+    FilesystemR10::unregister(connection, path.clone()).await?;
 
     Ok(uuid)
 }

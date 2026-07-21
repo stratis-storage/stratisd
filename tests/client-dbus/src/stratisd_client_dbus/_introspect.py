@@ -14,8 +14,8 @@ SPECS = {
     </signal>
   </interface>
 """,
-    "org.storage.stratis3.Manager.r9": """
-<interface name="org.storage.stratis3.Manager.r9">
+    "org.storage.stratis3.Manager.r10": """
+<interface name="org.storage.stratis3.Manager.r10">
     <method name="CreatePool">
       <arg name="name" type="s" direction="in" />
       <arg name="devices" type="as" direction="in" />
@@ -84,8 +84,8 @@ SPECS = {
     </property>
   </interface>
 """,
-    "org.storage.stratis3.Report.r9": """
-<interface name="org.storage.stratis3.Report.r9">
+    "org.storage.stratis3.Report.r10": """
+<interface name="org.storage.stratis3.Report.r10">
     <method name="GetReport">
       <arg name="name" type="s" direction="in" />
       <arg name="result" type="s" direction="out" />
@@ -94,8 +94,8 @@ SPECS = {
     </method>
   </interface>
 """,
-    "org.storage.stratis3.blockdev.r9": """
-<interface name="org.storage.stratis3.blockdev.r9">
+    "org.storage.stratis3.blockdev.r10": """
+<interface name="org.storage.stratis3.blockdev.r10">
     <property name="Devnode" type="s" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>
@@ -122,8 +122,8 @@ SPECS = {
     </property>
   </interface>
 """,
-    "org.storage.stratis3.filesystem.r9": """
-<interface name="org.storage.stratis3.filesystem.r9">
+    "org.storage.stratis3.filesystem.r10": """
+<interface name="org.storage.stratis3.filesystem.r10">
     <method name="SetName">
       <arg name="name" type="s" direction="in" />
       <arg name="result" type="(bs)" direction="out" />
@@ -150,8 +150,8 @@ SPECS = {
     </property>
   </interface>
 """,
-    "org.storage.stratis3.pool.r9": """
-<interface name="org.storage.stratis3.pool.r9">
+    "org.storage.stratis3.pool.r10": """
+<interface name="org.storage.stratis3.pool.r10">
     <method name="AddCacheDevs">
       <arg name="devices" type="as" direction="in" />
       <arg name="results" type="(bao)" direction="out" />

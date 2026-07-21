@@ -879,6 +879,53 @@ impl Backstore {
         }
     }
 
+    /// Remove caching from the pool. Removes the dm-cache device and
+    /// its cache-sub and meta-sub sub-devices, preserving the origin
+    /// device. Wipes the cache blockdevs and removes the cache tier.
+    ///
+    /// The caller is responsible for suspending the thinpool before
+    /// calling this method, redirecting the thinpool to the new
+    /// backstore device via set_device, and resuming the thinpool.
+    ///
+    /// Precondition: self.cache_tier.is_some() && self.cache.is_some()
+    /// Postcondition: self.cache_tier.is_none() && self.cache.is_none()
+    ///                && self.linear.is_some()
+    ///
+    /// WARNING: metadata changing event
+    pub fn remove_cache(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        let mut cache_tier = self
+            .cache_tier
+            .take()
+            .ok_or_else(|| StratisError::Msg("Pool does not have a cache".to_string()))?;
+
+        self.cache
+            .take()
+            .expect("cache_tier.is_some() <=> self.cache.is_some()");
+
+        // Remove cache, cache-sub, and meta-sub DM devices.
+        // The origin-sub device is preserved.
+        // Order matters: cache must be removed before its sub-devices.
+        let (cache_name, _) = format_backstore_ids(pool_uuid, CacheRole::Cache);
+        let (cache_sub_name, _) = format_backstore_ids(pool_uuid, CacheRole::CacheSub);
+        let (meta_sub_name, _) = format_backstore_ids(pool_uuid, CacheRole::MetaSub);
+        remove_optional_devices(vec![cache_name, cache_sub_name, meta_sub_name])?;
+
+        // The OriginSub DM device still exists in the kernel.
+        // Re-wrap it as a LinearDev.
+        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
+        let origin = LinearDev::setup(
+            get_dm(),
+            &dm_name,
+            Some(&dm_uuid),
+            self.data_tier.segments.map_to_dm(),
+        )?;
+        self.linear = Some(origin);
+
+        cache_tier.destroy()?;
+
+        Ok(())
+    }
+
     pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
         self.data_tier.grow(dev)
     }

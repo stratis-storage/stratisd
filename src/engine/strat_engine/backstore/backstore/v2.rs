@@ -17,7 +17,8 @@ use tempfile::TempDir;
 
 use devicemapper::{
     CacheDev, CacheDevTargetTable, CacheTargetParams, DevId, Device, DmDevice, DmFlags, DmOptions,
-    LinearDev, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine, TargetTable,
+    LinearDev, LinearDevTargetParams, LinearDevTargetTable, LinearTargetParams, Sectors,
+    TargetLine, TargetTable,
 };
 
 use crate::{
@@ -1299,6 +1300,79 @@ impl Backstore {
                 )),
             },
         }
+    }
+
+    /// Remove caching from the pool. Replaces the dm-cache table on the
+    /// CacheRole::Cache device with a linear table pointing at the origin,
+    /// tears down the now-orphaned cache-sub and meta-sub devices, wipes
+    /// the cache blockdevs, and removes the cache tier.
+    ///
+    /// Precondition: self.cache_tier.is_some() && self.cap_device.cache.is_some()
+    /// Postcondition: self.cache_tier.is_none() && self.cap_device.cache.is_none()
+    ///                && self.cap_device.origin.is_some()
+    ///                && self.cap_device.placeholder.is_some()
+    ///
+    /// WARNING: metadata changing event
+    pub fn remove_cache(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        let mut cache_tier = self
+            .cache_tier
+            .take()
+            .ok_or_else(|| StratisError::Msg("Pool does not have a cache".to_string()))?;
+
+        self.cap_device
+            .cache
+            .take()
+            .expect("cache_tier.is_some() <=> self.cap_device.cache.is_some()");
+
+        let dm = get_dm();
+
+        // Recreate the origin linear device. init_cache consumed it via
+        // .take(), so cap_device.origin is None; rebuild from data tier
+        // segments.
+        let (origin_name, origin_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
+        let origin = LinearDev::setup(
+            dm,
+            &origin_name,
+            Some(&origin_uuid),
+            self.data_tier.segments.map_to_dm(),
+        )?;
+
+        // Suspend the CacheRole::Cache device (currently a dm-cache target).
+        let (dm_name, _) = format_backstore_ids(pool_uuid, CacheRole::Cache);
+        dm.device_suspend(
+            &DevId::Name(&dm_name),
+            DmOptions::default().set_flags(DmFlags::DM_SUSPEND),
+        )?;
+
+        // Replace the cache table with a linear table pointing at the
+        // origin — same shape as make_placeholder_dev.
+        let table = vec![TargetLine::new(
+            Sectors(0),
+            origin.size(),
+            LinearDevTargetParams::Linear(LinearTargetParams::new(origin.device(), Sectors(0))),
+        )];
+        let raw_table = LinearDevTargetTable::new(table.clone()).to_raw_table();
+        dm.table_load(&DevId::Name(&dm_name), &raw_table, DmOptions::default())?;
+
+        // Resume with the new linear table.
+        dm.device_suspend(&DevId::Name(&dm_name), DmOptions::private())?;
+
+        // Tear down the now-orphaned cache-sub and meta-sub devices.
+        let (cache_sub_name, _) = format_backstore_ids(pool_uuid, CacheRole::CacheSub);
+        let (meta_sub_name, _) = format_backstore_ids(pool_uuid, CacheRole::MetaSub);
+        remove_optional_devices(vec![cache_sub_name, meta_sub_name])?;
+
+        // Wrap the CacheRole::Cache device as a LinearDev placeholder.
+        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::Cache);
+        let placeholder = LinearDev::setup(dm, &dm_name, Some(&dm_uuid), table)?;
+
+        self.cap_device.origin = Some(origin);
+        self.cap_device.placeholder = Some(placeholder);
+
+        // Wipe the cache tier blockdevs.
+        cache_tier.destroy()?;
+
+        Ok(())
     }
 
     pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {

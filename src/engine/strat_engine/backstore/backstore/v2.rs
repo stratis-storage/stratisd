@@ -58,6 +58,8 @@ use crate::{
 /// typical size.
 const CACHE_BLOCK_SIZE: Sectors = Sectors(2048); // 1024 KiB
 
+type MakeCacheError = Box<(StratisError, Option<LinearDev>, Option<LinearDev>)>;
+
 /// Make a DM cache device. If the cache device is being made new,
 /// take extra steps to make it clean.
 fn make_cache(
@@ -66,39 +68,49 @@ fn make_cache(
     origin: LinearDev,
     cap: Option<LinearDev>,
     new: bool,
-) -> StratisResult<CacheDev> {
+) -> Result<CacheDev, MakeCacheError> {
     let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::MetaSub);
-    let meta = LinearDev::setup(
+    let meta = match LinearDev::setup(
         get_dm(),
         &dm_name,
         Some(&dm_uuid),
         cache_tier.meta_segments.map_to_dm(),
-    )?;
+    ) {
+        Ok(m) => m,
+        Err(e) => return Err(Box::new((e.into(), Some(origin), cap))),
+    };
 
     if new {
         // See comment in ThinPool::new() method
-        wipe_sectors(
+        if let Err(e) = wipe_sectors(
             meta.devnode(),
             Sectors(0),
             cmp::min(Sectors(8), meta.size()),
-        )?;
+        ) {
+            return Err(Box::new((e, Some(origin), cap)));
+        }
     }
 
     let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::CacheSub);
-    let cache = LinearDev::setup(
+    let cache = match LinearDev::setup(
         get_dm(),
         &dm_name,
         Some(&dm_uuid),
         cache_tier.cache_segments.map_to_dm(),
-    )?;
+    ) {
+        Ok(c) => c,
+        Err(e) => return Err(Box::new((e.into(), Some(origin), cap))),
+    };
 
     let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::Cache);
     if cap.is_some() {
         let dm = get_dm();
-        dm.device_suspend(
+        if let Err(e) = dm.device_suspend(
             &DevId::Name(&dm_name),
             DmOptions::default().set_flags(DmFlags::DM_SUSPEND),
-        )?;
+        ) {
+            return Err(Box::new((e.into(), Some(origin), cap)));
+        }
         let table = CacheDevTargetTable::new(
             Sectors(0),
             origin.size(),
@@ -112,14 +124,18 @@ fn make_cache(
                 Vec::new(),
             ),
         );
-        dm.table_load(
+        if let Err(e) = dm.table_load(
             &DevId::Name(&dm_name),
             &table.to_raw_table(),
             DmOptions::default(),
-        )?;
-        dm.device_suspend(&DevId::Name(&dm_name), DmOptions::private())?;
+        ) {
+            return Err(Box::new((e.into(), Some(origin), cap)));
+        }
+        if let Err(e) = dm.device_suspend(&DevId::Name(&dm_name), DmOptions::private()) {
+            return Err(Box::new((e.into(), Some(origin), cap)));
+        }
     };
-    Ok(CacheDev::setup(
+    match CacheDev::setup(
         get_dm(),
         &dm_name,
         Some(&dm_uuid),
@@ -127,7 +143,10 @@ fn make_cache(
         cache,
         origin,
         CACHE_BLOCK_SIZE,
-    )?)
+    ) {
+        Ok(cd) => Ok(cd),
+        Err(e) => Err(Box::new((e.into(), None, cap))),
+    }
 }
 
 /// Set up the linear device on top of the data tier that can later be converted to a
@@ -549,7 +568,7 @@ impl Backstore {
                     let cache_device = match make_cache(pool_uuid, &cache_tier, origin, None, false)
                     {
                         Ok(cd) => cd,
-                        Err(e) => {
+                        Err(boxed) => { let (e, _origin, _cap) = *boxed;
                             return Err(e);
                         }
                     };
@@ -706,7 +725,14 @@ impl Backstore {
                         .take()
                         .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.placeholder.is_some())");
 
-                let cache = make_cache(pool_uuid, &cache_tier, origin, Some(placeholder), true)?;
+                let cache = match make_cache(pool_uuid, &cache_tier, origin, Some(placeholder), true) {
+                    Ok(cache) => cache,
+                    Err(boxed) => { let (e, maybe_origin, maybe_placeholder) = *boxed;
+                        self.cap_device.origin = maybe_origin;
+                        self.cap_device.placeholder = maybe_placeholder;
+                        return Err(e);
+                    }
+                };
 
                 self.cap_device.cache = Some(cache);
 

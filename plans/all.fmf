@@ -18,7 +18,7 @@ prepare:
      - curl
      - device-mapper-devel
      - libblkid-devel
-     - make
+     - just
      - ncurses
      - rust
      - systemd

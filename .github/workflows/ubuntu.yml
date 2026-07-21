@@ -37,29 +37,29 @@ jobs:
     strategy:
       matrix:
         include:
-          - task: make -f Makefile clippy
+          - task: just -f justfile clippy
             components: clippy
-          - task: PROFILEDIR=debug make -f Makefile stratisd
+          - task: PROFILEDIR=debug just -f justfile stratisd
             components: cargo
-          - task: PROFILEDIR=debug make -f Makefile build-min
+          - task: PROFILEDIR=debug just -f justfile build-min
             components: cargo
-          - task: PROFILEDIR=debug make -f Makefile build-min-no-systemd
+          - task: PROFILEDIR=debug just -f justfile build-min-no-systemd
             components: cargo
-          - task: PROFILEDIR=debug make -f Makefile build-utils
+          - task: PROFILEDIR=debug just -f justfile build-utils
             components: cargo
-          - task: PROFILEDIR=debug make -f Makefile build-no-ipc
+          - task: PROFILEDIR=debug just -f justfile build-no-ipc
             components: cargo
-          - task: PROFILEDIR=debug make -f Makefile stratisd-tools
+          - task: PROFILEDIR=debug just -f justfile stratisd-tools
             components: cargo
-          - task: make -f Makefile docs-ci
+          - task: just -f justfile docs-ci
             components: cargo
-          - task: make -f Makefile test
+          - task: just -f justfile test
             components: cargo
-          - task: make -f Makefile stratisd
+          - task: just -f justfile stratisd
             components: cargo
-          - task: make -f Makefile build-min
+          - task: just -f justfile build-min
             components: cargo
-          - task: make -f Makefile build-no-ipc
+          - task: just -f justfile build-no-ipc
             components: cargo
     runs-on: ubuntu-24.04
     container:
@@ -80,7 +80,7 @@ jobs:
           libdevmapper-dev
           libsystemd-dev
           libudev-dev
-          make
+          just
           pkg-config
           sudo
           thin-provisioning-tools
@@ -100,7 +100,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - task: RUST_LOG=stratisd=debug make -f Makefile test-loop-root
+          - task: RUST_LOG=stratisd=debug just -f justfile test-loop-root
             components: cargo
     runs-on: ubuntu-24.04
     container:
@@ -123,7 +123,7 @@ jobs:
           libdevmapper-dev
           libsystemd-dev
           libudev-dev
-          make
+          just
           pkg-config
           sudo
           systemd
@@ -139,9 +139,9 @@ jobs:
       - name: Overwrite stratisd dependencies as necessary
         uses: stratis-storage/github-actions/stratisd-modify@HEAD
       - name: Build stratisd
-        run: PROFILEDIR=debug make -f Makefile build-all
+        run: PROFILEDIR=debug just -f justfile build-all
       - name: Install stratisd
-        run: PROFILEDIR=debug make -f Makefile install
+        run: PROFILEDIR=debug just -f justfile install
       - name: Reload udev
         run: udevadm control --reload
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
@@ -153,7 +153,7 @@ jobs:
         include:
           - task: >-
               TANG_URL=localhost
-              make -f Makefile test-clevis-loop-should-fail-root
+              just -f justfile test-clevis-loop-should-fail-root
             components: cargo
     runs-on: ubuntu-24.04
     container:
@@ -175,7 +175,7 @@ jobs:
           libdevmapper-dev
           libsystemd-dev
           libudev-dev
-          make
+          just
           pkg-config
           sudo
           systemd
@@ -191,9 +191,9 @@ jobs:
       - name: Overwrite stratisd dependencies as necessary
         uses: stratis-storage/github-actions/stratisd-modify@HEAD
       - name: Build stratisd
-        run: PROFILEDIR=debug make -f Makefile build-all
+        run: PROFILEDIR=debug just -f justfile build-all
       - name: Install stratisd
-        run: PROFILEDIR=debug make -f Makefile install
+        run: PROFILEDIR=debug just -f justfile install
       - name: Reload udev
         run: udevadm control --reload
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain

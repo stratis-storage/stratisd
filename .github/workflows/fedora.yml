@@ -37,29 +37,29 @@ jobs:
     strategy:
       matrix:
         include:
-          - task: make -f Makefile clippy
+          - task: just -f justfile clippy
             components: clippy
-          - task: PROFILEDIR=debug make -f Makefile stratisd
+          - task: PROFILEDIR=debug just -f justfile stratisd
             components: cargo
-          - task: PROFILEDIR=debug make -f Makefile build-min
+          - task: PROFILEDIR=debug just -f justfile build-min
             components: cargo
-          - task: PROFILEDIR=debug make -f Makefile build-min-no-systemd
+          - task: PROFILEDIR=debug just -f justfile build-min-no-systemd
             components: cargo
-          - task: PROFILEDIR=debug make -f Makefile build-utils
+          - task: PROFILEDIR=debug just -f justfile build-utils
             components: cargo
-          - task: PROFILEDIR=debug make -f Makefile build-no-ipc
+          - task: PROFILEDIR=debug just -f justfile build-no-ipc
             components: cargo
-          - task: PROFILEDIR=debug make -f Makefile stratisd-tools
+          - task: PROFILEDIR=debug just -f justfile stratisd-tools
             components: cargo
-          - task: make -f Makefile docs-ci
+          - task: just -f justfile docs-ci
             components: cargo
-          - task: make -f Makefile test
+          - task: just -f justfile test
             components: cargo
-          - task: make -f Makefile stratisd
+          - task: just -f justfile stratisd
             components: cargo
-          - task: make -f Makefile build-min
+          - task: just -f justfile build-min
             components: cargo
-          - task: make -f Makefile build-no-ipc
+          - task: just -f justfile build-no-ipc
             components: cargo
     runs-on: ubuntu-24.04
     container:
@@ -76,7 +76,7 @@ jobs:
           device-mapper-devel
           git
           libblkid-devel
-          make
+          just
           ncurses
           sudo
           systemd-devel

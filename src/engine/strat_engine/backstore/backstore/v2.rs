@@ -66,11 +66,12 @@ fn make_cache(
     pool_uuid: PoolUuid,
     cache_tier: &CacheTier<StratBlockDev>,
     origin: LinearDev,
+    origin_table: Vec<TargetLine<LinearDevTargetParams>>,
     cap: Option<LinearDev>,
     new: bool,
 ) -> Result<CacheDev, MakeCacheError> {
     let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::MetaSub);
-    let meta = match LinearDev::setup(
+    let mut meta = match LinearDev::setup(
         get_dm(),
         &dm_name,
         Some(&dm_uuid),
@@ -87,19 +88,23 @@ fn make_cache(
             Sectors(0),
             cmp::min(Sectors(8), meta.size()),
         ) {
+            let _ = meta.teardown(get_dm());
             return Err(Box::new((e, Some(origin), cap)));
         }
     }
 
     let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::CacheSub);
-    let cache = match LinearDev::setup(
+    let mut cache = match LinearDev::setup(
         get_dm(),
         &dm_name,
         Some(&dm_uuid),
         cache_tier.cache_segments.map_to_dm(),
     ) {
         Ok(c) => c,
-        Err(e) => return Err(Box::new((e.into(), Some(origin), cap))),
+        Err(e) => {
+            let _ = meta.teardown(get_dm());
+            return Err(Box::new((e.into(), Some(origin), cap)));
+        }
     };
 
     let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::Cache);
@@ -109,6 +114,8 @@ fn make_cache(
             &DevId::Name(&dm_name),
             DmOptions::default().set_flags(DmFlags::DM_SUSPEND),
         ) {
+            let _ = cache.teardown(get_dm());
+            let _ = meta.teardown(get_dm());
             return Err(Box::new((e.into(), Some(origin), cap)));
         }
         let table = CacheDevTargetTable::new(
@@ -129,9 +136,13 @@ fn make_cache(
             &table.to_raw_table(),
             DmOptions::default(),
         ) {
+            let _ = cache.teardown(get_dm());
+            let _ = meta.teardown(get_dm());
             return Err(Box::new((e.into(), Some(origin), cap)));
         }
         if let Err(e) = dm.device_suspend(&DevId::Name(&dm_name), DmOptions::private()) {
+            let _ = cache.teardown(get_dm());
+            let _ = meta.teardown(get_dm());
             return Err(Box::new((e.into(), Some(origin), cap)));
         }
     };
@@ -145,7 +156,12 @@ fn make_cache(
         CACHE_BLOCK_SIZE,
     ) {
         Ok(cd) => Ok(cd),
-        Err(e) => Err(Box::new((e.into(), None, cap))),
+        Err(e) => {
+            let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
+            let maybe_origin =
+                LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), origin_table).ok();
+            Err(Box::new((e.into(), maybe_origin, cap)))
+        }
     }
 }
 
@@ -565,10 +581,17 @@ impl Backstore {
                         }
                     };
 
-                    let cache_device = match make_cache(pool_uuid, &cache_tier, origin, None, false)
-                    {
+                    let cache_device = match make_cache(
+                        pool_uuid,
+                        &cache_tier,
+                        origin,
+                        data_tier.segments.map_to_dm(),
+                        None,
+                        false,
+                    ) {
                         Ok(cd) => cd,
-                        Err(boxed) => { let (e, _origin, _cap) = *boxed;
+                        Err(boxed) => {
+                            let (e, _origin, _cap) = *boxed;
                             return Err(e);
                         }
                     };
@@ -725,9 +748,17 @@ impl Backstore {
                         .take()
                         .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.placeholder.is_some())");
 
-                let cache = match make_cache(pool_uuid, &cache_tier, origin, Some(placeholder), true) {
+                let cache = match make_cache(
+                    pool_uuid,
+                    &cache_tier,
+                    origin,
+                    self.data_tier.segments.map_to_dm(),
+                    Some(placeholder),
+                    true,
+                ) {
                     Ok(cache) => cache,
-                    Err(boxed) => { let (e, maybe_origin, maybe_placeholder) = *boxed;
+                    Err(boxed) => {
+                        let (e, maybe_origin, maybe_placeholder) = *boxed;
                         self.cap_device.origin = maybe_origin;
                         self.cap_device.placeholder = maybe_placeholder;
                         return Err(e);

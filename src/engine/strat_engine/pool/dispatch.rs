@@ -196,6 +196,13 @@ impl Pool for AnyPool {
         }
     }
 
+    fn metadata_used(&self) -> Sectors {
+        match self {
+            AnyPool::V1(p) => p.metadata_used(),
+            AnyPool::V2(p) => p.metadata_used(),
+        }
+    }
+
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)> {
         match self {
             AnyPool::V1(p) => p.filesystems(),

@@ -317,6 +317,9 @@ pub trait Pool: Debug + Send + Sync {
     /// store user data.
     fn total_physical_used(&self) -> Option<Sectors>;
 
+    /// The number of Sectors in this pool used for Stratis metadata.
+    fn metadata_used(&self) -> Sectors;
+
     /// Get all the filesystems belonging to this pool.
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)>;
 

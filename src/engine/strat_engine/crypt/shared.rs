@@ -900,12 +900,12 @@ unsafe extern "C" fn open(
     #[allow(clippy::to_string_in_format_args)]
     match res {
         Ok(pass) => {
-            let malloc_pass = libc::malloc(pass.as_ref().len());
+            let malloc_pass = unsafe { libc::malloc(pass.as_ref().len()) };
             let pass_slice =
                 unsafe { from_raw_parts_mut::<u8>(malloc_pass.cast::<u8>(), pass.as_ref().len()) };
             pass_slice.copy_from_slice(pass.as_ref());
-            *buffer = malloc_pass.cast::<libc::c_char>();
-            *buffer_len = pass.as_ref().len();
+            unsafe { *buffer = malloc_pass.cast::<libc::c_char>() };
+            unsafe { *buffer_len = pass.as_ref().len() };
             0
         }
         Err(e) => {

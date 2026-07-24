@@ -258,7 +258,7 @@ impl DataDevice {
         for (_, &(_, length)) in self
             .extents
             .iter()
-            .filter(|(_, &(used, _))| used == DataDeviceUse::IntegrityMetadata)
+            .filter(|&(_, &(used, _))| used == DataDeviceUse::IntegrityMetadata)
         {
             if length % Sectors(8) != Sectors(0) {
                 errors.push(format!(

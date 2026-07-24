@@ -303,7 +303,6 @@ nonstandard_style = { level = "deny", priority = 4 }
 rust-2024-compatibility = { level = "deny", priority = 5}
 edition-2024-expr-fragment-specifier = { level = "allow", priority = 6}
 if-let-rescope = { level = "allow", priority = 6}
-rust-2024-incompatible-pat = { level = "allow", priority = 6}
 tail-expr-drop-order = { level = "allow", priority = 6}
 
 [lints.clippy]

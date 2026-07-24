@@ -384,7 +384,7 @@ fn sss_dispatch(json: &Value, recursion_limit: u64) -> StratisResult<Value> {
 
     let mut pin_map = Map::new();
     for jwe in jwes {
-        if let Value::String(ref s) = jwe {
+        if let Value::String(s) = jwe {
             // NOTE: Workaround for the on-disk format for Shamir secret sharing
             // as written by clevis. The base64 encoded string delimits the end
             // of the JSON blob with a period.
@@ -399,7 +399,7 @@ fn sss_dispatch(json: &Value, recursion_limit: u64) -> StratisResult<Value> {
             let value: Value = serde_json::from_slice(&json_bytes)?;
             let (pin, value) = pin_dispatch(&value, recursion_limit - 1)?;
             match pin_map.get_mut(&pin) {
-                Some(Value::Array(ref mut vec)) => vec.push(value),
+                Some(Value::Array(vec)) => vec.push(value),
                 None => {
                     pin_map.insert(pin, Value::from(vec![value]));
                 }

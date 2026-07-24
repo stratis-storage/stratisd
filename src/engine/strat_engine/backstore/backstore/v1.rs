@@ -625,9 +625,7 @@ impl Backstore {
             }
         };
 
-        if let Some((_, (ref existing_pin, ref existing_info))) =
-            encryption_info.single_clevis_info()
-        {
+        if let Some((_, (existing_pin, existing_info))) = encryption_info.single_clevis_info() {
             if existing_pin.as_str() == pin
                 && CryptHandle::can_unlock(
                     self.blockdevs()

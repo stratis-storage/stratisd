@@ -37,7 +37,7 @@ fn fmt_metadata(shr: &StaticHeaderResult, print_bytes: bool) -> String {
     if print_bytes {
         result += "\n\nBytes:\n\n";
         match &shr.bytes {
-            Ok(ref boxed) => {
+            Ok(boxed) => {
                 result += pretty_hex(boxed.as_ref()).as_str();
             }
             Err(e) => {

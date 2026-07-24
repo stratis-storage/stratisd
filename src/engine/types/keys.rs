@@ -380,11 +380,11 @@ impl EncryptionInfo {
         let entry = self.encryption_infos.entry(token_slot);
         match entry {
             Entry::Occupied(mut entry) => match entry.get_mut() {
-                UnlockMechanism::KeyDesc(ref mut kd) => match mech {
+                UnlockMechanism::KeyDesc(kd) => match mech {
                     UnlockMechanism::KeyDesc(kd_set) => *kd = kd_set,
                     UnlockMechanism::ClevisInfo(_) => return Err(StratisError::Msg("Binding is a key description but provided unlock mechanism is a Clevis binding".to_string())),
                 },
-                UnlockMechanism::ClevisInfo(ref mut clevis) => match mech {
+                UnlockMechanism::ClevisInfo(clevis) => match mech {
                     UnlockMechanism::KeyDesc(_) => return Err(StratisError::Msg("Binding is a Clevis binding but provided unlock mechanism is a key description".to_string())),
                     UnlockMechanism::ClevisInfo(clevis_set) => *clevis = clevis_set,
                 },
@@ -622,7 +622,7 @@ impl PoolEncryptionInfo {
     pub fn key_description(&self) -> StratisResult<Option<&KeyDescription>> {
         match self {
             PoolEncryptionInfo::KeyDesc(kd) | PoolEncryptionInfo::Both(kd, _) => {
-                if let MaybeInconsistent::No(ref key_description) = kd {
+                if let MaybeInconsistent::No(key_description) = kd {
                     Ok(Some(key_description))
                 } else {
                     Err(StratisError::Msg(
@@ -637,7 +637,7 @@ impl PoolEncryptionInfo {
     pub fn clevis_info(&self) -> StratisResult<Option<&ClevisInfo>> {
         match self {
             PoolEncryptionInfo::ClevisInfo(ci) | PoolEncryptionInfo::Both(_, ci) => {
-                if let MaybeInconsistent::No(ref clevis_info) = ci {
+                if let MaybeInconsistent::No(clevis_info) = ci {
                     Ok(Some(clevis_info))
                 } else {
                     Err(StratisError::Msg(

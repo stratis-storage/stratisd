@@ -445,7 +445,7 @@ impl Pool for SimPool {
             OptionalTokenSlotInput::Some(t) => {
                 if let Some(info) = encryption_info.get_info(t) {
                     match info {
-                        UnlockMechanism::KeyDesc(ref key_desc) => {
+                        UnlockMechanism::KeyDesc(key_desc) => {
                             if key_description != key_desc {
                                 return Err(StratisError::Msg(format!(
                                     "Key slot {t} is already in use by key description {}; requested {}",
@@ -603,7 +603,7 @@ impl Pool for SimPool {
             .and_then(|t| encryption_info.get_info(t).map(|mech| (t, mech)))
         {
             match info {
-                UnlockMechanism::KeyDesc(ref key) => {
+                UnlockMechanism::KeyDesc(key) => {
                     if key != new_key_desc {
                         encryption_info.set_info(token_slot, UnlockMechanism::KeyDesc(new_key_desc.to_owned()))?;
                         Ok(RenameAction::Renamed(Key))

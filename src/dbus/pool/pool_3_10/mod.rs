@@ -2,6 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+mod props;
+
 use std::{
     path::PathBuf,
     sync::{atomic::AtomicU64, Arc},
@@ -30,6 +32,7 @@ use crate::{
                 send_enable_overprovisioning_signal_on_change, send_fs_limit_signal_on_change,
                 set_enable_overprovisioning_prop, set_fs_limit_prop,
             },
+            pool_3_10::props::metadata_used_prop,
             pool_3_3::grow_physical_device_method,
             pool_3_5::init_cache_method,
             pool_3_6::create_filesystems_method,
@@ -472,5 +475,10 @@ impl PoolR10 {
     #[zbus(property(emits_changed_signal = "true"))]
     async fn last_reencrypted_timestamp(&self) -> Result<(bool, String), Error> {
         pool_prop(&self.engine, self.uuid, last_reencrypted_timestamp_prop).await
+    }
+
+    #[zbus(property(emits_changed_signal = "true"))]
+    async fn metadata_used(&self) -> Result<String, Error> {
+        pool_prop(&self.engine, self.uuid, metadata_used_prop).await
     }
 }

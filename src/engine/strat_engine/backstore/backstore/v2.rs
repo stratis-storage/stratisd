@@ -58,7 +58,11 @@ use crate::{
 /// typical size.
 const CACHE_BLOCK_SIZE: Sectors = Sectors(2048); // 1024 KiB
 
-type MakeCacheError = Box<(StratisError, Option<LinearDev>, Option<LinearDev>)>;
+struct MakeCacheError {
+    error: StratisError,
+    origin: Option<LinearDev>,
+    cap: Option<LinearDev>,
+}
 
 /// Make a DM cache device. If the cache device is being made new,
 /// take extra steps to make it clean.
@@ -69,7 +73,7 @@ fn make_cache(
     origin_table: Vec<TargetLine<LinearDevTargetParams>>,
     cap: Option<LinearDev>,
     new: bool,
-) -> Result<CacheDev, MakeCacheError> {
+) -> Result<CacheDev, Box<MakeCacheError>> {
     let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::MetaSub);
     let mut meta = match LinearDev::setup(
         get_dm(),
@@ -78,7 +82,13 @@ fn make_cache(
         cache_tier.meta_segments.map_to_dm(),
     ) {
         Ok(m) => m,
-        Err(e) => return Err(Box::new((e.into(), Some(origin), cap))),
+        Err(e) => {
+            return Err(Box::new(MakeCacheError {
+                error: e.into(),
+                origin: Some(origin),
+                cap,
+            }))
+        }
     };
 
     if new {
@@ -89,7 +99,11 @@ fn make_cache(
             cmp::min(Sectors(8), meta.size()),
         ) {
             let _ = meta.teardown(get_dm());
-            return Err(Box::new((e, Some(origin), cap)));
+            return Err(Box::new(MakeCacheError {
+                error: e,
+                origin: Some(origin),
+                cap,
+            }));
         }
     }
 
@@ -103,7 +117,11 @@ fn make_cache(
         Ok(c) => c,
         Err(e) => {
             let _ = meta.teardown(get_dm());
-            return Err(Box::new((e.into(), Some(origin), cap)));
+            return Err(Box::new(MakeCacheError {
+                error: e.into(),
+                origin: Some(origin),
+                cap,
+            }));
         }
     };
 
@@ -116,7 +134,11 @@ fn make_cache(
         ) {
             let _ = cache.teardown(get_dm());
             let _ = meta.teardown(get_dm());
-            return Err(Box::new((e.into(), Some(origin), cap)));
+            return Err(Box::new(MakeCacheError {
+                error: e.into(),
+                origin: Some(origin),
+                cap,
+            }));
         }
         let table = CacheDevTargetTable::new(
             Sectors(0),
@@ -138,12 +160,20 @@ fn make_cache(
         ) {
             let _ = cache.teardown(get_dm());
             let _ = meta.teardown(get_dm());
-            return Err(Box::new((e.into(), Some(origin), cap)));
+            return Err(Box::new(MakeCacheError {
+                error: e.into(),
+                origin: Some(origin),
+                cap,
+            }));
         }
         if let Err(e) = dm.device_suspend(&DevId::Name(&dm_name), DmOptions::private()) {
             let _ = cache.teardown(get_dm());
             let _ = meta.teardown(get_dm());
-            return Err(Box::new((e.into(), Some(origin), cap)));
+            return Err(Box::new(MakeCacheError {
+                error: e.into(),
+                origin: Some(origin),
+                cap,
+            }));
         }
     };
     match CacheDev::setup(
@@ -160,7 +190,11 @@ fn make_cache(
             let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
             let maybe_origin =
                 LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), origin_table).ok();
-            Err(Box::new((e.into(), maybe_origin, cap)))
+            Err(Box::new(MakeCacheError {
+                error: e.into(),
+                origin: maybe_origin,
+                cap,
+            }))
         }
     }
 }
@@ -591,8 +625,7 @@ impl Backstore {
                     ) {
                         Ok(cd) => cd,
                         Err(boxed) => {
-                            let (e, _origin, _cap) = *boxed;
-                            return Err(e);
+                            return Err(boxed.error);
                         }
                     };
                     (None, Some(cache_device), Some(cache_tier), None)
@@ -758,10 +791,10 @@ impl Backstore {
                 ) {
                     Ok(cache) => cache,
                     Err(boxed) => {
-                        let (e, maybe_origin, maybe_placeholder) = *boxed;
-                        self.cap_device.origin = maybe_origin;
-                        self.cap_device.placeholder = maybe_placeholder;
-                        return Err(e);
+                        let err = *boxed;
+                        self.cap_device.origin = err.origin;
+                        self.cap_device.placeholder = err.cap;
+                        return Err(err.error);
                     }
                 };
 

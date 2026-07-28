@@ -791,10 +791,10 @@ impl Backstore {
                 ) {
                     Ok(cache) => cache,
                     Err(boxed) => {
-                        let err = *boxed;
-                        self.cap_device.origin = err.origin;
-                        self.cap_device.placeholder = err.cap;
-                        return Err(err.error);
+                        let MakeCacheError { error, origin, cap } = *boxed;
+                        self.cap_device.origin = origin;
+                        self.cap_device.placeholder = cap;
+                        return Err(error);
                     }
                 };
 

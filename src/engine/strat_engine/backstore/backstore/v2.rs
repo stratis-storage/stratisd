@@ -64,15 +64,14 @@ struct MakeCacheError {
     cap: Option<LinearDev>,
 }
 
-/// Make a DM cache device. If the cache device is being made new,
-/// take extra steps to make it clean.
+/// Make a DM cache device. If a cap device is provided, the cache
+/// is being newly created, so take extra steps to make it clean.
 fn make_cache(
     pool_uuid: PoolUuid,
     cache_tier: &CacheTier<StratBlockDev>,
     origin: LinearDev,
     origin_table: Vec<TargetLine<LinearDevTargetParams>>,
     cap: Option<LinearDev>,
-    new: bool,
 ) -> Result<CacheDev, Box<MakeCacheError>> {
     let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::MetaSub);
     let mut meta = match LinearDev::setup(
@@ -91,7 +90,7 @@ fn make_cache(
         }
     };
 
-    if new {
+    if cap.is_some() {
         // See comment in ThinPool::new() method
         if let Err(e) = wipe_sectors(
             meta.devnode(),
@@ -621,7 +620,6 @@ impl Backstore {
                         origin,
                         data_tier.segments.map_to_dm(),
                         None,
-                        false,
                     ) {
                         Ok(cd) => cd,
                         Err(boxed) => {
@@ -787,7 +785,6 @@ impl Backstore {
                     origin,
                     self.data_tier.segments.map_to_dm(),
                     Some(placeholder),
-                    true,
                 ) {
                     Ok(cache) => cache,
                     Err(boxed) => {

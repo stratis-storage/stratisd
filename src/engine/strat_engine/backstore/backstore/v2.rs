@@ -774,7 +774,9 @@ impl Backstore {
 
                 let origin = self.cap_device.origin
                         .take()
-                        .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.origin.is_some())");
+                        .ok_or_else(|| StratisError::Msg(
+                            "Expected origin device but it was not present; cap device is in an inconsistent state".to_string()
+                        ))?;
                 let placeholder = self.cap_device.placeholder
                         .take()
                         .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.placeholder.is_some())");

@@ -974,6 +974,7 @@ where
         // the operation is performed. As a result, the header iterator will always be
         // equal to or longer than the blockdev record iterator which means all blockdevs
         // that have had operations performed on them will always be restored.
+        #![allow(tail_expr_drop_order)]
         for (blockdev, header) in rollback_record.into_iter().zip(headers) {
             if let Err(e) = restore_luks_header(blockdev.devnode(), header.as_path()) {
                 warn!(

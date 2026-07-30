@@ -1406,6 +1406,7 @@ impl Backstore {
     }
 
     pub fn prepare_reencrypt(&self) -> StratisResult<Vec<(u32, SizedKeyMemory, u32)>> {
+        #![allow(tail_expr_drop_order)]
         match self.cap_device.enc {
             Some(Either::Left(_)) => {
                 Err(StratisError::Msg("Encrypted pool where the encrypted device has not yet been created cannot be reencrypted".to_string()))

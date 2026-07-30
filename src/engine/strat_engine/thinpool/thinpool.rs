@@ -957,6 +957,7 @@ where
         flex_devs: &FlexDevsSave,
         backstore: &B,
     ) -> StratisResult<ThinPool<B>> {
+        #![allow(tail_expr_drop_order)]
         let mdv_segments = flex_devs.meta_dev.to_vec();
         let meta_segments = flex_devs.thin_meta_dev.to_vec();
         let data_segments = flex_devs.thin_data_dev.to_vec();

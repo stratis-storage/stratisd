@@ -30,6 +30,7 @@ pub async fn init_cache_method(
     pool_uuid: PoolUuid,
     devices: Vec<PathBuf>,
 ) -> ((bool, Vec<OwnedObjectPath>), u16, String) {
+    #![allow(tail_expr_drop_order)]
     let default_return = (false, Vec::default());
 
     let guard_res = engine

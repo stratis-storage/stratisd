@@ -44,6 +44,7 @@ pub async fn create_filesystems_method(
     pool_uuid: PoolUuid,
     filesystems: Vec<(&str, (bool, &str))>,
 ) -> ((bool, Vec<(OwnedObjectPath, String)>), u16, String) {
+    #![allow(tail_expr_drop_order)]
     let default_return = (false, (Vec::new()));
 
     if filesystems.len() > 1 {
@@ -151,6 +152,7 @@ pub async fn destroy_filesystems_method(
     pool_uuid: PoolUuid,
     filesystems: Vec<ObjectPath<'_>>,
 ) -> ((bool, Vec<String>), u16, String) {
+    #![allow(tail_expr_drop_order)]
     let default_return = (false, (Vec::new()));
 
     let uuids = {
@@ -335,6 +337,7 @@ pub async fn add_data_devs_method(
     pool_uuid: PoolUuid,
     devices: Vec<PathBuf>,
 ) -> ((bool, Vec<OwnedObjectPath>), u16, String) {
+    #![allow(tail_expr_drop_order)]
     let default_return = (false, Vec::default());
 
     let guard_res = engine
@@ -412,6 +415,7 @@ pub async fn init_cache_method(
     pool_uuid: PoolUuid,
     devices: Vec<PathBuf>,
 ) -> ((bool, Vec<OwnedObjectPath>), u16, String) {
+    #![allow(tail_expr_drop_order)]
     let default_return = (false, Vec::default());
 
     let guard_res = engine
@@ -492,6 +496,7 @@ pub async fn add_cache_devs_method(
     pool_uuid: PoolUuid,
     devices: Vec<PathBuf>,
 ) -> ((bool, Vec<OwnedObjectPath>), u16, String) {
+    #![allow(tail_expr_drop_order)]
     let default_return = (false, Vec::default());
 
     let guard_res = engine

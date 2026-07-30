@@ -280,6 +280,7 @@ SPECS = {
     <property name="HasCache" type="b" access="read" />
     <property name="KeyDescriptions" type="v" access="read" />
     <property name="LastReencryptedTimestamp" type="(bs)" access="read" />
+    <property name="MetadataUsed" type="s" access="read" />
     <property name="MetadataVersion" type="t" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>

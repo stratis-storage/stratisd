@@ -108,6 +108,7 @@ impl StratEngine {
         blockdev_paths: &[&Path],
         encryption_info: Option<&InputEncryptionInfo>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
+        #![allow(tail_expr_drop_order)]
         if let Some(ei) = encryption_info {
             validate_key_descs(ei.key_descs())?;
         }
@@ -301,6 +302,7 @@ impl StratEngine {
 
     /// The implementation for pool_evented when caused by a devicemapper event.
     async fn pool_evented_dm(&self, pools: &HashSet<PoolUuid>) -> HashMap<PoolUuid, PoolDiff> {
+        #![allow(tail_expr_drop_order)]
         let mut joins = Vec::new();
         for uuid in pools {
             if let Some(guard) = self.pools.write(PoolIdentifier::Uuid(*uuid)).await {
@@ -335,6 +337,7 @@ impl StratEngine {
         &self,
         pools: &HashSet<PoolUuid>,
     ) -> HashMap<FilesystemUuid, StratFilesystemDiff> {
+        #![allow(tail_expr_drop_order)]
         let mut joins = Vec::new();
         for uuid in pools {
             if let Some(guard) = self.pools.write(PoolIdentifier::Uuid(*uuid)).await {
@@ -462,6 +465,7 @@ impl Report for StratEngine {
 #[async_trait]
 impl Engine for StratEngine {
     async fn handle_events(&self, events: Vec<UdevEngineEvent>) -> HandleEvents<dyn Pool> {
+        #![allow(tail_expr_drop_order)]
         let mut ret_guards = Vec::new();
         let mut diffs = HashMap::new();
 
@@ -530,6 +534,7 @@ impl Engine for StratEngine {
         encryption_info: Option<&InputEncryptionInfo>,
         integrity_spec: IntegritySpec,
     ) -> StratisResult<CreateAction<PoolUuid>> {
+        #![allow(tail_expr_drop_order)]
         if let Some(ei) = encryption_info {
             validate_key_descs(ei.key_descs())?;
         }
@@ -891,6 +896,7 @@ impl Engine for StratEngine {
         pool_id: PoolIdentifier<PoolUuid>,
         has_partially_constructed: bool,
     ) -> StratisResult<StopAction<PoolUuid>> {
+        #![allow(tail_expr_drop_order)]
         let id_str = pool_id.to_string();
 
         let stopped_pools = self.liminal_devices.read().await.stopped_pools();

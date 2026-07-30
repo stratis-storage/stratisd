@@ -54,6 +54,7 @@ static BLOCKDEVS_IN_PROGRESS: LazyLock<Mutex<HashSet<PathBuf>>> =
 fn udev_info(
     devnode: &DevicePath,
 ) -> StratisResult<(UdevOwnership, Device, Option<StratisResult<String>>)> {
+    #![allow(tail_expr_drop_order)]
     block_device_apply(devnode, |d| {
         (
             decide_ownership(d),
@@ -148,6 +149,7 @@ pub fn find_stratis_devs_by_uuid(
 ///
 /// Returns optional number of partitions and superblock type or error.
 fn verify_device_with_blkid(path: &DevicePath) -> StratisResult<(Option<i32>, Option<String>)> {
+    #![allow(tail_expr_drop_order)]
     let mut probe = BlkidProbe::new_from_filename(path)?;
     probe.enable_superblocks(true)?;
     probe.enable_partitions(true)?;
@@ -374,6 +376,7 @@ impl TryFrom<&[&Path]> for ProcessedPathInfos {
     // If paths is not empty then, either an error is returned OR at least one
     // of the fields of the result is not empty.
     fn try_from(paths: &[&Path]) -> StratisResult<Self> {
+        #![allow(tail_expr_drop_order)]
         let canonical_paths = paths
             .iter()
             .map(|p| {
@@ -730,6 +733,7 @@ pub fn initialize_devices_legacy(
         encryption_info: Option<&InputEncryptionInfo>,
         sector_size: Option<u32>,
     ) -> StratisResult<Vec<v1::StratBlockDev>> {
+        #![allow(tail_expr_drop_order)]
         let mut initialized_blockdevs: Vec<v1::StratBlockDev> = Vec::new();
         for dev_info in devices.inner {
             match initialize_one(
@@ -904,6 +908,7 @@ pub fn initialize_devices(
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
     ) -> StratisResult<Vec<v2::StratBlockDev>> {
+        #![allow(tail_expr_drop_order)]
         let mut initialized_blockdevs: Vec<v2::StratBlockDev> = Vec::new();
         for dev_info in devices.inner {
             match initialize_one(&dev_info, pool_uuid, mda_data_size) {
@@ -1262,6 +1267,7 @@ mod tests {
         // can not be initialized, all the devices previously initialized are
         // properly cleaned up.
         fn test_failure_cleanup(paths: &[&Path], key_desc: Option<&KeyDescription>) {
+            #![allow(tail_expr_drop_order)]
             if paths.len() <= 1 {
                 panic!("Test requires more than one device");
             }
@@ -1515,6 +1521,7 @@ mod tests {
         // can not be initialized, all the devices previously initialized are
         // properly cleaned up.
         fn test_failure_cleanup(paths: &[&Path]) {
+            #![allow(tail_expr_drop_order)]
             if paths.len() <= 1 {
                 panic!("Test requires more than one device")
             }

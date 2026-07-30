@@ -53,6 +53,7 @@ async fn signal_thread() -> StratisResult<()> {
 /// If sim is true, start the sim engine rather than the real engine.
 /// Always check for devicemapper context.
 pub fn run(sim: bool) -> StratisResult<()> {
+    #![allow(tail_expr_drop_order)]
     if !sim {
         // If stratisd is running as PID 1, then it is definitely in a container and the
         // unshare_mount_namespace() command method will fail silently, since the mount namespace will

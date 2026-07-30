@@ -22,6 +22,7 @@ use crate::{
 };
 
 #[allow(clippy::too_many_arguments)]
+#[allow(tail_expr_drop_order)]
 pub async fn create_filesystems_method(
     engine: &Arc<dyn Engine>,
     connection: &Arc<Connection>,

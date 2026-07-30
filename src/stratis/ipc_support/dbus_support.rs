@@ -21,6 +21,7 @@ use crate::{
 
 /// Set up the cooperating D-Bus threads.
 pub async fn setup(engine: Arc<dyn Engine>, mut udev: UdevHandler) -> StratisResult<()> {
+    #![allow(tail_expr_drop_order)]
     {
         let pools = engine.pools().await;
         for (_, pool_uuid, _) in pools.iter() {

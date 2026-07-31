@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
+    cmp::max,
     fs::OpenOptions,
     io::{self, Seek, SeekFrom, Write},
     mem::forget,
@@ -900,12 +901,21 @@ unsafe extern "C" fn open(
     #[allow(clippy::to_string_in_format_args)]
     match res {
         Ok(pass) => {
-            let malloc_pass = unsafe { libc::malloc(pass.as_ref().len()) };
+            let pass_len = pass.as_ref().len();
+            let alloc_len = max(pass_len, 1);
+            let malloc_pass = unsafe { libc::malloc(alloc_len) };
+            if malloc_pass.is_null() {
+                warn!(
+                    "malloc() returned null when allocating {} bytes for passphrase",
+                    alloc_len
+                );
+                return -libc::ENOMEM;
+            }
             let pass_slice =
-                unsafe { from_raw_parts_mut::<u8>(malloc_pass.cast::<u8>(), pass.as_ref().len()) };
+                unsafe { from_raw_parts_mut::<u8>(malloc_pass.cast::<u8>(), pass_len) };
             pass_slice.copy_from_slice(pass.as_ref());
             unsafe { *buffer = malloc_pass.cast::<libc::c_char>() };
-            unsafe { *buffer_len = pass.as_ref().len() };
+            unsafe { *buffer_len = pass_len };
             0
         }
         Err(e) => {

@@ -927,7 +927,7 @@ unsafe extern "C" fn open(
             if let Ok(mut g) = guard {
                 *g = Some(e);
             }
-            -1
+            -libc::EPERM
         }
     }
 }

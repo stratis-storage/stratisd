@@ -432,6 +432,11 @@ stratisd-tools:
 	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratisd-tools ${EXTRAS_FEATURES} ${TARGET_ARGS}
 
+.PHONY: systemd-lint
+## Statically lint systemd configuration files after install step
+systemd-lint:
+	systemd-analyze verify $$(ls /usr/lib/systemd/system/stratis*.service)
+
 .PHONY: test
 ## Basic tests
 test:

@@ -2174,6 +2174,106 @@ mod tests {
         );
     }
 
+    fn test_remove_cache_direct(paths: &[&Path]) {
+        assert!(paths.len() > 1);
+
+        let (cache_paths, data_paths) = paths.split_at(1);
+
+        let devices = ProcessedPathInfos::try_from(data_paths).unwrap();
+        let (stratis_devices, unowned_devices) = devices.unpack();
+        stratis_devices.error_on_not_empty().unwrap();
+
+        let name = "stratis-test-pool";
+        let (uuid, mut pool) = StratPool::initialize(name, unowned_devices, None).unwrap();
+        invariant(&pool, name);
+
+        assert!(!pool.has_cache());
+        let result = pool.remove_cache(uuid, name).unwrap();
+        assert!(!result.is_changed());
+
+        let (_, fs_uuid, _) = pool
+            .create_filesystems(name, uuid, &[("stratis-filesystem", None, None)])
+            .unwrap()
+            .changed()
+            .and_then(|mut fs| fs.pop())
+            .unwrap();
+        invariant(&pool, name);
+
+        let tmp_dir = tempfile::Builder::new()
+            .prefix("stratis_testing")
+            .tempdir()
+            .unwrap();
+        let new_file = tmp_dir.path().join("stratis_test.txt");
+        let bytestring = b"some bytes";
+        {
+            let (_, fs) = pool.get_filesystem(fs_uuid).unwrap();
+            mount(
+                Some(&fs.devnode()),
+                tmp_dir.path(),
+                Some("xfs"),
+                MsFlags::empty(),
+                None as Option<&str>,
+            )
+            .unwrap();
+            OpenOptions::new()
+                .create(true)
+                .truncate(true)
+                .write(true)
+                .open(&new_file)
+                .unwrap()
+                .write_all(bytestring)
+                .unwrap();
+        }
+
+        pool.init_cache(uuid, name, cache_paths, true).unwrap();
+        invariant(&pool, name);
+        assert!(pool.has_cache());
+
+        let metadata = pool.record(name);
+        assert!(metadata.backstore.cache_tier.is_some());
+
+        let result = pool.remove_cache(uuid, name).unwrap();
+        assert!(result.is_changed());
+        assert!(!pool.has_cache());
+        invariant(&pool, name);
+
+        let metadata = pool.record(name);
+        assert_matches!(metadata.backstore.cache_tier, None);
+
+        let mut buf = [0u8; 10];
+        {
+            OpenOptions::new()
+                .read(true)
+                .open(&new_file)
+                .unwrap()
+                .read_exact(&mut buf)
+                .unwrap();
+        }
+        assert_eq!(&buf, bytestring);
+
+        let result = pool.remove_cache(uuid, name).unwrap();
+        assert!(!result.is_changed());
+
+        umount(tmp_dir.path()).unwrap();
+        pool.teardown(uuid).unwrap();
+    }
+
+    #[test]
+    fn loop_test_remove_cache_direct() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(3, 4, None),
+            test_remove_cache_direct,
+        );
+    }
+
+    #[test]
+    fn real_test_remove_cache_direct() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(2, None, None),
+            test_remove_cache_direct,
+        );
+    }
+
     /// Tests online reencryption functionality by performing online reencryption and then stopping and
     /// starting the pool.
     fn clevis_test_online_reencrypt(paths: &[&Path]) {

@@ -16,6 +16,7 @@ exclude = [
     "/.githooks",
     "/.github",
     "/.gitignore",
+    "/.gitlint",
     "/.packit.yaml",
     "/.yamlint.yaml",
     "/_typos.toml",

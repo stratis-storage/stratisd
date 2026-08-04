@@ -364,3 +364,25 @@ jobs:
         run: PROFILEDIR=debug make -f Makefile install
       - name: Lint systemd configuration
         run: make -f Makefile systemd-lint
+
+  commit-checks:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    container:
+      image: fedora:43  # CURRENT DEVELOPMENT ENVIRONMENT
+    steps:
+      - name: Install dependencies
+        run: dnf install -y git gitlint
+      - uses: baptiste0928/cargo-install@v3
+        with:
+          crate: typos-cli
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: allow gitlint to process commits
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: gitlint
+        run: gitlint --commits "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+      - name: check spelling
+        run: git log "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}" | typos -

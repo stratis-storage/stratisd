@@ -51,7 +51,7 @@ pub fn get_kernel_cmdline() -> Result<HashMap<String, Option<Vec<String>>>, io::
         let value_in_map = cmdline_map.get_mut(&name);
         let value = name_value.next().map(|s| s.to_string());
         match value_in_map {
-            Some(Some(ref mut vec)) => {
+            Some(Some(vec)) => {
                 if let Some(v) = value {
                     vec.push(v);
                 }

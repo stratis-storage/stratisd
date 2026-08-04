@@ -492,7 +492,7 @@ where
     U: AsUuid,
 {
     match lock_key {
-        PoolIdentifier::Name(ref n) => unsafe { inner.get().as_ref() }
+        PoolIdentifier::Name(n) => unsafe { inner.get().as_ref() }
             .and_then(|i| i.get_by_name(n).map(|(u, _)| (u, n.clone()))),
         PoolIdentifier::Uuid(u) => {
             unsafe { inner.get().as_ref() }.and_then(|i| i.get_by_uuid(*u).map(|(n, _)| (*u, n)))

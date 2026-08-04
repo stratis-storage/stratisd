@@ -31,6 +31,7 @@ fn main() {
                 "#include <systemd/sd-daemon.h>\n#include <systemd/sd-journal.h>",
             )
             .blocklist_type("max_align_t")
+            .wrap_unsafe_ops(true)
             .generate()
             .expect("Could not generate bindings for systemd");
 

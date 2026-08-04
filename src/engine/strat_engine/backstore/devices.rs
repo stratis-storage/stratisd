@@ -567,7 +567,7 @@ pub fn initialize_devices_legacy(
         // which will never have a hardware ID.
         let hw_id = match (underlying_device.crypt_handle().is_some(), id_wwn) {
             (true, _) => None,
-            (_, Some(Ok(ref hw_id))) => Some(hw_id.to_owned()),
+            (_, Some(Ok(hw_id))) => Some(hw_id.to_owned()),
             (_, Some(Err(_))) => {
                 warn!("Value for ID_WWN for device {} obtained from the udev database could not be decoded; inserting device into pool with UUID {} anyway",
                       underlying_device.physical_path().display(),
@@ -815,7 +815,7 @@ pub fn initialize_devices(
         // are always represented as logical, software-based devicemapper devices
         // which will never have a hardware ID.
         let hw_id = match id_wwn {
-            Some(Ok(ref hw_id)) => Some(hw_id.to_owned()),
+            Some(Ok(hw_id)) => Some(hw_id.to_owned()),
             Some(Err(_)) => {
                 warn!("Value for ID_WWN for device {} obtained from the udev database could not be decoded; inserting device into pool with UUID {} anyway",
                       devnode.display(),

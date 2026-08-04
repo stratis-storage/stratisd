@@ -1180,7 +1180,7 @@ impl Backstore {
                 // Ignore thumbprint if stratis:tang:trust_url is set in the clevis_info
                 // config.
                 let info = handle.encryption_info().get_info(k);
-                if let Some(UnlockMechanism::KeyDesc(ref kd)) = info {
+                if let Some(UnlockMechanism::KeyDesc(kd)) = info {
                     if kd == key_desc {
                         Ok(None)
                     } else {
@@ -1239,7 +1239,7 @@ impl Backstore {
             Some(t) => {
                 let info = ei.get_info(t);
                 match info {
-                    Some(UnlockMechanism::KeyDesc(ref kd)) => if kd == key_desc {
+                    Some(UnlockMechanism::KeyDesc(kd)) => if kd == key_desc {
                         Ok(Some(false))
                     } else {
                         handle.rebind_keyring(t, key_desc)?;

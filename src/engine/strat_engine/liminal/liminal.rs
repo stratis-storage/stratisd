@@ -143,7 +143,7 @@ impl LiminalDevices {
                 for (dev_uuid, info) in map.iter() {
                     match info {
                         LInfo::Stratis(_) => (),
-                        LInfo::Luks(ref luks_info) => {
+                        LInfo::Luks(luks_info) => {
                             match handle_luks(luks_info, token_slot, passphrase) {
                                 Ok(()) => unlocked.push(*dev_uuid),
                                 Err(e) => return Err(e),

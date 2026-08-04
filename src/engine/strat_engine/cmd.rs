@@ -401,7 +401,7 @@ pub fn clevis_luks_bind(
             get_persistent_keyring()?;
             execute_cmd(&mut cmd)
         }
-        Either::Right(ref key) => {
+        Either::Right(key) => {
             cmd.stdin(Stdio::piped())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped());

@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
+    cmp::max,
     fs::OpenOptions,
     io::{self, Seek, SeekFrom, Write},
     mem::forget,
@@ -384,7 +385,7 @@ fn sss_dispatch(json: &Value, recursion_limit: u64) -> StratisResult<Value> {
 
     let mut pin_map = Map::new();
     for jwe in jwes {
-        if let Value::String(ref s) = jwe {
+        if let Value::String(s) = jwe {
             // NOTE: Workaround for the on-disk format for Shamir secret sharing
             // as written by clevis. The base64 encoded string delimits the end
             // of the JSON blob with a period.
@@ -399,7 +400,7 @@ fn sss_dispatch(json: &Value, recursion_limit: u64) -> StratisResult<Value> {
             let value: Value = serde_json::from_slice(&json_bytes)?;
             let (pin, value) = pin_dispatch(&value, recursion_limit - 1)?;
             match pin_map.get_mut(&pin) {
-                Some(Value::Array(ref mut vec)) => vec.push(value),
+                Some(Value::Array(vec)) => vec.push(value),
                 None => {
                     pin_map.insert(pin, Value::from(vec![value]));
                 }
@@ -900,12 +901,21 @@ unsafe extern "C" fn open(
     #[allow(clippy::to_string_in_format_args)]
     match res {
         Ok(pass) => {
-            let malloc_pass = libc::malloc(pass.as_ref().len());
+            let pass_len = pass.as_ref().len();
+            let alloc_len = max(pass_len, 1);
+            let malloc_pass = unsafe { libc::malloc(alloc_len) };
+            if malloc_pass.is_null() {
+                warn!(
+                    "malloc() returned null when allocating {} bytes for passphrase",
+                    alloc_len
+                );
+                return -libc::ENOMEM;
+            }
             let pass_slice =
-                unsafe { from_raw_parts_mut::<u8>(malloc_pass.cast::<u8>(), pass.as_ref().len()) };
+                unsafe { from_raw_parts_mut::<u8>(malloc_pass.cast::<u8>(), pass_len) };
             pass_slice.copy_from_slice(pass.as_ref());
-            *buffer = malloc_pass.cast::<libc::c_char>();
-            *buffer_len = pass.as_ref().len();
+            unsafe { *buffer = malloc_pass.cast::<libc::c_char>() };
+            unsafe { *buffer_len = pass_len };
             0
         }
         Err(e) => {
@@ -917,7 +927,7 @@ unsafe extern "C" fn open(
             if let Ok(mut g) = guard {
                 *g = Some(e);
             }
-            -1
+            -libc::EPERM
         }
     }
 }

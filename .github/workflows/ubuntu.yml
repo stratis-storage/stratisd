@@ -144,7 +144,7 @@ jobs:
         run: PROFILEDIR=debug make -f Makefile install
       - name: Reload udev
         run: udevadm control --reload
-      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
+      - name: Test ${{ matrix.task }} on CURRENT_DEVELOPMENT_RUST_TOOLCHAIN
         run: ${{ matrix.task }}
 
   checks_with_tang_should_fail:
@@ -196,5 +196,5 @@ jobs:
         run: PROFILEDIR=debug make -f Makefile install
       - name: Reload udev
         run: udevadm control --reload
-      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
+      - name: Test ${{ matrix.task }} on CURRENT_DEVELOPMENT_RUST_TOOLCHAIN
         run: ${{ matrix.task }}

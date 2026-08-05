@@ -94,7 +94,7 @@ jobs:
         run: PROFILEDIR=debug make -f Makefile install
       - name: Reload udev
         run: udevadm control --reload
-      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
+      - name: Test ${{ matrix.task }} on CURRENT_DEVELOPMENT_RUST_TOOLCHAIN
         run: ${{ matrix.task }}
 
   python-based-tests:
@@ -144,7 +144,7 @@ jobs:
         run: sudo cp stratisd.conf /usr/share/dbus-1/system.d
       - name: Reload udev
         run: sudo udevadm control --reload
-      - name: Tests on ${{ matrix.image }} using Rust ${{ matrix.toolchain }}
+      - name: Run tests
         run: >
           sudo make
           RUST_LOG=stratisd=debug

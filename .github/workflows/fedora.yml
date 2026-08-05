@@ -88,5 +88,5 @@ jobs:
           components: ${{ matrix.components }}
       - name: Overwrite stratisd dependencies as necessary
         uses: stratis-storage/github-actions/stratisd-modify@HEAD
-      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
+      - name: Test ${{ matrix.task }} on CURRENT_DEVELOPMENT_RUST_TOOLCHAIN
         run: ${{ matrix.task }}

@@ -83,6 +83,11 @@ UTILS_FEATURES = --no-default-features --features dbus_enabled,engine,systemd_co
 
 STATIC_FLAG = -C target-feature=+crt-static
 
+.PHONY: actionlint
+## Lint Github Workflows files
+actionlint:
+	actionlint
+
 .PHONY: audit
 ## Run cargo audit
 audit:

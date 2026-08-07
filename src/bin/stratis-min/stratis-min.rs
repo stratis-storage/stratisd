@@ -191,7 +191,9 @@ fn parse_args() -> Command {
             Command::new("filesystem").subcommands(vec![
                 Command::new("create")
                     .arg(Arg::new("pool_name").required(true))
-                    .arg(Arg::new("fs_name").required(true)),
+                    .arg(Arg::new("fs_name").required(true))
+                    .arg(Arg::new("size").long("size").num_args(1))
+                    .arg(Arg::new("size_limit").long("size-limit").num_args(1)),
                 Command::new("destroy")
                     .arg(Arg::new("pool_name").required(true))
                     .arg(Arg::new("fs_name").required(true)),
@@ -202,6 +204,10 @@ fn parse_args() -> Command {
                 Command::new("origin")
                     .arg(Arg::new("pool_name").required(true))
                     .arg(Arg::new("fs_name").required(true)),
+                Command::new("set-size-limit")
+                    .arg(Arg::new("pool_name").required(true))
+                    .arg(Arg::new("fs_name").required(true))
+                    .arg(Arg::new("size_limit").long("size-limit").num_args(1)),
             ]),
             Command::new("report"),
         ])
@@ -660,6 +666,14 @@ fn main() -> Result<(), String> {
             }
         } else if let Some(subcommand) = args.subcommand_matches("filesystem") {
             if let Some(args) = subcommand.subcommand_matches("create") {
+                let size = args
+                    .get_one::<String>("size")
+                    .map(|s| s.parse::<u128>())
+                    .transpose()?;
+                let size_limit = args
+                    .get_one::<String>("size_limit")
+                    .map(|s| s.parse::<u128>())
+                    .transpose()?;
                 filesystem::filesystem_create(
                     args.get_one::<String>("pool_name")
                         .expect("required")
@@ -667,6 +681,8 @@ fn main() -> Result<(), String> {
                     args.get_one::<String>("fs_name")
                         .expect("required")
                         .to_owned(),
+                    size,
+                    size_limit,
                 )?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("destroy") {
@@ -704,6 +720,21 @@ fn main() -> Result<(), String> {
                 .map(|origin| {
                     println!("{origin}");
                 })?;
+                Ok(())
+            } else if let Some(args) = subcommand.subcommand_matches("set-size-limit") {
+                let size_limit = args
+                    .get_one::<String>("size_limit")
+                    .map(|s| s.parse::<u128>())
+                    .transpose()?;
+                filesystem::filesystem_set_size_limit(
+                    args.get_one::<String>("pool_name")
+                        .expect("required")
+                        .to_owned(),
+                    args.get_one::<String>("fs_name")
+                        .expect("required")
+                        .to_owned(),
+                    size_limit,
+                )?;
                 Ok(())
             } else {
                 filesystem::filesystem_list()?;

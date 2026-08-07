@@ -8,8 +8,13 @@ use crate::{
 };
 
 // stratis-min filesystem create
-pub fn filesystem_create(pool_name: String, filesystem_name: String) -> StratisResult<()> {
-    do_request_standard!(FsCreate, pool_name, filesystem_name)
+pub fn filesystem_create(
+    pool_name: String,
+    filesystem_name: String,
+    size: Option<u128>,
+    size_limit: Option<u128>,
+) -> StratisResult<()> {
+    do_request_standard!(FsCreate, pool_name, filesystem_name, size, size_limit)
 }
 
 // stratis-min filesystem [list]
@@ -58,4 +63,13 @@ pub fn filesystem_origin(pool_name: String, filesystem_name: String) -> StratisR
     } else {
         Ok(origin.unwrap_or_else(|| "None".to_string()))
     }
+}
+
+// stratis-min filesystem set-size-limit
+pub fn filesystem_set_size_limit(
+    pool_name: String,
+    filesystem_name: String,
+    size_limit: Option<u128>,
+) -> StratisResult<()> {
+    do_request_standard!(FsSetSizeLimit, pool_name, filesystem_name, size_limit)
 }

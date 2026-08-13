@@ -5,7 +5,7 @@
 use std::{
     collections::HashMap,
     error::Error,
-    fs::OpenOptions,
+    fs::{rename, OpenOptions},
     io::{self, Read, Write},
     path::Path,
 };
@@ -70,11 +70,17 @@ pub fn get_kernel_cmdline() -> Result<HashMap<String, Option<Vec<String>>>, io::
 }
 
 pub fn write_unit_file(dest: &Path, file_contents: String) -> Result<(), io::Error> {
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(dest)?;
-    file.write_all(file_contents.as_bytes())?;
+    let tmp_dest = dest.with_extension("tmp");
+    {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&tmp_dest)?;
+        file.write_all(file_contents.as_bytes())?;
+    }
+
+    rename(&tmp_dest, dest)?;
+
     Ok(())
 }

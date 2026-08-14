@@ -4,7 +4,7 @@
 
 use std::{
     error::Error,
-    fs::create_dir_all,
+    fs::{create_dir_all, read_link, remove_file},
     io,
     os::unix::fs::symlink,
     path::{Path, PathBuf},
@@ -22,15 +22,29 @@ fn make_wanted_by_initrd(unit_path: &Path) -> Result<(), io::Error> {
     if !initrd_target_wants_path.exists() {
         create_dir_all(initrd_target_wants_path)?;
     }
-    symlink(
-        unit_path,
-        [
-            initrd_target_wants_path,
-            &Path::new(unit_path.file_name().expect("Is unit file")),
-        ]
-        .iter()
-        .collect::<PathBuf>(),
-    )?;
+    let symlink_source = [
+        initrd_target_wants_path,
+        &Path::new(unit_path.file_name().expect("Is unit file")),
+    ]
+    .iter()
+    .collect::<PathBuf>();
+
+    if symlink_source.exists() {
+        if !read_link(&symlink_source)
+            .map(|target| target == unit_path)
+            .unwrap_or(false)
+        {
+            match remove_file(&symlink_source) {
+                Ok(_) => {}
+                Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+                Err(e) => return Err(e),
+            };
+            symlink(unit_path, symlink_source)?;
+        }
+    } else {
+        symlink(unit_path, symlink_source)?;
+    }
+
     Ok(())
 }
 

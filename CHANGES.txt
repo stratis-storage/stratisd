@@ -1,3 +1,19 @@
+stratisd 3.9.3
+==============
+Recommended development platform for Python development: Fedora 43
+
+- Return owned LinearDevs from make_cache on error:
+  https://github.com/stratis-storage/stratisd/pull/4059
+
+- Remove symlink source before symlinking:
+  https://github.com/stratis-storage/stratisd/pull/4067
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/4068
+  https://github.com/stratis-storage/stratisd/pull/4061
+  https://github.com/stratis-storage/stratisd/pull/4023
+
+
 stratisd 3.9.2
 ==============
 Recommended development platform for Python development: Fedora 43

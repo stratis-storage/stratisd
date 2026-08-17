@@ -1018,7 +1018,7 @@ impl Pool for StratPool {
                 // If just adding data devices, no need to suspend the pool.
                 // No action will be taken on the DM devices.
                 let bdev_info = self.backstore.add_datadevs(pool_uuid, unowned_devices)?;
-                self.thin_pool.set_queue_mode();
+                self.thin_pool.clear_out_of_alloc_space();
                 self.thin_pool.clear_out_of_meta_flag();
 
                 Ok((
@@ -1246,9 +1246,8 @@ impl Pool for StratPool {
 
         let changed = self.backstore.grow(device)?;
         if changed {
-            if self.thin_pool.set_queue_mode() {
-                self.write_metadata(name)?;
-            }
+            self.thin_pool.clear_out_of_alloc_space();
+            self.write_metadata(name)?;
             Ok((
                 GrowAction::Grown((pool_uuid, device)),
                 Some(PoolDiff {

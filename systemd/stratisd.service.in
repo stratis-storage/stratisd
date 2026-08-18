@@ -1,6 +1,7 @@
 [Unit]
 Description=Stratis daemon
 Documentation=man:stratisd(8)
+After=remote-fs.target
 
 [Service]
 BusName=org.storage.stratis3

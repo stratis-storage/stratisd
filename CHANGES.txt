@@ -2,6 +2,11 @@ stratisd 3.9.3
 ==============
 Recommended development platform for Python development: Fedora 43
 
+- Remove ordering cycle in stratisd.service for dependent services:
+  https://github.com/stratis-storage/stratisd/issues/3968
+  https://github.com/stratis-storage/stratisd/pull/4070
+  https://github.com/stratis-storage/stratisd/pull/4019
+
 - Return owned LinearDevs from make_cache on error:
   https://github.com/stratis-storage/stratisd/pull/4059
 

@@ -1014,9 +1014,9 @@ checksum = "09edd9e8b54e49e587e4f6295a7d29c3ea94d469cb40ab8ca70b288248a81db2"
 
 [[package]]
 name = "libblkid-rs"
-version = "0.4.0"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7979dd6bf515e8b38734d42311fe5f668ad3383c0acfd22d14f20ef420807e6e"
+checksum = "f6eee640d2d3e939915ef2576b4d0d6aa4d40d96b37cfbcec38c3c1ff7d4f221"
 dependencies = [
  "either",
  "libblkid-rs-sys",

@@ -554,9 +554,9 @@ checksum = "c2e66c9d817f1720209181c316d28635c050fa304f9c79e47a520882661b7308"
 
 [[package]]
 name = "devicemapper"
-version = "0.34.7"
+version = "0.34.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "607791a4633fca6e032a66614f4fe96a721dd8641ebe98438283e53d361503cd"
+checksum = "6d95021344f9715868259d6b500aa0fb2a3b53c39b5c88fc45814355e53ce83a"
 dependencies = [
  "bitflags",
  "cfg-if",

@@ -152,7 +152,7 @@ fn wrap_method(f: &mut ImplItemFn) {
             (args, arg_idents)
         },
     );
-    let stmts = f.block.stmts.drain(..).collect::<Vec<_>>();
+    let stmts = &f.block.stmts;
 
     wrapped_sig.inputs = args
         .into_iter()

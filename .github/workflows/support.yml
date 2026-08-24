@@ -52,8 +52,8 @@ jobs:
           - dependencies: ruff
             task: make -f Makefile fmt-ci
             working-directory: ./tests/client-dbus
-          - dependencies: yamllint tmt
-            task: make -f Makefile yamllint tmtlint
+          - dependencies: tmt
+            task: make -f Makefile tmtlint
             working-directory: .
     runs-on: ubuntu-24.04
     container: fedora:43  # CURRENT DEVELOPMENT ENVIRONMENT
@@ -75,3 +75,8 @@ jobs:
       - name: Run test
         run: ${{ matrix.task }}
         working-directory: ${{ matrix.working-directory }}
+
+  general_checks:
+    uses: stratis-storage/github-actions/.github/workflows/reusable_general.yml@master
+    with:
+      fedora-container-image-number: 43  # CURRENT DEVELOPMENT ENVIRONMENT

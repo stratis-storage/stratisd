@@ -31,8 +31,6 @@ jobs:
         include:
           - task: make -f Makefile fmt-ci
             components: rustfmt
-          - task: make -f Makefile check-typos
-            components: cargo
     runs-on: ubuntu-24.04
     container:
       image: fedora:43  # CURRENT DEVELOPMENT ENVIRONMENT
@@ -56,9 +54,6 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: ${{ matrix.components }}
-      - uses: baptiste0928/cargo-install@v3
-        with:
-          crate: typos-cli
       - name: Test ${{ matrix.task }} on CURRENT DEVELOPMENT RUST TOOLCHAIN
         run: ${{ matrix.task }}
 

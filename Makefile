@@ -260,6 +260,11 @@ docs-rust:
 docs/%.8: docs/%.txt
 	a2x -f manpage $<
 
+.PHONY: fix-typos
+## Fix spelling errors
+fix-typos:
+	typos -w
+
 .PHONY: fmt
 ## Run cargo fmt
 fmt: fmt-macros

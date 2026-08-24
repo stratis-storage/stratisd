@@ -278,9 +278,7 @@ impl DataDevice {
                 && self.sum(&[DataDeviceUse::IntegrityMetadata]) > Sectors(0)
             {
                 vec![
-                    format!(
-                        "Integrity specification should resolve to 0 allocations for integrity, but data device has space allocated for integrity."
-                    )
+                    "Integrity specification should resolve to 0 allocations for integrity, but data device has space allocated for integrity.".to_string()
                 ]
             } else {
                 vec![]

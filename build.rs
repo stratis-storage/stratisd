@@ -30,7 +30,8 @@ fn main() {
                 "systemd-header.h",
                 "#include <systemd/sd-daemon.h>\n#include <systemd/sd-journal.h>",
             )
-            .blocklist_type("max_align_t")
+            .allowlist_function("sd_notify")
+            .allowlist_function("syslog")
             .wrap_unsafe_ops(true)
             .generate()
             .expect("Could not generate bindings for systemd");

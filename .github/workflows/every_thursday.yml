@@ -1,0 +1,15 @@
+---
+name: stratisd weekly thursday evening
+
+on:
+  schedule:
+    - cron: 15 23 * * 5
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  current_rust_version:
+    uses: stratis-storage/github-actions/.github/workflows/rust_development_version.yml@ebccadd4ad37491429d5912747b62a60ad88b490
+    with:
+      fedora-container-image-number: 43  # CURRENT DEVELOPMENT ENVIRONMENT

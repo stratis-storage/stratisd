@@ -152,7 +152,7 @@ fn wrap_method(f: &mut ImplItemFn) {
             (args, arg_idents)
         },
     );
-    let stmts = &f.block.stmts;
+    let stmts = std::mem::take(&mut f.block.stmts);
 
     wrapped_sig.inputs = args
         .into_iter()

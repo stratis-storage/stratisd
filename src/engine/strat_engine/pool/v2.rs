@@ -1118,6 +1118,10 @@ impl Pool for StratPool {
             .map(|u| u + self.metadata_size)
     }
 
+    fn metadata_used(&self) -> Sectors {
+        self.metadata_size
+    }
+
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)> {
         self.thin_pool
             .filesystems()

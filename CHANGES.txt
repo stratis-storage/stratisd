@@ -1,3 +1,44 @@
+stratisd 3.9.3
+==============
+Recommended development platform for Python development: Fedora 43
+
+- Remove ordering cycle in stratisd.service for dependent services:
+  https://github.com/stratis-storage/stratisd/issues/3968
+  https://github.com/stratis-storage/stratisd/pull/4070
+  https://github.com/stratis-storage/stratisd/pull/4019
+
+- Return owned LinearDevs from make_cache on error:
+  https://github.com/stratis-storage/stratisd/pull/4059
+
+- Remove symlink source before symlinking:
+  https://github.com/stratis-storage/stratisd/pull/4067
+
+- Increase devicemapper dependency lower bound to 0.34.6;
+  Increase devicemapper dependency actual version to 0.34.8:
+  https://github.com/stratis-storage/stratisd/pull/4081
+  https://github.com/stratis-storage/stratisd/pull/4072
+
+- Increase getrandom dependency actual version to 0.4.3:
+  https://github.com/stratis-storage/stratisd/pull/4074
+
+- Increase libblkid-rs dependency lower bound to 0.4.2:
+  https://github.com/stratis-storage/stratisd/pull/4073
+
+- Increase chacha20 dependency actual version to 0.10.2:
+  https://github.com/stratis-storage/stratisd/pull/4080
+
+- Increase event-listener dependency actual version to 5.4.2:
+  https://github.com/stratis-storage/stratisd/pull/4062
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/4076
+  https://github.com/stratis-storage/stratisd/pull/4075
+  https://github.com/stratis-storage/stratisd/pull/4068
+  https://github.com/stratis-storage/stratisd/pull/4064
+  https://github.com/stratis-storage/stratisd/pull/4061
+  https://github.com/stratis-storage/stratisd/pull/4023
+
+
 stratisd 3.9.2
 ==============
 Recommended development platform for Python development: Fedora 43

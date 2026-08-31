@@ -1684,7 +1684,7 @@ dependencies = [
 
 [[package]]
 name = "stratisd_proc_macros"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "proc-macro2",
  "quote",

@@ -1,6 +1,6 @@
 [package]
 name = "stratisd_proc_macros"
-version = "0.2.3"
+version = "0.2.4"
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true

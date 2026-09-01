@@ -37,7 +37,7 @@ endif
 ifeq ($(origin CLIPPY_FIX), undefined)
   CLIPPY_OPTS = --all-targets --no-deps
 else
-  CLIPPY_OPTS = --fix
+  CLIPPY_OPTS = --fix --allow-dirty --allow-staged
 endif
 
 AUDIT_OPTS = -D warnings

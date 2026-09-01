@@ -1,0 +1,17 @@
+---
+name: stratisd thursday evening
+
+on:
+  schedule:
+    - cron: 15 23 * * 4
+
+  workflow_dispatch:
+
+jobs:
+  current_rust_version:
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: stratis-storage/github-actions/.github/workflows/rust_development_version.yml@master
+    with:
+      fedora-container-image-number: 43  # CURRENT DEVELOPMENT ENVIRONMENT

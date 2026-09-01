@@ -274,6 +274,7 @@ impl StratPool {
         paths_to_wipe: Option<Vec<Either<PathBuf, PathBuf>>>,
         encryption_info: Option<PoolEncryptionInfo>,
     ) -> StratisResult<(Name, StratPool)> {
+        #![allow(tail_expr_drop_order)]
         check_metadata(metadata)?;
 
         let backstore =

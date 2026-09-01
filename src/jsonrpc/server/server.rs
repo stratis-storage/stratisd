@@ -299,6 +299,7 @@ impl StratisServer {
     }
 
     pub async fn run(mut self) {
+        #![allow(tail_expr_drop_order)]
         loop {
             match self.handle_request().await {
                 Ok(true) => (),

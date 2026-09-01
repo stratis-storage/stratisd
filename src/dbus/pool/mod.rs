@@ -49,6 +49,7 @@ pub async fn register_pool<'a>(
     counter: &Arc<AtomicU64>,
     pool_uuid: PoolUuid,
 ) -> StratisResult<(ObjectPath<'a>, Vec<ObjectPath<'a>>, Vec<ObjectPath<'a>>)> {
+    #![allow(tail_expr_drop_order)]
     match engine.get_pool(PoolIdentifier::Uuid(pool_uuid)).await {
         Some(pool) => {
             let path = ObjectPath::try_from(format!(
@@ -217,6 +218,7 @@ pub async fn unregister_pool(
     fs_uuids: &[FilesystemUuid],
     dev_uuids: &[DevUuid],
 ) -> StratisResult<PoolUuid> {
+    #![allow(tail_expr_drop_order)]
     // Unregister all filesystems
     for fs_uuid in fs_uuids {
         let maybe_fs_path = manager.write().await.filesystem_get_path(fs_uuid).cloned();

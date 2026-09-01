@@ -124,6 +124,7 @@ pub async fn stop_pool_method(
     manager: &Lockable<Arc<RwLock<Manager>>>,
     pool: ObjectPath<'_>,
 ) -> ((bool, String), u16, String) {
+    #![allow(tail_expr_drop_order)]
     let default_return = (false, String::new());
 
     let pool_uuid = match manager.read().await.pool_get_uuid(&pool) {

@@ -208,10 +208,11 @@ impl StratisParams {
                     false,
                 )))
             }
-            StratisParamType::FsCreate(pool_name, fs_name) => {
+            StratisParamType::FsCreate(pool_name, fs_name, size, size_limit) => {
                 expects_fd!(self.fd_opt, false);
                 Ok(StratisRet::FsCreate(stratis_result_to_return(
-                    filesystem::filesystem_create(engine, &pool_name, &fs_name).await,
+                    filesystem::filesystem_create(engine, &pool_name, &fs_name, size, size_limit)
+                        .await,
                     false,
                 )))
             }
@@ -240,6 +241,14 @@ impl StratisParams {
                 Ok(StratisRet::FsOrigin(stratis_result_to_return(
                     filesystem::filesystem_origin(engine, &pool_name, &fs_name).await,
                     None,
+                )))
+            }
+            StratisParamType::FsSetSizeLimit(pool_name, fs_name, size_limit) => {
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::FsSetSizeLimit(stratis_result_to_return(
+                    filesystem::filesystem_set_size_limit(engine, &pool_name, &fs_name, size_limit)
+                        .await,
+                    false,
                 )))
             }
             StratisParamType::Report => {

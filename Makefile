@@ -81,6 +81,7 @@ EXTRAS_FEATURES =  --no-default-features --features engine,extras
 UDEV_FEATURES = --no-default-features --features udev_scripts
 UTILS_FEATURES = --no-default-features --features dbus_enabled,engine,systemd_compat
 
+STATIC_CARGO_FLAGS = CARGO_PROFILE_RELEASE_LTO=thin
 STATIC_CFLAGS = -C target-feature=+crt-static
 
 .PHONY: actionlint
@@ -389,6 +390,7 @@ install-udev-cfg:
 ## Build stratis-base32-decode binary
 stratis-base32-decode:
 	PKG_CONFIG_ALLOW_CROSS=1 \
+	${STATIC_CARGO_FLAGS} \
 	RUSTFLAGS="${RUSTFLAGS}" \
 	cargo ${RUSTC} ${RELEASE_FLAG}  \
 	--bin=stratis-base32-decode \
@@ -409,6 +411,7 @@ stratis-min:
 ## Build stratis-str-cmp binary
 stratis-str-cmp:
 	PKG_CONFIG_ALLOW_CROSS=1 \
+	${STATIC_CARGO_FLAGS} \
 	RUSTFLAGS="${RUSTFLAGS}" \
 	cargo ${RUSTC} ${RELEASE_FLAG}  \
 	--bin=stratis-str-cmp \

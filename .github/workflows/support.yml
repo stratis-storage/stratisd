@@ -56,7 +56,7 @@ jobs:
             task: make -f Makefile tmtlint
             working-directory: .
     runs-on: ubuntu-24.04
-    container: fedora:43  # CURRENT DEVELOPMENT ENVIRONMENT
+    container: fedora:44  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - name: Install dependencies
         run: >
@@ -79,4 +79,4 @@ jobs:
   general_checks:
     uses: stratis-storage/github-actions/.github/workflows/reusable_general.yml@master
     with:
-      fedora-container-image-number: 43  # CURRENT DEVELOPMENT ENVIRONMENT
+      fedora-container-image-number: 44  # CURRENT DEVELOPMENT ENVIRONMENT

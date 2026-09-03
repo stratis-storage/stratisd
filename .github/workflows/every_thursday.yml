@@ -14,4 +14,4 @@ jobs:
       pull-requests: write
     uses: stratis-storage/github-actions/.github/workflows/rust_development_version.yml@master
     with:
-      fedora-container-image-number: 43  # CURRENT DEVELOPMENT ENVIRONMENT
+      fedora-container-image-number: 44  # CURRENT DEVELOPMENT ENVIRONMENT

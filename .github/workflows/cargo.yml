@@ -27,7 +27,7 @@ jobs:
   checks-with-ci-repo:
     runs-on: ubuntu-24.04
     container:
-      image: fedora:43  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:44  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - name: Install dependencies for Fedora
         run: >

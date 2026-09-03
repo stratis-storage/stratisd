@@ -81,7 +81,8 @@ EXTRAS_FEATURES =  --no-default-features --features engine,extras
 UDEV_FEATURES = --no-default-features --features udev_scripts
 UTILS_FEATURES = --no-default-features --features dbus_enabled,engine,systemd_compat
 
-STATIC_FLAG = -C target-feature=+crt-static
+STATIC_CARGO_FLAGS = CARGO_PROFILE_RELEASE_LTO=thin
+STATIC_CFLAGS = -C target-feature=+crt-static
 
 .PHONY: actionlint
 ## Lint Github Workflows files
@@ -389,12 +390,13 @@ install-udev-cfg:
 ## Build stratis-base32-decode binary
 stratis-base32-decode:
 	PKG_CONFIG_ALLOW_CROSS=1 \
+	${STATIC_CARGO_FLAGS} \
 	RUSTFLAGS="${RUSTFLAGS}" \
 	cargo ${RUSTC} ${RELEASE_FLAG}  \
 	--bin=stratis-base32-decode \
 	${UDEV_FEATURES} \
 	${TARGET_ARGS} \
-	-- ${STATIC_FLAG}
+	-- ${STATIC_CFLAGS}
 	@ldd target/${PROFILEDIR}/stratis-base32-decode|grep --quiet --silent "statically linked" || (echo "stratis-base32-decode is not statically linked" && exit 1)
 
 .PHONY: stratis-min
@@ -409,12 +411,13 @@ stratis-min:
 ## Build stratis-str-cmp binary
 stratis-str-cmp:
 	PKG_CONFIG_ALLOW_CROSS=1 \
+	${STATIC_CARGO_FLAGS} \
 	RUSTFLAGS="${RUSTFLAGS}" \
 	cargo ${RUSTC} ${RELEASE_FLAG}  \
 	--bin=stratis-str-cmp \
 	${UDEV_FEATURES} \
 	${TARGET_ARGS} \
-	-- ${STATIC_FLAG}
+	-- ${STATIC_CFLAGS}
 	@ldd target/${PROFILEDIR}/stratis-str-cmp|grep --quiet --silent "statically linked" || (echo "stratis-str-cmp is not statically linked" && exit 1)
 
 .PHONY: stratisd

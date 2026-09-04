@@ -16,7 +16,7 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 use devicemapper::{
-    CacheDev, CacheDevTargetTable, CacheTargetParams, DevId, Device, DmDevice, DmFlags, DmOptions,
+    CacheDev, CacheDevTargetTable, CacheTargetParams, DevId, Device, DmDevice, DmOptions,
     LinearDev, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine, TargetTable,
 };
 
@@ -127,18 +127,6 @@ fn make_cache(
     let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::Cache);
     if cap.is_some() {
         let dm = get_dm();
-        if let Err(e) = dm.device_suspend(
-            &DevId::Name(&dm_name),
-            DmOptions::default().set_flags(DmFlags::DM_SUSPEND),
-        ) {
-            let _ = cache.teardown(get_dm());
-            let _ = meta.teardown(get_dm());
-            return Err(Box::new(MakeCacheError {
-                error: e.into(),
-                origin: Some(origin),
-                cap,
-            }));
-        }
         let table = CacheDevTargetTable::new(
             Sectors(0),
             origin.size(),

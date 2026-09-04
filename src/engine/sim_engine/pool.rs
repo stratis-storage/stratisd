@@ -224,6 +224,20 @@ impl Pool for SimPool {
         }
     }
 
+    fn remove_cache(
+        &mut self,
+        _pool_uuid: PoolUuid,
+        _pool_name: &str,
+    ) -> StratisResult<SetDeleteAction<DevUuid, ()>> {
+        if self.has_cache() {
+            let uuids: Vec<_> = self.cache_devs.keys().cloned().collect();
+            self.cache_devs.clear();
+            Ok(SetDeleteAction::new(uuids, vec![]))
+        } else {
+            Ok(SetDeleteAction::empty())
+        }
+    }
+
     fn create_filesystems(
         &mut self,
         _pool_name: &str,
@@ -1474,5 +1488,70 @@ mod tests {
             Some(devs) => devs.len() == devices.len(),
             _ => false,
         });
+    }
+
+    #[test]
+    fn remove_cache_empty() {
+        let engine = SimEngine::default();
+        let pool_name = "pool_name";
+        let uuid = test_async!(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            IntegritySpec::default(),
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
+        assert!(!pool.has_cache());
+        let result = pool.remove_cache(uuid, pool_name).unwrap();
+        assert!(!result.is_changed());
+    }
+
+    #[test]
+    fn remove_cache_with_cache() {
+        let engine = SimEngine::default();
+        let pool_name = "pool_name";
+        let uuid = test_async!(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            IntegritySpec::default(),
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
+        pool.init_cache(uuid, pool_name, &[Path::new("/dev/cache1")], true)
+            .unwrap();
+        assert!(pool.has_cache());
+        let result = pool.remove_cache(uuid, pool_name).unwrap();
+        assert!(result.is_changed());
+        assert!(!pool.has_cache());
+    }
+
+    #[test]
+    fn remove_cache_idempotent() {
+        let engine = SimEngine::default();
+        let pool_name = "pool_name";
+        let uuid = test_async!(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            IntegritySpec::default(),
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
+        pool.init_cache(uuid, pool_name, &[Path::new("/dev/cache1")], true)
+            .unwrap();
+        assert!(pool.has_cache());
+        let result1 = pool.remove_cache(uuid, pool_name).unwrap();
+        assert!(result1.is_changed());
+        assert!(!pool.has_cache());
+        let result2 = pool.remove_cache(uuid, pool_name).unwrap();
+        assert!(!result2.is_changed());
     }
 }

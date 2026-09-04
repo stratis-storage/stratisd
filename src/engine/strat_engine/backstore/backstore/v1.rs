@@ -30,11 +30,12 @@ use crate::{
             metadata::MDADataSize,
             names::{format_backstore_ids, CacheRole},
             serde_structs::{BackstoreSave, CapSave, Recordable},
+            thinpool::ThinPool,
             writing::wipe_sectors,
         },
         types::{
             ActionAvailability, BlockDevTier, DevUuid, EncryptionInfo, InputEncryptionInfo,
-            KeyDescription, Name, PoolEncryptionInfo, PoolUuid, SizedKeyMemory,
+            KeyDescription, Name, OffsetDirection, PoolEncryptionInfo, PoolUuid, SizedKeyMemory,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -875,6 +876,92 @@ impl Backstore {
 
             Ok(())
         }
+    }
+
+    /// Remove caching from the pool. Removes the dm-cache device and
+    /// its cache-sub and meta-sub sub-devices, preserving the origin
+    /// device. Wipes the cache blockdevs and removes the cache tier.
+    ///
+    /// The caller is responsible for suspending the thinpool before
+    /// calling this method, redirecting the thinpool to the new
+    /// backstore device via set_device, and resuming the thinpool.
+    ///
+    /// Precondition: self.cache_tier.is_some() && self.cache.is_some()
+    /// Postcondition: self.cache_tier.is_none() && self.cache.is_none()
+    ///                && self.linear.is_some()
+    ///
+    /// WARNING: metadata changing event
+    pub fn remove_cache(
+        &mut self,
+        thinpool: &mut ThinPool<Backstore>,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<()> {
+        let mut cache_tier = self
+            .cache_tier
+            .take()
+            .ok_or_else(|| StratisError::Msg("Pool does not have a cache".to_string()))?;
+        let cache = self
+            .cache
+            .take()
+            .expect("cache_tier.is_some() <=> self.cache.is_some()");
+
+        // The OriginSub DM device still exists in the kernel.
+        // Re-wrap it as a LinearDev.
+        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
+        let origin = match LinearDev::setup(
+            get_dm(),
+            &dm_name,
+            Some(&dm_uuid),
+            self.data_tier.segments.map_to_dm(),
+        ) {
+            Ok(l) => l,
+            Err(e) => {
+                self.cache_tier = Some(cache_tier);
+                self.cache = Some(cache);
+                return Err(StratisError::Chained(
+                    "Failed to regenerate the origin linear device".to_string(),
+                    Box::new(StratisError::from(e)),
+                ));
+            }
+        };
+        self.linear = Some(origin);
+
+        let device = match self.device() {
+            Some(d) => d,
+            None => {
+                self.cache_tier = Some(cache_tier);
+                self.cache = Some(cache);
+                self.linear = None;
+                return Err(StratisError::Msg("No cap device found".to_string()));
+            }
+        };
+
+        thinpool.suspend()?;
+        let set_device_res = thinpool.set_device(device, Sectors(0), OffsetDirection::Forwards);
+        let resume_res = thinpool.resume();
+        if let Err(e) = set_device_res.and(resume_res) {
+            self.cache_tier = Some(cache_tier);
+            self.cache = Some(cache);
+            self.linear = None;
+            return Err(StratisError::Chained(
+                "Failed to switch thin pool backing device".to_string(),
+                Box::new(e),
+            ));
+        }
+
+        // Remove cache, cache-sub, and meta-sub DM devices.
+        // The origin-sub device is preserved.
+        // Order matters: cache must be removed before its sub-devices.
+        let (cache_name, _) = format_backstore_ids(pool_uuid, CacheRole::Cache);
+        let (cache_sub_name, _) = format_backstore_ids(pool_uuid, CacheRole::CacheSub);
+        let (meta_sub_name, _) = format_backstore_ids(pool_uuid, CacheRole::MetaSub);
+        if let Err(e) = remove_optional_devices(vec![cache_name, cache_sub_name, meta_sub_name]) {
+            warn!("Failed to clean up cache devices: {e}; they may need to be manually removed");
+        }
+
+        cache_tier.destroy()?;
+
+        Ok(())
     }
 
     pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {

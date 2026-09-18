@@ -143,6 +143,30 @@ pub enum CacheRole {
     OriginSub,
 }
 
+/// Format a name & uuid for the dm-raid pool migration device.
+///
+/// Prerequisite: len(format!("{}", FORMAT_VERSION)
+///             + len("stratis")                         7
+///             + len("private")                         7
+///             + len("migrate")                         7
+///             + num_dashes                             5
+///             + len(pool uuid)                         32
+///             + raid1                                  5
+///             < 128 (129 for UUID)
+///
+/// which is equivalent to len(format!("{}", FORMAT_VERSION) < 63 (64 for UUID)
+pub fn format_dm_raid_migrate_ids(pool_uuid: PoolUuid) -> (DmNameBuf, DmUuidBuf) {
+    let value = format!(
+        "stratis-{}-private-{}-migrate-raid1",
+        FORMAT_VERSION,
+        uuid_to_string!(pool_uuid),
+    );
+    (
+        DmNameBuf::new(value.clone()).expect("FORMAT_VERSION display length < 60"),
+        DmUuidBuf::new(value).expect("FORMAT_VERSION display length < 61"),
+    )
+}
+
 /// Format a name & uuid for the flex layer.
 ///
 /// Prerequisite: len(format!("{}", FORMAT_VERSION)

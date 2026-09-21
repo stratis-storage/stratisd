@@ -4,11 +4,12 @@
 
 use std::path::PathBuf;
 
-use clap::{Arg, ArgAction, ArgGroup, Command};
+use clap::{Arg, ArgAction, ArgGroup, Command, Parser};
 
-use crate::tools::{check_metadata, dump_metadata, legacy_pool};
-
-use stratisd::stratis::VERSION;
+use crate::{
+    tools::{check_metadata, dump_metadata, legacy_pool},
+    VERSION,
+};
 
 pub trait ToolCommand<'a> {
     fn name(&self) -> &'a str;
@@ -16,38 +17,28 @@ pub trait ToolCommand<'a> {
     fn show_in_after_help(&self) -> bool;
 }
 
-struct StratisDumpMetadata;
+#[derive(Parser)]
+#[command(
+    version,
+    name = "stratis-dumpmetadata",
+    about = "Reads Stratis metadata from a Stratis device and displays it",
+    next_line_help = true
+)]
+struct StratisDumpMetadataCli {
+    /// Print metadata of given device
+    #[arg(required = true)]
+    dev: PathBuf,
 
-impl StratisDumpMetadata {
-    fn cmd() -> Command {
-        Command::new("stratis-dumpmetadata")
-            .version(VERSION)
-            .about("Reads Stratis metadata from a Stratis device and displays it")
-            .next_line_help(true)
-            .arg(
-                Arg::new("dev")
-                    .value_parser(clap::value_parser!(PathBuf))
-                    .required(true)
-                    .help("Print metadata of given device"),
-            )
-            .arg(
-                Arg::new("print_bytes")
-                    .long("print-bytes")
-                    .action(ArgAction::SetTrue)
-                    .num_args(0)
-                    .short('b')
-                    .help("Print byte buffer of signature block"),
-            )
-            .arg(
-                Arg::new("only")
-                    .long("only")
-                    .action(ArgAction::Set)
-                    .value_name("PORTION")
-                    .value_parser(["pool"])
-                    .help("Only print specified portion of the metadata"),
-            )
-    }
+    /// Print byte buffer of signature block
+    #[arg(action = ArgAction::SetTrue, long="print-bytes", num_args=0, short='b')]
+    print_bytes: bool,
+
+    /// Only print specified portion of the metadata
+    #[arg(action = ArgAction::Set, long="only", value_name = "PORTION", value_parser=["pool"])]
+    only: Option<String>,
 }
+
+struct StratisDumpMetadata;
 
 impl<'a> ToolCommand<'a> for StratisDumpMetadata {
     fn name(&self) -> &'a str {
@@ -55,18 +46,11 @@ impl<'a> ToolCommand<'a> for StratisDumpMetadata {
     }
 
     fn run(&self, command_line_args: Vec<String>) -> Result<(), String> {
-        let matches = StratisDumpMetadata::cmd().get_matches_from(command_line_args);
-        let devpath = matches
-            .get_one::<PathBuf>("dev")
-            .expect("'dev' is a mandatory argument");
-
+        let matches = StratisDumpMetadataCli::parse_from(command_line_args);
         dump_metadata::run(
-            devpath,
-            matches.get_flag("print_bytes"),
-            matches
-                .get_one::<String>("only")
-                .map(|v| v == "pool")
-                .unwrap_or(false),
+            &matches.dev,
+            matches.print_bytes,
+            matches.only.map(|v| v == "pool").unwrap_or(false),
         )
     }
 
@@ -75,22 +59,20 @@ impl<'a> ToolCommand<'a> for StratisDumpMetadata {
     }
 }
 
-struct StratisCheckMetadata;
-
-impl StratisCheckMetadata {
-    fn cmd() -> Command {
-        Command::new("stratis-checkmetadata")
-            .version(VERSION)
-            .about("Check validity of Stratis metadata")
-            .next_line_help(true)
-            .arg(
-                Arg::new("file")
-                    .value_parser(clap::value_parser!(PathBuf))
-                    .required(true)
-                    .help("File containing pool-level metadata as JSON"),
-            )
-    }
+#[derive(Parser)]
+#[command(
+    version,
+    name = "stratis-checkmetadata",
+    about = "Check validity of Stratis metadata",
+    next_line_help = true
+)]
+struct StratisCheckMetadataCli {
+    /// File containing pool-level metadata as JSON
+    #[arg(required = true)]
+    file: PathBuf,
 }
+
+struct StratisCheckMetadata;
 
 impl<'a> ToolCommand<'a> for StratisCheckMetadata {
     fn name(&self) -> &'a str {
@@ -98,12 +80,8 @@ impl<'a> ToolCommand<'a> for StratisCheckMetadata {
     }
 
     fn run(&self, command_line_args: Vec<String>) -> Result<(), String> {
-        let matches = StratisCheckMetadata::cmd().get_matches_from(command_line_args);
-        let infile = matches
-            .get_one::<PathBuf>("file")
-            .expect("'file' is a mandatory argument");
-
-        check_metadata::run(infile, false)
+        let matches = StratisCheckMetadataCli::parse_from(command_line_args);
+        check_metadata::run(&matches.file, false)
     }
 
     fn show_in_after_help(&self) -> bool {
@@ -111,22 +89,20 @@ impl<'a> ToolCommand<'a> for StratisCheckMetadata {
     }
 }
 
-struct StratisPrintMetadata;
-
-impl StratisPrintMetadata {
-    fn cmd() -> Command {
-        Command::new("stratis-printmetadata")
-            .version(VERSION)
-            .about("Print a human-suitable representation of Stratis metadata")
-            .next_line_help(true)
-            .arg(
-                Arg::new("file")
-                    .value_parser(clap::value_parser!(PathBuf))
-                    .required(true)
-                    .help("File containing pool-level metadata as JSON"),
-            )
-    }
+#[derive(Parser)]
+#[command(
+    version,
+    name = "stratis-printmetadata",
+    about = "Print a human-suitable representation of Stratis metadata",
+    next_line_help = true
+)]
+struct StratisPrintMetadataCli {
+    /// File containing pool-level metadata as JSON
+    #[arg(required = true)]
+    file: PathBuf,
 }
+
+struct StratisPrintMetadata;
 
 impl<'a> ToolCommand<'a> for StratisPrintMetadata {
     fn name(&self) -> &'a str {
@@ -134,12 +110,8 @@ impl<'a> ToolCommand<'a> for StratisPrintMetadata {
     }
 
     fn run(&self, command_line_args: Vec<String>) -> Result<(), String> {
-        let matches = StratisPrintMetadata::cmd().get_matches_from(command_line_args);
-        let infile = matches
-            .get_one::<PathBuf>("file")
-            .expect("'file' is a mandatory argument");
-
-        check_metadata::run(infile, true)
+        let matches = StratisPrintMetadataCli::parse_from(command_line_args);
+        check_metadata::run(&matches.file, true)
     }
 
     fn show_in_after_help(&self) -> bool {
@@ -220,12 +192,14 @@ pub fn cmds<'a>() -> Vec<Box<dyn ToolCommand<'a>>> {
 #[cfg(test)]
 mod tests {
 
-    use super::{StratisCheckMetadata, StratisDumpMetadata, StratisPrintMetadata};
+    use clap::CommandFactory;
+
+    use super::{StratisCheckMetadataCli, StratisDumpMetadataCli, StratisPrintMetadataCli};
 
     #[test]
     fn test_dumpmetadata_parse_args() {
-        StratisCheckMetadata::cmd().debug_assert();
-        StratisDumpMetadata::cmd().debug_assert();
-        StratisPrintMetadata::cmd().debug_assert();
+        StratisCheckMetadataCli::command().debug_assert();
+        StratisDumpMetadataCli::command().debug_assert();
+        StratisPrintMetadataCli::command().debug_assert();
     }
 }

@@ -120,13 +120,19 @@ def _possibly_add_filesystems(pool_object_path, *, fs_specs=None):
         (_, return_code, message) = Pool.Methods.CreateFilesystems(
             pool_proxy,
             {
-                "specs": map(
-                    lambda x: (
-                        x[0],
-                        (False, "") if x[1] is None else (True, str(x[1].magnitude)),
-                        (False, "") if x[2] is None else (True, str(x[2].magnitude)),
-                    ),
-                    fs_specs,
+                "specs": list(
+                    map(
+                        lambda x: (
+                            x[0],
+                            (False, "")
+                            if x[1] is None
+                            else (True, str(x[1].magnitude)),
+                            (False, "")
+                            if x[2] is None
+                            else (True, str(x[2].magnitude)),
+                        ),
+                        fs_specs,
+                    )
                 )
             },
         )

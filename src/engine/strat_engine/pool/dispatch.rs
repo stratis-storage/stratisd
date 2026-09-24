@@ -15,10 +15,10 @@ use crate::{
         strat_engine::pool::{v1, v2},
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo, Key,
-            KeyDescription, Name, OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolUuid,
-            PropChangeAction, ReencryptedDevice, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction, SizedKeyMemory, StratSigblockVersion,
+            EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo,
+            IntegritySpec, Key, KeyDescription, Name, OptionalTokenSlotInput, PoolDiff,
+            PoolEncryptionInfo, PoolUuid, PropChangeAction, ReencryptedDevice, RegenAction,
+            RenameAction, SetCreateAction, SetDeleteAction, SizedKeyMemory, StratSigblockVersion,
         },
     },
     stratis::StratisResult,
@@ -516,6 +516,32 @@ impl Pool for AnyPool {
         match self {
             AnyPool::V1(p) => p.last_reencrypt(),
             AnyPool::V2(p) => p.last_reencrypt(),
+        }
+    }
+
+    fn migrate(
+        &self,
+        pool_uuid: PoolUuid,
+        name: &str,
+        blockdev_paths: &[&Path],
+        encryption_info: Option<&InputEncryptionInfo>,
+        integrity_spec: IntegritySpec,
+    ) -> StratisResult<()> {
+        match self {
+            AnyPool::V1(p) => p.migrate(
+                pool_uuid,
+                name,
+                blockdev_paths,
+                encryption_info,
+                integrity_spec,
+            ),
+            AnyPool::V2(p) => p.migrate(
+                pool_uuid,
+                name,
+                blockdev_paths,
+                encryption_info,
+                integrity_spec,
+            ),
         }
     }
 }

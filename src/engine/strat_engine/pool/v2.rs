@@ -39,11 +39,11 @@ use crate::{
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
             Diff, EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo,
-            Key, KeyDescription, Name, OffsetDirection, OptionalTokenSlotInput, PoolDiff,
-            PoolEncryptionInfo, PoolUuid, PropChangeAction, ReencryptedDevice, RegenAction,
-            RenameAction, SetCreateAction, SetDeleteAction, SizedKeyMemory, StratFilesystemDiff,
-            StratPoolDiff, StratSigblockVersion, TokenUnlockMethod, UnlockMechanism,
-            ValidatedIntegritySpec,
+            IntegritySpec, Key, KeyDescription, Name, OffsetDirection, OptionalTokenSlotInput,
+            PoolDiff, PoolEncryptionInfo, PoolUuid, PropChangeAction, ReencryptedDevice,
+            RegenAction, RenameAction, SetCreateAction, SetDeleteAction, SizedKeyMemory,
+            StratFilesystemDiff, StratPoolDiff, StratSigblockVersion, TokenUnlockMethod,
+            UnlockMechanism, ValidatedIntegritySpec,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -1462,6 +1462,18 @@ impl Pool for StratPool {
 
     fn last_reencrypt(&self) -> Option<DateTime<Utc>> {
         self.last_reencrypt
+    }
+
+    #[allow(unused_variables)]
+    fn migrate(
+        &self,
+        pool_uuid: PoolUuid,
+        name: &str,
+        blockdev_paths: &[&Path],
+        encryption_info: Option<&InputEncryptionInfo>,
+        integrity_spec: IntegritySpec,
+    ) -> StratisResult<()> {
+        unimplemented!()
     }
 }
 

@@ -10,7 +10,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use log::{error, warn};
+use log::{debug, error};
 use uuid::Uuid;
 
 use super::lib;
@@ -80,7 +80,7 @@ fn generator_with_err(early_dir: String) -> Result<(), Box<dyn Error>> {
     {
         Some(uuid) => uuid,
         None => {
-            warn!("{pool_uuid_key} kernel command line parameter not found; disabling generator");
+            debug!("{pool_uuid_key} kernel command line parameter not found; disabling generator");
             return Ok(());
         }
     };

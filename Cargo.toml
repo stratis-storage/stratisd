@@ -72,7 +72,7 @@ name = "stratis-utils"
 required-features = ["dbus_enabled", "engine"]
 
 [dependencies.async-trait]
-version = "0.1.80"
+version = "0.1.92"
 optional = true
 
 [dependencies.byteorder]
@@ -300,15 +300,15 @@ unused = { level = "deny", priority = 2}
 rust_2018_idioms = { level = "deny", priority = 3 }
 nonstandard_style = { level = "deny", priority = 4 }
 
-rust-2024-compatibility = { level = "deny", priority = 5}
-edition-2024-expr-fragment-specifier = { level = "allow", priority = 6}
-if-let-rescope = { level = "allow", priority = 6}
-tail-expr-drop-order = { level = "allow", priority = 6}
+rust_2024_compatibility = { level = "deny", priority = 5}
+edition_2024_expr_fragment_specifier = { level = "allow", priority = 6}
+if_let_rescope = { level = "allow", priority = 6}
+tail_expr_drop_order = { level = "allow", priority = 6}
 
 [lints.clippy]
 all = { level = "deny" }
 cargo = { level = "deny", priority = 1 }
-multiple-crate-versions = { level = "allow", priority = 2 }
+multiple_crate_versions = { level = "allow", priority = 2 }
 from_over_into = { level = "allow", priority = 3 }
 upper_case_acronyms = { level = "allow", priority = 3 }
 # SOME PEDANTIC OR NURSERY LINTS THAT STRATISD CURRENTLY OBEYS.

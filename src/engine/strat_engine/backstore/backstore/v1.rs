@@ -116,6 +116,13 @@ impl InternalBackstore for Backstore {
             .or_else(|| self.linear.as_ref().map(|d| d.device()))
     }
 
+    fn device_path(&self) -> Option<PathBuf> {
+        self.cache
+            .as_ref()
+            .map(|d| d.devnode())
+            .or_else(|| self.linear.as_ref().map(|d| d.devnode()))
+    }
+
     fn datatier_allocated_size(&self) -> Sectors {
         self.data_tier.allocated()
     }

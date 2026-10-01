@@ -24,6 +24,8 @@ srpm_build_deps:
     - git
     - cargo
     - openssl-devel
+    - python3-build
+    - python3-giturlparse
     - python3-semantic_version
 
 jobs:

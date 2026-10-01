@@ -2,6 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::path::PathBuf;
+
 use devicemapper::{Device, Sectors};
 
 use crate::{engine::types::PoolUuid, stratis::StratisResult};
@@ -15,6 +17,12 @@ pub trait InternalBackstore {
     /// or not. There may be no device if no data has yet been allocated from
     /// the backstore.
     fn device(&self) -> Option<Device>;
+
+    /// Return the device path that this tier is currently using.
+    /// This may change, depending on whether the backstore is supporting a cache
+    /// or not. There may be no device path if no data has been allocated from
+    /// the backstore.
+    fn device_path(&self) -> Option<PathBuf>;
 
     /// The current size of allocated space on the blockdevs in the data tier.
     fn datatier_allocated_size(&self) -> Sectors;

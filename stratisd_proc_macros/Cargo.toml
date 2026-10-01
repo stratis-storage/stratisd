@@ -32,4 +32,4 @@ nonstandard_style = { level = "deny", priority = 4 }
 [lints.clippy]
 all = { level = "deny" }
 cargo = { level = "deny", priority = 1 }
-multiple-crate-versions = { level = "allow", priority = 2 }
+multiple_crate_versions = { level = "allow", priority = 2 }

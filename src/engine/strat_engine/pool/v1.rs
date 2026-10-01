@@ -18,11 +18,7 @@ use devicemapper::{Bytes, DmNameBuf, Sectors};
 use stratisd_proc_macros::strat_pool_impl_gen;
 
 #[cfg(any(test, feature = "extras"))]
-use crate::engine::strat_engine::{
-    backstore::UnownedDevices,
-    metadata::MDADataSize,
-    thinpool::{ThinPoolSizeParams, DATA_BLOCK_SIZE},
-};
+use crate::engine::strat_engine::thinpool::{ThinPoolSizeParams, DATA_BLOCK_SIZE};
 use crate::{
     engine::{
         engine::{BlockDev, DumpState, Filesystem, Pool, StateDiff},
@@ -32,24 +28,25 @@ use crate::{
         },
         strat_engine::{
             backstore::{
-                backstore::{v1::Backstore, InternalBackstore},
+                backstore::{self, v1::Backstore, InternalBackstore},
                 blockdev::{v1::StratBlockDev, InternalBlockDev},
-                ProcessedPathInfos,
+                migrate, ProcessedPathInfos, UnownedDevices,
             },
             crypt::{handle::v1::CryptHandle, CLEVIS_LUKS_TOKEN_ID, LUKS2_TOKEN_ID},
             keys::{search_key_persistent, validate_key_descs},
             liminal::DeviceSet,
-            metadata::disown_device,
+            metadata::{disown_device, MDADataSize},
+            pool,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             thinpool::{StratFilesystem, ThinPool},
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
             Diff, EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo,
-            IntegritySpec, Key, KeyDescription, Name, OffsetDirection, OptionalTokenSlotInput,
-            PoolDiff, PoolEncryptionInfo, PoolUuid, PropChangeAction, ReencryptedDevice,
-            RegenAction, RenameAction, SetCreateAction, SetDeleteAction, SizedKeyMemory,
-            StratFilesystemDiff, StratPoolDiff, StratSigblockVersion, TokenUnlockMethod,
+            Key, KeyDescription, Name, OffsetDirection, OptionalTokenSlotInput, PoolDiff,
+            PoolEncryptionInfo, PoolUuid, PropChangeAction, ReencryptedDevice, RegenAction,
+            RenameAction, SetCreateAction, SetDeleteAction, SizedKeyMemory, StratFilesystemDiff,
+            StratPoolDiff, StratSigblockVersion, TokenUnlockMethod, ValidatedIntegritySpec,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -543,6 +540,109 @@ impl StratPool {
     /// Rename the pool in the LUKS2 metadata if it is encrypted.
     pub fn rename_pool(&mut self, new_name: &Name) -> StratisResult<()> {
         self.backstore.rename_pool(new_name)
+    }
+
+    pub fn migrate(
+        mut self,
+        pool_uuid: PoolUuid,
+        blockdev_paths: UnownedDevices,
+        encryption_info: Option<&InputEncryptionInfo>,
+        integrity_spec: ValidatedIntegritySpec,
+    ) -> Result<pool::v2::StratPool, (StratisError, Box<StratPool>)> {
+        fn inner(
+            pool: &mut StratPool,
+            pool_uuid: PoolUuid,
+            unowned_devices: UnownedDevices,
+            encryption_info: Option<&InputEncryptionInfo>,
+            integrity_spec: ValidatedIntegritySpec,
+        ) -> StratisResult<backstore::v2::Backstore> {
+            let old_cap_device = pool.backstore.device_path().ok_or_else(|| {
+                StratisError::Msg(
+                    "Source backstore for migration does not appear to have a cap device"
+                        .to_string(),
+                )
+            })?;
+
+            let mut new_backstore = backstore::v2::Backstore::initialize(
+                pool_uuid,
+                unowned_devices,
+                MDADataSize::default(),
+                encryption_info,
+                integrity_spec,
+            )?;
+            new_backstore.alloc(pool_uuid, &[pool.backstore.datatier_allocated_size()])?;
+            let new_device = new_backstore.device().ok_or_else(|| {
+                StratisError::Msg(
+                    "Target backstore for migration does not appear to have a cap device"
+                        .to_string(),
+                )
+            })?;
+            let new_cap_device = new_backstore.device_path().ok_or_else(|| {
+                StratisError::Msg(
+                    "Target backstore for migration does not appear to have a cap device"
+                        .to_string(),
+                )
+            })?;
+
+            let temp_device =
+                migrate::set_up_raid_array(pool_uuid, &old_cap_device, &new_cap_device)?;
+            if let Err(causal_e) =
+                pool.thin_pool
+                    .set_device(temp_device, Sectors(0), OffsetDirection::Forwards)
+            {
+                migrate::tear_down_raid(pool_uuid).map_err(|e| StratisError::RollbackError {
+                    causal_error: Box::new(causal_e),
+                    rollback_error: Box::new(e),
+                    level: ActionAvailability::NoPoolChanges,
+                })?;
+            }
+            migrate::wait_on_sync_completion(pool_uuid)?;
+            if let Err(causal_e) =
+                pool.thin_pool
+                    .set_device(new_device, Sectors(0), OffsetDirection::Forwards)
+            {
+                return Err(StratisError::ActionAvailabilityError {
+                    error: Box::new(causal_e),
+                    level: ActionAvailability::NoPoolChanges,
+                });
+            }
+
+            migrate::tear_down_raid(pool_uuid)?;
+            // TODO: Clean up old backstore devices
+
+            Ok(new_backstore)
+        }
+
+        if self.action_avail >= ActionAvailability::NoRequests {
+            return Err((
+                StratisError::ActionDisabled(self.action_avail.clone()),
+                Box::new(self),
+            ));
+        }
+
+        match inner(
+            &mut self,
+            pool_uuid,
+            blockdev_paths,
+            encryption_info,
+            integrity_spec,
+        ) {
+            Ok(new_backstore) => Ok(pool::v2::StratPool {
+                backstore: new_backstore,
+                thin_pool: self
+                    .thin_pool
+                    .change_backstore::<backstore::v2::Backstore>(),
+                action_avail: self.action_avail,
+                metadata_size: self.metadata_size,
+                last_reencrypt: self.last_reencrypt,
+            }),
+            Err(e) => {
+                if let Some(state) = e.error_to_available_actions() {
+                    self.action_avail = state;
+                }
+                Err((e, Box::new(self)))
+            }
+        }
     }
 }
 
@@ -1527,18 +1627,6 @@ impl Pool for StratPool {
 
     fn last_reencrypt(&self) -> Option<DateTime<Utc>> {
         self.last_reencrypt
-    }
-
-    #[allow(unused_variables)]
-    fn migrate(
-        &self,
-        pool_uuid: PoolUuid,
-        name: &str,
-        blockdev_paths: &[&Path],
-        encryption_info: Option<&InputEncryptionInfo>,
-        integrity_spec: IntegritySpec,
-    ) -> StratisResult<()> {
-        unimplemented!()
     }
 }
 

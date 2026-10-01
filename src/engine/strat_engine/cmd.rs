@@ -31,6 +31,8 @@ use serde_json::Value;
 
 use devicemapper::{MetaBlocks, Sectors};
 
+#[cfg(feature = "md_raid")]
+use crate::engine::types::PoolUuid;
 use crate::{
     engine::{
         engine::MAX_STRATIS_PASS_SIZE,
@@ -91,6 +93,8 @@ const TPM2_CREATEPRIMARY: &str = "tpm2_createprimary";
 const TPM2_UNSEAL: &str = "tpm2_unseal";
 const TPM2_LOAD: &str = "tpm2_load";
 const MKTEMP: &str = "mktemp";
+#[cfg(feature = "md_raid")]
+const MDADM: &str = "mdadm";
 
 // This list of executables required for Clevis to function properly is based
 // off of the Clevis dracut module and the Stratis dracut module for supporting
@@ -132,6 +136,8 @@ static EXECUTABLES: LazyLock<HashMap<String, Option<PathBuf>>> = LazyLock::new(|
             find_executable(THIN_METADATA_SIZE),
         ),
         (CRYPTSETUP.to_string(), find_executable(CRYPTSETUP)),
+        #[cfg(feature = "md_raid")]
+        (MDADM.to_string(), find_executable(MDADM)),
     ]
     .iter()
     .cloned()
@@ -611,6 +617,36 @@ pub fn run_decrypt(path: &Path) -> StratisResult<()> {
         .arg("--resume-only")
         .arg("--token-only")
         .arg(path);
+
+    execute_cmd(&mut cmd)
+}
+
+#[cfg(feature = "md_raid")]
+pub fn set_up_raid_1(
+    pool_uuid: PoolUuid,
+    cap_device: &Path,
+    destination: &Path,
+) -> StratisResult<PathBuf> {
+    let mut cmd = Command::new("mdadm");
+    let path = PathBuf::from(format!("/dev/md/{pool_uuid}"));
+    cmd.arg("--create")
+        .arg(&path)
+        .arg("--level=1")
+        .arg("--raid-devices=2")
+        .arg("--metadata=none")
+        .arg(cap_device)
+        .arg(destination);
+
+    execute_cmd(&mut cmd)?;
+
+    Ok(path)
+}
+
+#[cfg(feature = "md_raid")]
+pub fn tear_down_raid_1(pool_uuid: PoolUuid) -> StratisResult<()> {
+    let mut cmd = Command::new("mdadm");
+    cmd.arg("--stop")
+        .arg(format!("/dev/md/{pool_uuid}").as_str());
 
     execute_cmd(&mut cmd)
 }

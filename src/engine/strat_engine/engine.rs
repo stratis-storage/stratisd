@@ -909,6 +909,62 @@ impl Engine for StratEngine {
         Ok(())
     }
 
+    async fn migrate(
+        &self,
+        pool_uuid: PoolUuid,
+        name: &str,
+        blockdev_paths: &[&Path],
+        encryption_info: Option<&InputEncryptionInfo>,
+        integrity_spec: IntegritySpec,
+    ) -> StratisResult<()> {
+        let (validated_name, stratis_devices, unowned_devices, validated_integrity_spec) =
+            validate_input_v2(encryption_info, name, blockdev_paths, integrity_spec).await?;
+        stratis_devices.error_on_not_empty()?;
+
+        let pool = {
+            let mut modify_guard = self.pools.modify_all().await;
+            let (_, pool) = modify_guard.remove_by_uuid(pool_uuid).ok_or_else(|| {
+                StratisError::Msg(format!(
+                    "No pool with UUID {pool_uuid} found in pool record"
+                ))
+            })?;
+            pool
+        };
+
+        match pool {
+            AnyPool::V1(p) => {
+                match p.migrate(
+                    pool_uuid,
+                    unowned_devices,
+                    encryption_info,
+                    validated_integrity_spec,
+                ) {
+                    Ok(mut p) => {
+                        let res = p.write_metadata(name);
+                        self.pools.modify_all().await.insert(
+                            validated_name,
+                            pool_uuid,
+                            AnyPool::V2(Box::new(p)),
+                        );
+                        res?;
+                        Ok(())
+                    }
+                    Err((e, p)) => {
+                        self.pools.modify_all().await.insert(
+                            validated_name,
+                            pool_uuid,
+                            AnyPool::V1(p),
+                        );
+                        Err(e)
+                    }
+                }
+            }
+            AnyPool::V2(_) => {
+                unimplemented!()
+            }
+        }
+    }
+
     fn is_sim(&self) -> bool {
         false
     }

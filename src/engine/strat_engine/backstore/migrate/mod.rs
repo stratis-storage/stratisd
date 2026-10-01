@@ -6,3 +6,8 @@
 mod dm_raid;
 #[cfg(feature = "md_raid")]
 mod md_raid;
+
+#[cfg(not(feature = "md_raid"))]
+pub use dm_raid::{set_up_raid_array, tear_down_raid, wait_on_sync_completion};
+#[cfg(feature = "md_raid")]
+pub use md_raid::{set_up_raid_array, tear_down_raid, wait_on_sync_completion};

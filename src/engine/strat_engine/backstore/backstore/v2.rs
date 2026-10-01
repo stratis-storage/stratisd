@@ -230,6 +230,19 @@ impl CapDevice {
             .or_else(|| self.placeholder.as_ref().map(|lin| lin.device()))
     }
 
+    fn device_path(&self) -> Option<PathBuf> {
+        self.enc
+            .as_ref()
+            .and_then(|either| {
+                either
+                    .as_ref()
+                    .right()
+                    .map(|h| h.activated_device_path().to_owned())
+            })
+            .or_else(|| self.cache.as_ref().map(|c| c.devnode()))
+            .or_else(|| self.placeholder.as_ref().map(|lin| lin.devnode()))
+    }
+
     pub fn is_encrypted(&self) -> bool {
         self.enc.is_some()
     }
@@ -511,6 +524,10 @@ pub struct Backstore {
 impl InternalBackstore for Backstore {
     fn device(&self) -> Option<Device> {
         self.cap_device.device()
+    }
+
+    fn device_path(&self) -> Option<PathBuf> {
+        self.cap_device.device_path()
     }
 
     fn datatier_allocated_size(&self) -> Sectors {

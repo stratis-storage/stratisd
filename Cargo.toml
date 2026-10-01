@@ -72,7 +72,7 @@ name = "stratis-utils"
 required-features = ["dbus_enabled", "engine"]
 
 [dependencies.async-trait]
-version = "0.1.80"
+version = "0.1.92"
 optional = true
 
 [dependencies.byteorder]

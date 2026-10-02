@@ -500,6 +500,18 @@ pub trait Pool: Debug + Send + Sync {
 
     /// Get the timestamp of the last online reencryption operation.
     fn last_reencrypt(&self) -> Option<DateTime<Utc>>;
+
+    /// Migrate data to a new pool.
+    ///
+    /// This operation allows configuring the target pool configuration.
+    fn migrate(
+        &self,
+        pool_uuid: PoolUuid,
+        name: &str,
+        blockdev_paths: &[&Path],
+        encryption_info: Option<&InputEncryptionInfo>,
+        integrity_spec: IntegritySpec,
+    ) -> StratisResult<()>;
 }
 
 pub type HandleEvents<P> = (

@@ -12,6 +12,7 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use either::Either;
+use futures::executor::block_on;
 use serde_json::{Map, Value};
 
 use devicemapper::{Bytes, DmNameBuf, Sectors};
@@ -20,7 +21,6 @@ use stratisd_proc_macros::strat_pool_impl_gen;
 #[cfg(any(test, feature = "extras"))]
 use crate::engine::strat_engine::{
     backstore::UnownedDevices,
-    metadata::MDADataSize,
     thinpool::{ThinPoolSizeParams, DATA_BLOCK_SIZE},
 };
 use crate::{
@@ -32,24 +32,25 @@ use crate::{
         },
         strat_engine::{
             backstore::{
-                backstore::{v1::Backstore, InternalBackstore},
+                backstore::{v1::Backstore, v2, InternalBackstore},
                 blockdev::{v1::StratBlockDev, InternalBlockDev},
                 ProcessedPathInfos,
             },
             crypt::{handle::v1::CryptHandle, CLEVIS_LUKS_TOKEN_ID, LUKS2_TOKEN_ID},
             keys::{search_key_persistent, validate_key_descs},
             liminal::DeviceSet,
-            metadata::disown_device,
+            metadata::{disown_device, MDADataSize},
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
+            shared::validate_input_v2,
             thinpool::{StratFilesystem, ThinPool},
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
             Diff, EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo,
-            Key, KeyDescription, Name, OffsetDirection, OptionalTokenSlotInput, PoolDiff,
-            PoolEncryptionInfo, PoolUuid, PropChangeAction, ReencryptedDevice, RegenAction,
-            RenameAction, SetCreateAction, SetDeleteAction, SizedKeyMemory, StratFilesystemDiff,
-            StratPoolDiff, StratSigblockVersion, TokenUnlockMethod,
+            IntegritySpec, Key, KeyDescription, Name, OffsetDirection, OptionalTokenSlotInput,
+            PoolDiff, PoolEncryptionInfo, PoolUuid, PropChangeAction, ReencryptedDevice,
+            RegenAction, RenameAction, SetCreateAction, SetDeleteAction, SizedKeyMemory,
+            StratFilesystemDiff, StratPoolDiff, StratSigblockVersion, TokenUnlockMethod,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -190,10 +191,6 @@ impl StratPool {
         devices: UnownedDevices,
         encryption_info: Option<&InputEncryptionInfo>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
-        if let Some(ei) = encryption_info {
-            validate_key_descs(ei.key_descs())?;
-        }
-
         let pool_uuid = PoolUuid::new_v4();
 
         // FIXME: Initializing with the minimum MDA size is not necessarily
@@ -1531,6 +1528,31 @@ impl Pool for StratPool {
 
     fn last_reencrypt(&self) -> Option<DateTime<Utc>> {
         self.last_reencrypt
+    }
+
+    fn migrate(
+        &self,
+        pool_uuid: PoolUuid,
+        name: &str,
+        blockdev_paths: &[&Path],
+        encryption_info: Option<&InputEncryptionInfo>,
+        integrity_spec: IntegritySpec,
+    ) -> StratisResult<()> {
+        let (name, stratis_devices, unowned_devices, integrity) = block_on(validate_input_v2(
+            encryption_info,
+            name,
+            blockdev_paths,
+            integrity_spec,
+        ))?;
+        stratis_devices.error_on_not_empty()?;
+
+        let new_backstore = v2::Backstore::initialize(
+            pool_uuid,
+            unowned_devices,
+            MDADataSize::default(),
+            encryption_info,
+            integrity,
+        )?;
     }
 }
 

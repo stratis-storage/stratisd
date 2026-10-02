@@ -29,11 +29,11 @@ use crate::{
         structures::Table,
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo, Key,
-            KeyDescription, Name, OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolUuid,
-            PropChangeAction, ReencryptedDevice, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction, SizedKeyMemory, StratSigblockVersion, UnlockMechanism,
-            ValidatedIntegritySpec,
+            EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo,
+            IntegritySpec, Key, KeyDescription, Name, OptionalTokenSlotInput, PoolDiff,
+            PoolEncryptionInfo, PoolUuid, PropChangeAction, ReencryptedDevice, RegenAction,
+            RenameAction, SetCreateAction, SetDeleteAction, SizedKeyMemory, StratSigblockVersion,
+            UnlockMechanism, ValidatedIntegritySpec,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -1176,6 +1176,18 @@ impl Pool for SimPool {
 
     fn last_reencrypt(&self) -> Option<DateTime<Utc>> {
         self.last_reencrypt
+    }
+
+    #[allow(unused_variables)]
+    fn migrate(
+        &self,
+        pool_uuid: PoolUuid,
+        name: &str,
+        blockdev_paths: &[&Path],
+        encryption_info: Option<&InputEncryptionInfo>,
+        integrity_spec: IntegritySpec,
+    ) -> StratisResult<()> {
+        unimplemented!()
     }
 }
 

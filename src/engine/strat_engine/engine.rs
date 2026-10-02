@@ -19,19 +19,21 @@ use tokio::{
 
 use devicemapper::DmNameBuf;
 
+#[cfg(test)]
+use crate::engine::strat_engine::shared::validate_input_v1;
 use crate::{
     engine::{
         engine::{HandleEvents, KeyActions},
-        shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
+        shared::{create_pool_idempotent_or_err, validate_name},
         strat_engine::{
-            backstore::ProcessedPathInfos,
             cmd::verify_executables,
             dm::get_dm,
-            keys::{validate_key_descs, StratKeyActions},
+            keys::StratKeyActions,
             liminal::{find_all, DeviceSet, LiminalDevices},
             names::KeyDescription,
             ns::MemoryFilesystem,
             pool::{v1, v2, AnyPool},
+            shared::validate_input_v2,
         },
         structures::{
             AllLockReadAvailableGuard, AllLockReadGuard, AllLockWriteAvailableGuard,
@@ -42,7 +44,7 @@ use crate::{
             CreateAction, DeleteAction, DevUuid, FilesystemUuid, InputEncryptionInfo,
             IntegritySpec, LockedPoolsInfo, PoolDiff, PoolIdentifier, RenameAction, ReportType,
             SetUnlockAction, StartAction, StopAction, StoppedPoolsInfo, StratFilesystemDiff,
-            TokenUnlockMethod, UdevEngineEvent, UnlockMethod, ValidatedIntegritySpec,
+            TokenUnlockMethod, UdevEngineEvent, UnlockMethod,
         },
         Engine, Name, Pool, PoolUuid, Report,
     },
@@ -108,26 +110,8 @@ impl StratEngine {
         blockdev_paths: &[&Path],
         encryption_info: Option<&InputEncryptionInfo>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
-        if let Some(ei) = encryption_info {
-            validate_key_descs(ei.key_descs())?;
-        }
-
-        validate_name(name)?;
-        let name = Name::new(name.to_owned());
-
-        validate_paths(blockdev_paths)?;
-
-        let cloned_paths = blockdev_paths
-            .iter()
-            .map(|p| p.to_path_buf())
-            .collect::<Vec<_>>();
-
-        let devices = spawn_blocking!({
-            let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
-            ProcessedPathInfos::try_from(borrowed_paths.as_slice())
-        })??;
-
-        let (stratis_devices, unowned_devices) = devices.unpack();
+        let (name, stratis_devices, unowned_devices) =
+            validate_input_v1(encryption_info, name, blockdev_paths).await?;
 
         let maybe_guard = self.pools.read(PoolIdentifier::Name(name.clone())).await;
         if let Some(guard) = maybe_guard {
@@ -530,27 +514,8 @@ impl Engine for StratEngine {
         encryption_info: Option<&InputEncryptionInfo>,
         integrity_spec: IntegritySpec,
     ) -> StratisResult<CreateAction<PoolUuid>> {
-        if let Some(ei) = encryption_info {
-            validate_key_descs(ei.key_descs())?;
-        }
-
-        validate_name(name)?;
-        let name = Name::new(name.to_owned());
-        let integrity_spec = ValidatedIntegritySpec::try_from(integrity_spec)?;
-
-        validate_paths(blockdev_paths)?;
-
-        let cloned_paths = blockdev_paths
-            .iter()
-            .map(|p| p.to_path_buf())
-            .collect::<Vec<_>>();
-
-        let devices = spawn_blocking!({
-            let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
-            ProcessedPathInfos::try_from(borrowed_paths.as_slice())
-        })??;
-
-        let (stratis_devices, unowned_devices) = devices.unpack();
+        let (name, stratis_devices, unowned_devices, validated_integrity_spec) =
+            validate_input_v2(encryption_info, name, blockdev_paths, integrity_spec).await?;
 
         let maybe_guard = self.pools.read(PoolIdentifier::Name(name.clone())).await;
         if let Some(guard) = maybe_guard {
@@ -598,7 +563,7 @@ impl Engine for StratEngine {
                         &cloned_name,
                         unowned_devices,
                         cloned_enc_info.as_ref(),
-                        integrity_spec,
+                        validated_integrity_spec,
                     )
                 })??;
                 pools.insert(

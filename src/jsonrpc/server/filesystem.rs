@@ -7,6 +7,8 @@ use std::sync::Arc;
 use chrono::SecondsFormat;
 use tokio::task::block_in_place;
 
+use devicemapper::Bytes;
+
 use crate::{
     engine::{Engine, EngineAction, Name, PoolIdentifier},
     jsonrpc::interface::FsListType,
@@ -18,6 +20,8 @@ pub async fn filesystem_create<'a>(
     engine: Arc<dyn Engine>,
     pool_name: &'a str,
     name: &'a str,
+    size: Option<u128>,
+    size_limit: Option<u128>,
 ) -> StratisResult<bool> {
     let mut guard = engine
         .get_mut_pool(PoolIdentifier::Name(Name::new(pool_name.to_owned())))
@@ -26,7 +30,11 @@ pub async fn filesystem_create<'a>(
     let (_, pool_uuid, pool) = guard.as_mut_tuple();
     block_in_place(|| {
         Ok(pool
-            .create_filesystems(pool_name, pool_uuid, &[(name, None, None)])?
+            .create_filesystems(
+                pool_name,
+                pool_uuid,
+                &[(name, size.map(Bytes), size_limit.map(Bytes))],
+            )?
             .is_changed())
     })
 }
@@ -113,4 +121,25 @@ pub async fn filesystem_origin<'a>(
         .get_filesystem_by_name(&Name::new(fs_name.to_string()))
         .ok_or_else(|| StratisError::Msg(format!("No filesystem named {fs_name} found")))?;
     Ok(fs.origin().map(|u| u.as_simple().to_string()))
+}
+
+// stratis-min filesystem set-size-limit
+pub async fn filesystem_set_size_limit<'a>(
+    engine: Arc<dyn Engine>,
+    pool_name: &'a str,
+    fs_name: &'a str,
+    size_limit: Option<u128>,
+) -> StratisResult<bool> {
+    let mut pool = engine
+        .get_mut_pool(PoolIdentifier::Name(Name::new(pool_name.to_owned())))
+        .await
+        .ok_or_else(|| StratisError::Msg(format!("No pool named {pool_name} found")))?;
+    let (uuid, _) = pool
+        .get_filesystem_by_name(&Name::new(fs_name.to_string()))
+        .ok_or_else(|| StratisError::Msg(format!("No filesystem named {fs_name} found")))?;
+    block_in_place(|| {
+        Ok(pool
+            .set_fs_size_limit(uuid, size_limit.map(Bytes))?
+            .is_changed())
+    })
 }

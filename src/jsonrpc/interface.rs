@@ -64,10 +64,11 @@ pub enum StratisParamType {
     PoolIsStopped(PoolIdentifier<PoolUuid>),
     PoolHasPassphrase(PoolIdentifier<PoolUuid>),
     PoolIsBound(PoolIdentifier<PoolUuid>),
-    FsCreate(String, String),
+    FsCreate(String, String, Option<u128>, Option<u128>),
     FsDestroy(String, String),
     FsRename(String, String, String),
     FsOrigin(String, String),
+    FsSetSizeLimit(String, String, Option<u128>),
     FsList,
     Report,
 }
@@ -108,5 +109,6 @@ pub enum StratisRet {
     FsDestroy((bool, u16, String)),
     FsRename((bool, u16, String)),
     FsOrigin((Option<String>, u16, String)),
+    FsSetSizeLimit((bool, u16, String)),
     Report(Value),
 }

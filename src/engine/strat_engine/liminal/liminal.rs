@@ -688,6 +688,7 @@ impl LiminalDevices {
     where
         B: DumpState<'a, DumpInput = Sectors> + InternalBlockDev,
     {
+        #![allow(tail_expr_drop_order)]
         if tier == BlockDevTier::Data {
             let orig = dev.cached();
             match dev.calc_new_size() {

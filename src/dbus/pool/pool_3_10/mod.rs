@@ -17,7 +17,7 @@ use zbus::{
 
 mod methods;
 
-pub use methods::remove_cache_method;
+pub use methods::{migrate_method, remove_cache_method};
 
 use crate::{
     dbus::{
@@ -368,6 +368,33 @@ impl PoolR10 {
     #[zbus(out_args("results", "return_code", "return_string"))]
     async fn remove_cache(&self) -> ((bool, Vec<String>), u16, String) {
         remove_cache_method(&self.engine, &self.connection, &self.manager, self.uuid).await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    #[zbus(out_args("results", "return_code", "return_string"))]
+    async fn migrate(
+        &self,
+        devices: Vec<PathBuf>,
+        key_descs: Vec<((bool, u32), KeyDescription)>,
+        clevis_infos: Vec<((bool, u32), &str, &str)>,
+        journal_size: (bool, u64),
+        tag_spec: (bool, &str),
+        allocate_superblock: (bool, bool),
+    ) -> ((bool, Vec<OwnedObjectPath>), u16, String) {
+        migrate_method(
+            &self.engine,
+            &self.connection,
+            &self.manager,
+            &self.counter,
+            self.uuid,
+            devices,
+            key_descs,
+            clevis_infos,
+            journal_size,
+            tag_spec,
+            allocate_superblock,
+        )
+        .await
     }
 
     #[zbus(property(emits_changed_signal = "const"))]

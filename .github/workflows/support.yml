@@ -80,3 +80,8 @@ jobs:
     uses: stratis-storage/github-actions/.github/workflows/reusable_general.yml@master
     with:
       fedora-container-image-number: 44  # CURRENT DEVELOPMENT ENVIRONMENT
+
+  commit-checks:
+    uses: stratis-storage/github-actions/.github/workflows/commits.yml@master
+    with:
+      fedora-container-image-number: 44  # CURRENT DEVELOPMENT ENVIRONMENT

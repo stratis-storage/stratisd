@@ -6,13 +6,14 @@
 
 use std::{path::Path, sync::LazyLock};
 
-use devicemapper::{DevId, DmError, DmNameBuf, DmOptions, DM};
+use devicemapper::{DevId, DmError, DmNameBuf, DmOptions, DmUuidBuf, DM};
 
 use crate::{
     engine::{
         strat_engine::names::{
-            format_backstore_ids, format_crypt_backstore_name, format_crypt_name, format_flex_ids,
-            format_thin_ids, format_thinpool_ids, CacheRole, FlexRole, ThinPoolRole, ThinRole,
+            format_backstore_ids, format_backstore_migrate_name, format_crypt_backstore_name,
+            format_crypt_name, format_flex_ids, format_thin_ids, format_thinpool_ids, CacheRole,
+            FlexRole, ThinPoolRole, ThinRole,
         },
         types::{DevUuid, FilesystemUuid, PoolUuid},
     },
@@ -21,6 +22,16 @@ use crate::{
 
 /// Path to logical devices for encrypted devices
 pub const DEVICEMAPPER_PATH: &str = "/dev/mapper";
+
+/// The roles of all DM devices that may make up a backstore, ordered so that
+/// every device precedes the devices it is built on top of. This is the order
+/// in which they must be removed.
+const BACKSTORE_ROLES: [CacheRole; 4] = [
+    CacheRole::Cache,
+    CacheRole::CacheSub,
+    CacheRole::MetaSub,
+    CacheRole::OriginSub,
+];
 
 pub static DM_CONTEXT: LazyLock<Result<DM, DmError>> = LazyLock::new(DM::new);
 
@@ -50,6 +61,58 @@ pub fn remove_optional_devices(devs: Vec<DmNameBuf>) -> StratisResult<()> {
         if devices.contains(&device) {
             get_dm().device_remove(&DevId::Name(&device), DmOptions::default())?;
         }
+    }
+    Ok(())
+}
+
+/// Rename each of the given DM devices from the first name in the pair to the
+/// second. Devices that do not exist are skipped. If any rename fails, the
+/// renames that have already succeeded are undone before returning the error,
+/// so that on failure no device has been left under a new name.
+pub fn rename_optional_devices(renames: &[(DmNameBuf, DmNameBuf)]) -> StratisResult<()> {
+    let devices = get_dm()
+        .list_devices()?
+        .into_iter()
+        .map(|(name, _, _)| name)
+        .collect::<Vec<_>>();
+    for (index, (old_name, new_name)) in renames.iter().enumerate() {
+        if !devices.contains(old_name) {
+            continue;
+        }
+        if let Err(e) = get_dm().device_rename(old_name, &DevId::Name(new_name)) {
+            for (old_name, new_name) in renames[..index].iter() {
+                if devices.contains(old_name) {
+                    if let Err(e) = get_dm().device_rename(new_name, &DevId::Name(old_name)) {
+                        warn!(
+                            "Failed to restore the name of devicemapper device {} to {}: {e}; it may need to be manually renamed",
+                            &**new_name, &**old_name
+                        );
+                    }
+                }
+            }
+            return Err(StratisError::from(e));
+        }
+    }
+    Ok(())
+}
+
+/// Set the UUID of each of the given DM devices. Devices that do not exist and
+/// devices that already have a UUID are skipped; the kernel permits a DM
+/// device's UUID to be set only once, and only if it was not set at creation.
+pub fn set_optional_device_uuids(uuids: &[(DmNameBuf, DmUuidBuf)]) -> StratisResult<()> {
+    let devices = get_dm()
+        .list_devices()?
+        .into_iter()
+        .map(|(name, _, _)| name)
+        .collect::<Vec<_>>();
+    for (name, uuid) in uuids {
+        if !devices.contains(name) {
+            continue;
+        }
+        if get_dm().device_info(&DevId::Name(name))?.uuid().is_some() {
+            continue;
+        }
+        get_dm().device_rename(name, &DevId::Uuid(uuid))?;
     }
     Ok(())
 }
@@ -93,18 +156,67 @@ pub fn mdv_device(pool_uuid: PoolUuid) -> DmNameBuf {
 }
 
 pub fn list_of_backstore_devices_legacy(pool_uuid: PoolUuid) -> Vec<DmNameBuf> {
-    let mut devs = Vec::new();
+    BACKSTORE_ROLES
+        .iter()
+        .map(|role| format_backstore_ids(pool_uuid, *role).0)
+        .collect()
+}
 
-    let (cache, _) = format_backstore_ids(pool_uuid, CacheRole::Cache);
-    devs.push(cache);
-    let (cache_sub, _) = format_backstore_ids(pool_uuid, CacheRole::CacheSub);
-    devs.push(cache_sub);
-    let (cache_meta, _) = format_backstore_ids(pool_uuid, CacheRole::MetaSub);
-    devs.push(cache_meta);
-    let (origin, _) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
-    devs.push(origin);
+/// The temporary names of the backstore devices of a pool that is the source
+/// of an in-progress migration. These devices have been moved out of the way
+/// by `rename_backstore_devices_migrate()` so that the destination
+/// backstore can take the canonical names.
+pub fn list_of_backstore_devices_migrate(pool_uuid: PoolUuid) -> Vec<DmNameBuf> {
+    BACKSTORE_ROLES
+        .iter()
+        .map(|role| format_backstore_migrate_name(pool_uuid, *role))
+        .collect()
+}
 
-    devs
+/// Move the backstore devices of the migration source pool to their temporary
+/// names, freeing up the canonical names for the destination backstore.
+pub fn rename_backstore_devices_migrate(pool_uuid: PoolUuid) -> StratisResult<()> {
+    rename_optional_devices(&backstore_migrate_renames(pool_uuid))
+}
+
+/// Move the backstore devices of the migration source pool back to their
+/// canonical names. Only valid if the destination backstore has not yet taken
+/// those names, that is, if the migration failed before any destination
+/// backstore device was created.
+pub fn restore_backstore_devices_migrate(pool_uuid: PoolUuid) -> StratisResult<()> {
+    rename_optional_devices(
+        &backstore_migrate_renames(pool_uuid)
+            .into_iter()
+            .map(|(canonical, migrate)| (migrate, canonical))
+            .collect::<Vec<_>>(),
+    )
+}
+
+/// Set the UUIDs of the backstore devices of the migration destination pool.
+/// These devices were created without UUIDs because the source backstore's
+/// devices still held them; this must only be called once the source
+/// backstore has been torn down.
+pub fn set_backstore_device_uuids(pool_uuid: PoolUuid) -> StratisResult<()> {
+    set_optional_device_uuids(
+        &BACKSTORE_ROLES
+            .iter()
+            .map(|role| format_backstore_ids(pool_uuid, *role))
+            .collect::<Vec<_>>(),
+    )
+}
+
+/// Pairs of canonical and temporary backstore device names for a pool, in
+/// migration order.
+fn backstore_migrate_renames(pool_uuid: PoolUuid) -> Vec<(DmNameBuf, DmNameBuf)> {
+    BACKSTORE_ROLES
+        .iter()
+        .map(|role| {
+            (
+                format_backstore_ids(pool_uuid, *role).0,
+                format_backstore_migrate_name(pool_uuid, *role),
+            )
+        })
+        .collect()
 }
 
 pub fn list_of_backstore_devices(pool_uuid: PoolUuid) -> Vec<DmNameBuf> {

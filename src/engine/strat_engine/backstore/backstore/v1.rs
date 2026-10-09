@@ -26,7 +26,10 @@ use crate::{
                 shared::BlockSizeSummary,
             },
             crypt::{back_up_luks_header, handle::v1::CryptHandle, restore_luks_header},
-            dm::{get_dm, list_of_backstore_devices, remove_optional_devices},
+            dm::{
+                get_dm, list_of_backstore_devices, list_of_backstore_devices_migrate,
+                remove_optional_devices,
+            },
             metadata::MDADataSize,
             names::{format_backstore_ids, CacheRole},
             serde_structs::{BackstoreSave, CapSave, Recordable},
@@ -516,6 +519,19 @@ impl Backstore {
     /// Teardown the DM devices in the backstore.
     pub fn teardown(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
         let devs = list_of_backstore_devices(pool_uuid);
+        remove_optional_devices(devs)?;
+        if let Some(ref mut cache_tier) = self.cache_tier {
+            cache_tier.block_mgr.teardown()?;
+        }
+        self.data_tier.block_mgr.teardown()
+    }
+
+    /// Teardown the DM devices in a backstore that has been renamed by
+    /// `rename_backstore_devices_migrate()`. Unlike `teardown()`, this must
+    /// not remove the devices under their canonical names: those names now
+    /// belong to the destination backstore of the migration.
+    pub fn teardown_migrate(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        let devs = list_of_backstore_devices_migrate(pool_uuid);
         remove_optional_devices(devs)?;
         if let Some(ref mut cache_tier) = self.cache_tier {
             cache_tier.block_mgr.teardown()?;

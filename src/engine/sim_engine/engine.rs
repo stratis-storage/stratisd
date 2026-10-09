@@ -439,6 +439,32 @@ impl Engine for SimEngine {
         Ok(())
     }
 
+    async fn migrate(
+        &self,
+        pool_uuid: PoolUuid,
+        _: &str,
+        blockdev_paths: &[&Path],
+        encryption_info: Option<&InputEncryptionInfo>,
+        integrity_spec: IntegritySpec,
+    ) -> StratisResult<()> {
+        let mut modify_guard = self.pools.modify_all().await;
+        let (name, _) = modify_guard.remove_by_uuid(pool_uuid).ok_or_else(|| {
+            StratisError::Msg(format!(
+                "No pool with UUID {pool_uuid} found in pool record"
+            ))
+        })?;
+        let validated_integrity_spec = ValidatedIntegritySpec::try_from(integrity_spec)?;
+        let converted_ei = convert_encryption_info(encryption_info, Some(&self.key_handler))?;
+        let (_, sim_pool) = SimPool::new(
+            blockdev_paths,
+            converted_ei.as_ref(),
+            validated_integrity_spec,
+        );
+        modify_guard.insert(name, pool_uuid, sim_pool);
+
+        Ok(())
+    }
+
     fn is_sim(&self) -> bool {
         true
     }

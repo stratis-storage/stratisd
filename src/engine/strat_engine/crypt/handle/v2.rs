@@ -520,7 +520,6 @@ impl CryptHandle {
     }
 
     /// Return the path of the activated devicemapper device.
-    #[cfg(test)]
     pub fn activated_device_path(&self) -> &Path {
         &self.metadata.activated_path
     }

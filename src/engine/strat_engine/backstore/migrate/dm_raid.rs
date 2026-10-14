@@ -39,7 +39,7 @@ pub fn set_up_raid_array(
         0,
         *min(cap_dev_size.sectors(), dest_dev_size.sectors()),
         "raid".to_string(),
-        format!("raid1 1 0 2 - {} - {}", cap_devno, dest_devno),
+        format!("raid1 3 128 rebuild 1 2 - {} - {}", cap_devno, dest_devno),
     )];
 
     let devinfo = dm.device_create(&dm_name, Some(&dm_uuid), DmOptions::private())?;
@@ -63,7 +63,7 @@ pub fn wait_on_sync_completion(pool_uuid: PoolUuid) -> StratisResult<()> {
         let mut all_statuses = Vec::new();
         for (_, _, ty, status) in table_status {
             if ty == "raid" {
-                let sync_status = status.split(" ").nth(7).ok_or_else(|| {
+                let sync_status = status.split(" ").nth(4).ok_or_else(|| {
                     StratisError::Msg(format!(
                         "dm-raid status did not have the expected format: {status}"
                     ))

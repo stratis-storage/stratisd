@@ -155,7 +155,6 @@ pub enum CacheRole {
 ///             < 128 (129 for UUID)
 ///
 /// which is equivalent to len(format!("{}", FORMAT_VERSION) < 63 (64 for UUID)
-#[cfg(not(feature = "md_raid"))]
 pub fn format_dm_raid_migrate_ids(pool_uuid: PoolUuid) -> (DmNameBuf, DmUuidBuf) {
     let value = format!(
         "stratis-{}-private-{}-migrate-raid1",

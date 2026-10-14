@@ -516,6 +516,17 @@ impl Backstore {
         self.data_tier.destroy()
     }
 
+    /// Destroy the source backstore in a migration operation after
+    /// migration is complete.
+    pub fn destroy_migrate(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        let devs = list_of_backstore_devices_migrate(pool_uuid);
+        remove_optional_devices(devs)?;
+        if let Some(ref mut cache_tier) = self.cache_tier {
+            cache_tier.destroy()?;
+        }
+        self.data_tier.destroy()
+    }
+
     /// Teardown the DM devices in the backstore.
     pub fn teardown(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
         let devs = list_of_backstore_devices(pool_uuid);

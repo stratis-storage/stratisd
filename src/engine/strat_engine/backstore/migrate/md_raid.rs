@@ -36,10 +36,13 @@ pub fn set_up_raid_array(
 }
 
 pub fn wait_on_sync_completion(pool_uuid: PoolUuid) -> StratisResult<()> {
-    let md_dev = readlink(format!("/dev/md/{pool_uuid}").as_str())?;
-    let md_dev_file_name = Path::new(&md_dev)
-        .file_name()
-        .ok_or_else(|| StratisError::Msg(format!("Failed to read symlink /dev/md/{pool_uuid}")))?;
+    let md_dev = readlink(format!("/dev/md/{}", pool_uuid.simple()).as_str())?;
+    let md_dev_file_name = Path::new(&md_dev).file_name().ok_or_else(|| {
+        StratisError::Msg(format!(
+            "Failed to read symlink /dev/md/{}",
+            pool_uuid.simple()
+        ))
+    })?;
     let md_status_file = File::open(format!("/sys/block/{}", md_dev_file_name.display()))?;
     let flags = OFlag::from_bits(fcntl(&md_status_file, FcntlArg::F_GETFL)?).ok_or_else(|| {
         StratisError::Msg(format!(

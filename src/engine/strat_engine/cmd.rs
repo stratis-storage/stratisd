@@ -628,12 +628,11 @@ pub fn set_up_raid_1(
     destination: &Path,
 ) -> StratisResult<PathBuf> {
     let mut cmd = Command::new("mdadm");
-    let path = PathBuf::from(format!("/dev/md/{pool_uuid}"));
-    cmd.arg("--create")
+    let path = PathBuf::from(format!("/dev/md/{}", pool_uuid.simple()));
+    cmd.arg("--build")
         .arg(&path)
         .arg("--level=1")
         .arg("--raid-devices=2")
-        .arg("--metadata=none")
         .arg(cap_device)
         .arg(destination);
 
@@ -646,7 +645,7 @@ pub fn set_up_raid_1(
 pub fn tear_down_raid_1(pool_uuid: PoolUuid) -> StratisResult<()> {
     let mut cmd = Command::new("mdadm");
     cmd.arg("--stop")
-        .arg(format!("/dev/md/{pool_uuid}").as_str());
+        .arg(format!("/dev/md/{}", pool_uuid.simple()).as_str());
 
     execute_cmd(&mut cmd)
 }

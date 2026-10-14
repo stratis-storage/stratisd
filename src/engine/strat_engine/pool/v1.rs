@@ -687,7 +687,7 @@ impl StratPool {
             // Nothing refers to the source backstore's devices any more, so
             // they can be removed, releasing the devicemapper UUIDs that the
             // destination backstore's devices are still waiting for.
-            pool.backstore.teardown_migrate(pool_uuid)?;
+            pool.backstore.destroy_migrate(pool_uuid)?;
             new_backstore.set_deferred_dm_uuids(pool_uuid)?;
 
             Ok(new_backstore)

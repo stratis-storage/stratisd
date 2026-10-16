@@ -945,3 +945,97 @@ fn stratis_min_key_set_empty() {
 fn test_stratis_min_key_set_empty() {
     test_with_stratisd_min_sim(stratis_min_key_set_empty);
 }
+
+#[test]
+// Test parsing when creating a filesystem with no arguments
+fn test_stratis_min_filesystem_create_no_args() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem").arg("create");
+    cmd.assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains(
+            "required arguments were not provided",
+        ));
+}
+
+#[test]
+// Test parsing when set_size_limit with no required args
+fn test_stratis_min_filesystem_set_size_limit_missing_limit() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem").arg("set-size-limit");
+    cmd.assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains(
+            "required arguments were not provided",
+        ));
+}
+
+#[test]
+// Test parsing set_size_limit with no required names
+fn test_stratis_min_fs_set_size_limit_missing_names() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem").arg("set-size-limit").arg("1024");
+    cmd.assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains(
+            "required arguments were not provided",
+        ));
+}
+
+#[test]
+// Test parsing when set_size_limit with no daemon running
+fn test_stratis_min_fs_set_size_limit_no_daemon() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem")
+        .arg("set-size-limit")
+        .arg("f1")
+        .arg("p1")
+        .arg("1024");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("IO error"));
+}
+
+fn stratis_min_create_pool_and_fs_with_size() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("create").arg("pn").arg("/dev/n");
+    cmd.assert().success();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem")
+        .arg("create")
+        .arg("--size")
+        .arg("1073741824")
+        .arg("--size-limit")
+        .arg("2147483648")
+        .arg("pn")
+        .arg("fn");
+    cmd.assert().success();
+}
+
+#[test]
+fn test_stratis_min_create_pool_and_fs_with_size() {
+    test_with_stratisd_min_sim(stratis_min_create_pool_and_fs_with_size);
+}
+
+fn stratis_min_fs_set_size_limit() {
+    stratis_min_create_pool_and_fs();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem")
+        .arg("set-size-limit")
+        .arg("pn")
+        .arg("fn")
+        // for the filesystem limit we need
+        // a huge number of bytes/sectors
+        // that are divisible by 512
+        .arg((u64::MAX / 512 * 512).to_string());
+    cmd.assert().success();
+}
+
+#[test]
+fn test_stratis_min_fs_set_size_limit() {
+    test_with_stratisd_min_sim(stratis_min_fs_set_size_limit);
+}

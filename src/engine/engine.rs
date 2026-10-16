@@ -637,6 +637,18 @@ pub trait Engine: Debug + Report + Send + Sync {
     /// Refresh the state of all pools and liminal devices.
     async fn refresh_state(&self) -> StratisResult<()>;
 
+    /// Migrate data to a new pool.
+    ///
+    /// This operation allows configuring the target pool configuration.
+    async fn migrate(
+        &self,
+        pool_uuid: PoolUuid,
+        name: &str,
+        blockdev_paths: &[&Path],
+        encryption_info: Option<&InputEncryptionInfo>,
+        integrity_spec: IntegritySpec,
+    ) -> StratisResult<()>;
+
     /// Return true if this engine is the simulator engine, otherwise false.
     fn is_sim(&self) -> bool;
 }

@@ -9,6 +9,7 @@ mod blockdevmgr;
 mod cache_tier;
 mod data_tier;
 mod devices;
+pub mod migrate;
 mod range_alloc;
 mod shared;
 
@@ -16,7 +17,7 @@ pub use self::{
     blockdev::v2::integrity_meta_space,
     devices::{
         find_stratis_devs_by_uuid, get_devno_from_path, get_logical_sector_size,
-        ProcessedPathInfos, UnownedDevices,
+        ProcessedPathInfos, StratisDevices, UnownedDevices,
     },
 };
 

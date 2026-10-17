@@ -4,8 +4,8 @@
 
 use std::{
     os::{
-        fd::BorrowedFd,
-        unix::io::{AsRawFd, RawFd},
+        fd::{BorrowedFd, FromRawFd, OwnedFd},
+        unix::io::AsRawFd,
     },
     sync::Arc,
 };
@@ -13,7 +13,10 @@ use std::{
 use nix::fcntl::{fcntl, FcntlArg, OFlag};
 #[cfg(feature = "dbus_enabled")]
 use tokio::sync::RwLock;
-use tokio::{io::unix::AsyncFd, task::spawn};
+use tokio::{
+    io::{unix::AsyncFd, Interest},
+    task::spawn,
+};
 #[cfg(feature = "dbus_enabled")]
 use zbus::Connection;
 
@@ -42,7 +45,7 @@ pub async fn dm_event_thread(
         #[cfg(feature = "dbus_enabled")] connection: &Arc<Connection>,
         #[cfg(feature = "dbus_enabled")] manager: Lockable<Arc<RwLock<Manager>>>,
         engine: &Arc<dyn Engine>,
-        fd: &AsyncFd<RawFd>,
+        fd: &AsyncFd<OwnedFd>,
     ) -> StratisResult<()> {
         {
             let mut guard = fd.readable().await?;
@@ -105,7 +108,7 @@ pub async fn dm_event_thread(
 
 /// Set the devicemapper file descriptor to nonblocking and create an asynchronous
 /// context for polling for events.
-fn setup_dm() -> StratisResult<AsyncFd<RawFd>> {
+fn setup_dm() -> StratisResult<AsyncFd<OwnedFd>> {
     let dm = get_dm_init()?;
     // This version check also implicitly checks for the presence of a working udevd;
     // if udev us not running this function should return an error to prevent
@@ -127,6 +130,8 @@ fn setup_dm() -> StratisResult<AsyncFd<RawFd>> {
             ),
         )?;
 
-        Ok(AsyncFd::new(fd)?)
+        let owned_fd = unsafe { OwnedFd::from_raw_fd(fd) };
+        unsafe { AsyncFd::register_with_interest(owned_fd, Interest::READABLE) }
+            .map_err(|e| StratisError::Msg(format!("Failed to register async fd: {e}")))
     }
 }

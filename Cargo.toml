@@ -220,7 +220,7 @@ version = "0.3.3"
 optional = true
 
 [dependencies.tokio]
-version = "1.45.1"
+version = "1.53.3"
 optional = true
 features = ["sync", "macros", "rt", "rt-multi-thread", "signal", "net", "time"]
 

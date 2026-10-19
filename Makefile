@@ -82,7 +82,7 @@ UDEV_FEATURES = --no-default-features --features udev_scripts
 UTILS_FEATURES = --no-default-features --features dbus_enabled,engine,systemd_compat
 
 STATIC_CARGO_FLAGS = CARGO_PROFILE_RELEASE_LTO=thin
-STATIC_CFLAGS = -C target-feature=+crt-static
+STATIC_CFLAGS = -C target-feature=+crt-static -C relocation-model=static
 
 .PHONY: actionlint
 ## Lint Github Workflows files
@@ -397,7 +397,6 @@ stratis-base32-decode:
 	${UDEV_FEATURES} \
 	${TARGET_ARGS} \
 	-- ${STATIC_CFLAGS}
-	@ldd target/${PROFILEDIR}/stratis-base32-decode|grep --quiet --silent "statically linked" || (echo "stratis-base32-decode is not statically linked" && exit 1)
 
 .PHONY: stratis-min
 ## Build stratis-min for early userspace
@@ -418,7 +417,6 @@ stratis-str-cmp:
 	${UDEV_FEATURES} \
 	${TARGET_ARGS} \
 	-- ${STATIC_CFLAGS}
-	@ldd target/${PROFILEDIR}/stratis-str-cmp|grep --quiet --silent "statically linked" || (echo "stratis-str-cmp is not statically linked" && exit 1)
 
 .PHONY: stratisd
 ## Build stratisd

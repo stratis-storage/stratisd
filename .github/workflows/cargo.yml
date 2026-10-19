@@ -4,13 +4,13 @@ name: stratisd cargo CI
 on:
   push:
     branches:
-      - master
+      - patch-3.9.3
     paths:
       - '**/Cargo.toml'
       - '.github/workflows/cargo.yml'
   pull_request:
     branches:
-      - master
+      - patch-3.9.3
     paths:
       - '**/Cargo.toml'
       - '.github/workflows/cargo.yml'

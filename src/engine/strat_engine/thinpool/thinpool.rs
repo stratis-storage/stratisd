@@ -87,6 +87,8 @@ mod consts {
 #[derive(strum_macros::AsRefStr)]
 #[strum(serialize_all = "snake_case")]
 enum FeatureArg {
+    // TODO: Remove in stratisd 4.0. Retained only to recognize and migrate
+    // away from this feature arg on old pools; stratisd no longer sets it.
     ErrorIfNoSpace,
     NoDiscardPassdown,
     SkipBlockZeroing,
@@ -238,6 +240,7 @@ pub struct ThinPool<B> {
     fs_limit: u64,
     enable_overprov: bool,
     out_of_meta_space: bool,
+    out_of_alloc_space: bool,
     backstore: PhantomData<B>,
 }
 
@@ -337,45 +340,15 @@ impl<B> ThinPool<B> {
         Ok(())
     }
 
-    /// Set the pool IO mode to error on writes when out of space.
-    ///
-    /// This mode should be enabled when the pool is out of space to allocate to the
-    /// pool.
-    fn set_error_mode(&mut self) -> bool {
-        if !self.out_of_alloc_space() {
-            if let Err(e) = self.thin_pool.error_if_no_space(get_dm()) {
-                warn!("Could not put thin pool into IO error mode on out of space conditions: {e}");
-                false
-            } else {
-                true
-            }
-        } else {
-            false
-        }
-    }
-
-    /// Set the pool IO mode to queue writes when out of space.
-    ///
-    /// This mode should be enabled when the pool has space to allocate to the pool.
-    /// This prevents unnecessary IO errors while the pools is being extended and
-    /// the writes can then be processed after the extension.
-    pub fn set_queue_mode(&mut self) -> bool {
-        if self.out_of_alloc_space() {
-            if let Err(e) = self.thin_pool.queue_if_no_space(get_dm()) {
-                warn!("Could not put thin pool into IO queue mode on out of space conditions: {e}");
-                false
-            } else {
-                true
-            }
-        } else {
-            false
-        }
-    }
-
     /// Returns true if the pool has run out of available space to allocate.
     pub fn out_of_alloc_space(&self) -> bool {
-        thin_table::get_feature_args(self.thin_pool.table())
-            .contains(&FeatureArg::ErrorIfNoSpace.as_ref().to_string())
+        self.out_of_alloc_space
+    }
+
+    /// Indicate to the pool that it may now have more room to allocate from the
+    /// backstore.
+    pub fn clear_out_of_alloc_space(&mut self) {
+        self.out_of_alloc_space = false;
     }
 
     pub fn get_filesystem_by_uuid(&self, uuid: FilesystemUuid) -> Option<(Name, &StratFilesystem)> {
@@ -813,6 +786,7 @@ impl ThinPool<v1::Backstore> {
             fs_limit: DEFAULT_FS_LIMIT,
             enable_overprov: true,
             out_of_meta_space: false,
+            out_of_alloc_space: false,
             backstore: PhantomData,
         })
     }
@@ -934,6 +908,7 @@ impl ThinPool<v2::Backstore> {
             fs_limit: DEFAULT_FS_LIMIT,
             enable_overprov: true,
             out_of_meta_space: false,
+            out_of_alloc_space: false,
             backstore: PhantomData,
         })
     }
@@ -1081,10 +1056,27 @@ where
         )?;
 
         // TODO: Remove in stratisd 4.0.
-        let mut migrate = false;
+        // Older pools may have error_if_no_space persisted from before stratisd
+        // stopped ever putting the thin pool into IO error mode on out of space
+        // conditions; migrate them to queue_if_no_space on this first startup.
+        let feature_args = thin_pool_save
+            .feature_args
+            .as_ref()
+            .map(|fa| {
+                fa.iter()
+                    .filter(|arg| arg != &&FeatureArg::ErrorIfNoSpace.as_ref().to_string())
+                    .cloned()
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_else(|| {
+                vec![
+                    FeatureArg::NoDiscardPassdown.as_ref().to_string(),
+                    FeatureArg::SkipBlockZeroing.as_ref().to_string(),
+                ]
+            });
 
         let data_dev_size = data_dev.size();
-        let mut thinpool_dev = ThinPoolDev::setup(
+        let thinpool_dev = ThinPoolDev::setup(
             get_dm(),
             &thinpool_name,
             Some(&thinpool_uuid),
@@ -1095,24 +1087,8 @@ where
             // space currently which will cause the value to be updated when the
             // thinpool's check method is invoked.
             sectors_to_datablocks(data_dev_size),
-            thin_pool_save
-                .feature_args
-                .as_ref()
-                .map(|hs| hs.to_vec())
-                .unwrap_or_else(|| {
-                    migrate = true;
-                    vec![
-                        FeatureArg::NoDiscardPassdown.as_ref().to_string(),
-                        FeatureArg::SkipBlockZeroing.as_ref().to_string(),
-                        FeatureArg::ErrorIfNoSpace.as_ref().to_string(),
-                    ]
-                }),
+            feature_args,
         )?;
-
-        // TODO: Remove in stratisd 4.0.
-        if migrate {
-            thinpool_dev.queue_if_no_space(get_dm())?;
-        }
 
         let mut fs_table = Table::default();
         for (origin, snap) in ready_to_merge {
@@ -1216,6 +1192,12 @@ where
             fs_limit,
             enable_overprov: thin_pool_save.enable_overprov.unwrap_or(true),
             out_of_meta_space: false,
+            // The out-of-space state is no longer persisted in the pool
+            // metadata, so recompute it here: the pool is out of allocation
+            // space if the backstore has no room left to extend the data
+            // device. This mirrors the condition in extend_thin_data_device.
+            out_of_alloc_space: sectors_to_datablocks(backstore.available_in_backstore())
+                == DataBlocks(0),
             backstore: PhantomData,
         })
     }
@@ -1470,8 +1452,10 @@ where
         let available_size = backstore.available_in_backstore();
         let data_ext = min(sectors_to_datablocks(available_size), DATA_ALLOC_SIZE);
         if data_ext == DataBlocks(0) {
+            let changed = !self.out_of_alloc_space;
+            self.out_of_alloc_space = true;
             return (
-                self.set_error_mode(),
+                changed,
                 Err(StratisError::OutOfSpaceError(format!(
                     "{DATA_ALLOC_SIZE} requested but no space is available"
                 ))),
@@ -1624,8 +1608,10 @@ where
 
         if 2u64 * meta_growth > backstore.available_in_backstore() {
             self.out_of_meta_space = true;
+            let changed = !self.out_of_alloc_space;
+            self.out_of_alloc_space = true;
             (
-                self.set_error_mode(),
+                changed,
                 Err(StratisError::Msg(
                     "Not enough unallocated space available on the pool to extend metadata device"
                         .to_string(),

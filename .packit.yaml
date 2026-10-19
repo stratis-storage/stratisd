@@ -34,6 +34,7 @@ jobs:
       trigger: pull_request
       targets:
           - fedora-all
+          - fedora-all-ppc64le
 
     - job: copr_build
       identifier: copr_commit

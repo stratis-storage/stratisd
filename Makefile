@@ -40,8 +40,6 @@ else
   CLIPPY_OPTS = --fix --allow-dirty --allow-staged
 endif
 
-AUDIT_OPTS = -D warnings
-
 ifeq ($(origin TARGET), undefined)
 else
   TARGET_ARGS = --target=${TARGET}
@@ -92,12 +90,12 @@ actionlint:
 .PHONY: audit
 ## Run cargo audit
 audit:
-	cargo audit ${AUDIT_OPTS}
+	cargo audit
 
 .PHONY: audit-all-rust
 ## Audit Rust executables
 audit-all-rust: build-all-rust
-	cargo audit ${AUDIT_OPTS} bin \
+	cargo audit bin \
 		./target/${PROFILEDIR}/stratisd \
 		./target/${PROFILEDIR}/stratisd-min \
 		./target/${PROFILEDIR}/stratis-min \

@@ -9,6 +9,7 @@ mod blockdevmgr;
 mod cache_tier;
 mod data_tier;
 mod devices;
+mod integrity;
 mod range_alloc;
 mod shared;
 

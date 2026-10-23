@@ -16,6 +16,26 @@ use stratisd::{
     stratis::{StratisError, VERSION},
 };
 
+fn parse_size(s: &str) -> Result<u128, String> {
+    let split = s.find(|c: char| !c.is_ascii_digit()).unwrap_or(s.len());
+    let (magnitude_str, units) = s.split_at(split);
+    let magnitude: u128 = magnitude_str
+        .parse()
+        .map_err(|_| "Ill-formed size: magnitude must be a decimal integer".to_string())?;
+    let multiplier = match units {
+        "B" => 1,
+        "KiB" => 1024,
+        "MiB" => 1024 * 1024,
+        "GiB" => 1024 * 1024 * 1024,
+        "TiB" => 1024u128.pow(4),
+        "PiB" => 1024u128.pow(5),
+        _ => {
+            return Err("Ill-formed size: units must be B, KiB, MiB, GiB, TiB, or PiB".to_string())
+        }
+    };
+    Ok(magnitude * multiplier)
+}
+
 fn parse_args() -> Command {
     Command::new("stratis-min")
         .version(VERSION)
@@ -191,7 +211,9 @@ fn parse_args() -> Command {
             Command::new("filesystem").subcommands(vec![
                 Command::new("create")
                     .arg(Arg::new("pool_name").required(true))
-                    .arg(Arg::new("fs_name").required(true)),
+                    .arg(Arg::new("fs_name").required(true))
+                    .arg(Arg::new("size").long("size").num_args(1))
+                    .arg(Arg::new("size_limit").long("size-limit").num_args(1)),
                 Command::new("destroy")
                     .arg(Arg::new("pool_name").required(true))
                     .arg(Arg::new("fs_name").required(true)),
@@ -202,6 +224,10 @@ fn parse_args() -> Command {
                 Command::new("origin")
                     .arg(Arg::new("pool_name").required(true))
                     .arg(Arg::new("fs_name").required(true)),
+                Command::new("set-size-limit")
+                    .arg(Arg::new("pool_name").required(true))
+                    .arg(Arg::new("fs_name").required(true))
+                    .arg(Arg::new("size_limit").num_args(1).required(true)),
             ]),
             Command::new("report"),
         ])
@@ -660,6 +686,14 @@ fn main() -> Result<(), String> {
             }
         } else if let Some(subcommand) = args.subcommand_matches("filesystem") {
             if let Some(args) = subcommand.subcommand_matches("create") {
+                let size = args
+                    .get_one::<String>("size")
+                    .map(|s| parse_size(s))
+                    .transpose()?;
+                let size_limit = args
+                    .get_one::<String>("size_limit")
+                    .map(|s| parse_size(s))
+                    .transpose()?;
                 filesystem::filesystem_create(
                     args.get_one::<String>("pool_name")
                         .expect("required")
@@ -667,6 +701,8 @@ fn main() -> Result<(), String> {
                     args.get_one::<String>("fs_name")
                         .expect("required")
                         .to_owned(),
+                    size,
+                    size_limit,
                 )?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("destroy") {
@@ -704,6 +740,21 @@ fn main() -> Result<(), String> {
                 .map(|origin| {
                     println!("{origin}");
                 })?;
+                Ok(())
+            } else if let Some(args) = subcommand.subcommand_matches("set-size-limit") {
+                let size_limit = args
+                    .get_one::<String>("size_limit")
+                    .map(|s| parse_size(s))
+                    .transpose()?;
+                filesystem::filesystem_set_size_limit(
+                    args.get_one::<String>("pool_name")
+                        .expect("required")
+                        .to_owned(),
+                    args.get_one::<String>("fs_name")
+                        .expect("required")
+                        .to_owned(),
+                    size_limit.expect("required"),
+                )?;
                 Ok(())
             } else {
                 filesystem::filesystem_list()?;

@@ -26,7 +26,7 @@ if $(stratis-min pool is-stopped "$POOL_UUID"); then
 		fi
 	fi
 	if $(stratis-min pool has-passphrase "$POOL_UUID"); then
-		if systemd-ask-password \
+		if systemd-ask-password --timeout=0 \
 			"Enter password for pool with UUID $POOL_UUID" |
 			stratis-min pool start --token-slot=any --prompt "$POOL_UUID"; then
 			exit 0

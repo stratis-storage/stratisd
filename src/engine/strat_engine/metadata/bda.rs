@@ -107,12 +107,12 @@ impl BDA {
     }
 
     /// Read latest metadata from the disk
-    pub fn load_state<F>(&self, mut f: &mut F) -> StratisResult<Option<Vec<u8>>>
+    pub fn load_state<F>(&self, f: &mut F) -> StratisResult<Option<Vec<u8>>>
     where
         F: Read + Seek,
     {
         self.regions
-            .load_state(STATIC_HEADER_SIZE.sectors().bytes(), &mut f)
+            .load_state(STATIC_HEADER_SIZE.sectors().bytes(), f)
     }
 
     /// The time when the most recent metadata was written to the BDA,

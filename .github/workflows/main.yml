@@ -4,14 +4,14 @@ name: stratisd CI
 on:
   push:
     branches:
-      - master
+      - patch-3.9.3
     paths-ignore:
       - '.packit.yaml'
       - 'plans/**'
       - 'tests-fmf/**'
   pull_request:
     branches:
-      - master
+      - patch-3.9.3
     paths-ignore:
       - '.packit.yaml'
       - 'plans/**'
@@ -33,7 +33,7 @@ jobs:
             components: rustfmt
     runs-on: ubuntu-24.04
     container:
-      image: fedora:43  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:44  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - name: Install dependencies for Fedora
@@ -60,7 +60,7 @@ jobs:
   stratis-cli-checks:
     runs-on: ubuntu-24.04
     container:
-      image: fedora:43  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:44  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged --userns=host --ipc=host -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1
     steps:
       - name: Install dependencies
@@ -74,6 +74,7 @@ jobs:
           device-mapper-devel
           git
           glibc-static
+          jq
           libblkid-devel
           make
           ncurses
@@ -86,23 +87,19 @@ jobs:
           python3-psutil
           python3-wcwidth
           systemd-devel
-          toml-cli
       - uses: actions/checkout@v6
         with:
           path: stratisd
           persist-credentials: false
-      - name: Get package MSRV
-        id: msrv
-        run: |
-          MSRV=$(toml get --toml-path Cargo.toml "workspace.package.rust-version")
-          echo "MSRV=$MSRV" >> "$GITHUB_OUTPUT"
-        working-directory: stratisd
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: cargo
-          toolchain: ${{ steps.msrv.outputs.MSRV }}
       - name: Overwrite stratisd dependencies as necessary
         uses: stratis-storage/github-actions/stratisd-modify@HEAD
+        with:
+          working-directory: stratisd
+      - name: Set toolchain to MSRV
+        uses: stratis-storage/github-actions/set-rust-toolchain@HEAD
         with:
           working-directory: stratisd
       - name: Build stratisd
@@ -117,6 +114,7 @@ jobs:
       - uses: stratis-storage/github-actions/github-modify@HEAD
         with:
           repo: stratis-cli
+          default_branch: v3.9.1
       - name: Print head commit
         run: git log --oneline -1
         working-directory: stratis-cli
@@ -131,7 +129,7 @@ jobs:
   stratis-min-cli-checks:
     runs-on: ubuntu-24.04
     container:
-      image: fedora:43  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:44  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged --userns=host --ipc=host -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1
     steps:
       - name: Install dependencies
@@ -180,7 +178,7 @@ jobs:
   shell-checks:
     runs-on: ubuntu-24.04
     container:
-      image: fedora:43  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:44  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - name: Install dependencies
         run: >
@@ -198,7 +196,7 @@ jobs:
   python-based-tests:
     runs-on: ubuntu-24.04
     container:
-      image: fedora:43  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:44  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - name: Install dependencies for Fedora
@@ -243,7 +241,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - rev: master
+          - rev: v3.9.1
     runs-on: ubuntu-24.04
     steps:
       - name: Run apt-get update
@@ -256,6 +254,7 @@ jobs:
           clang
           curl
           git
+          jq
           libblkid-dev
           libcryptsetup-dev
           libdevmapper-dev
@@ -274,24 +273,19 @@ jobs:
           dbus-python-client-gen
           justbytes
           psutil
-      - name: Install toml-cli
-        run: pip install --user toml-cli
       - uses: actions/checkout@v6
         with:
           path: stratisd
           persist-credentials: false
-      - name: Get package MSRV
-        id: msrv
-        run: |
-          PATH="$PATH:$(python3 -m site --user-base)/bin" MSRV=$(toml get --toml-path Cargo.toml "workspace.package.rust-version")
-          echo "MSRV=$MSRV" >> "$GITHUB_OUTPUT"
-        working-directory: stratisd
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: cargo
-          toolchain: ${{ steps.msrv.outputs.MSRV }}
       - name: Overwrite stratisd dependencies as necessary
         uses: stratis-storage/github-actions/stratisd-modify@HEAD
+        with:
+          working-directory: stratisd
+      - name: Set toolchain to MSRV
+        uses: stratis-storage/github-actions/set-rust-toolchain@HEAD
         with:
           working-directory: stratisd
       - name: Build stratisd
@@ -308,6 +302,7 @@ jobs:
       - uses: stratis-storage/github-actions/github-modify@HEAD
         with:
           repo: testing
+          default_branch: v3.9.1
       - name: Run stratisd_cert.py
         run: >
           sudo
@@ -325,7 +320,7 @@ jobs:
   systemd-checks:
     runs-on: ubuntu-24.04
     container:
-      image: fedora:43  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:44  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - name: Install dependencies
         run: >

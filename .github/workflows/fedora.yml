@@ -4,7 +4,7 @@ name: stratisd CI on fedora
 on:
   push:
     branches:
-      - master
+      - patch-3.9.3
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
@@ -15,7 +15,7 @@ on:
       - 'tests-fmf/**'
   pull_request:
     branches:
-      - master
+      - patch-3.9.3
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
@@ -63,7 +63,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-24.04
     container:
-      image: fedora:43  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:44  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev
     steps:
       - name: Install dependencies for Fedora

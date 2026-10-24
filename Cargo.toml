@@ -292,6 +292,7 @@ extras = ["dep:pretty-hex"]
 min = ["dep:termios"]
 systemd_compat = ["dep:bindgen"]
 udev_scripts = ["dep:data-encoding"]
+md_raid = []
 
 [lints.rust]
 warnings = { level = "deny" }

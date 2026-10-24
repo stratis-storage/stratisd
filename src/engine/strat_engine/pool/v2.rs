@@ -141,11 +141,11 @@ fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
 
 #[derive(Debug)]
 pub struct StratPool {
-    backstore: Backstore,
-    thin_pool: ThinPool<Backstore>,
-    action_avail: ActionAvailability,
-    metadata_size: Sectors,
-    last_reencrypt: Option<DateTime<Utc>>,
+    pub(super) backstore: Backstore,
+    pub(super) thin_pool: ThinPool<Backstore>,
+    pub(super) action_avail: ActionAvailability,
+    pub(super) metadata_size: Sectors,
+    pub(super) last_reencrypt: Option<DateTime<Utc>>,
 }
 
 #[strat_pool_impl_gen]
@@ -160,10 +160,6 @@ impl StratPool {
         encryption_info: Option<&InputEncryptionInfo>,
         integrity_spec: ValidatedIntegritySpec,
     ) -> StratisResult<(PoolUuid, StratPool)> {
-        if let Some(ei) = encryption_info {
-            validate_key_descs(ei.key_descs())?;
-        }
-
         let pool_uuid = PoolUuid::new_v4();
 
         // FIXME: Initializing with the minimum MDA size is not necessarily

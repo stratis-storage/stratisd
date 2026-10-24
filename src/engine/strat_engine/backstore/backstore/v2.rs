@@ -16,8 +16,8 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 use devicemapper::{
-    CacheDev, CacheDevTargetTable, CacheTargetParams, DevId, Device, DmDevice, DmOptions,
-    LinearDev, LinearDevTargetParams, LinearDevTargetTable, LinearTargetParams, Sectors,
+    CacheDev, CacheDevTargetTable, CacheTargetParams, DevId, Device, DmDevice, DmOptions, DmUuid,
+    DmUuidBuf, LinearDev, LinearDevTargetParams, LinearDevTargetTable, LinearTargetParams, Sectors,
     TargetLine, TargetTable,
 };
 
@@ -37,7 +37,10 @@ use crate::{
                 back_up_luks_header, handle::v2::CryptHandle, manual_wipe, restore_luks_header,
                 DEFAULT_CRYPT_DATA_OFFSET_V2,
             },
-            dm::{get_dm, list_of_backstore_devices, remove_optional_devices, DEVICEMAPPER_PATH},
+            dm::{
+                get_dm, list_of_backstore_devices, remove_optional_devices,
+                set_backstore_device_uuids, DEVICEMAPPER_PATH,
+            },
             keys::{search_key_process, unset_key_process},
             metadata::MDADataSize,
             names::{format_backstore_ids, format_crypt_backstore_name, CacheRole},
@@ -65,6 +68,21 @@ struct MakeCacheError {
     cap: Option<LinearDev>,
 }
 
+/// The UUID to give a backstore DM device at creation.
+///
+/// While this backstore is the destination of a pool migration the source
+/// backstore still holds the DM UUIDs derived from this pool UUID, and the
+/// kernel requires DM UUIDs to be unique, so the destination's devices must be
+/// created without one. `Backstore::set_deferred_dm_uuids()` sets them once
+/// the source backstore has been torn down.
+fn deferrable_dm_uuid(uuid: &DmUuidBuf, deferred: bool) -> Option<&DmUuid> {
+    if deferred {
+        None
+    } else {
+        Some(uuid)
+    }
+}
+
 /// Make a DM cache device. If a cap device is provided, the cache
 /// is being newly created, so take extra steps to make it clean.
 fn make_cache(
@@ -73,12 +91,13 @@ fn make_cache(
     origin: LinearDev,
     origin_table: Vec<TargetLine<LinearDevTargetParams>>,
     cap: Option<LinearDev>,
+    deferred_dm_uuids: bool,
 ) -> Result<CacheDev, Box<MakeCacheError>> {
     let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::MetaSub);
     let mut meta = match LinearDev::setup(
         get_dm(),
         &dm_name,
-        Some(&dm_uuid),
+        deferrable_dm_uuid(&dm_uuid, deferred_dm_uuids),
         cache_tier.meta_segments.map_to_dm(),
     ) {
         Ok(m) => m,
@@ -111,7 +130,7 @@ fn make_cache(
     let mut cache = match LinearDev::setup(
         get_dm(),
         &dm_name,
-        Some(&dm_uuid),
+        deferrable_dm_uuid(&dm_uuid, deferred_dm_uuids),
         cache_tier.cache_segments.map_to_dm(),
     ) {
         Ok(c) => c,
@@ -167,7 +186,7 @@ fn make_cache(
     match CacheDev::setup(
         get_dm(),
         &dm_name,
-        Some(&dm_uuid),
+        deferrable_dm_uuid(&dm_uuid, deferred_dm_uuids),
         meta,
         cache,
         origin,
@@ -176,8 +195,13 @@ fn make_cache(
         Ok(cd) => Ok(cd),
         Err(e) => {
             let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
-            let maybe_origin =
-                LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), origin_table).ok();
+            let maybe_origin = LinearDev::setup(
+                get_dm(),
+                &dm_name,
+                deferrable_dm_uuid(&dm_uuid, deferred_dm_uuids),
+                origin_table,
+            )
+            .ok();
             Err(Box::new(MakeCacheError {
                 error: e.into(),
                 origin: maybe_origin,
@@ -192,6 +216,7 @@ fn make_cache(
 fn make_placeholder_dev(
     pool_uuid: PoolUuid,
     origin: &LinearDev,
+    deferred_dm_uuids: bool,
 ) -> Result<LinearDev, StratisError> {
     let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::Cache);
     let target = vec![TargetLine::new(
@@ -199,7 +224,13 @@ fn make_placeholder_dev(
         origin.size(),
         LinearDevTargetParams::Linear(LinearTargetParams::new(origin.device(), Sectors(0))),
     )];
-    LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), target).map_err(StratisError::from)
+    LinearDev::setup(
+        get_dm(),
+        &dm_name,
+        deferrable_dm_uuid(&dm_uuid, deferred_dm_uuids),
+        target,
+    )
+    .map_err(StratisError::from)
 }
 
 /// Contains all devices that could potentially be the cap device and the allocations recorded on
@@ -219,6 +250,11 @@ struct CapDevice {
     allocs: Vec<(Sectors, Sectors)>,
     /// Metadata allocations on the cache or placeholder device.
     crypt_meta_allocs: Vec<(Sectors, Sectors)>,
+    /// True if the DM devices belonging to this cap device must be created
+    /// without a DM UUID because the backstore that this one is the migration
+    /// destination of still holds them. Cleared by
+    /// `Backstore::set_deferred_dm_uuids()`.
+    deferred_dm_uuids: bool,
 }
 
 impl CapDevice {
@@ -228,6 +264,19 @@ impl CapDevice {
             .and_then(|either| either.as_ref().right().map(|h| h.device()))
             .or_else(|| self.cache.as_ref().map(|c| c.device()))
             .or_else(|| self.placeholder.as_ref().map(|lin| lin.device()))
+    }
+
+    fn device_path(&self) -> Option<PathBuf> {
+        self.enc
+            .as_ref()
+            .and_then(|either| {
+                either
+                    .as_ref()
+                    .right()
+                    .map(|h| h.activated_device_path().to_owned())
+            })
+            .or_else(|| self.cache.as_ref().map(|c| c.devnode()))
+            .or_else(|| self.placeholder.as_ref().map(|lin| lin.devnode()))
     }
 
     pub fn is_encrypted(&self) -> bool {
@@ -430,8 +479,13 @@ impl CapDevice {
         if create {
             let table = data_tier.segments.map_to_dm();
             let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
-            let origin = LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), table)?;
-            let placeholder = make_placeholder_dev(pool_uuid, &origin)?;
+            let origin = LinearDev::setup(
+                get_dm(),
+                &dm_name,
+                deferrable_dm_uuid(&dm_uuid, self.deferred_dm_uuids),
+                table,
+            )?;
+            let placeholder = make_placeholder_dev(pool_uuid, &origin, self.deferred_dm_uuids)?;
             let handle = match self.enc {
                 Some(Either::Left(ref einfo)) => Some(CryptHandle::initialize(
                     &once(DEVICEMAPPER_PATH)
@@ -511,6 +565,10 @@ pub struct Backstore {
 impl InternalBackstore for Backstore {
     fn device(&self) -> Option<Device> {
         self.cap_device.device()
+    }
+
+    fn device_path(&self) -> Option<PathBuf> {
+        self.cap_device.device_path()
     }
 
     fn datatier_allocated_size(&self) -> Sectors {
@@ -609,6 +667,7 @@ impl Backstore {
                         origin,
                         data_tier.segments.map_to_dm(),
                         None,
+                        false,
                     ) {
                         Ok(cd) => cd,
                         Err(boxed) => {
@@ -623,7 +682,7 @@ impl Backstore {
                 }
             }
         } else {
-            let placeholder = make_placeholder_dev(pool_uuid, &origin)?;
+            let placeholder = make_placeholder_dev(pool_uuid, &origin, false)?;
             (Some(placeholder), None, None, Some(origin))
         };
 
@@ -678,6 +737,7 @@ impl Backstore {
                 enc,
                 allocs: pool_save.backstore.cap.allocs.clone(),
                 crypt_meta_allocs: pool_save.backstore.cap.crypt_meta_allocs.clone(),
+                deferred_dm_uuids: false,
             },
         })
     }
@@ -698,6 +758,53 @@ impl Backstore {
         encryption_info: Option<&InputEncryptionInfo>,
         integrity_spec: ValidatedIntegritySpec,
     ) -> StratisResult<Backstore> {
+        Backstore::initialize_internal(
+            pool_uuid,
+            devices,
+            mda_data_size,
+            encryption_info,
+            integrity_spec,
+            false,
+        )
+    }
+
+    /// Initialize a Backstore object that is the destination of a migration
+    /// from another backstore for the same pool UUID.
+    ///
+    /// The two backstores derive their DM identifiers from the same pool UUID,
+    /// so they can not both hold them. The source backstore's devices must
+    /// have been moved to their temporary names before this is called; because
+    /// a DM device's UUID can not be changed once set, the source keeps the DM
+    /// UUIDs and this backstore's devices are created without one. Once the
+    /// source backstore has been torn down, `set_deferred_dm_uuids()` gives
+    /// this backstore's devices the UUIDs they would have had.
+    ///
+    /// WARNING: metadata changing event
+    pub fn initialize_for_migration(
+        pool_uuid: PoolUuid,
+        devices: UnownedDevices,
+        mda_data_size: MDADataSize,
+        encryption_info: Option<&InputEncryptionInfo>,
+        integrity_spec: ValidatedIntegritySpec,
+    ) -> StratisResult<Backstore> {
+        Backstore::initialize_internal(
+            pool_uuid,
+            devices,
+            mda_data_size,
+            encryption_info,
+            integrity_spec,
+            true,
+        )
+    }
+
+    fn initialize_internal(
+        pool_uuid: PoolUuid,
+        devices: UnownedDevices,
+        mda_data_size: MDADataSize,
+        encryption_info: Option<&InputEncryptionInfo>,
+        integrity_spec: ValidatedIntegritySpec,
+        deferred_dm_uuids: bool,
+    ) -> StratisResult<Backstore> {
         let data_tier = DataTier::<StratBlockDev>::new(
             BlockDevMgr::<StratBlockDev>::initialize(pool_uuid, devices, mda_data_size)?,
             integrity_spec,
@@ -713,6 +820,7 @@ impl Backstore {
                 enc: encryption_info.cloned().map(Either::Left),
                 allocs: Vec::new(),
                 crypt_meta_allocs: Vec::new(),
+                deferred_dm_uuids,
             },
         };
 
@@ -724,6 +832,17 @@ impl Backstore {
         }
 
         Ok(backstore)
+    }
+
+    /// Give this backstore's DM devices the UUIDs that were withheld by
+    /// `initialize_for_migration()`.
+    ///
+    /// Precondition: the backstore that this one was migrated from has been
+    /// torn down, so that the UUIDs are no longer in use.
+    pub fn set_deferred_dm_uuids(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        set_backstore_device_uuids(pool_uuid)?;
+        self.cap_device.deferred_dm_uuids = false;
+        Ok(())
     }
 
     fn meta_alloc_cache(&mut self, sizes: &[Sectors]) -> StratisResult<bool> {
@@ -776,6 +895,7 @@ impl Backstore {
                     origin,
                     self.data_tier.segments.map_to_dm(),
                     Some(placeholder),
+                    self.cap_device.deferred_dm_uuids,
                 ) {
                     Ok(cache) => cache,
                     Err(boxed) => {

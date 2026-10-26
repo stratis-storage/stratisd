@@ -10,9 +10,9 @@ use tokio::task::block_in_place;
 
 use crate::{
     engine::{
-        BlockDevTier, CreateAction, DeleteAction, Engine, EngineAction, Features,
-        InputEncryptionInfo, IntegritySpec, KeyDescription, Name, OptionalTokenSlotInput,
-        PoolIdentifier, PoolUuid, RenameAction, StratSigblockVersion, TokenUnlockMethod,
+        BlockDevTier, CreateAction, DeleteAction, Engine, EngineAction, InputEncryptionInfo,
+        IntegritySpec, KeyDescription, Name, OptionalTokenSlotInput, PoolIdentifier, PoolUuid,
+        RenameAction, StratSigblockVersion, TokenUnlockMethod,
     },
     jsonrpc::interface::PoolListType,
     stratis::{StratisError, StratisResult},
@@ -298,15 +298,13 @@ pub async fn pool_is_encrypted(
             .or_else(|| stopped.partially_constructed.get(pool_uuid))
         {
             match poolinfo
-                .metadata_version
-                .ok_or_else(|| StratisError::Msg("Found multiple metadata versions".to_string()))?
+            .metadata_version
+            .ok_or_else(|| StratisError::Msg("Found multiple metadata versions".to_string()))?
             {
                 StratSigblockVersion::V1 => Ok(poolinfo.info.is_some()),
-                StratSigblockVersion::V2 => Ok(poolinfo
-                    .features
-                    .as_ref()
-                    .unwrap_or(&Features::default())
-                    .encryption),
+                StratSigblockVersion::V2 => Ok(poolinfo.features.as_ref().ok_or_else(|| {
+                    StratisError::Msg("Pool reports metadata version V2 but not features are available for the stopped pool".to_string())
+                })?.encryption),
             }
         } else {
             Err(StratisError::Msg(format!("Pool with {id} not found")))

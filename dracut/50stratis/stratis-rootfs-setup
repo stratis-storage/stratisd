@@ -6,8 +6,8 @@ if [ -z "$STRATIS_ROOTFS_UUID" ]; then
 fi
 
 i=0
-while ! stratis-min pool is-stopped "$STRATIS_ROOTFS_UUID" >/dev/null; do
-	echo Waiting on pool with UUID $STRATIS_ROOTFS_UUID...
+while [ "$(stratis-min pool all-devices-present "$STRATIS_ROOTFS_UUID" 2>/dev/null)" != true ]; do
+	echo Waiting on all devices for pool with UUID $STRATIS_ROOTFS_UUID...
 	sleep 1
 	if [ "$i" = 5 ]; then
 		break
@@ -15,7 +15,7 @@ while ! stratis-min pool is-stopped "$STRATIS_ROOTFS_UUID" >/dev/null; do
 	i=$(($i + 1))
 done
 
-if $(stratis-min pool is-stopped "$STRATIS_ROOTFS_UUID"); then
+if $(stratis-min pool all-devices-present "$STRATIS_ROOTFS_UUID"); then
 	if $(stratis-min pool has-passphrase "$STRATIS_ROOTFS_UUID"); then
 		ATTEMPTS_REMAINING=3
 		if

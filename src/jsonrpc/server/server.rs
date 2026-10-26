@@ -194,6 +194,13 @@ impl StratisParams {
                     false,
                 )))
             }
+            StratisParamType::PoolAllDevicesPresent(id) => {
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::PoolAllDevicesPresent(stratis_result_to_return(
+                    pool::pool_all_devices_present(engine, id).await,
+                    false,
+                )))
+            }
             StratisParamType::PoolHasPassphrase(id) => {
                 expects_fd!(self.fd_opt, false);
                 Ok(StratisRet::PoolHasPassphrase(stratis_result_to_return(

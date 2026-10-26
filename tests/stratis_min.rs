@@ -945,3 +945,19 @@ fn stratis_min_key_set_empty() {
 fn test_stratis_min_key_set_empty() {
     test_with_stratisd_min_sim(stratis_min_key_set_empty);
 }
+
+fn stratis_min_pool_all_devices_present() {
+    stratis_min_create_pool_and_fs();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool")
+        .arg("all-devices-present")
+        .arg("--name")
+        .arg("pn");
+    cmd.assert().success().stdout("true\n");
+}
+
+#[test]
+// Test that all devices are reported present for a running pool.
+fn test_stratis_min_pool_all_devices_present() {
+    test_with_stratisd_min_sim(stratis_min_pool_all_devices_present);
+}

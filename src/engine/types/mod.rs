@@ -234,6 +234,10 @@ pub struct StoppedPoolInfo {
     pub devices: Vec<PoolDevice>,
     pub metadata_version: Option<StratSigblockVersion>,
     pub features: Option<Features>,
+    /// True if the devices found match the complete set of devices recorded
+    /// in the pool metadata. False if some devices are missing or if this
+    /// cannot be determined, e.g., because some devices are not yet unlocked.
+    pub devices_complete: bool,
 }
 
 #[derive(Default, Debug, Eq, PartialEq)]

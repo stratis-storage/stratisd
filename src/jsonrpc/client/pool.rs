@@ -143,6 +143,16 @@ pub fn pool_is_stopped(id: PoolIdentifier<PoolUuid>) -> StratisResult<bool> {
     }
 }
 
+// stratis-min pool all-devices-present
+pub fn pool_all_devices_present(id: PoolIdentifier<PoolUuid>) -> StratisResult<bool> {
+    let (present, rc, rs) = do_request!(PoolAllDevicesPresent, id);
+    if rc != 0 {
+        Err(StratisError::Msg(rs))
+    } else {
+        Ok(present)
+    }
+}
+
 // stratis-min pool has-passphrase
 pub fn pool_has_passphrase(id: PoolIdentifier<PoolUuid>) -> StratisResult<bool> {
     let (has_passphrase, rc, rs) = do_request!(PoolHasPassphrase, id);

@@ -2288,6 +2288,78 @@ mod tests {
         );
     }
 
+    /// Test creating a pool, adding a two device cache, stopping the pool, wiping one of the
+    /// cache devices so that it is missing when the engine is re-initialized, and then
+    /// starting the pool with the cache removed.
+    fn test_remove_cache_missing_cache_dev(paths: &[&Path]) {
+        let name = "pool_name";
+        let uuid = {
+            let (send, _recv) = unbounded_channel();
+            let engine = StratEngine::initialize(send).unwrap();
+            let uuid =
+                test_async!(engine.create_pool(name, &[paths[0]], None, IntegritySpec::default()))
+                    .unwrap()
+                    .changed()
+                    .unwrap();
+            {
+                let mut pool =
+                    test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
+                pool.init_cache(uuid, name, &[paths[1], paths[2]], true)
+                    .unwrap();
+                assert!(pool.has_cache());
+            }
+            test_async!(engine.stop_pool(PoolIdentifier::Uuid(uuid), true)).unwrap();
+            uuid
+        };
+
+        OpenOptions::new()
+            .write(true)
+            .open(paths[2])
+            .map_err(StratisError::from)
+            .and_then(|mut f| disown_device(&mut f))
+            .unwrap();
+
+        let (send, _recv) = unbounded_channel();
+        let engine = StratEngine::initialize(send).unwrap();
+
+        // Without removing the cache, the pool cannot be started because a cache device
+        // recorded in the metadata is missing.
+        assert!(test_async!(engine.start_pool(
+            PoolIdentifier::Uuid(uuid),
+            TokenUnlockMethod::None,
+            None,
+            false,
+        ))
+        .is_err());
+        assert!(test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid))).is_none());
+
+        test_async!(engine.start_pool(
+            PoolIdentifier::Uuid(uuid),
+            TokenUnlockMethod::None,
+            None,
+            true,
+        ))
+        .unwrap();
+        let pool = test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid))).unwrap();
+        assert!(!pool.has_cache());
+    }
+
+    #[test]
+    fn loop_test_remove_cache_missing_cache_dev() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(3, None),
+            test_remove_cache_missing_cache_dev,
+        );
+    }
+
+    #[test]
+    fn real_test_remove_cache_missing_cache_dev() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(3, None, None),
+            test_remove_cache_missing_cache_dev,
+        );
+    }
+
     fn test_remove_cache_direct(paths: &[&Path]) {
         assert!(paths.len() > 1);
 

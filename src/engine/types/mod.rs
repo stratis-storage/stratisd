@@ -240,7 +240,7 @@ pub struct StoppedPoolInfo {
     pub devices_complete: bool,
 }
 
-#[derive(Default, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Features {
     pub encryption: bool,
     pub key_description_enabled: bool,

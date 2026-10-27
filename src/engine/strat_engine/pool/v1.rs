@@ -2338,4 +2338,101 @@ mod tests {
             clevis_test_online_reencrypt,
         );
     }
+
+    /// Test creating a pool, adding a two device cache, stopping the pool, wiping one of the
+    /// cache devices so that it is missing when the engine is re-initialized, and then
+    /// starting the pool with the cache removed.
+    ///
+    /// Verifies that unencrypted V1 pools correctly detect missing cache devices via metadata
+    /// validation (devices_complete=false), and that remove_cache=true allows the pool to start
+    /// by stripping the incomplete cache tier.
+    fn test_remove_cache_missing_cache_dev(paths: &[&Path]) {
+        let name = "pool_name";
+        let uuid = {
+            let (send, _recv) = unbounded_channel();
+            let engine = StratEngine::initialize(send).unwrap();
+            let uuid = test_async!(engine.create_pool_legacy(name, &[paths[0]], None))
+                .unwrap()
+                .changed()
+                .unwrap();
+            {
+                let mut pool =
+                    test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
+                pool.init_cache(uuid, name, &[paths[1], paths[2]], true)
+                    .unwrap();
+                assert!(pool.has_cache());
+            }
+            test_async!(engine.stop_pool(PoolIdentifier::Uuid(uuid), true)).unwrap();
+            uuid
+        };
+
+        OpenOptions::new()
+            .write(true)
+            .open(paths[2])
+            .map_err(StratisError::from)
+            .and_then(|mut f| disown_device(&mut f))
+            .unwrap();
+
+        let (send, _recv) = unbounded_channel();
+        let engine = StratEngine::initialize(send).unwrap();
+
+        // Verify that this unencrypted V1 pool correctly detects the missing cache device.
+        // Since all devices are open, metadata can be read and validated, so devices_complete
+        // should be false. However, pool_all_devices_present() has a V1 blanket exemption
+        // that returns true for ALL V1 pools regardless of devices_complete.
+        let stopped_pools = test_async!(engine.stopped_pools());
+        let stopped_info = stopped_pools
+            .stopped
+            .get(&uuid)
+            .expect("Pool should be in stopped pools");
+        assert_eq!(
+            stopped_info.metadata_version,
+            Some(StratSigblockVersion::V1),
+            "Pool should be V1"
+        );
+        assert!(
+            !stopped_info.devices_complete,
+            "Unencrypted V1 pool should correctly detect missing cache device (devices_complete=false)"
+        );
+
+        // The pool correctly detected the missing cache device (devices_complete=false above).
+        // Without removing the cache, the pool cannot be started because a cache device
+        // recorded in the metadata is missing.
+        assert!(test_async!(engine.start_pool(
+            PoolIdentifier::Uuid(uuid),
+            TokenUnlockMethod::None,
+            None,
+            false,
+        ))
+        .is_err());
+        assert!(test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid))).is_none());
+
+        // Use remove_cache=true to explicitly strip the incomplete cache tier, allowing the
+        // pool to start successfully.
+        test_async!(engine.start_pool(
+            PoolIdentifier::Uuid(uuid),
+            TokenUnlockMethod::None,
+            None,
+            true,
+        ))
+        .unwrap();
+        let pool = test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid))).unwrap();
+        assert!(!pool.has_cache());
+    }
+
+    #[test]
+    fn loop_test_remove_cache_missing_cache_dev() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(3, None),
+            test_remove_cache_missing_cache_dev,
+        );
+    }
+
+    #[test]
+    fn real_test_remove_cache_missing_cache_dev() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(3, None, None),
+            test_remove_cache_missing_cache_dev,
+        );
+    }
 }

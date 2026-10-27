@@ -96,12 +96,19 @@ pub fn get_metadata(
         .copied()
         .collect::<HashSet<_>>();
 
-    let matches = if allow_missing_cache {
-        data_uuids.is_subset(&found_uuids) && found_uuids.is_subset(&meta_uuids)
+    let (missing, extra) = if allow_missing_cache {
+        (
+            data_uuids.difference(&found_uuids).collect::<HashSet<_>>(),
+            found_uuids.difference(&meta_uuids).collect::<HashSet<_>>(),
+        )
     } else {
-        found_uuids == meta_uuids
+        (
+            meta_uuids.difference(&found_uuids).collect::<HashSet<_>>(),
+            found_uuids.difference(&meta_uuids).collect::<HashSet<_>>(),
+        )
     };
-    if !matches {
+
+    if !missing.is_empty() || !extra.is_empty() {
         let mut meta_list: Vec<_> = meta_uuids.into_iter().collect();
         meta_list.sort_unstable();
         let mut found_list: Vec<_> = found_uuids.into_iter().collect();

@@ -57,7 +57,7 @@ mod keys;
 
 macro_rules! uuid {
     ($vis:vis $ident:ident) => {
-        #[derive(Copy, Clone, Debug, Default, Hash, Eq, PartialEq, Deserialize, Serialize)]
+        #[derive(Copy, Clone, Debug, Default, Hash, Eq, PartialEq, Deserialize, Serialize, Ord, PartialOrd)]
         $vis struct $ident(pub uuid::Uuid);
 
         impl $ident {

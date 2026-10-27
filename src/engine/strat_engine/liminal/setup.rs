@@ -8,6 +8,8 @@
 use std::{
     collections::{HashMap, HashSet},
     fs::OpenOptions,
+    io::Write,
+    path::PathBuf,
 };
 
 use chrono::{DateTime, Utc};
@@ -18,14 +20,18 @@ use devicemapper::Sectors;
 use crate::{
     engine::{
         strat_engine::{
-            backstore::blockdev::{
-                v1::{self, UnderlyingDevice},
-                v2, InternalBlockDev,
+            backstore::{
+                blockdev::{
+                    v1::{self, UnderlyingDevice},
+                    v2, InternalBlockDev,
+                },
+                find_stratis_devs_by_uuid,
             },
             crypt::handle::v1::CryptHandle,
             device::blkdev_size,
             liminal::device_info::LStratisInfo,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
+            udev::UEVENT_CHANGE_EVENT,
         },
         types::{BlockDevTier, DevUuid, DevicePath, TokenUnlockMethod},
     },
@@ -107,6 +113,25 @@ pub fn get_metadata(
             found_uuids.difference(&meta_uuids).collect::<HashSet<_>>(),
         )
     };
+
+    if !missing.is_empty() {
+        let missing_uuids: Vec<DevUuid> = missing.iter().map(|u| **u).collect();
+        if let Ok(found_devs) = find_stratis_devs_by_uuid(None, &missing_uuids) {
+            for (_dev_uuid, (_path, dev)) in found_devs {
+                let uevent_file = [
+                    "/sys/dev/block",
+                    &format!("{}:{}", dev.major, dev.minor),
+                    "uevent",
+                ]
+                .iter()
+                .collect::<PathBuf>();
+                let _ = OpenOptions::new()
+                    .write(true)
+                    .open(uevent_file)
+                    .and_then(|mut file| file.write_all(UEVENT_CHANGE_EVENT.as_bytes()));
+            }
+        }
+    }
 
     if !missing.is_empty() || !extra.is_empty() {
         let mut meta_list: Vec<_> = meta_uuids.into_iter().collect();

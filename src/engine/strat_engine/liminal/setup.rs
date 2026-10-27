@@ -102,15 +102,19 @@ pub fn get_metadata(
         found_uuids == meta_uuids
     };
     if !matches {
+        let mut meta_list: Vec<_> = meta_uuids.into_iter().collect();
+        meta_list.sort_unstable();
+        let mut found_list: Vec<_> = found_uuids.into_iter().collect();
+        found_list.sort_unstable();
         return Err(StratisError::Msg(format!(
             "UUIDs in metadata ({}) did not match UUIDs found ({})",
             Itertools::intersperse(
-                meta_uuids.into_iter().map(|u| u.to_string()),
+                meta_list.into_iter().map(|u| u.to_string()),
                 ", ".to_string(),
             )
             .collect::<String>(),
             Itertools::intersperse(
-                found_uuids.into_iter().map(|u| u.to_string()),
+                found_list.into_iter().map(|u| u.to_string()),
                 ", ".to_string(),
             )
             .collect::<String>(),

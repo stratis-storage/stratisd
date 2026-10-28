@@ -12,6 +12,7 @@ use tokio::{
     sync::{
         broadcast::{error::TryRecvError, Receiver},
         mpsc::UnboundedSender,
+        oneshot,
     },
     task::spawn_blocking,
 };
@@ -23,17 +24,24 @@ use crate::{
 
 // Poll for udev events.
 // Check for exit condition and return if true.
+// Signals on ready once the monitor is listening. If setup fails, ready is
+// dropped without a signal so that the receiver observes the failure.
 pub async fn udev_thread(
     sender: UnboundedSender<UdevEngineEvent>,
+    ready: oneshot::Sender<()>,
     mut should_exit: Receiver<()>,
 ) -> StratisResult<()> {
     spawn_blocking(move || {
         let context = libudev::Context::new()?;
         let mut udev = UdevMonitor::create(&context)?;
 
+        // The receiver is gone only if the engine already failed to start,
+        // in which case the error is reported there.
+        let _ = ready.send(());
 
         loop {
             let mut pollers = [PollFd::new(udev.as_fd(), PollFlags::POLLIN)];
+
             match poll(&mut pollers, 100u8)? {
                 0 => {
                     match should_exit.try_recv() {

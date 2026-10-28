@@ -35,6 +35,7 @@ use crate::{
             dm::{get_dm, thin_device},
             names::{format_thin_ids, ThinRole},
             serde_structs::FilesystemSave,
+            udev::UEVENT_CHANGE_EVENT,
         },
         types::{
             ActionAvailability, Compare, Diff, FilesystemUuid, Name, PoolUuid, StratFilesystemDiff,
@@ -167,7 +168,7 @@ impl StratFilesystem {
                 .write_all(
                     format!(
                         "{} {} STRATISPOOLNAME={} STRATISFSNAME={}",
-                        devlinks::UEVENT_CHANGE_EVENT,
+                        UEVENT_CHANGE_EVENT,
                         fs_uuid,
                         BASE32_NOPAD.encode(pool_name.as_bytes()),
                         BASE32_NOPAD.encode(fs_name.as_bytes()),

@@ -275,6 +275,7 @@ impl Engine for SimEngine {
                                 .map(|ei| ei.all_clevis_infos().count() > 0)
                                 .unwrap_or(false),
                         }),
+                        devices_complete: true,
                     },
                 );
                 st

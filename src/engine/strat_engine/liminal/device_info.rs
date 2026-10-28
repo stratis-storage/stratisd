@@ -21,7 +21,7 @@ use crate::{
             backstore::blockdev::{v1, v2},
             liminal::{
                 identify::{DeviceInfo, LuksInfo, StratisDevInfo, StratisInfo},
-                setup::{get_feature_set, get_name},
+                setup::get_metadata,
             },
             metadata::{StratisIdentifiers, BDA},
         },
@@ -569,8 +569,12 @@ impl DeviceSet {
         &self,
     ) -> StratisResult<(MaybeInconsistent<Option<Name>>, Option<Features>)> {
         match self.as_opened_set() {
-            Some(set) => get_name(&set).map(MaybeInconsistent::No).and_then(|name| {
-                get_feature_set(&set).map(|feat| (name, feat.map(Features::from)))
+            Some(set) => get_metadata(&set, false).map(|opt| match opt {
+                Some((_, pool)) => (
+                    MaybeInconsistent::No(Some(Name::new(pool.name))),
+                    Some(Features::from(pool.features)),
+                ),
+                None => (MaybeInconsistent::No(None), None),
             }),
             None => gather_pool_name(
                 self.internal.len(),
@@ -657,6 +661,10 @@ impl DeviceSet {
                     None
                 }
             };
+            // Features can only be obtained if the devices found match the
+            // devices in the metadata, so their presence indicates that the
+            // device set is complete.
+            let devices_complete = features.is_some();
             StoppedPoolInfo {
                 info,
                 devices: self
@@ -679,6 +687,7 @@ impl DeviceSet {
                     .collect::<Vec<_>>(),
                 metadata_version: self.metadata_version().ok(),
                 features,
+                devices_complete,
             }
         })
     }

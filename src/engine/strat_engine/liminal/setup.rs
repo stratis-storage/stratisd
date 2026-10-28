@@ -8,6 +8,8 @@
 use std::{
     collections::{HashMap, HashSet},
     fs::OpenOptions,
+    io::Write,
+    path::PathBuf,
 };
 
 use chrono::{DateTime, Utc};
@@ -18,16 +20,20 @@ use devicemapper::Sectors;
 use crate::{
     engine::{
         strat_engine::{
-            backstore::blockdev::{
-                v1::{self, UnderlyingDevice},
-                v2, InternalBlockDev,
+            backstore::{
+                blockdev::{
+                    v1::{self, UnderlyingDevice},
+                    v2, InternalBlockDev,
+                },
+                find_stratis_devs_by_uuid,
             },
             crypt::handle::v1::CryptHandle,
             device::blkdev_size,
             liminal::device_info::LStratisInfo,
-            serde_structs::{BackstoreSave, BaseBlockDevSave, PoolFeatures, PoolSave},
+            serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
+            udev::UEVENT_CHANGE_EVENT,
         },
-        types::{BlockDevTier, DevUuid, DevicePath, Name, TokenUnlockMethod},
+        types::{BlockDevTier, DevUuid, DevicePath, TokenUnlockMethod},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -38,10 +44,15 @@ use crate::{
 /// metadata could be written.
 /// Returns an error if there is a last update time, but no metadata could
 /// be obtained from any of the devices.
+/// Returns an error if devices provided don't match the devices recorded in the
+/// metadata. If allow_missing_cache is true, cache devices recorded in the
+/// metadata are permitted to be absent from the devices provided; all data devices
+/// must still be present and no devices not recorded in the metadata may be provided.
 ///
 /// Precondition: infos and bdas have identical sets of keys
 pub fn get_metadata(
     infos: &HashMap<DevUuid, &LStratisInfo>,
+    allow_missing_cache: bool,
 ) -> StratisResult<Option<(DateTime<Utc>, PoolSave)>> {
     // Try to read from all available devnodes that could contain most
     // recent metadata. In the event of errors, continue to try until all are
@@ -59,120 +70,90 @@ pub fn get_metadata(
         None => return Ok(None),
     };
 
-    OpenOptions::new()
+    let pool: PoolSave = OpenOptions::new()
         .read(true)
         .open(&info.dev_info.devnode)
         .ok()
         .and_then(|mut f| info.bda.load_state(&mut f).unwrap_or(None))
         .and_then(|data| serde_json::from_slice(&data).ok())
-        .map(|psave| Some((time, psave)))
         .ok_or_else(|| {
             StratisError::Msg(
                 "timestamp indicates data was written, but no data successfully read".to_string(),
             )
-        })
-}
+        })?;
 
-/// Get the name from the most recent metadata from a set of devices.
-/// Returns None if no metadata found for this pool on any device. This can
-/// happen if the pool was constructed but failed in the interval before the
-/// metadata could be written.
-/// Returns an error if devices provided don't match the devices recorded in the
-/// metadata.
-pub fn get_name(infos: &HashMap<DevUuid, &LStratisInfo>) -> StratisResult<Option<Name>> {
     let found_uuids = infos.keys().copied().collect::<HashSet<_>>();
-    match get_metadata(infos)? {
-        Some((_, pool)) => {
-            let v = [];
-            let meta_uuids = pool
-                .backstore
-                .data_tier
-                .blockdev
-                .devs
+    let data_uuids = pool
+        .backstore
+        .data_tier
+        .blockdev
+        .devs
+        .iter()
+        .map(|bd| bd.uuid)
+        .collect::<HashSet<_>>();
+    let cache_uuids = pool
+        .backstore
+        .cache_tier
+        .as_ref()
+        .map(|ct| ct.blockdev.devs.iter().map(|bd| bd.uuid).collect())
+        .unwrap_or_default();
+    let meta_uuids = data_uuids
+        .union(&cache_uuids)
+        .copied()
+        .collect::<HashSet<_>>();
+
+    let (missing, extra) = if allow_missing_cache {
+        (
+            data_uuids.difference(&found_uuids).collect::<HashSet<_>>(),
+            found_uuids.difference(&meta_uuids).collect::<HashSet<_>>(),
+        )
+    } else {
+        (
+            meta_uuids.difference(&found_uuids).collect::<HashSet<_>>(),
+            found_uuids.difference(&meta_uuids).collect::<HashSet<_>>(),
+        )
+    };
+
+    if !missing.is_empty() {
+        let missing_uuids: Vec<DevUuid> = missing.iter().map(|u| **u).collect();
+        if let Ok(found_devs) = find_stratis_devs_by_uuid(None, &missing_uuids) {
+            for (_dev_uuid, (_path, dev)) in found_devs {
+                let uevent_file = [
+                    "/sys/dev/block",
+                    &format!("{}:{}", dev.major, dev.minor),
+                    "uevent",
+                ]
                 .iter()
-                .map(|bd| bd.uuid)
-                .chain(
-                    pool.backstore
-                        .cache_tier
-                        .as_ref()
-                        .map(|ct| ct.blockdev.devs.iter())
-                        .unwrap_or_else(|| v.iter())
-                        .map(|bd| bd.uuid),
-                )
-                .collect::<HashSet<_>>();
-
-            if found_uuids != meta_uuids {
-                return Err(StratisError::Msg(format!(
-                    "UUIDs in metadata ({}) did not match UUIDs found ({})",
-                    Itertools::intersperse(
-                        meta_uuids.into_iter().map(|u| u.to_string()),
-                        ", ".to_string(),
-                    )
-                    .collect::<String>(),
-                    Itertools::intersperse(
-                        found_uuids.into_iter().map(|u| u.to_string()),
-                        ", ".to_string(),
-                    )
-                    .collect::<String>(),
-                )));
+                .collect::<PathBuf>();
+                let _ = OpenOptions::new()
+                    .write(true)
+                    .open(uevent_file)
+                    .and_then(|mut file| file.write_all(UEVENT_CHANGE_EVENT.as_bytes()));
             }
-
-            Ok(Some(Name::new(pool.name)))
         }
-        None => Ok(None),
     }
-}
 
-/// Get the feature set from the most recent metadata from a set of devices.
-/// Returns None if no metadata found for this pool on any device. This can
-/// happen if the pool was constructed but failed in the interval before the
-/// metadata could be written.
-/// Returns an error if devices provided don't match the devices recorded in the
-/// metadata.
-pub fn get_feature_set(
-    infos: &HashMap<DevUuid, &LStratisInfo>,
-) -> StratisResult<Option<Vec<PoolFeatures>>> {
-    let found_uuids = infos.keys().copied().collect::<HashSet<_>>();
-    match get_metadata(infos)? {
-        Some((_, pool)) => {
-            let v = [];
-            let meta_uuids = pool
-                .backstore
-                .data_tier
-                .blockdev
-                .devs
-                .iter()
-                .map(|bd| bd.uuid)
-                .chain(
-                    pool.backstore
-                        .cache_tier
-                        .as_ref()
-                        .map(|ct| ct.blockdev.devs.iter())
-                        .unwrap_or_else(|| v.iter())
-                        .map(|bd| bd.uuid),
-                )
-                .collect::<HashSet<_>>();
-
-            if found_uuids != meta_uuids {
-                return Err(StratisError::Msg(format!(
-                    "UUIDs in metadata ({}) did not match UUIDs found ({})",
-                    Itertools::intersperse(
-                        meta_uuids.into_iter().map(|u| u.to_string()),
-                        ", ".to_string(),
-                    )
-                    .collect::<String>(),
-                    Itertools::intersperse(
-                        found_uuids.into_iter().map(|u| u.to_string()),
-                        ", ".to_string(),
-                    )
-                    .collect::<String>(),
-                )));
-            }
-
-            Ok(Some(pool.features))
-        }
-        None => Ok(None),
+    if !missing.is_empty() || !extra.is_empty() {
+        let mut meta_list: Vec<_> = meta_uuids.into_iter().collect();
+        meta_list.sort_unstable();
+        let mut found_list: Vec<_> = found_uuids.into_iter().collect();
+        found_list.sort_unstable();
+        return Err(StratisError::Msg(format!(
+            "UUIDs in metadata ({}) did not match UUIDs found ({})",
+            Itertools::intersperse(
+                meta_list.into_iter().map(|u| u.to_string()),
+                ", ".to_string(),
+            )
+            .collect::<String>(),
+            Itertools::intersperse(
+                found_list.into_iter().map(|u| u.to_string()),
+                ", ".to_string(),
+            )
+            .collect::<String>(),
+        )));
     }
+
+    Ok(Some((time, pool)))
 }
 
 /// Get all the blockdevs corresponding to this pool that can be obtained from

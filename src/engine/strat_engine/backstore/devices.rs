@@ -111,7 +111,7 @@ pub fn get_devno_from_path(path: &Path) -> StratisResult<Device> {
 /// internally in stratisd, udev events cannot be used for device identification
 /// because they will not have the opportunity to be processed.
 pub fn find_stratis_devs_by_uuid(
-    pool_uuid: PoolUuid,
+    pool_uuid: Option<PoolUuid>,
     uuids: &[DevUuid],
 ) -> StratisResult<HashMap<DevUuid, (DevicePath, Device)>> {
     let mut map = HashMap::new();
@@ -128,7 +128,7 @@ pub fn find_stratis_devs_by_uuid(
             let dev_pool_uuid = PoolUuid::parse_str(&cache.get_tag_value("POOL_UUID", &devname)?)?;
             let devno = get_devno_from_path(&devname)?;
 
-            if dev_pool_uuid == pool_uuid && uuids.contains(&dev_uuid) {
+            if pool_uuid.is_none_or(|uuid| uuid == dev_pool_uuid) && uuids.contains(&dev_uuid) {
                 info!(
                     "Found device with path: {}, pool UUID: {}, device UUID: {} after unlock",
                     devname.display(),

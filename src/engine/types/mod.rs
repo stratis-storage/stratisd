@@ -57,7 +57,7 @@ mod keys;
 
 macro_rules! uuid {
     ($vis:vis $ident:ident) => {
-        #[derive(Copy, Clone, Debug, Default, Hash, Eq, PartialEq, Deserialize, Serialize)]
+        #[derive(Copy, Clone, Debug, Default, Hash, Eq, PartialEq, Deserialize, Serialize, Ord, PartialOrd)]
         $vis struct $ident(pub uuid::Uuid);
 
         impl $ident {
@@ -234,9 +234,13 @@ pub struct StoppedPoolInfo {
     pub devices: Vec<PoolDevice>,
     pub metadata_version: Option<StratSigblockVersion>,
     pub features: Option<Features>,
+    /// True if the devices found match the complete set of devices recorded
+    /// in the pool metadata. False if some devices are missing or if this
+    /// cannot be determined, e.g., because some devices are not yet unlocked.
+    pub devices_complete: bool,
 }
 
-#[derive(Default, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Features {
     pub encryption: bool,
     pub key_description_enabled: bool,

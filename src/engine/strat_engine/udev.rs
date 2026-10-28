@@ -20,6 +20,8 @@ pub const CRYPTO_FS_TYPE: &str = "crypto_LUKS";
 /// Possible value for a udev subsystem designation
 pub const SUBSYSTEM_BLOCK: &str = "block";
 
+pub const UEVENT_CHANGE_EVENT: &str = "change";
+
 /// Make an enumerator for enumerating block devices. Return an error if there
 /// was any udev-related error.
 pub fn block_enumerator(context: &libudev::Context) -> libudev::Result<libudev::Enumerator> {

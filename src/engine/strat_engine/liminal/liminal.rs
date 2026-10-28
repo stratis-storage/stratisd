@@ -249,7 +249,7 @@ impl LiminalDevices {
             .remove(&pool_uuid)
             .or_else(|| self.partially_constructed_pools.remove(&pool_uuid))
             .expect("Checked above");
-        match find_stratis_devs_by_uuid(pool_uuid, &uuids) {
+        match find_stratis_devs_by_uuid(Some(pool_uuid), &uuids) {
             Ok(infos) => infos.into_iter().for_each(|(dev_uuid, (path, devno))| {
                 if let Ok(Ok(Some(bda))) = bda_wrapper(&path) {
                     self.uuid_lookup

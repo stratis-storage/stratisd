@@ -1,0 +1,10 @@
+[advisories]
+ignore = [
+  "RUSTSEC-2026-0370",
+  "RUSTSEC-2026-0371",
+  "RUSTSEC-2026-0372",
+]
+
+[output]
+deny = ["warnings"]
+quiet = false

@@ -1,3 +1,41 @@
+stratisd 3.9.4
+==============
+Recommended development platform for Python development: Fedora 44
+
+* Cherry-picked commits:
+  * Invoke composite action to override toolchain with MSRV
+  * Add --allow-dirty and --allow-staged flags for CLIPPY_FIX
+  * Rename STATIC_FLAG to STATIC_CFLAGS
+  * Add STATIC_CARGO_FLAGS to set LTO
+  * Increase CURRENT DEVELOPMENT ENVIRONMENT to 44
+  * Set CURRENT DEVELOPMENT RUST TOOLCHAIN to 1.98.1
+  * Remove remaining suspend when creating cache device
+  * Increase rand dependency lower bound to 0.10.1
+  * Make array argument a list
+  * Downgrade warn level log entries in systemd generators
+  * Add additional dependencies for srpm build
+  * Replace '-' with '_' in lint names
+  * Increase async-trait lower bound to 0.1.92
+  * Remove some unnecessary 'mut' type annotations
+  * Update CURRENT DEVELOPMENT RUST TOOLCHAIN to 1.99.0
+  * Add commit check to CI
+  * Fix logic error in stratisd-min
+  * Update CURRENT DEVELOPMENT RUST TOOLCHAIN to 1.99.1
+  * Ignore unmaintained warnings for zbus crates
+  * Specify audit options in audit.toml file
+  * stratisd_proc_macros v0.2.4
+  * Add infinite timeout to systemd-ask-password
+  * Allow dead code in systemd bindings file
+  * Add shell formatting check to git hooks
+
+* New commits:
+  * Remove workflows that run on a schedule
+  * Run GitHub workflows test against this branch
+  * Use stratis-cli v3.9.1 in tests
+  * Run testing tests with v3.9.1
+  * Make COPR package with pre-release tag
+
+
 stratisd 3.9.3
 ==============
 Recommended development platform for Python development: Fedora 43

@@ -31,7 +31,10 @@ use nix::{
     unistd::close,
 };
 use serde::Serialize;
-use tokio::{io::unix::AsyncFd, task::JoinHandle};
+use tokio::{
+    io::{unix::AsyncFd, Interest},
+    task::JoinHandle,
+};
 
 #[cfg(feature = "systemd_compat")]
 use crate::systemd;
@@ -447,7 +450,8 @@ impl StratisUnixListener {
         bind(fd.as_raw_fd(), &UnixAddr::new(path.as_ref())?)?;
         listen(&fd, Backlog::new(0).expect("0 is always valid"))?;
         Ok(StratisUnixListener {
-            fd: AsyncFd::new(fd)?,
+            fd: unsafe { AsyncFd::register_with_interest(fd, Interest::READABLE) }
+                .map_err(|e| StratisError::Msg(format!("Failed to register async fd: {e}")))?,
         })
     }
 }
@@ -459,7 +463,10 @@ fn try_accept(fd: RawFd) -> StratisResult<StratisUnixRequest> {
     })?;
     fcntl(&fd, FcntlArg::F_SETFL(flags | OFlag::O_NONBLOCK))?;
     Ok(StratisUnixRequest {
-        fd: Arc::new(AsyncFd::new(fd)?),
+        fd: Arc::new(
+            unsafe { AsyncFd::register_with_interest(fd, Interest::READABLE) }
+                .map_err(|e| StratisError::Msg(format!("Failed to register async fd: {e}")))?,
+        ),
     })
 }
 

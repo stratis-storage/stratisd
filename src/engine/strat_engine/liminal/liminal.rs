@@ -1276,7 +1276,7 @@ fn load_stratis_metadata(
             )));
     }
 
-    match get_metadata(&stratis_infos_ref(infos)) {
+    match get_metadata(&stratis_infos_ref(infos), remove_cache) {
         Ok(opt) => {
             let (timestamp, mut metadata) = opt
             .ok_or_else(|| {

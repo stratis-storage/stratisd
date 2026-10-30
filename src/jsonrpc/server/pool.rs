@@ -10,9 +10,9 @@ use tokio::task::block_in_place;
 
 use crate::{
     engine::{
-        BlockDevTier, CreateAction, DeleteAction, Engine, EngineAction, Features,
-        InputEncryptionInfo, IntegritySpec, KeyDescription, Name, OptionalTokenSlotInput,
-        PoolIdentifier, PoolUuid, RenameAction, StratSigblockVersion, TokenUnlockMethod,
+        BlockDevTier, CreateAction, DeleteAction, Engine, EngineAction, InputEncryptionInfo,
+        IntegritySpec, KeyDescription, Name, OptionalTokenSlotInput, PoolIdentifier, PoolUuid,
+        RenameAction, StratSigblockVersion, TokenUnlockMethod,
     },
     jsonrpc::interface::PoolListType,
     stratis::{StratisError, StratisResult},
@@ -298,15 +298,13 @@ pub async fn pool_is_encrypted(
             .or_else(|| stopped.partially_constructed.get(pool_uuid))
         {
             match poolinfo
-                .metadata_version
-                .ok_or_else(|| StratisError::Msg("Found multiple metadata versions".to_string()))?
+            .metadata_version
+            .ok_or_else(|| StratisError::Msg("Found multiple metadata versions".to_string()))?
             {
                 StratSigblockVersion::V1 => Ok(poolinfo.info.is_some()),
-                StratSigblockVersion::V2 => Ok(poolinfo
-                    .features
-                    .as_ref()
-                    .unwrap_or(&Features::default())
-                    .encryption),
+                StratSigblockVersion::V2 => Ok(poolinfo.features.as_ref().ok_or_else(|| {
+                    StratisError::Msg("Pool reports metadata version V2 but not features are available for the stopped pool".to_string())
+                })?.encryption),
             }
         } else {
             Err(StratisError::Msg(format!("Pool with {id} not found")))
@@ -340,6 +338,36 @@ pub async fn pool_is_stopped(
     } else {
         Err(StratisError::Msg(format!("Pool with {id} not found")))
     }
+}
+
+// stratis-min pool all-devices-present
+//
+// Returns true if the pool is running or if all of the devices recorded in its
+// metadata have been found. Pools with V1 metadata are always reported as
+// having all devices present.
+pub async fn pool_all_devices_present(
+    engine: Arc<dyn Engine>,
+    id: PoolIdentifier<PoolUuid>,
+) -> StratisResult<bool> {
+    let stopped = engine.stopped_pools().await;
+    if engine.get_pool(id.clone()).await.is_some() {
+        return Ok(true);
+    }
+    let pool_uuid = match id {
+        PoolIdentifier::Uuid(ref u) => u,
+        PoolIdentifier::Name(ref n) => stopped
+            .name_to_uuid
+            .get(n)
+            .ok_or_else(|| StratisError::Msg(format!("Could not find pool with name {n}")))?,
+    };
+    stopped
+        .stopped
+        .get(pool_uuid)
+        .or_else(|| stopped.partially_constructed.get(pool_uuid))
+        .map(|info| {
+            matches!(info.metadata_version, Some(StratSigblockVersion::V1)) || info.devices_complete
+        })
+        .ok_or_else(|| StratisError::Msg(format!("Pool with {id} not found")))
 }
 
 // stratis-min pool has-passphrase

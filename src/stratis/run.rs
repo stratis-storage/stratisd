@@ -13,8 +13,9 @@ use tokio::{
     runtime::Builder,
     select, signal,
     sync::{
-        broadcast::channel,
+        broadcast::{self, channel},
         mpsc::{self, unbounded_channel},
+        oneshot,
     },
     task,
 };
@@ -93,13 +94,18 @@ pub fn run(sim: bool) -> StratisResult<()> {
         })
         .build()?;
     runtime.block_on(async move {
-        async fn start_threads(engine: Arc<dyn Engine>, sim: bool, key_recv: Option<mpsc::UnboundedReceiver<KeyDescription>>) -> StratisResult<()> {
-            let (trigger, should_exit) = channel(1);
-            let (udev_sender, udev_receiver) = unbounded_channel::<UdevEngineEvent>();
+        async fn start_threads(
+            engine: Arc<dyn Engine>,
+            sim: bool,
+            key_recv: Option<mpsc::UnboundedReceiver<KeyDescription>>,
+            join_udev: task::JoinHandle<StratisResult<()>>,
+            udev_receiver: mpsc::UnboundedReceiver<UdevEngineEvent>,
+            trigger: broadcast::Sender<()>,
+        ) -> StratisResult<()> {
             #[cfg(feature = "dbus_enabled")]
             let (connection, udev, manager) = create_dbus_handler(Arc::clone(&engine), udev_receiver).await?;
 
-            let join_udev = udev_thread(udev_sender, should_exit);
+            let join_udev = async move { join_udev.await? };
             #[cfg(feature = "dbus_enabled")]
             let join_ipc = setup(
                 Arc::clone(&engine),
@@ -180,23 +186,35 @@ pub fn run(sim: bool) -> StratisResult<()> {
         }
 
         info!("stratis daemon version {VERSION} started");
+
+        // The udev thread is started before the engine so that the udev monitor
+        // is listening before the engine enumerates devices; the engine blocks
+        // on udev_ready until then. Engine initialization otherwise runs in
+        // parallel with udev monitor setup. If engine initialization fails,
+        // returning drops trigger, which notifies the udev thread to exit.
+        let (trigger, should_exit) = channel(1);
+        let (udev_sender, udev_receiver) = unbounded_channel::<UdevEngineEvent>();
+        let (ready, udev_ready) = oneshot::channel();
+        let join_udev = task::spawn(udev_thread(udev_sender, ready, should_exit));
+
         if sim {
             info!("Using SimEngine");
-            start_threads(Arc::new(SimEngine::default()), sim, None).await
+            start_threads(Arc::new(SimEngine::default()), sim, None, join_udev, udev_receiver, trigger).await
         } else {
             info!("Using StratEngine");
             let (sender, recv) = unbounded_channel();
-            start_threads(
-                Arc::new(match StratEngine::initialize(sender) {
-                    Ok(engine) => engine,
-                    Err(e) => {
-                        error!("Failed to start up stratisd engine: {e}; exiting");
-                        return Err(e);
-                    }
-                }),
-                sim,
-                Some(recv),
-            ).await
+            let engine = match task::spawn_blocking(move || {
+                StratEngine::initialize_after_udev(sender, udev_ready)
+            })
+            .await?
+            {
+                Ok(engine) => engine,
+                Err(e) => {
+                    error!("Failed to start up stratisd engine: {e}; exiting");
+                    return Err(e);
+                }
+            };
+            start_threads(Arc::new(engine), sim, Some(recv), join_udev, udev_receiver, trigger).await
         }
     })?;
     Ok(())

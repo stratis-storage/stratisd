@@ -8,8 +8,8 @@ fi
 POOL_UUID="$1"
 
 i=0
-while ! stratis-min pool is-stopped "$POOL_UUID" >/dev/null; do
-	echo Waiting on pool with UUID $POOL_UUID...
+while [ "$(stratis-min pool all-devices-present "$POOL_UUID" 2>/dev/null)" != true ]; do
+	echo Waiting on all devices for pool with UUID $POOL_UUID...
 	sleep 1
 	if [ "$i" = 5 ]; then
 		break
@@ -17,30 +17,35 @@ while ! stratis-min pool is-stopped "$POOL_UUID" >/dev/null; do
 	i=$(($i + 1))
 done
 
-if $(stratis-min pool is-stopped "$POOL_UUID"); then
-	if $(stratis-min pool is-bound "$POOL_UUID"); then
-		if stratis-min pool start --token-slot=any "$POOL_UUID"; then
-			exit 0
-		else
-			echo Failed to start pool with UUID $POOL_UUID using an unattended unlock method. >&2
+if $(stratis-min pool all-devices-present "$POOL_UUID"); then
+	if $(stratis-min pool is-stopped "$POOL_UUID"); then
+		if $(stratis-min pool is-bound "$POOL_UUID"); then
+			if stratis-min pool start --token-slot=any "$POOL_UUID"; then
+				exit 0
+			else
+				echo Failed to start pool with UUID $POOL_UUID using an unattended unlock method. >&2
+			fi
 		fi
-	fi
-	if $(stratis-min pool has-passphrase "$POOL_UUID"); then
-		if systemd-ask-password --timeout=0 \
-			"Enter password for pool with UUID $POOL_UUID" |
-			stratis-min pool start --token-slot=any --prompt "$POOL_UUID"; then
-			exit 0
-		else
-			echo Failed to start pool with UUID $POOL_UUID using passphrase. >&2
+		if $(stratis-min pool has-passphrase "$POOL_UUID"); then
+			if systemd-ask-password --timeout=0 \
+				"Enter password for pool with UUID $POOL_UUID" |
+				stratis-min pool start --token-slot=any --prompt "$POOL_UUID"; then
+				exit 0
+			else
+				echo Failed to start pool with UUID $POOL_UUID using passphrase. >&2
+			fi
 		fi
-	fi
-	if ! $(stratis-min pool is-encrypted "$POOL_UUID"); then
-		if stratis-min pool start "$POOL_UUID"; then
-			exit 0
-		else
-			echo Failed to start pool with UUID $POOL_UUID. >&2
+		if ! $(stratis-min pool is-encrypted "$POOL_UUID"); then
+			if stratis-min pool start "$POOL_UUID"; then
+				exit 0
+			else
+				echo Failed to start pool with UUID $POOL_UUID. >&2
+			fi
 		fi
+		exit 1
 	fi
+else
+	echo Could not find all devices for pool "$POOL_UUID"
 	exit 1
 fi
 

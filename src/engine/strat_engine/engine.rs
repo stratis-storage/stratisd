@@ -13,7 +13,7 @@ use async_trait::async_trait;
 use futures::{executor::block_on, future::join_all};
 use serde_json::Value;
 use tokio::{
-    sync::{mpsc, RwLock},
+    sync::{mpsc, oneshot, RwLock},
     task::{spawn_blocking, JoinHandle},
 };
 
@@ -82,9 +82,22 @@ impl StratEngine {
     /// Returns an error if the kernel doesn't support required DM features.
     /// Returns an error if there was an error reading device nodes.
     /// Returns an error if the executables on which it depends can not be found.
-    pub fn initialize(sender: mpsc::UnboundedSender<KeyDescription>) -> StratisResult<StratEngine> {
+    /// Returns an error if the udev monitor failed to start.
+    ///
+    /// Blocks until `udev_ready` signals that the udev monitor is listening,
+    /// so that no device event can fall between device enumeration and the
+    /// start of monitoring. This must not be called from an async context
+    /// without `spawn_blocking`.
+    pub fn initialize_after_udev(
+        sender: mpsc::UnboundedSender<KeyDescription>,
+        udev_ready: oneshot::Receiver<()>,
+    ) -> StratisResult<StratEngine> {
         let fs = MemoryFilesystem::new()?;
         verify_executables()?;
+
+        udev_ready.blocking_recv().map_err(|_| {
+            StratisError::Msg("udev monitor failed to start; can not enumerate devices".to_string())
+        })?;
 
         let mut liminal_devices = LiminalDevices::default();
         let mut pools = Table::default();
@@ -99,6 +112,14 @@ impl StratEngine {
             key_handler: Arc::new(StratKeyActions::new(sender)),
             fs,
         })
+    }
+
+    /// Setup a StratEngine without waiting on a udev monitor.
+    #[cfg(test)]
+    pub fn initialize(sender: mpsc::UnboundedSender<KeyDescription>) -> StratisResult<StratEngine> {
+        let (ready, udev_ready) = oneshot::channel();
+        let _ = ready.send(());
+        StratEngine::initialize_after_udev(sender, udev_ready)
     }
 
     #[cfg(test)]

@@ -28,6 +28,7 @@ use crate::{
 };
 
 #[allow(clippy::too_many_arguments)]
+#[allow(tail_expr_drop_order)]
 pub async fn start_pool_method(
     engine: &Arc<dyn Engine>,
     connection: &Arc<Connection>,

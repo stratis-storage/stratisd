@@ -17,6 +17,7 @@ pub async fn load_vks(
     engine: Arc<dyn Engine>,
     mut recv: Option<UnboundedReceiver<KeyDescription>>,
 ) -> StratisResult<()> {
+    #![allow(tail_expr_drop_order)]
     loop {
         if let Some(ref mut r) = recv {
             let sent_kd = r.recv().await.ok_or_else(|| {

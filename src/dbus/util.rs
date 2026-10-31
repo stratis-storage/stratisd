@@ -116,6 +116,7 @@ macro_rules! send_signal {
 }
 
 #[allow(clippy::implicit_hasher)]
+#[allow(tail_expr_drop_order)]
 pub async fn send_pool_background_signals(
     manager: Lockable<Arc<RwLock<Manager>>>,
     connection: &Arc<Connection>,
@@ -387,6 +388,7 @@ pub async fn send_pool_foreground_signals(
     uuid: PoolUuid,
     diff: PoolDiff,
 ) {
+    #![allow(tail_expr_drop_order)]
     let dbus = manager.read().await;
     let pool_path = match dbus.pool_get_path(&uuid) {
         Some(path) => path,
@@ -728,6 +730,7 @@ pub async fn send_pool_foreground_signals(
 }
 
 #[allow(clippy::implicit_hasher)]
+#[allow(tail_expr_drop_order)]
 pub async fn send_fs_background_signals(
     manager: Lockable<Arc<RwLock<Manager>>>,
     connection: &Arc<Connection>,
@@ -751,6 +754,7 @@ pub async fn send_fs_background_signals(
 }
 
 pub async fn send_fs_size_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    #![allow(tail_expr_drop_order)]
     send_signal!(
         connection,
         FilesystemR0,
@@ -834,6 +838,7 @@ pub async fn send_fs_size_signal(connection: &Arc<Connection>, path: &ObjectPath
 }
 
 pub async fn send_fs_used_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    #![allow(tail_expr_drop_order)]
     send_signal!(
         connection,
         FilesystemR0,
@@ -917,6 +922,7 @@ pub async fn send_fs_used_signal(connection: &Arc<Connection>, path: &ObjectPath
 }
 
 pub async fn send_locked_pools_signals(connection: &Arc<Connection>) {
+    #![allow(tail_expr_drop_order)]
     let path = match ObjectPath::from_static_str(STRATIS_BASE_PATH) {
         Ok(path) => path,
         Err(e) => {
@@ -944,6 +950,7 @@ pub async fn send_locked_pools_signals(connection: &Arc<Connection>) {
 }
 
 pub async fn send_stopped_pools_signals(connection: &Arc<Connection>) {
+    #![allow(tail_expr_drop_order)]
     let path = match ObjectPath::from_static_str(STRATIS_BASE_PATH) {
         Ok(path) => path,
         Err(e) => {
@@ -1023,6 +1030,7 @@ pub async fn send_pool_name_signal(
     path: &ObjectPath<'_>,
     fs_paths: Vec<&OwnedObjectPath>,
 ) {
+    #![allow(tail_expr_drop_order)]
     send_signal!(connection, PoolR0, path, name_changed, "name", "pool.r0");
     send_signal!(connection, PoolR1, path, name_changed, "name", "pool.r1");
     send_signal!(connection, PoolR2, path, name_changed, "name", "pool.r2");
@@ -1120,6 +1128,7 @@ pub async fn send_pool_name_signal(
 }
 
 pub async fn send_overprovisioning_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    #![allow(tail_expr_drop_order)]
     send_signal!(
         connection,
         PoolR1,
@@ -1195,6 +1204,7 @@ pub async fn send_overprovisioning_signal(connection: &Arc<Connection>, path: &O
 }
 
 pub async fn send_fs_limit_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    #![allow(tail_expr_drop_order)]
     send_signal!(
         connection,
         PoolR1,
@@ -1274,6 +1284,7 @@ pub async fn send_clevis_info_signal(
     path: &ObjectPath<'_>,
     lowest_token_slot: bool,
 ) {
+    #![allow(tail_expr_drop_order)]
     if lowest_token_slot {
         send_signal!(
             connection,
@@ -1363,6 +1374,7 @@ pub async fn send_keyring_signal(
     path: &ObjectPath<'_>,
     lowest_token_slot: bool,
 ) {
+    #![allow(tail_expr_drop_order)]
     if lowest_token_slot {
         send_signal!(
             connection,
@@ -1448,6 +1460,7 @@ pub async fn send_keyring_signal(
 }
 
 pub async fn send_free_token_slots_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    #![allow(tail_expr_drop_order)]
     send_signal!(
         connection,
         PoolR8,
@@ -1467,6 +1480,7 @@ pub async fn send_free_token_slots_signal(connection: &Arc<Connection>, path: &O
 }
 
 pub async fn send_action_availability_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    #![allow(tail_expr_drop_order)]
     send_signal!(
         connection,
         PoolR0,
@@ -1550,6 +1564,7 @@ pub async fn send_action_availability_signal(connection: &Arc<Connection>, path:
 }
 
 pub async fn send_has_cache_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    #![allow(tail_expr_drop_order)]
     send_signal!(
         connection,
         PoolR0,
@@ -1633,6 +1648,7 @@ pub async fn send_has_cache_signal(connection: &Arc<Connection>, path: &ObjectPa
 }
 
 pub async fn send_origin_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    #![allow(tail_expr_drop_order)]
     send_signal!(
         connection,
         FilesystemR7,
@@ -1660,6 +1676,7 @@ pub async fn send_origin_signal(connection: &Arc<Connection>, path: &ObjectPath<
 }
 
 pub async fn send_size_limit_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    #![allow(tail_expr_drop_order)]
     send_signal!(
         connection,
         FilesystemR6,
@@ -1695,6 +1712,7 @@ pub async fn send_size_limit_signal(connection: &Arc<Connection>, path: &ObjectP
 }
 
 pub async fn send_merge_scheduled_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    #![allow(tail_expr_drop_order)]
     send_signal!(
         connection,
         FilesystemR7,
@@ -1722,6 +1740,7 @@ pub async fn send_merge_scheduled_signal(connection: &Arc<Connection>, path: &Ob
 }
 
 pub async fn send_fs_name_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    #![allow(tail_expr_drop_order)]
     send_signal!(
         connection,
         FilesystemR0,
@@ -1885,6 +1904,7 @@ pub async fn send_fs_name_signal(connection: &Arc<Connection>, path: &ObjectPath
 }
 
 pub async fn send_new_physical_size_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    #![allow(tail_expr_drop_order)]
     send_signal!(
         connection,
         BlockdevR3,
@@ -1944,6 +1964,7 @@ pub async fn send_new_physical_size_signal(connection: &Arc<Connection>, path: &
 }
 
 pub async fn send_user_info_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    #![allow(tail_expr_drop_order)]
     send_signal!(
         connection,
         BlockdevR3,
@@ -2003,6 +2024,7 @@ pub async fn send_user_info_signal(connection: &Arc<Connection>, path: &ObjectPa
 }
 
 pub async fn send_encrypted_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    #![allow(tail_expr_drop_order)]
     send_signal!(
         connection,
         PoolR9,
@@ -2014,6 +2036,7 @@ pub async fn send_encrypted_signal(connection: &Arc<Connection>, path: &ObjectPa
 }
 
 pub async fn send_last_reencrypted_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    #![allow(tail_expr_drop_order)]
     send_signal!(
         connection,
         PoolR9,
@@ -2028,6 +2051,7 @@ pub async fn send_blockdev_physical_size_signal(
     connection: &Arc<Connection>,
     path: &ObjectPath<'_>,
 ) {
+    #![allow(tail_expr_drop_order)]
     send_signal!(
         connection,
         BlockdevR0,

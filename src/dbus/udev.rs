@@ -39,6 +39,7 @@ impl UdevHandler {
     }
 
     pub async fn process_udev_events(&mut self) -> StratisResult<()> {
+        #![allow(tail_expr_drop_order)]
         let mut events = Vec::new();
         events.push(self.receiver.recv().await.ok_or_else(|| {
             StratisError::Msg("Channel from udev handler to D-Bus handler was shut".to_string())

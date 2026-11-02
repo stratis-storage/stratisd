@@ -3,6 +3,7 @@ ignore = [
   "RUSTSEC-2026-0370",
   "RUSTSEC-2026-0371",
   "RUSTSEC-2026-0372",
+  "RUSTSEC-2026-0386",
 ]
 
 [output]

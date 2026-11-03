@@ -26,6 +26,7 @@ pub async fn stop_pool_method(
     id: &str,
     id_type: &str,
 ) -> ((bool, String), u16, String) {
+    #![allow(tail_expr_drop_order)]
     let default_return = (false, String::new());
 
     let id = match id_type {

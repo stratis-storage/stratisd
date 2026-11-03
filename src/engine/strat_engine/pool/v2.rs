@@ -246,6 +246,7 @@ impl StratPool {
         token_slot: TokenUnlockMethod,
         passphrase: Option<SizedKeyMemory>,
     ) -> StratisResult<(Name, StratPool)> {
+        #![allow(tail_expr_drop_order)]
         check_metadata(metadata)?;
 
         let backstore = Backstore::setup(

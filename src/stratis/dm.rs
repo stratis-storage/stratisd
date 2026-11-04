@@ -127,6 +127,6 @@ fn setup_dm() -> StratisResult<AsyncFd<RawFd>> {
             ),
         )?;
 
-        Ok(AsyncFd::new(fd)?)
+        Ok(unsafe { AsyncFd::register(fd) }.map_err(|e| e.into_parts().1)?)
     }
 }

@@ -123,7 +123,7 @@ fn setup_dm() -> StratisResult<AsyncFd<RawFd>> {
             borrowed_fd,
             FcntlArg::F_SETFL(
                 OFlag::from_bits_truncate(fcntl(borrowed_fd, FcntlArg::F_GETFL)?)
-                    & !OFlag::O_NONBLOCK,
+                    | OFlag::O_NONBLOCK,
             ),
         )?;
 

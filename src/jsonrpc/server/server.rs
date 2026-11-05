@@ -454,7 +454,7 @@ impl StratisUnixListener {
         bind(fd.as_raw_fd(), &UnixAddr::new(path.as_ref())?)?;
         listen(&fd, Backlog::new(0).expect("0 is always valid"))?;
         Ok(StratisUnixListener {
-            fd: AsyncFd::new(fd)?,
+            fd: unsafe { AsyncFd::register(fd) }.map_err(|e| e.into_parts().1)?,
         })
     }
 }
@@ -466,7 +466,7 @@ fn try_accept(fd: RawFd) -> StratisResult<StratisUnixRequest> {
     })?;
     fcntl(&fd, FcntlArg::F_SETFL(flags | OFlag::O_NONBLOCK))?;
     Ok(StratisUnixRequest {
-        fd: Arc::new(AsyncFd::new(fd)?),
+        fd: Arc::new(unsafe { AsyncFd::register(fd) }.map_err(|e| e.into_parts().1)?),
     })
 }
 

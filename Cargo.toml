@@ -198,7 +198,7 @@ version = "0.4.2"
 optional = true
 
 [dependencies.libc]
-version = "0.2.180"
+version = "0.2.183"
 optional = true
 
 [dependencies.libcryptsetup-rs]
@@ -224,7 +224,7 @@ version = "0.4.20"
 optional = true
 
 [dependencies.nix]
-version = "0.31.1"
+version = "0.31.2"
 optional = true
 features = ["fs", "ioctl", "mount", "poll", "process", "sched", "signal", "socket"]
 

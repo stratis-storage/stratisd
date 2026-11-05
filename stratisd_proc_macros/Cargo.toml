@@ -4,11 +4,11 @@ version = "0.2.4"
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
 description = "Stratis daemon procedural macros"
-license = "MPL-2.0"
-repository = "https://github.com/stratis-storage/stratisd/"
-keywords = ["Linux", "filesystem", "storage"]
-categories = ["filesystem"]
 readme = "README.md"
 
 [lib]
@@ -22,14 +22,5 @@ quote = "1.0.36"
 version = "2.0.89"
 features = ["full", "extra-traits"]
 
-[lints.rust]
-warnings = { level = "deny" }
-future_incompatible = { level = "deny", priority = 1 }
-unused = { level = "deny", priority = 2}
-rust_2018_idioms = { level = "deny", priority = 3 }
-nonstandard_style = { level = "deny", priority = 4 }
-
-[lints.clippy]
-all = { level = "deny" }
-cargo = { level = "deny", priority = 1 }
-multiple_crate_versions = { level = "allow", priority = 2 }
+[lints]
+workspace = true

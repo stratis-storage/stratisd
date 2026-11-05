@@ -224,7 +224,7 @@ version = "0.4.20"
 optional = true
 
 [dependencies.nix]
-version = "0.31.1"
+version = "0.31.2"
 optional = true
 features = ["fs", "ioctl", "mount", "poll", "process", "sched", "signal", "socket"]
 

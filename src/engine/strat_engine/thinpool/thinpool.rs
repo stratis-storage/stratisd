@@ -248,6 +248,25 @@ impl<B> ThinPool<B> {
         calc_total_physical_used(self.used().map(|(du, _)| du), &self.segments)
     }
 
+    /// Do type magic to convert the thin pool from one version of the
+    /// backstore to another.
+    pub fn change_backstore<BB>(self) -> ThinPool<BB> {
+        ThinPool {
+            thin_pool: self.thin_pool,
+            segments: self.segments,
+            id_gen: self.id_gen,
+            filesystems: self.filesystems,
+            mdv: self.mdv,
+            backstore_device: self.backstore_device,
+            thin_pool_status: self.thin_pool_status,
+            allocated_size: self.allocated_size,
+            fs_limit: self.fs_limit,
+            enable_overprov: self.enable_overprov,
+            out_of_meta_space: self.out_of_meta_space,
+            backstore: PhantomData,
+        }
+    }
+
     /// Get the last cached value for the total amount of space used on the
     /// thin pool in the data and metadata devices.
     fn used(&self) -> Option<(Sectors, MetaBlocks)> {

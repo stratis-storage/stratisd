@@ -16,6 +16,28 @@ use stratisd::{
     stratis::{StratisError, VERSION},
 };
 
+fn parse_size(s: &str) -> Result<u128, String> {
+    let split = s.find(|c: char| !c.is_ascii_digit()).unwrap_or(s.len());
+    let (magnitude_str, units) = s.split_at(split);
+    let magnitude: u128 = magnitude_str
+        .parse()
+        .map_err(|_| "Ill-formed size: magnitude must be a decimal integer".to_string())?;
+    let multiplier = match units {
+        "B" => 1,
+        "KiB" => 1024,
+        "MiB" => 1024 * 1024,
+        "GiB" => 1024 * 1024 * 1024,
+        "TiB" => 1024u128.pow(4),
+        "PiB" => 1024u128.pow(5),
+        _ => {
+            return Err("Ill-formed size: units must be B, KiB, MiB, GiB, TiB, or PiB".to_string())
+        }
+    };
+    magnitude
+        .checked_mul(multiplier)
+        .ok_or_else(|| "Ill-formed size: byte count exceeds u128::MAX".to_string())
+}
+
 fn parse_args() -> Command {
     Command::new("stratis-min")
         .version(VERSION)
@@ -194,7 +216,9 @@ fn parse_args() -> Command {
             Command::new("filesystem").subcommands(vec![
                 Command::new("create")
                     .arg(Arg::new("pool_name").required(true))
-                    .arg(Arg::new("fs_name").required(true)),
+                    .arg(Arg::new("fs_name").required(true))
+                    .arg(Arg::new("size").long("size").num_args(1))
+                    .arg(Arg::new("size_limit").long("size-limit").num_args(1)),
                 Command::new("destroy")
                     .arg(Arg::new("pool_name").required(true))
                     .arg(Arg::new("fs_name").required(true)),
@@ -205,6 +229,10 @@ fn parse_args() -> Command {
                 Command::new("origin")
                     .arg(Arg::new("pool_name").required(true))
                     .arg(Arg::new("fs_name").required(true)),
+                Command::new("set-size-limit")
+                    .arg(Arg::new("pool_name").required(true))
+                    .arg(Arg::new("fs_name").required(true))
+                    .arg(Arg::new("size_limit").num_args(1).required(true)),
             ]),
             Command::new("report"),
         ])
@@ -677,6 +705,14 @@ fn main() -> Result<(), String> {
             }
         } else if let Some(subcommand) = args.subcommand_matches("filesystem") {
             if let Some(args) = subcommand.subcommand_matches("create") {
+                let size = args
+                    .get_one::<String>("size")
+                    .map(|s| parse_size(s))
+                    .transpose()?;
+                let size_limit = args
+                    .get_one::<String>("size_limit")
+                    .map(|s| parse_size(s))
+                    .transpose()?;
                 filesystem::filesystem_create(
                     args.get_one::<String>("pool_name")
                         .expect("required")
@@ -684,6 +720,8 @@ fn main() -> Result<(), String> {
                     args.get_one::<String>("fs_name")
                         .expect("required")
                         .to_owned(),
+                    size,
+                    size_limit,
                 )?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("destroy") {
@@ -722,6 +760,21 @@ fn main() -> Result<(), String> {
                     println!("{origin}");
                 })?;
                 Ok(())
+            } else if let Some(args) = subcommand.subcommand_matches("set-size-limit") {
+                let size_limit = args
+                    .get_one::<String>("size_limit")
+                    .map(|s| parse_size(s))
+                    .transpose()?;
+                filesystem::filesystem_set_size_limit(
+                    args.get_one::<String>("pool_name")
+                        .expect("required")
+                        .to_owned(),
+                    args.get_one::<String>("fs_name")
+                        .expect("required")
+                        .to_owned(),
+                    size_limit.expect("required"),
+                )?;
+                Ok(())
             } else {
                 filesystem::filesystem_list()?;
                 Ok(())
@@ -742,9 +795,69 @@ fn main() -> Result<(), String> {
 
 #[cfg(test)]
 mod test {
-    use super::parse_args;
+    use super::{parse_args, parse_size};
+
     #[test]
     fn test_stratis_min_parse_args() {
         parse_args().debug_assert();
+    }
+
+    #[test]
+    fn test_parse_size_all_units() {
+        assert_eq!(parse_size("1B"), Ok(1));
+        assert_eq!(parse_size("1KiB"), Ok(1024));
+        assert_eq!(parse_size("1MiB"), Ok(1024 * 1024));
+        assert_eq!(parse_size("1GiB"), Ok(1024 * 1024 * 1024));
+        assert_eq!(parse_size("1TiB"), Ok(1024u128.pow(4)));
+        assert_eq!(parse_size("1PiB"), Ok(1024u128.pow(5)));
+    }
+
+    #[test]
+    fn test_parse_size_exact_byte_values() {
+        assert_eq!(parse_size("5GiB"), Ok(5 * 1024 * 1024 * 1024));
+        assert_eq!(parse_size("10MiB"), Ok(10 * 1024 * 1024));
+        assert_eq!(parse_size("512KiB"), Ok(512 * 1024));
+    }
+
+    #[test]
+    fn test_parse_size_u128_max_bytes() {
+        let s = format!("{}B", u128::MAX);
+        assert_eq!(parse_size(&s), Ok(u128::MAX));
+    }
+
+    #[test]
+    fn test_parse_size_multiplication_overflow() {
+        let pib = 1024u128.pow(5);
+        let max_magnitude = u128::MAX / pib;
+        assert!(parse_size(&format!("{max_magnitude}PiB")).is_ok());
+        assert_eq!(
+            parse_size(&format!("{}PiB", max_magnitude + 1)),
+            Err("Ill-formed size: byte count exceeds u128::MAX".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_size_invalid_unit() {
+        assert!(parse_size("1GB").is_err());
+        assert!(parse_size("1gib").is_err());
+        assert!(parse_size("1mb").is_err());
+    }
+
+    #[test]
+    fn test_parse_size_fractional() {
+        assert!(parse_size("1.5GiB").is_err());
+    }
+
+    #[test]
+    fn test_parse_size_missing_unit() {
+        assert!(parse_size("1024").is_err());
+    }
+
+    #[test]
+    fn test_parse_size_empty_magnitude() {
+        assert_eq!(
+            parse_size("GiB"),
+            Err("Ill-formed size: magnitude must be a decimal integer".to_string())
+        );
     }
 }

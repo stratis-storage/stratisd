@@ -961,3 +961,233 @@ fn stratis_min_pool_all_devices_present() {
 fn test_stratis_min_pool_all_devices_present() {
     test_with_stratisd_min_sim(stratis_min_pool_all_devices_present);
 }
+
+#[test]
+// Test parsing when creating a filesystem with no arguments
+fn test_stratis_min_filesystem_create_no_args() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem").arg("create");
+    cmd.assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains(
+            "required arguments were not provided",
+        ));
+}
+
+#[test]
+// Test parsing when set_size_limit with no required args
+fn test_stratis_min_filesystem_set_size_limit_missing_limit() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem").arg("set-size-limit");
+    cmd.assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains(
+            "required arguments were not provided",
+        ));
+}
+
+#[test]
+// Test parsing set_size_limit with no required names
+fn test_stratis_min_fs_set_size_limit_missing_names() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem").arg("set-size-limit").arg("1024B");
+    cmd.assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains(
+            "required arguments were not provided",
+        ));
+}
+
+#[test]
+// Test parsing when set_size_limit with no daemon running
+fn test_stratis_min_fs_set_size_limit_no_daemon() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem")
+        .arg("set-size-limit")
+        .arg("f1")
+        .arg("p1")
+        .arg("1024B");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("IO error"));
+}
+
+fn stratis_min_create_pool_and_fs_with_size() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("create").arg("pn").arg("/dev/n");
+    cmd.assert().success();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem")
+        .arg("create")
+        .arg("--size")
+        .arg("1073741824B")
+        .arg("--size-limit")
+        .arg("2147483648B")
+        .arg("pn")
+        .arg("fn");
+    cmd.assert().success();
+}
+
+#[test]
+fn test_stratis_min_create_pool_and_fs_with_size() {
+    test_with_stratisd_min_sim(stratis_min_create_pool_and_fs_with_size);
+}
+
+fn stratis_min_fs_set_size_limit() {
+    stratis_min_create_pool_and_fs();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem")
+        .arg("set-size-limit")
+        .arg("pn")
+        .arg("fn")
+        // for the filesystem limit we need
+        // a huge number of bytes/sectors
+        // that are divisible by 512
+        .arg("2TiB");
+    cmd.assert().success();
+}
+
+#[test]
+fn test_stratis_min_fs_set_size_limit() {
+    test_with_stratisd_min_sim(stratis_min_fs_set_size_limit);
+}
+
+#[test]
+fn test_stratis_min_parse_size_invalid_unit() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem")
+        .arg("create")
+        .arg("--size")
+        .arg("1GB")
+        .arg("pn")
+        .arg("fn");
+    cmd.assert().failure().stderr(predicate::str::contains(
+        "units must be B, KiB, MiB, GiB, TiB, or PiB",
+    ));
+}
+
+#[test]
+fn test_stratis_min_parse_size_lowercase_unit() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem")
+        .arg("create")
+        .arg("--size")
+        .arg("1gib")
+        .arg("pn")
+        .arg("fn");
+    cmd.assert().failure().stderr(predicate::str::contains(
+        "units must be B, KiB, MiB, GiB, TiB, or PiB",
+    ));
+}
+
+#[test]
+fn test_stratis_min_parse_size_fractional() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem")
+        .arg("create")
+        .arg("--size")
+        .arg("1.5GiB")
+        .arg("pn")
+        .arg("fn");
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("Ill-formed size"));
+}
+
+#[test]
+fn test_stratis_min_parse_size_missing_unit() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem")
+        .arg("create")
+        .arg("--size")
+        .arg("1024")
+        .arg("pn")
+        .arg("fn");
+    cmd.assert().failure().stderr(predicate::str::contains(
+        "units must be B, KiB, MiB, GiB, TiB, or PiB",
+    ));
+}
+
+#[test]
+fn test_stratis_min_parse_size_space_before_unit() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem")
+        .arg("create")
+        .arg("--size")
+        .arg("1 GiB")
+        .arg("pn")
+        .arg("fn");
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("Ill-formed size"));
+}
+
+#[test]
+fn test_stratis_min_parse_size_magnitude_overflow() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem")
+        .arg("create")
+        .arg("--size")
+        .arg("999999999999999999999999999999999999999PiB")
+        .arg("pn")
+        .arg("fn");
+    cmd.assert().failure().stderr(predicate::str::contains(
+        "magnitude must be a decimal integer",
+    ));
+}
+
+#[test]
+fn test_stratis_min_parse_size_multiplication_overflow() {
+    // 302231454903657293676544PiB is exactly 2^128 bytes, which overflows u128.
+    // This magnitude fits in u128 but the product does not, exercising checked_mul.
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem")
+        .arg("create")
+        .arg("--size")
+        .arg("302231454903657293676544PiB")
+        .arg("pn")
+        .arg("fn");
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("byte count exceeds u128::MAX"));
+}
+
+#[test]
+fn test_stratis_min_parse_size_empty_magnitude() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem")
+        .arg("create")
+        .arg("--size")
+        .arg("GiB")
+        .arg("pn")
+        .arg("fn");
+    cmd.assert().failure().stderr(predicate::str::contains(
+        "magnitude must be a decimal integer",
+    ));
+}
+
+fn stratis_min_create_pool_and_fs_with_all_units() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("create").arg("pn").arg("/dev/n");
+    cmd.assert().success();
+
+    for size_str in ["1073741824B", "1048576KiB", "1024MiB", "1GiB"] {
+        let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+        cmd.arg("filesystem")
+            .arg("create")
+            .arg("--size")
+            .arg(size_str)
+            .arg("pn")
+            .arg(format!("fn_{size_str}"));
+        cmd.assert().success();
+    }
+}
+
+#[test]
+fn test_stratis_min_create_pool_and_fs_with_all_units() {
+    test_with_stratisd_min_sim(stratis_min_create_pool_and_fs_with_all_units);
+}

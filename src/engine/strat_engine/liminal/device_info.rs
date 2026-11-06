@@ -592,12 +592,7 @@ impl DeviceSet {
                     LInfo::Luks(l) => Some(l.pool_name.as_ref()),
                 }),
             )
-            .map(|opt| {
-                (
-                    opt.expect("self.as_opened_set().is_some() if pool is unencrypted"),
-                    None,
-                )
-            }),
+            .map(|opt| (opt.unwrap_or(MaybeInconsistent::No(None)), None)),
         }
     }
 

@@ -303,6 +303,15 @@ impl LInfo {
         }
     }
 
+    /// Returns the metadata version for this device.
+    /// Any LUKS device is, by definition, a V1 device.
+    fn metadata_version(&self) -> StratSigblockVersion {
+        match self {
+            LInfo::Luks(_) => StratSigblockVersion::V1,
+            LInfo::Stratis(info) => info.bda.sigblock_version(),
+        }
+    }
+
     /// Remove a device if it matches the given device path.
     fn update_on_remove(
         info: LInfo,
@@ -754,10 +763,7 @@ impl DeviceSet {
 
     pub fn metadata_version(&self) -> StratisResult<StratSigblockVersion> {
         let metadata_version = self.iter().fold(HashSet::new(), |mut set, (_, info)| {
-            match info {
-                LInfo::Luks(_) => set.insert(StratSigblockVersion::V1),
-                LInfo::Stratis(info) => set.insert(info.bda.sigblock_version()),
-            };
+            set.insert(info.metadata_version());
             set
         });
         if metadata_version.len() > 1 {

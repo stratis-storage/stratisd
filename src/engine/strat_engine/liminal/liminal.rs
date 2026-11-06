@@ -57,6 +57,8 @@ type MetadataResult = StratisResult<(
     Option<Vec<Either<PathBuf, PathBuf>>>,
 )>;
 
+type PoolSetupResult = Result<(Name, AnyPool), (StratisError, HashMap<DevUuid, Box<LStratisInfo>>)>;
+
 /// Devices which stratisd has discovered but which have not been assembled
 /// into pools.
 #[derive(Debug, Default, Eq, PartialEq)]
@@ -342,12 +344,27 @@ impl LiminalDevices {
         fn start_pool_failure(
             pools: &Table<PoolUuid, AnyPool>,
             pool_uuid: PoolUuid,
-            infos: &HashMap<DevUuid, Box<LStratisInfo>>,
-            meta_res: MetadataResult,
+            stopped_pool: DeviceSet,
+            remove_cache: bool,
             token_slot: TokenUnlockMethod,
             passphrase_fd: Option<RawFd>,
-        ) -> StratisResult<(Name, AnyPool)> {
-            let (timestamp, metadata, paths_to_wipe) = meta_res?;
+        ) -> PoolSetupResult {
+            let mut infos = match stopped_pool.into_opened_set() {
+                Either::Left(infos) => infos,
+                Either::Right(_) => return Err((
+                    StratisError::Msg(
+                        "V2 pool contains closed devices; all devices must be open for V2 pools"
+                            .to_string(),
+                    ),
+                    HashMap::new(),
+                )),
+            };
+
+            let (timestamp, metadata, paths_to_wipe) =
+                match load_stratis_metadata(pool_uuid, &mut infos, remove_cache) {
+                    Ok(result) => result,
+                    Err(e) => return Err((e, infos)),
+                };
             let processed_paths_to_wipe = paths_to_wipe.map(|v| {
                 v.into_iter()
                     .map(|e| {
@@ -364,20 +381,31 @@ impl LiminalDevices {
             ) {
                 (_, _, None) => None,
                 (false, _, _) => {
-                    return Err(StratisError::Msg(format!(
-                        "Pool with UUID {pool_uuid} is not encrypted but an unlock method or passphrase was provided"
-                    )));
+                    return Err((
+                        StratisError::Msg(format!(
+                            "Pool with UUID {pool_uuid} is not encrypted but an unlock method or passphrase was provided"
+                        )),
+                        infos,
+                    ));
                 }
-                (true, TokenUnlockMethod::None, _) => return Err(StratisError::Msg(
-                    "Metadata reported that encryption enabled but no unlock method was provided"
-                        .to_string(),
-                )),
+                (true, TokenUnlockMethod::None, _) => {
+                    return Err((
+                        StratisError::Msg(
+                            "Metadata reported that encryption enabled but no unlock method was provided"
+                                .to_string(),
+                        ),
+                        infos,
+                    ));
+                }
                 (true, _, Some(fd)) => {
                     let mut memory = match SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE) {
                         Ok(m) => m,
-                        Err(e) => return Err(StratisError::from(e)),
+                        Err(e) => return Err((StratisError::from(e), infos)),
                     };
-                    let len = read_key_shared(fd, memory.as_mut())?;
+                    let len = match read_key_shared(fd, memory.as_mut()) {
+                        Ok(len) => len,
+                        Err(e) => return Err((e, infos)),
+                    };
                     Some(SizedKeyMemory::new(memory, len))
                 }
             };
@@ -385,13 +413,14 @@ impl LiminalDevices {
             setup_pool(
                 pools,
                 pool_uuid,
-                infos,
+                &infos,
                 timestamp,
                 metadata,
                 processed_paths_to_wipe,
                 token_slot,
                 passphrase,
             )
+            .map_err(|e| (e, infos))
         }
 
         let stopped_pool = self
@@ -403,13 +432,14 @@ impl LiminalDevices {
         assert!(pools.get_by_uuid(pool_uuid).is_none());
         assert!(!self.stopped_pools.contains_key(&pool_uuid));
 
-        let mut infos = stopped_pool
-            .into_opened_set()
-            .expect_left("Cannot fail in V2 of metadata");
-
-        let res = load_stratis_metadata(pool_uuid, &mut infos, remove_cache);
-
-        match start_pool_failure(pools, pool_uuid, &infos, res, token_slot, passphrase_fd) {
+        match start_pool_failure(
+            pools,
+            pool_uuid,
+            stopped_pool,
+            remove_cache,
+            token_slot,
+            passphrase_fd,
+        ) {
             Ok((name, pool)) => {
                 self.uuid_lookup = self
                     .uuid_lookup
@@ -430,7 +460,7 @@ impl LiminalDevices {
                 info!("Pool with name \"{name}\" and UUID \"{pool_uuid}\" set up");
                 Ok((name, pool_uuid, pool, Vec::new()))
             }
-            Err(err) => {
+            Err((err, infos)) => {
                 info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {err}");
                 self.handle_stopped_pool(
                     pool_uuid,

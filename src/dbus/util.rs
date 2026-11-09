@@ -27,9 +27,7 @@ use crate::{
             Manager, ManagerR0, ManagerR1, ManagerR2, ManagerR3, ManagerR4, ManagerR5, ManagerR6,
             ManagerR7, ManagerR8, ManagerR9,
         },
-        pool::{
-            PoolR0, PoolR1, PoolR10, PoolR2, PoolR3, PoolR4, PoolR5, PoolR6, PoolR7, PoolR8, PoolR9,
-        },
+        pool::{PoolR0, PoolR1, PoolR2, PoolR3, PoolR4, PoolR5, PoolR6, PoolR7, PoolR8, PoolR9},
         types::DbusErrorEnum,
     },
     engine::{FilesystemUuid, Lockable, PoolDiff, PoolUuid, StratFilesystemDiff},
@@ -368,16 +366,6 @@ pub async fn send_pool_background_signals(
                 "pool.r9"
             );
         }
-        if diff.pool.metadata_size.changed().is_some() {
-            send_signal!(
-                connection,
-                PoolR10,
-                pool_path,
-                metadata_used_changed,
-                "metadata used",
-                "pool.r10"
-            );
-        }
     }
 }
 
@@ -713,16 +701,6 @@ pub async fn send_pool_foreground_signals(
             no_alloc_space_changed,
             "no alloc space",
             "pool.r9"
-        );
-    }
-    if diff.pool.metadata_size.changed().is_some() {
-        send_signal!(
-            connection,
-            PoolR10,
-            pool_path,
-            metadata_used_changed,
-            "metadata used",
-            "pool.r10"
         );
     }
 }

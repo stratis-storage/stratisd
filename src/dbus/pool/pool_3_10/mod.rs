@@ -15,10 +15,6 @@ use zbus::{
     Connection,
 };
 
-mod methods;
-
-pub use methods::remove_cache_method;
-
 use crate::{
     dbus::{
         manager::Manager,
@@ -363,11 +359,6 @@ impl PoolR10 {
     #[zbus(out_args("results", "return_code", "return_string"))]
     async fn decrypt_pool(&self) -> (bool, u16, String) {
         decrypt_pool_method(&self.engine, &self.connection, &self.manager, self.uuid).await
-    }
-
-    #[zbus(out_args("results", "return_code", "return_string"))]
-    async fn remove_cache(&self) -> ((bool, Vec<String>), u16, String) {
-        remove_cache_method(&self.engine, &self.connection, &self.manager, self.uuid).await
     }
 
     #[zbus(property(emits_changed_signal = "const"))]

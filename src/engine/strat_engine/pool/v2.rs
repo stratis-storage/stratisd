@@ -2322,6 +2322,22 @@ mod tests {
         let (send, _recv) = unbounded_channel();
         let engine = StratEngine::initialize(send).unwrap();
 
+        // Verify that V2 metadata validation correctly detects the missing cache device.
+        let stopped_pools = test_async!(engine.stopped_pools());
+        let stopped_info = stopped_pools
+            .stopped
+            .get(&uuid)
+            .expect("Pool should be in stopped pools");
+        assert_eq!(
+            stopped_info.metadata_version,
+            Some(StratSigblockVersion::V2),
+            "Pool should be V2"
+        );
+        assert!(
+            !stopped_info.devices_complete,
+            "V2 pool should correctly detect missing cache device (devices_complete=false)"
+        );
+
         // Without removing the cache, the pool cannot be started because a cache device
         // recorded in the metadata is missing.
         assert!(test_async!(engine.start_pool(

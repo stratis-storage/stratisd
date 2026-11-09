@@ -832,10 +832,6 @@ impl Pool for SimPool {
         Some(Sectors(0))
     }
 
-    fn metadata_used(&self) -> Sectors {
-        Sectors(0)
-    }
-
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)> {
         self.filesystems
             .iter()

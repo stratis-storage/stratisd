@@ -158,15 +158,6 @@ pub trait Pool: Debug + Send + Sync {
         supports_encrypted: bool,
     ) -> StratisResult<SetCreateAction<DevUuid>>;
 
-    /// Remove the cache tier from the pool. Tears down the dm-cache
-    /// device, wipes the cache blockdevs, and removes the cache tier.
-    /// Returns the UUIDs of the cache devices that were removed.
-    fn remove_cache(
-        &mut self,
-        pool_uuid: PoolUuid,
-        pool_name: &str,
-    ) -> StratisResult<SetDeleteAction<DevUuid, ()>>;
-
     /// Creates the filesystems specified by specs.
     /// Returns a list of the names of filesystems actually created.
     /// Returns an error if any of the specified names are already in use
@@ -325,9 +316,6 @@ pub trait Pool: Debug + Send + Sync {
     /// by any subcomponent of Stratis, either for internal management or to
     /// store user data.
     fn total_physical_used(&self) -> Option<Sectors>;
-
-    /// The number of Sectors in this pool used for Stratis metadata.
-    fn metadata_used(&self) -> Sectors;
 
     /// Get all the filesystems belonging to this pool.
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)>;

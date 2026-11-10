@@ -21,6 +21,7 @@ use crate::{
 
 mod pool_3_0;
 mod pool_3_1;
+mod pool_3_10;
 mod pool_3_2;
 mod pool_3_3;
 mod pool_3_4;
@@ -33,6 +34,7 @@ mod shared;
 
 pub use pool_3_0::PoolR0;
 pub use pool_3_1::PoolR1;
+pub use pool_3_10::PoolR10;
 pub use pool_3_2::PoolR2;
 pub use pool_3_3::PoolR3;
 pub use pool_3_4::PoolR4;
@@ -177,6 +179,18 @@ pub async fn register_pool<'a>(
             {
                 warn!("Failed to register interface pool.r9 for pool with UUID {pool_uuid}: {e}");
             }
+            if let Err(e) = PoolR10::register(
+                engine,
+                connection,
+                manager,
+                counter,
+                path.clone(),
+                pool_uuid,
+            )
+            .await
+            {
+                warn!("Failed to register interface pool.r10 for pool with UUID {pool_uuid}: {e}");
+            }
 
             manager.write().await.add_pool(&path, pool_uuid)?;
 
@@ -276,6 +290,9 @@ pub async fn unregister_pool(
     }
     if let Err(e) = PoolR9::unregister(connection, path.clone()).await {
         warn!("Failed to deregister interface pool.r9 for path {path}: {e}");
+    }
+    if let Err(e) = PoolR10::unregister(connection, path.clone()).await {
+        warn!("Failed to deregister interface pool.r10 for path {path}: {e}");
     }
 
     Ok(uuid)

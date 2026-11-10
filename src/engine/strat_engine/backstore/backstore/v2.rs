@@ -38,12 +38,15 @@ use crate::{
                 DEFAULT_CRYPT_DATA_OFFSET_V2,
             },
             dm::{
-                get_dm, list_of_backstore_devices, remove_optional_devices,
-                set_backstore_device_uuids, DEVICEMAPPER_PATH,
+                get_dm, list_of_backstore_devices, list_of_backstore_devices_migrate,
+                remove_optional_devices, set_backstore_device_uuids, DEVICEMAPPER_PATH,
             },
             keys::{search_key_process, unset_key_process},
             metadata::MDADataSize,
-            names::{format_backstore_ids, format_crypt_backstore_name, CacheRole},
+            names::{
+                format_backstore_ids, format_crypt_backstore_migrate_name,
+                format_crypt_backstore_name, CacheRole,
+            },
             serde_structs::{BackstoreSave, CapSave, PoolFeatures, PoolSave, Recordable},
             shared::shift_allocation_offset,
             thinpool::ThinPool,
@@ -1070,6 +1073,51 @@ impl Backstore {
         }
         self.data_tier.destroy()?;
         unset_key_process(&VolumeKeyKeyDescription::new(pool_uuid)).map(|_| ())
+    }
+
+    /// Destroy the source backstore of a migration once the migration is
+    /// complete and nothing uses its devices any more.
+    ///
+    /// The source backstore's devices have been renamed by
+    /// `rename_backstore_devices_migrate()`, so unlike `destroy()` this
+    /// removes the devices under their temporary names; their canonical names
+    /// belong to the destination backstore. For the same reason the volume key
+    /// in the keyring is left alone: the destination backstore's volume key
+    /// is stored under the same key description.
+    pub fn destroy_migrate(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        if let Some(h) = self
+            .cap_device
+            .enc
+            .as_ref()
+            .and_then(|either| either.as_ref().right())
+        {
+            h.wipe_renamed(&format_crypt_backstore_migrate_name(pool_uuid))?;
+        }
+        remove_optional_devices(list_of_backstore_devices_migrate(pool_uuid))?;
+        if let Some(ref mut cache_tier) = self.cache_tier {
+            cache_tier.destroy()?;
+        }
+        self.data_tier.destroy()
+    }
+
+    /// Put this backstore's volume key back in the keyring if it is missing.
+    ///
+    /// The volume key of the source and destination backstores of a migration
+    /// share a key description, so rolling back a failed migration removes the
+    /// source backstore's volume key along with the destination's. This must
+    /// be called after the source backstore's devices have been restored.
+    pub fn restore_volume_key(&self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        match self
+            .cap_device
+            .enc
+            .as_ref()
+            .and_then(|either| either.as_ref().right())
+        {
+            Some(h) if !Self::volume_key_is_loaded(pool_uuid)? => {
+                CryptHandle::load_vk_to_keyring(h.luks2_device_path(), pool_uuid)
+            }
+            _ => Ok(()),
+        }
     }
 
     /// Teardown the DM devices in the backstore.

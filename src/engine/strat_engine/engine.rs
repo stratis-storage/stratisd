@@ -952,36 +952,42 @@ impl Engine for StratEngine {
             pool
         };
 
-        match pool {
-            AnyPool::V1(p) => {
-                match p.migrate(
+        let migrated = match pool {
+            AnyPool::V1(p) => p
+                .migrate(
                     pool_uuid,
                     unowned_devices,
                     encryption_info,
                     validated_integrity_spec,
-                ) {
-                    Ok(mut p) => {
-                        let res = p.write_metadata(name);
-                        self.pools.modify_all().await.insert(
-                            validated_name,
-                            pool_uuid,
-                            AnyPool::V2(Box::new(p)),
-                        );
-                        res?;
-                        Ok(())
-                    }
-                    Err((e, p)) => {
-                        self.pools.modify_all().await.insert(
-                            validated_name,
-                            pool_uuid,
-                            AnyPool::V1(p),
-                        );
-                        Err(e)
-                    }
-                }
+                )
+                .map(Box::new)
+                .map_err(|(e, p)| (e, AnyPool::V1(p))),
+            AnyPool::V2(p) => p
+                .migrate(
+                    pool_uuid,
+                    unowned_devices,
+                    encryption_info,
+                    validated_integrity_spec,
+                )
+                .map(Box::new)
+                .map_err(|(e, p)| (e, AnyPool::V2(p))),
+        };
+        match migrated {
+            Ok(mut p) => {
+                let res = p.write_metadata(name);
+                self.pools
+                    .modify_all()
+                    .await
+                    .insert(validated_name, pool_uuid, AnyPool::V2(p));
+                res?;
+                Ok(())
             }
-            AnyPool::V2(_) => {
-                unimplemented!()
+            Err((e, p)) => {
+                self.pools
+                    .modify_all()
+                    .await
+                    .insert(validated_name, pool_uuid, p);
+                Err(e)
             }
         }
     }

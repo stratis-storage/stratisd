@@ -665,6 +665,24 @@ impl Display for SetDeleteAction<FilesystemUuid, (FilesystemUuid, Option<Filesys
     }
 }
 
+impl Display for SetDeleteAction<DevUuid, ()> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.changed.is_empty() {
+            write!(f, "No cache devices to remove; no action taken")
+        } else {
+            write!(
+                f,
+                "Cache devices with UUIDs {} were successfully removed",
+                self.changed
+                    .iter()
+                    .map(|u| u.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        }
+    }
+}
+
 /// Action indicating a Clevis binding regeneration
 pub struct RegenAction;
 

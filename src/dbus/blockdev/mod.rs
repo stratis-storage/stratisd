@@ -19,6 +19,7 @@ use crate::{
 
 mod blockdev_3_0;
 mod blockdev_3_1;
+mod blockdev_3_10;
 mod blockdev_3_2;
 mod blockdev_3_3;
 mod blockdev_3_4;
@@ -31,6 +32,7 @@ mod shared;
 
 pub use blockdev_3_0::BlockdevR0;
 pub use blockdev_3_1::BlockdevR1;
+pub use blockdev_3_10::BlockdevR10;
 pub use blockdev_3_2::BlockdevR2;
 pub use blockdev_3_3::BlockdevR3;
 pub use blockdev_3_4::BlockdevR4;
@@ -173,6 +175,18 @@ pub async fn register_blockdev<'a>(
     {
         warn!("Failed to register interface blockdev.r9 for pool with UUID {pool_uuid}: {e}");
     };
+    if let Err(e) = BlockdevR10::register(
+        engine.clone(),
+        connection,
+        manager,
+        path.clone(),
+        pool_uuid,
+        dev_uuid,
+    )
+    .await
+    {
+        warn!("Failed to register interface blockdev.r10 for pool with UUID {pool_uuid}: {e}");
+    };
     manager.write().await.add_blockdev(&path, dev_uuid)?;
     Ok(path)
 }
@@ -192,6 +206,7 @@ pub async fn unregister_blockdev(
     BlockdevR7::unregister(connection, path.clone()).await?;
     BlockdevR8::unregister(connection, path.clone()).await?;
     BlockdevR9::unregister(connection, path.clone()).await?;
+    BlockdevR10::unregister(connection, path.clone()).await?;
 
     let mut lock = manager.write().await;
     let uuid = lock

@@ -22,6 +22,7 @@ use crate::{
 
 mod manager_3_0;
 mod manager_3_1;
+mod manager_3_10;
 mod manager_3_2;
 mod manager_3_3;
 mod manager_3_4;
@@ -32,6 +33,7 @@ mod manager_3_8;
 mod manager_3_9;
 mod report_3_0;
 mod report_3_1;
+mod report_3_10;
 mod report_3_2;
 mod report_3_3;
 mod report_3_4;
@@ -43,6 +45,7 @@ mod report_3_9;
 
 pub use manager_3_0::ManagerR0;
 pub use manager_3_1::ManagerR1;
+pub use manager_3_10::ManagerR10;
 pub use manager_3_2::ManagerR2;
 pub use manager_3_3::ManagerR3;
 pub use manager_3_4::ManagerR4;
@@ -53,6 +56,7 @@ pub use manager_3_8::ManagerR8;
 pub use manager_3_9::ManagerR9;
 pub use report_3_0::ReportR0;
 pub use report_3_1::ReportR1;
+pub use report_3_10::ReportR10;
 pub use report_3_2::ReportR2;
 pub use report_3_3::ReportR3;
 pub use report_3_4::ReportR4;
@@ -264,6 +268,9 @@ pub async fn register_manager(
     if let Err(e) = ManagerR9::register(engine, connection, manager, counter).await {
         warn!("Failed to register interface Manager.r9: {e}");
     }
+    if let Err(e) = ManagerR10::register(engine, connection, manager, counter).await {
+        warn!("Failed to register interface Manager.r10: {e}");
+    }
     if let Err(e) = ReportR0::register(engine, connection).await {
         warn!("Failed to register interface Report.r0: {e}");
     }
@@ -293,6 +300,9 @@ pub async fn register_manager(
     }
     if let Err(e) = ReportR9::register(engine, connection).await {
         warn!("Failed to register interface Report.r9: {e}");
+    }
+    if let Err(e) = ReportR10::register(engine, connection).await {
+        warn!("Failed to register interface Report.r10: {e}");
     }
     if let Err(e) = connection
         .object_server()

@@ -4,9 +4,7 @@ export PROFILEDIR=debug
 
 make fmt-ci &&
 	make fmt-shell-ci &&
-	make stratisd &&
-	make stratisd-tools &&
-	make build-min &&
+	make build-all-rust &&
 	make build-no-ipc &&
 	make test &&
 	make clippy &&

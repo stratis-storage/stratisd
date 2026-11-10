@@ -758,19 +758,8 @@ impl Pool for StratPool {
             .map(|(uuid, _)| uuid)
             .collect();
 
-        self.thin_pool.suspend()?;
-        let result = self.backstore.remove_cache(pool_uuid).and_then(|()| {
-            self.thin_pool.set_device(
-                self.backstore.device().expect(
-                    "Since thin pool exists, space must have been allocated \
-                     from the backstore, so backstore must have a cap device",
-                ),
-                Sectors(0),
-                OffsetDirection::Forwards,
-            )
-        });
-        self.thin_pool.resume()?;
-        result?;
+        self.backstore
+            .remove_cache(&mut self.thin_pool, pool_uuid)?;
         self.write_metadata(pool_name)?;
         Ok(SetDeleteAction::new(cache_uuids, vec![]))
     }

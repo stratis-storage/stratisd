@@ -57,6 +57,7 @@ pub async fn remove_cache_method(
                 };
 
                 let mut removed_uuids = Vec::new();
+                let mut failed_unregisters = Vec::new();
                 for dev_uuid in dev_uuids {
                     let opt = manager.read().await.blockdev_get_path(&dev_uuid).cloned();
                     match opt {
@@ -64,20 +65,29 @@ pub async fn remove_cache_method(
                             if let Err(e) =
                                 unregister_blockdev(connection, manager, &p.as_ref()).await
                             {
-                                warn!("Unable to unregister object path for blockdev with UUID {dev_uuid} belonging to pool {pool_uuid} on the D-Bus: {e}");
+                                failed_unregisters.push(e);
+                            } else {
+                                removed_uuids.push(dev_uuid.simple().to_string());
                             }
                         }
                         None => {
                             warn!("No path found to unregister for removed cache blockdev with UUID {dev_uuid}");
                         }
                     }
-                    removed_uuids.push(dev_uuid.simple().to_string());
                 }
-                (
-                    (true, removed_uuids),
-                    DbusErrorEnum::OK as u16,
-                    OK_STRING.to_string(),
-                )
+                if failed_unregisters.is_empty() {
+                    (
+                        (true, removed_uuids),
+                        DbusErrorEnum::OK as u16,
+                        OK_STRING.to_string(),
+                    )
+                } else {
+                    let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::BestEffortError(
+                        "Failed to unregister all blockdevs from the D-Bus".to_string(),
+                        failed_unregisters,
+                    ));
+                    (default_return, rc, rs)
+                }
             }
             None => (
                 default_return,

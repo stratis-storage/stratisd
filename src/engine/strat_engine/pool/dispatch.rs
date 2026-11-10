@@ -44,6 +44,17 @@ impl Pool for AnyPool {
         }
     }
 
+    fn remove_cache(
+        &mut self,
+        pool_uuid: PoolUuid,
+        pool_name: &str,
+    ) -> StratisResult<SetDeleteAction<DevUuid, ()>> {
+        match self {
+            AnyPool::V1(p) => p.remove_cache(pool_uuid, pool_name),
+            AnyPool::V2(p) => p.remove_cache(pool_uuid, pool_name),
+        }
+    }
+
     fn bind_clevis(
         &mut self,
         name: &Name,

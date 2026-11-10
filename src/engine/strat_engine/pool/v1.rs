@@ -742,6 +742,40 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action("NoRequests")]
+    fn remove_cache(
+        &mut self,
+        pool_uuid: PoolUuid,
+        pool_name: &str,
+    ) -> StratisResult<SetDeleteAction<DevUuid, ()>> {
+        if !self.has_cache() {
+            return Ok(SetDeleteAction::empty());
+        }
+
+        let cache_uuids: Vec<_> = self
+            .backstore
+            .cachedevs()
+            .into_iter()
+            .map(|(uuid, _)| uuid)
+            .collect();
+
+        self.thin_pool.suspend()?;
+        let result = self.backstore.remove_cache(pool_uuid).and_then(|()| {
+            self.thin_pool.set_device(
+                self.backstore.device().expect(
+                    "Since thin pool exists, space must have been allocated \
+                     from the backstore, so backstore must have a cap device",
+                ),
+                Sectors(0),
+                OffsetDirection::Forwards,
+            )
+        });
+        self.thin_pool.resume()?;
+        result?;
+        self.write_metadata(pool_name)?;
+        Ok(SetDeleteAction::new(cache_uuids, vec![]))
+    }
+
+    #[pool_mutating_action("NoRequests")]
     #[pool_rollback]
     fn bind_clevis(
         &mut self,

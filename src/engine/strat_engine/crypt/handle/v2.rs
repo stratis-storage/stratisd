@@ -947,6 +947,20 @@ impl CryptHandle {
         )
     }
 
+    /// Wipe all LUKS2 metadata on the device safely using libcryptsetup,
+    /// deactivating the device under the given name rather than under its
+    /// activation name.
+    ///
+    /// This is for a device that has been renamed, so that its activation name
+    /// now belongs to a different device that must not be deactivated.
+    pub fn wipe_renamed(&self, name: &DmName) -> StratisResult<()> {
+        ensure_wiped(
+            &mut self.acquire_crypt_device()?,
+            self.luks2_device_path(),
+            name,
+        )
+    }
+
     /// Changed the encrypted device size
     /// `None` will fill up the entire underlying physical device.
     /// `Some(_)` will resize the device to the given number of sectors.

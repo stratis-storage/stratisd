@@ -266,6 +266,34 @@ pub fn format_backstore_ids(pool_uuid: PoolUuid, role: CacheRole) -> (DmNameBuf,
     )
 }
 
+/// Format the temporary name given to the encryption layer DM device of the
+/// source pool of an in-progress migration.
+///
+/// Only V2 pools have an encryption layer that is named after the pool UUID,
+/// so for a V1 source pool no device with this name ever exists. A V2 source
+/// pool's encryption device must give up the canonical name, see
+/// `format_crypt_backstore_name()`, before the destination backstore can
+/// activate its own encryption layer under it.
+///
+/// Prerequisite: len(format!("{}", FORMAT_VERSION)
+///             + len("stratis")                         7
+///             + len("private")                         7
+///             + len("crypt")                           5
+///             + len("migrate")                         7
+///             + num_dashes                             5
+///             + len(pool uuid)                         32
+///             < 128
+///
+/// which is equivalent to len(format!("{}", FORMAT_VERSION) < 65
+pub fn format_crypt_backstore_migrate_name(pool_uuid: PoolUuid) -> DmNameBuf {
+    let value = format!(
+        "stratis-{}-private-{}-crypt-migrate",
+        FORMAT_VERSION,
+        uuid_to_string!(pool_uuid)
+    );
+    DmNameBuf::new(value).expect("FORMAT_VERSION display_length < 65")
+}
+
 /// Format the temporary name given to a backstore DM device belonging to the
 /// source pool of an in-progress migration.
 ///

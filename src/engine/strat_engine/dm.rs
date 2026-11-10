@@ -4,16 +4,17 @@
 
 // Get ability to instantiate a devicemapper context.
 
-use std::{path::Path, sync::LazyLock};
+use std::{iter::once, path::Path, sync::LazyLock};
 
 use devicemapper::{DevId, DmError, DmNameBuf, DmOptions, DmUuidBuf, DM};
 
 use crate::{
     engine::{
         strat_engine::names::{
-            format_backstore_ids, format_backstore_migrate_name, format_crypt_backstore_name,
-            format_crypt_name, format_flex_ids, format_thin_ids, format_thinpool_ids, CacheRole,
-            FlexRole, ThinPoolRole, ThinRole,
+            format_backstore_ids, format_backstore_migrate_name,
+            format_crypt_backstore_migrate_name, format_crypt_backstore_name, format_crypt_name,
+            format_flex_ids, format_thin_ids, format_thinpool_ids, CacheRole, FlexRole,
+            ThinPoolRole, ThinRole,
         },
         types::{DevUuid, FilesystemUuid, PoolUuid},
     },
@@ -167,9 +168,12 @@ pub fn list_of_backstore_devices_legacy(pool_uuid: PoolUuid) -> Vec<DmNameBuf> {
 /// by `rename_backstore_devices_migrate()` so that the destination
 /// backstore can take the canonical names.
 pub fn list_of_backstore_devices_migrate(pool_uuid: PoolUuid) -> Vec<DmNameBuf> {
-    BACKSTORE_ROLES
-        .iter()
-        .map(|role| format_backstore_migrate_name(pool_uuid, *role))
+    once(format_crypt_backstore_migrate_name(pool_uuid))
+        .chain(
+            BACKSTORE_ROLES
+                .iter()
+                .map(|role| format_backstore_migrate_name(pool_uuid, *role)),
+        )
         .collect()
 }
 
@@ -207,16 +211,21 @@ pub fn set_backstore_device_uuids(pool_uuid: PoolUuid) -> StratisResult<()> {
 
 /// Pairs of canonical and temporary backstore device names for a pool, in
 /// migration order.
+///
+/// The encryption layer of a V2 pool is included. A V1 pool has no device with
+/// that name, and nonexistent devices are skipped when renaming.
 fn backstore_migrate_renames(pool_uuid: PoolUuid) -> Vec<(DmNameBuf, DmNameBuf)> {
-    BACKSTORE_ROLES
-        .iter()
-        .map(|role| {
-            (
-                format_backstore_ids(pool_uuid, *role).0,
-                format_backstore_migrate_name(pool_uuid, *role),
-            )
-        })
-        .collect()
+    once((
+        format_crypt_backstore_name(&pool_uuid),
+        format_crypt_backstore_migrate_name(pool_uuid),
+    ))
+    .chain(BACKSTORE_ROLES.iter().map(|role| {
+        (
+            format_backstore_ids(pool_uuid, *role).0,
+            format_backstore_migrate_name(pool_uuid, *role),
+        )
+    }))
+    .collect()
 }
 
 pub fn list_of_backstore_devices(pool_uuid: PoolUuid) -> Vec<DmNameBuf> {

@@ -68,8 +68,10 @@ PROFILEDIR ?= release
 
 ifeq ($(PROFILEDIR), debug)
   RELEASE_FLAG =
+  STATIC_CARGO_FLAGS = CARGO_PROFILE_DEV_LTO=thin
 else
   RELEASE_FLAG = --release
+  STATIC_CARGO_FLAGS = CARGO_PROFILE_RELEASE_LTO=thin
 endif
 
 MIN_FEATURES = --no-default-features --features engine,min
@@ -79,7 +81,6 @@ EXTRAS_FEATURES =  --no-default-features --features engine,extras
 UDEV_FEATURES = --no-default-features --features udev_scripts
 UTILS_FEATURES = --no-default-features --features dbus_enabled,engine,systemd_compat
 
-STATIC_CARGO_FLAGS = CARGO_PROFILE_RELEASE_LTO=thin
 STATIC_CFLAGS = -C target-feature=+crt-static
 
 .PHONY: actionlint

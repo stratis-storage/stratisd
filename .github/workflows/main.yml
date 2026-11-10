@@ -113,6 +113,7 @@ jobs:
       - uses: stratis-storage/github-actions/github-modify@HEAD
         with:
           repo: stratis-cli
+          default_branch: v3.9.2
       - name: Print head commit
         run: git log --oneline -1
         working-directory: stratis-cli
@@ -299,6 +300,7 @@ jobs:
       - uses: stratis-storage/github-actions/github-modify@HEAD
         with:
           repo: testing
+          default_branch: v3.9.1
       - name: Run stratisd_cert.py
         run: >
           sudo

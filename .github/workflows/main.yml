@@ -66,7 +66,6 @@ jobs:
       - name: Install dependencies
         run: >
           dnf install -y
-          asciidoc
           clang
           cryptsetup-devel
           dbus-daemon
@@ -102,10 +101,10 @@ jobs:
         with:
           working-directory: stratisd
       - name: Build stratisd
-        run: PROFILEDIR=debug make -f Makefile build-all
+        run: PROFILEDIR=debug make -f Makefile build-all-rust
         working-directory: stratisd
       - name: Install stratisd
-        run: PROFILEDIR=debug make -f Makefile install
+        run: PROFILEDIR=debug make -f Makefile install-programs
         working-directory: stratisd
       - name: Workaround for dbus inotify
         run: cp stratisd.conf /usr/share/dbus-1/system.d
@@ -199,7 +198,6 @@ jobs:
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
-          asciidoc
           clang
           cryptsetup-devel
           curl
@@ -224,9 +222,9 @@ jobs:
       - name: Overwrite stratisd dependencies as necessary
         uses: stratis-storage/github-actions/stratisd-modify@HEAD
       - name: Build stratisd
-        run: PROFILEDIR=debug make -f Makefile build-all
+        run: PROFILEDIR=debug make -f Makefile build-all-rust
       - name: Install stratisd
-        run: PROFILEDIR=debug make -f Makefile install
+        run: PROFILEDIR=debug make -f Makefile install-programs
       - name: Check basic behavior of test_predict
         run: >
           STRATIS_PREDICT_USAGE=/usr/bin/stratis-predict-usage

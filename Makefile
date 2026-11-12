@@ -114,7 +114,7 @@ build-all: build-all-rust build-all-man
 build-all-man: docs/stratisd.8 docs/stratis-dumpmetadata.8
 
 .PHONY: build-all-rust
-## Build all Rust artifacts
+## Build all Rust artifacts that are generally packaged and distributed
 build-all-rust: stratisd build-min build-utils build-udev-utils stratisd-tools
 
 .PHONY: build-min

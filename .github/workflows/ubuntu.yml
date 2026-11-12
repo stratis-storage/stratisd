@@ -39,25 +39,19 @@ jobs:
         include:
           - task: make -f Makefile clippy
             components: clippy
-          - task: PROFILEDIR=debug make -f Makefile stratisd
-            components: cargo
-          - task: PROFILEDIR=debug make -f Makefile build-min
+          - task: PROFILEDIR=debug make -f Makefile build-all-rust
             components: cargo
           - task: PROFILEDIR=debug make -f Makefile build-min-no-systemd
             components: cargo
-          - task: PROFILEDIR=debug make -f Makefile build-utils
-            components: cargo
           - task: PROFILEDIR=debug make -f Makefile build-no-ipc
-            components: cargo
-          - task: PROFILEDIR=debug make -f Makefile stratisd-tools
             components: cargo
           - task: make -f Makefile docs-ci
             components: cargo
           - task: make -f Makefile test
             components: cargo
-          - task: make -f Makefile stratisd
+          - task: make -f Makefile build-all-rust
             components: cargo
-          - task: make -f Makefile build-min
+          - task: make -f Makefile build-min-no-systemd
             components: cargo
           - task: make -f Makefile build-no-ipc
             components: cargo
@@ -113,7 +107,6 @@ jobs:
         run: >
           DEBIAN_FRONTEND=noninteractive
           apt-get install -y
-          asciidoc
           clang
           cryptsetup
           curl
@@ -139,9 +132,9 @@ jobs:
       - name: Overwrite stratisd dependencies as necessary
         uses: stratis-storage/github-actions/stratisd-modify@HEAD
       - name: Build stratisd
-        run: PROFILEDIR=debug make -f Makefile build-all
+        run: PROFILEDIR=debug make -f Makefile build-all-rust
       - name: Install stratisd
-        run: PROFILEDIR=debug make -f Makefile install
+        run: PROFILEDIR=debug make -f Makefile install-programs
       - name: Reload udev
         run: udevadm control --reload
       - name: Test ${{ matrix.task }} on CURRENT_DEVELOPMENT_RUST_TOOLCHAIN
@@ -166,7 +159,6 @@ jobs:
         run: >
           DEBIAN_FRONTEND=noninteractive
           apt-get install -y
-          asciidoc
           clang
           curl
           git
@@ -191,9 +183,9 @@ jobs:
       - name: Overwrite stratisd dependencies as necessary
         uses: stratis-storage/github-actions/stratisd-modify@HEAD
       - name: Build stratisd
-        run: PROFILEDIR=debug make -f Makefile build-all
+        run: PROFILEDIR=debug make -f Makefile build-all-rust
       - name: Install stratisd
-        run: PROFILEDIR=debug make -f Makefile install
+        run: PROFILEDIR=debug make -f Makefile install-programs
       - name: Reload udev
         run: udevadm control --reload
       - name: Test ${{ matrix.task }} on CURRENT_DEVELOPMENT_RUST_TOOLCHAIN

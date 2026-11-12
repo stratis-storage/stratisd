@@ -331,7 +331,6 @@ engine = [
     "dep:either",
     "dep:env_logger",
     "dep:futures",
-    "dep:indexmap",
     "dep:itertools",
     "dep:libblkid-rs",
     "dep:libc",
@@ -359,7 +358,10 @@ engine = [
 ]
 default = ["dbus_enabled", "engine"]
 dbus_enabled = ["dep:zbus"]
-extras = ["dep:pretty-hex"]
+extras = [
+    "dep:indexmap",
+    "dep:pretty-hex"
+]
 min = ["dep:termios"]
 systemd_compat = ["dep:bindgen"]
 udev_scripts = ["dep:data-encoding"]

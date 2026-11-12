@@ -19,19 +19,21 @@ use tokio::{
 
 use devicemapper::DmNameBuf;
 
+#[cfg(test)]
+use crate::engine::strat_engine::shared::validate_input_v1;
 use crate::{
     engine::{
         engine::{HandleEvents, KeyActions},
-        shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
+        shared::{create_pool_idempotent_or_err, validate_name},
         strat_engine::{
-            backstore::ProcessedPathInfos,
             cmd::verify_executables,
             dm::get_dm,
-            keys::{validate_key_descs, StratKeyActions},
+            keys::StratKeyActions,
             liminal::{find_all, DeviceSet, LiminalDevices},
             names::KeyDescription,
             ns::MemoryFilesystem,
             pool::{v1, v2, AnyPool},
+            shared::validate_input_v2,
         },
         structures::{
             AllLockReadAvailableGuard, AllLockReadGuard, AllLockWriteAvailableGuard,
@@ -42,7 +44,7 @@ use crate::{
             CreateAction, DeleteAction, DevUuid, FilesystemUuid, InputEncryptionInfo,
             IntegritySpec, LockedPoolsInfo, PoolDiff, PoolIdentifier, RenameAction, ReportType,
             SetUnlockAction, StartAction, StopAction, StoppedPoolsInfo, StratFilesystemDiff,
-            TokenUnlockMethod, UdevEngineEvent, UnlockMethod, ValidatedIntegritySpec,
+            TokenUnlockMethod, UdevEngineEvent, UnlockMethod,
         },
         Engine, Name, Pool, PoolUuid, Report,
     },
@@ -129,26 +131,8 @@ impl StratEngine {
         blockdev_paths: &[&Path],
         encryption_info: Option<&InputEncryptionInfo>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
-        if let Some(ei) = encryption_info {
-            validate_key_descs(ei.key_descs())?;
-        }
-
-        validate_name(name)?;
-        let name = Name::new(name.to_owned());
-
-        validate_paths(blockdev_paths)?;
-
-        let cloned_paths = blockdev_paths
-            .iter()
-            .map(|p| p.to_path_buf())
-            .collect::<Vec<_>>();
-
-        let devices = spawn_blocking!({
-            let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
-            ProcessedPathInfos::try_from(borrowed_paths.as_slice())
-        })??;
-
-        let (stratis_devices, unowned_devices) = devices.unpack();
+        let (name, stratis_devices, unowned_devices) =
+            validate_input_v1(encryption_info, name, blockdev_paths).await?;
 
         let maybe_guard = self.pools.read(PoolIdentifier::Name(name.clone())).await;
         if let Some(guard) = maybe_guard {
@@ -551,27 +535,8 @@ impl Engine for StratEngine {
         encryption_info: Option<&InputEncryptionInfo>,
         integrity_spec: IntegritySpec,
     ) -> StratisResult<CreateAction<PoolUuid>> {
-        if let Some(ei) = encryption_info {
-            validate_key_descs(ei.key_descs())?;
-        }
-
-        validate_name(name)?;
-        let name = Name::new(name.to_owned());
-        let integrity_spec = ValidatedIntegritySpec::try_from(integrity_spec)?;
-
-        validate_paths(blockdev_paths)?;
-
-        let cloned_paths = blockdev_paths
-            .iter()
-            .map(|p| p.to_path_buf())
-            .collect::<Vec<_>>();
-
-        let devices = spawn_blocking!({
-            let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
-            ProcessedPathInfos::try_from(borrowed_paths.as_slice())
-        })??;
-
-        let (stratis_devices, unowned_devices) = devices.unpack();
+        let (name, stratis_devices, unowned_devices, validated_integrity_spec) =
+            validate_input_v2(encryption_info, name, blockdev_paths, integrity_spec).await?;
 
         let maybe_guard = self.pools.read(PoolIdentifier::Name(name.clone())).await;
         if let Some(guard) = maybe_guard {
@@ -619,7 +584,7 @@ impl Engine for StratEngine {
                         &cloned_name,
                         unowned_devices,
                         cloned_enc_info.as_ref(),
-                        integrity_spec,
+                        validated_integrity_spec,
                     )
                 })??;
                 pools.insert(
@@ -965,6 +930,68 @@ impl Engine for StratEngine {
         Ok(())
     }
 
+    async fn migrate(
+        &self,
+        pool_uuid: PoolUuid,
+        name: &str,
+        blockdev_paths: &[&Path],
+        encryption_info: Option<&InputEncryptionInfo>,
+        integrity_spec: IntegritySpec,
+    ) -> StratisResult<()> {
+        let (validated_name, stratis_devices, unowned_devices, validated_integrity_spec) =
+            validate_input_v2(encryption_info, name, blockdev_paths, integrity_spec).await?;
+        stratis_devices.error_on_not_empty()?;
+
+        let pool = {
+            let mut modify_guard = self.pools.modify_all().await;
+            let (_, pool) = modify_guard.remove_by_uuid(pool_uuid).ok_or_else(|| {
+                StratisError::Msg(format!(
+                    "No pool with UUID {pool_uuid} found in pool record"
+                ))
+            })?;
+            pool
+        };
+
+        let migrated = match pool {
+            AnyPool::V1(p) => p
+                .migrate(
+                    pool_uuid,
+                    unowned_devices,
+                    encryption_info,
+                    validated_integrity_spec,
+                )
+                .map(Box::new)
+                .map_err(|(e, p)| (e, AnyPool::V1(p))),
+            AnyPool::V2(p) => p
+                .migrate(
+                    pool_uuid,
+                    unowned_devices,
+                    encryption_info,
+                    validated_integrity_spec,
+                )
+                .map(Box::new)
+                .map_err(|(e, p)| (e, AnyPool::V2(p))),
+        };
+        match migrated {
+            Ok(mut p) => {
+                let res = p.write_metadata(name);
+                self.pools
+                    .modify_all()
+                    .await
+                    .insert(validated_name, pool_uuid, AnyPool::V2(p));
+                res?;
+                Ok(())
+            }
+            Err((e, p)) => {
+                self.pools
+                    .modify_all()
+                    .await
+                    .insert(validated_name, pool_uuid, p);
+                Err(e)
+            }
+        }
+    }
+
     fn is_sim(&self) -> bool {
         false
     }
@@ -974,10 +1001,13 @@ impl Engine for StratEngine {
 mod test {
     use std::{
         env,
+        fs::File,
+        io::{Read, Write},
         panic::{catch_unwind, UnwindSafe},
         path::Path,
     };
 
+    use nix::mount::{mount, umount, MsFlags};
     use retry::{delay::Fixed, retry};
     use tokio::sync::mpsc::unbounded_channel;
 
@@ -988,6 +1018,7 @@ mod test {
         strat_engine::{
             cmd,
             crypt::crypt_metadata_size,
+            dm::{get_dm, list_of_backstore_devices_migrate},
             ns::unshare_mount_namespace,
             tests::{crypt, loopbacked, real, FailDevice},
         },
@@ -1669,5 +1700,251 @@ mod test {
     #[test]
     fn real_test_start_stop() {
         real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_start_stop);
+    }
+
+    /// Create a pool on the first half of the given paths, write a file to a
+    /// filesystem on it, migrate the pool to the second half of the paths, and
+    /// verify that the pool is now a V2 pool, that the file is intact, and that
+    /// no temporary migration devices are left over.
+    ///
+    /// If `source_v1` is true the source pool is a V1 pool, otherwise it is a
+    /// V2 pool. `source_key_desc` and `dest_key_desc` request encryption of the
+    /// source and destination backstores respectively. V1 pools do not support
+    /// the V2 encryption input, so `source_key_desc` must be `None` for them.
+    fn test_migrate(
+        paths: &[&Path],
+        source_v1: bool,
+        source_key_desc: Option<&KeyDescription>,
+        dest_key_desc: Option<&KeyDescription>,
+    ) {
+        assert!(paths.len() > 1);
+        assert!(!(source_v1 && source_key_desc.is_some()));
+
+        let (source_paths, dest_paths) = paths.split_at(paths.len() / 2);
+
+        let to_info = |key_desc: Option<&KeyDescription>| {
+            key_desc.map(|kd| {
+                InputEncryptionInfo::new(vec![(Some(0), kd.to_owned())], vec![])
+                    .unwrap()
+                    .expect("key description was provided")
+            })
+        };
+        let source_info = to_info(source_key_desc);
+        let dest_info = to_info(dest_key_desc);
+
+        let (send, _recv) = unbounded_channel();
+        let engine = StratEngine::initialize(send).unwrap();
+
+        let name = "migrate_pool";
+        let uuid = if source_v1 {
+            test_async!(engine.create_pool_legacy(name, source_paths, None))
+        } else {
+            test_async!(engine.create_pool(
+                name,
+                source_paths,
+                source_info.as_ref(),
+                IntegritySpec::default()
+            ))
+        }
+        .unwrap()
+        .changed()
+        .unwrap();
+
+        let fs_name = "migrate_fs";
+        let fs_uuid = {
+            let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
+            assert_eq!(matches!(&*pool, AnyPool::V1(_)), source_v1);
+            let (_, fs_uuid, _) = pool
+                .create_filesystems(name, uuid, &[(fs_name, None, None)])
+                .unwrap()
+                .changed()
+                .and_then(|mut fs| fs.pop())
+                .unwrap();
+            fs_uuid
+        };
+        cmd::udev_settle().unwrap();
+
+        let tmp_dir = tempfile::Builder::new()
+            .prefix("stratis_testing")
+            .tempdir()
+            .unwrap();
+        let test_file = tmp_dir.path().join("stratis_test.txt");
+        let contents = [0xa5u8; 4096];
+
+        let devnode = {
+            let pool = test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid))).unwrap();
+            pool.get_filesystem(fs_uuid).unwrap().1.devnode()
+        };
+        mount(
+            Some(&devnode),
+            tmp_dir.path(),
+            Some("xfs"),
+            MsFlags::empty(),
+            None as Option<&str>,
+        )
+        .unwrap();
+        {
+            let mut f = File::create(&test_file).unwrap();
+            f.write_all(&contents).unwrap();
+            f.sync_all().unwrap();
+        }
+        umount(tmp_dir.path()).unwrap();
+
+        test_async!(engine.migrate(
+            uuid,
+            name,
+            dest_paths,
+            dest_info.as_ref(),
+            IntegritySpec::default()
+        ))
+        .unwrap();
+        cmd::udev_settle().unwrap();
+
+        // The pool keeps its UUID and name but is now a V2 pool whose
+        // encryption matches the request.
+        {
+            let pool = test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid))).unwrap();
+            let (pool_name, _, pool) = pool.as_tuple();
+            assert_eq!(&*pool_name, name);
+            assert!(matches!(pool, AnyPool::V2(_)));
+            assert_eq!(pool.is_encrypted(), dest_key_desc.is_some());
+        }
+
+        // No temporary migration devices are left behind.
+        let leftover = get_dm()
+            .list_devices()
+            .unwrap()
+            .into_iter()
+            .map(|(n, _, _)| n)
+            .filter(|n| list_of_backstore_devices_migrate(uuid).contains(n))
+            .collect::<Vec<_>>();
+        assert!(leftover.is_empty(), "left over devices: {leftover:?}");
+
+        // The data survived the migration.
+        let devnode = {
+            let pool = test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid))).unwrap();
+            pool.get_filesystem(fs_uuid).unwrap().1.devnode()
+        };
+        mount(
+            Some(&devnode),
+            tmp_dir.path(),
+            Some("xfs"),
+            MsFlags::empty(),
+            None as Option<&str>,
+        )
+        .unwrap();
+        let mut buf = Vec::new();
+        File::open(&test_file)
+            .unwrap()
+            .read_to_end(&mut buf)
+            .unwrap();
+        umount(tmp_dir.path()).unwrap();
+        assert_eq!(buf, contents);
+
+        // The migrated pool can be torn down and set up again from its
+        // on-disk metadata, which shows that the new metadata was written.
+        engine.teardown().unwrap();
+        let (send, _recv) = unbounded_channel();
+        let engine = StratEngine::initialize(send).unwrap();
+        {
+            let pools = test_async!(engine.pools());
+            let pool = pools.get_by_uuid(uuid);
+            if dest_key_desc.is_none() {
+                let (pool_name, pool) = pool.expect("pool should have been set up");
+                assert_eq!(&*pool_name, name);
+                assert!(!pool.is_encrypted());
+            }
+        }
+        engine.teardown().unwrap();
+    }
+
+    /// Migrate a V1 pool to an unencrypted V2 pool.
+    fn test_migrate_v1_to_v2(paths: &[&Path]) {
+        test_migrate(paths, true, None, None);
+    }
+
+    #[test]
+    fn loop_test_migrate_v1_to_v2() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_migrate_v1_to_v2,
+        );
+    }
+
+    #[test]
+    fn real_test_migrate_v1_to_v2() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(2, None, None),
+            test_migrate_v1_to_v2,
+        );
+    }
+
+    /// Migrate a V1 pool to an encrypted V2 pool.
+    fn test_migrate_v1_to_v2_encrypted(paths: &[&Path]) {
+        crypt::insert_and_cleanup_key(paths, |paths, key_desc| {
+            test_migrate(paths, true, None, Some(key_desc))
+        });
+    }
+
+    #[test]
+    fn loop_test_migrate_v1_to_v2_encrypted() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_migrate_v1_to_v2_encrypted,
+        );
+    }
+
+    #[test]
+    fn real_test_migrate_v1_to_v2_encrypted() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(2, None, None),
+            test_migrate_v1_to_v2_encrypted,
+        );
+    }
+
+    /// Migrate an unencrypted V2 pool to another unencrypted V2 pool.
+    fn test_migrate_v2_to_v2(paths: &[&Path]) {
+        test_migrate(paths, false, None, None);
+    }
+
+    #[test]
+    fn loop_test_migrate_v2_to_v2() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_migrate_v2_to_v2,
+        );
+    }
+
+    #[test]
+    fn real_test_migrate_v2_to_v2() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(2, None, None),
+            test_migrate_v2_to_v2,
+        );
+    }
+
+    /// Migrate an encrypted V2 pool to another encrypted V2 pool. Both
+    /// backstores use the same key description, so this exercises renaming
+    /// the source encryption layer and sharing the volume key.
+    fn test_migrate_v2_to_v2_encrypted(paths: &[&Path]) {
+        crypt::insert_and_cleanup_key(paths, |paths, key_desc| {
+            test_migrate(paths, false, Some(key_desc), Some(key_desc))
+        });
+    }
+
+    #[test]
+    fn loop_test_migrate_v2_to_v2_encrypted() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_migrate_v2_to_v2_encrypted,
+        );
+    }
+
+    #[test]
+    fn real_test_migrate_v2_to_v2_encrypted() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(2, None, None),
+            test_migrate_v2_to_v2_encrypted,
+        );
     }
 }

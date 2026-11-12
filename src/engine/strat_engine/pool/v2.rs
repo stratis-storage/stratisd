@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use either::Either;
 use serde_json::{Map, Value};
 
-use devicemapper::{Bytes, DmNameBuf, Sectors};
+use devicemapper::{Bytes, Device, DmNameBuf, Sectors};
 use stratisd_proc_macros::strat_pool_impl_gen;
 
 use crate::{
@@ -27,9 +27,10 @@ use crate::{
             backstore::{
                 backstore::{v2::Backstore, InternalBackstore},
                 blockdev::{v2::StratBlockDev, InternalBlockDev},
-                ProcessedPathInfos, UnownedDevices,
+                migrate, ProcessedPathInfos, UnownedDevices,
             },
             crypt::DEFAULT_CRYPT_DATA_OFFSET_V2,
+            dm::{rename_backstore_devices_migrate, restore_backstore_devices_migrate},
             keys::{search_key_persistent, validate_key_descs},
             liminal::DeviceSet,
             metadata::{disown_device, MDADataSize},
@@ -141,11 +142,11 @@ fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
 
 #[derive(Debug)]
 pub struct StratPool {
-    backstore: Backstore,
-    thin_pool: ThinPool<Backstore>,
-    action_avail: ActionAvailability,
-    metadata_size: Sectors,
-    last_reencrypt: Option<DateTime<Utc>>,
+    pub(super) backstore: Backstore,
+    pub(super) thin_pool: ThinPool<Backstore>,
+    pub(super) action_avail: ActionAvailability,
+    pub(super) metadata_size: Sectors,
+    pub(super) last_reencrypt: Option<DateTime<Utc>>,
 }
 
 #[strat_pool_impl_gen]
@@ -160,10 +161,6 @@ impl StratPool {
         encryption_info: Option<&InputEncryptionInfo>,
         integrity_spec: ValidatedIntegritySpec,
     ) -> StratisResult<(PoolUuid, StratPool)> {
-        if let Some(ei) = encryption_info {
-            validate_key_descs(ei.key_descs())?;
-        }
-
         let pool_uuid = PoolUuid::new_v4();
 
         // FIXME: Initializing with the minimum MDA size is not necessarily
@@ -333,6 +330,228 @@ impl StratPool {
     pub fn write_metadata(&mut self, name: &str) -> StratisResult<()> {
         let data = serde_json::to_string(&self.record(name))?;
         self.backstore.save_state(data.as_bytes())
+    }
+
+    /// Migrate the data in this pool to a new backstore built from the given
+    /// devices, which may be configured differently from the current one. The
+    /// pool keeps its name and UUID.
+    ///
+    /// The data is copied by mirroring the current backstore's cap device onto
+    /// the new backstore's with dm-raid, after which the thin pool is switched
+    /// to the new backstore and the current one is destroyed.
+    ///
+    /// On failure the pool is returned alongside the error. Unless the error
+    /// says otherwise it is back in its pre-migration state.
+    pub fn migrate(
+        mut self,
+        pool_uuid: PoolUuid,
+        blockdev_paths: UnownedDevices,
+        encryption_info: Option<&InputEncryptionInfo>,
+        integrity_spec: ValidatedIntegritySpec,
+    ) -> Result<StratPool, (StratisError, Box<StratPool>)> {
+        /// Return the pool to its pre-migration state: destroy whatever
+        /// destination backstore devices have been created, move the source
+        /// backstore's devices back to their canonical names, and put the
+        /// source backstore's volume key back in the keyring.
+        ///
+        /// Precondition: the thin pool is backed by the source backstore's
+        /// cap device, not by the mirror or the destination backstore.
+        fn roll_back(
+            pool_uuid: PoolUuid,
+            source: &Backstore,
+            new_backstore: Option<&mut Backstore>,
+            causal_error: StratisError,
+        ) -> StratisError {
+            match new_backstore
+                .map_or(Ok(()), |b| b.destroy(pool_uuid))
+                .and_then(|_| restore_backstore_devices_migrate(pool_uuid))
+                .and_then(|_| source.restore_volume_key(pool_uuid))
+            {
+                Ok(()) => causal_error,
+                Err(rollback_error) => StratisError::RollbackError {
+                    causal_error: Box::new(causal_error),
+                    rollback_error: Box::new(rollback_error),
+                    level: ActionAvailability::NoPoolChanges,
+                },
+            }
+        }
+
+        /// Point the thin pool at the given backstore device and make the
+        /// change take effect.
+        fn switch_thin_pool(pool: &mut StratPool, device: Device) -> StratisResult<()> {
+            pool.thin_pool
+                .set_device(device, Sectors(0), OffsetDirection::Forwards)?;
+            pool.thin_pool.resume()
+        }
+
+        fn inner(
+            pool: &mut StratPool,
+            pool_uuid: PoolUuid,
+            unowned_devices: UnownedDevices,
+            encryption_info: Option<&InputEncryptionInfo>,
+            integrity_spec: ValidatedIntegritySpec,
+        ) -> StratisResult<Backstore> {
+            let old_device = pool.backstore.device().ok_or_else(|| {
+                StratisError::Msg(
+                    "Source backstore for migration does not appear to have a cap device"
+                        .to_string(),
+                )
+            })?;
+            // The source backstore's cap device is identified by its device
+            // number from here on. Its name, and so the path derived from it,
+            // is about to be given to the destination backstore.
+            let old_cap_device = PathBuf::from(format!("/dev/block/{old_device}"));
+
+            // Both backstores derive their devicemapper names and UUIDs from
+            // the pool UUID, so they can not hold them at the same time. Move
+            // the source backstore's devices to temporary names, freeing the
+            // canonical names for the destination backstore. A devicemapper
+            // UUID can not be changed once it has been set, so the source
+            // keeps the UUIDs and the destination's devices are created
+            // without any; they are given their UUIDs at the end, once the
+            // source backstore has been torn down.
+            rename_backstore_devices_migrate(pool_uuid)?;
+
+            let mut new_backstore = match Backstore::initialize_for_migration(
+                pool_uuid,
+                unowned_devices,
+                MDADataSize::default(),
+                encryption_info,
+                integrity_spec,
+            ) {
+                Ok(b) => b,
+                Err(e) => return Err(roll_back(pool_uuid, &pool.backstore, None, e)),
+            };
+
+            if let Err(e) =
+                new_backstore.alloc(pool_uuid, &[pool.backstore.datatier_allocated_size()])
+            {
+                return Err(roll_back(
+                    pool_uuid,
+                    &pool.backstore,
+                    Some(&mut new_backstore),
+                    e,
+                ));
+            }
+            let (new_device, new_cap_device) =
+                match new_backstore.device().zip(new_backstore.device_path()) {
+                    Some(pair) => pair,
+                    None => {
+                        let e = StratisError::Msg(
+                            "Target backstore for migration does not appear to have a cap device"
+                                .to_string(),
+                        );
+                        return Err(roll_back(
+                            pool_uuid,
+                            &pool.backstore,
+                            Some(&mut new_backstore),
+                            e,
+                        ));
+                    }
+                };
+
+            let temp_device =
+                match migrate::set_up_raid_array(pool_uuid, &old_cap_device, &new_cap_device) {
+                    Ok(d) => d,
+                    Err(e) => {
+                        return Err(roll_back(
+                            pool_uuid,
+                            &pool.backstore,
+                            Some(&mut new_backstore),
+                            e,
+                        ))
+                    }
+                };
+
+            // Once the thin pool is backed by the mirror it must be returned
+            // to the source backstore's cap device before the mirror can be
+            // torn down.
+            if let Err(causal_e) = switch_thin_pool(pool, temp_device) {
+                let e = match migrate::tear_down_raid(pool_uuid) {
+                    Ok(()) => causal_e,
+                    Err(rollback_error) => StratisError::RollbackError {
+                        causal_error: Box::new(causal_e),
+                        rollback_error: Box::new(rollback_error),
+                        level: ActionAvailability::NoPoolChanges,
+                    },
+                };
+                return Err(roll_back(
+                    pool_uuid,
+                    &pool.backstore,
+                    Some(&mut new_backstore),
+                    e,
+                ));
+            }
+            if let Err(causal_e) = migrate::wait_on_sync_completion(pool_uuid) {
+                let e = match switch_thin_pool(pool, old_device)
+                    .and_then(|_| migrate::tear_down_raid(pool_uuid))
+                {
+                    Ok(()) => causal_e,
+                    Err(rollback_error) => StratisError::RollbackError {
+                        causal_error: Box::new(causal_e),
+                        rollback_error: Box::new(rollback_error),
+                        level: ActionAvailability::NoPoolChanges,
+                    },
+                };
+                return Err(roll_back(
+                    pool_uuid,
+                    &pool.backstore,
+                    Some(&mut new_backstore),
+                    e,
+                ));
+            }
+
+            // Past this point the destination backstore holds a complete copy
+            // of the data, so failures leave the pool on the destination
+            // rather than returning it to the source.
+            let unavailable = |e| StratisError::ActionAvailabilityError {
+                error: Box::new(e),
+                level: ActionAvailability::NoPoolChanges,
+            };
+            switch_thin_pool(pool, new_device).map_err(unavailable)?;
+            migrate::tear_down_raid(pool_uuid).map_err(unavailable)?;
+
+            // Nothing refers to the source backstore's devices any more, so
+            // they can be removed, releasing the devicemapper UUIDs that the
+            // destination backstore's devices are still waiting for.
+            pool.backstore
+                .destroy_migrate(pool_uuid)
+                .map_err(unavailable)?;
+            new_backstore
+                .set_deferred_dm_uuids(pool_uuid)
+                .map_err(unavailable)?;
+
+            Ok(new_backstore)
+        }
+
+        if self.action_avail >= ActionAvailability::NoRequests {
+            return Err((
+                StratisError::ActionDisabled(self.action_avail.clone()),
+                Box::new(self),
+            ));
+        }
+
+        match inner(
+            &mut self,
+            pool_uuid,
+            blockdev_paths,
+            encryption_info,
+            integrity_spec,
+        ) {
+            Ok(new_backstore) => {
+                self.backstore = new_backstore;
+                // The encryption layer, if any, is new, so no reencryption
+                // has taken place on it.
+                self.last_reencrypt = None;
+                Ok(self)
+            }
+            Err(e) => {
+                if let Some(state) = e.error_to_available_actions() {
+                    self.action_avail = state;
+                }
+                Err((e, Box::new(self)))
+            }
+        }
     }
 
     /// Teardown a pool.

@@ -613,14 +613,18 @@ pub mod tests {
 
     /// Return a static header with random block device and MDA size.
     /// The block device is less than the minimum, for efficiency in testing.
-    pub fn random_static_header(blkdev_size: u64, mda_size_factor: u32) -> StaticHeader {
+    pub fn random_static_header(
+        blkdev_size: u64,
+        mda_size_factor: u32,
+        sigblock_version: StratSigblockVersion,
+    ) -> StaticHeader {
         let pool_uuid = PoolUuid::new_v4();
         let dev_uuid = DevUuid::new_v4();
         let mda_data_size =
             MDADataSize::new(MDADataSize::default().bytes() + Bytes::from(mda_size_factor * 4));
         let blkdev_size = (Bytes::from(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();
         StaticHeader::new(
-            StratSigblockVersion::V1,
+            sigblock_version,
             StratisIdentifiers::new(pool_uuid, dev_uuid),
             mda_data_size,
             BlockdevSize::new(blkdev_size),
@@ -630,8 +634,11 @@ pub mod tests {
 
     /// Make a static header strategy
     pub fn static_header_strategy() -> BoxedStrategy<StaticHeader> {
-        (0..64u64, 0..64u32)
-            .prop_map(|(b, m)| random_static_header(b, m))
+        (0..64u64, 0..64u32, 1..=2u8)
+            .prop_map(|(b, m, v)| {
+                let version = StratSigblockVersion::from_repr(v).expect("version should be 1 or 2");
+                random_static_header(b, m, version)
+            })
             .boxed()
     }
 
@@ -660,7 +667,7 @@ pub mod tests {
                     .and_then(|_| f.sync_all())
             }
 
-            let sh = random_static_header(10000, 4);
+            let sh = random_static_header(10000, 4, StratSigblockVersion::V1);
             let buf_size = bytes!(static_header_size::STATIC_HEADER_SECTORS);
 
             let mut reference_buf = Cursor::new(vec![0; buf_size]);
@@ -738,7 +745,7 @@ pub mod tests {
     /// if the sigblock's timestamps don't match but they are otherwise
     /// identical.
     fn test_rewrite_older_sigblock() {
-        let sh = random_static_header(10000, 4);
+        let sh = random_static_header(10000, 4, StratSigblockVersion::V1);
 
         let ts = now_to_timestamp();
         let sh_older = StaticHeader {

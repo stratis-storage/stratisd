@@ -11,13 +11,13 @@ use std::sync::{
 
 use tokio::{
     runtime::Builder,
-    select, signal,
+    select,
+    signal::unix::{signal, SignalKind},
     sync::{
         broadcast::{self, channel},
         mpsc::{self, unbounded_channel},
         oneshot,
     },
-    task,
 };
 
 use nix::unistd::getpid;
@@ -34,19 +34,6 @@ use crate::{
         stratis::VERSION, timer::run_timers, udev_monitor::udev_thread,
     },
 };
-
-// Waits for SIGINT. If received, sends true to all blocking calls in blocking
-// threads which will then terminate.
-async fn signal_thread() -> StratisResult<()> {
-    task::spawn(async {
-        if let Err(e) = signal::ctrl_c().await {
-            error!("Failure while listening for signals: {e}");
-        }
-    })
-    .await?;
-
-    Ok(())
-}
 
 /// Set up all sorts of signal and event handling mechanisms.
 /// Initialize the engine and keep it running until a signal is received
@@ -116,7 +103,13 @@ pub fn run(sim: bool) -> StratisResult<()> {
                 Arc::clone(&engine),
                 udev_receiver,
             );
-            let join_signal = signal_thread();
+
+            // Set up signal-handlers immediately before select!, otherwise
+            // signal-handlers may be overridden by dependent C libraries
+            // during their own initialization steps.
+            let mut interrupt_signal = signal(SignalKind::interrupt())?;
+            let mut terminate_signal = signal(SignalKind::terminate())?;
+
             let join_dm = dm_event_thread(
                 #[cfg(feature = "dbus_enabled")]
                 Arc::clone(&connection),
@@ -173,8 +166,19 @@ pub fn run(sim: bool) -> StratisResult<()> {
                         info!("The key description thread exited; shutting down stratisd...");
                     }
                 }
-                _ = join_signal => {
-                    info!("Caught SIGINT; exiting...");
+                res = interrupt_signal.recv() => {
+                    if res.is_some() {
+                        info!("Caught SIGINT; exiting...");
+                    } else {
+                        error!("SIGINT listener closed; shutting down stratisd...");
+                    }
+                },
+                res = terminate_signal.recv() => {
+                    if res.is_some() {
+                        info!("Caught SIGTERM; exiting...");
+                    } else {
+                        error!("SIGTERM listener closed; shutting down stratisd...");
+                    }
                 },
             }
 

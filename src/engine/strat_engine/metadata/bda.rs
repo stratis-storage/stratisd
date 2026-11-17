@@ -206,7 +206,7 @@ mod tests {
         let sleep_time = time::Duration::from_secs(1);
 
         // Construct a BDA.
-        let sh = random_static_header(0, 0);
+        let sh = random_static_header(0, 0, StratSigblockVersion::V1);
         let mut buf = Cursor::new(vec![
             0;
             convert_test!(

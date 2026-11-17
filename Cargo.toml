@@ -178,7 +178,7 @@ version = "1.6.1"
 optional = true
 
 [dependencies.env_logger]
-version ="0.11.0"
+version ="0.11.3"
 optional = true
 
 [dependencies.futures]

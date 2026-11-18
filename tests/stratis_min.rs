@@ -7,6 +7,7 @@
 use assert_cmd::Command;
 use common::test_with_stratisd_min_sim;
 use predicates::prelude::predicate;
+use proptest::prelude::proptest;
 
 mod common;
 
@@ -1168,6 +1169,42 @@ fn test_stratis_min_parse_size_empty_magnitude() {
     cmd.assert().failure().stderr(predicate::str::contains(
         "magnitude must be a decimal integer",
     ));
+}
+
+proptest! {
+    #[test]
+    fn test_stratis_min_parse_size_proptest_invalid_unit(
+        m in 0u64..1_000_000u64,
+        suffix in "[a-zA-Z]{1,5}",
+    ) {
+        let valid_units = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"];
+        if !valid_units.contains(&suffix.as_str()) {
+            let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+            cmd.arg("filesystem")
+                .arg("create")
+                .arg("--size")
+                .arg(format!("{m}{suffix}"))
+                .arg("pn")
+                .arg("fn");
+            cmd.assert().failure().stderr(
+                predicate::str::contains("units must be B, KiB, MiB, GiB, TiB, or PiB"),
+            );
+        }
+    }
+
+    #[test]
+    fn test_stratis_min_parse_size_proptest_no_unit(m in 0u64..1_000_000u64) {
+        let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+        cmd.arg("filesystem")
+            .arg("create")
+            .arg("--size")
+            .arg(format!("{m}"))
+            .arg("pn")
+            .arg("fn");
+        cmd.assert().failure().stderr(
+            predicate::str::contains("units must be B, KiB, MiB, GiB, TiB, or PiB"),
+        );
+    }
 }
 
 fn stratis_min_create_pool_and_fs_with_all_units() {

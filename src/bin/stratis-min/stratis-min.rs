@@ -795,6 +795,8 @@ fn main() -> Result<(), String> {
 
 #[cfg(test)]
 mod test {
+    use proptest::prelude::{any, prop_assert, prop_assert_eq, proptest};
+
     use super::{parse_args, parse_size};
 
     #[test]
@@ -859,5 +861,93 @@ mod test {
             parse_size("GiB"),
             Err("Ill-formed size: magnitude must be a decimal integer".to_string())
         );
+    }
+
+    proptest! {
+        #[test]
+        fn test_stratis_min_parse_size_proptest_round_trip(
+            m in 0u128..=u128::MAX / 1024u128.pow(5),
+            unit_idx in 0usize..6,
+        ) {
+            let units = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"];
+            let multipliers: [u128; 6] = [
+                1,
+                1024,
+                1024 * 1024,
+                1024 * 1024 * 1024,
+                1024u128.pow(4),
+                1024u128.pow(5),
+            ];
+            let unit = units[unit_idx];
+            let multiplier = multipliers[unit_idx];
+            let input = format!("{m}{unit}");
+            match m.checked_mul(multiplier) {
+                Some(expected) => prop_assert_eq!(parse_size(&input), Ok(expected)),
+                None => prop_assert!(parse_size(&input).is_err()),
+            }
+        }
+
+        #[test]
+        fn test_stratis_min_parse_size_proptest_max_valid_per_unit(unit_idx in 0usize..6) {
+            let units = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"];
+            let multipliers: [u128; 6] = [
+                1,
+                1024,
+                1024 * 1024,
+                1024 * 1024 * 1024,
+                1024u128.pow(4),
+                1024u128.pow(5),
+            ];
+            let unit = units[unit_idx];
+            let multiplier = multipliers[unit_idx];
+            let max_magnitude = u128::MAX / multiplier;
+            let input = format!("{max_magnitude}{unit}");
+            prop_assert_eq!(parse_size(&input), Ok(max_magnitude * multiplier));
+        }
+
+        #[test]
+        fn test_stratis_min_parse_size_proptest_overflow_per_unit(unit_idx in 1usize..6) {
+            let units = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"];
+            let multipliers: [u128; 6] = [
+                1,
+                1024,
+                1024 * 1024,
+                1024 * 1024 * 1024,
+                1024u128.pow(4),
+                1024u128.pow(5),
+            ];
+            let unit = units[unit_idx];
+            let multiplier = multipliers[unit_idx];
+            let max_magnitude = u128::MAX / multiplier;
+            let overflowing = max_magnitude + 1;
+            let input = format!("{overflowing}{unit}");
+            prop_assert_eq!(
+                parse_size(&input),
+                Err("Ill-formed size: byte count exceeds u128::MAX".to_string())
+            );
+        }
+
+        #[test]
+        fn test_stratis_min_parse_size_proptest_invalid_unit(
+            m in any::<u128>(),
+            suffix in "[a-zA-Z]{1,5}",
+        ) {
+            let valid_units = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"];
+            if !valid_units.contains(&suffix.as_str()) {
+                let input = format!("{m}{suffix}");
+                prop_assert!(parse_size(&input).is_err());
+            }
+        }
+
+        #[test]
+        fn test_stratis_min_parse_size_proptest_no_unit(m in any::<u128>()) {
+            let input = format!("{m}");
+            prop_assert!(parse_size(&input).is_err());
+        }
+
+        #[test]
+        fn test_stratis_min_parse_size_proptest_no_panic(s in "\\PC{0,20}") {
+            let _ = parse_size(&s);
+        }
     }
 }

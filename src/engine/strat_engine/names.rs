@@ -143,6 +143,30 @@ pub enum CacheRole {
     OriginSub,
 }
 
+/// Format a name & uuid for the dm-raid pool migration device.
+///
+/// Prerequisite: len(format!("{}", FORMAT_VERSION)
+///             + len("stratis")                         7
+///             + len("private")                         7
+///             + len("migrate")                         7
+///             + num_dashes                             5
+///             + len(pool uuid)                         32
+///             + raid1                                  5
+///             < 128 (129 for UUID)
+///
+/// which is equivalent to len(format!("{}", FORMAT_VERSION) < 63 (64 for UUID)
+pub fn format_dm_raid_migrate_ids(pool_uuid: PoolUuid) -> (DmNameBuf, DmUuidBuf) {
+    let value = format!(
+        "stratis-{}-private-{}-migrate-raid1",
+        FORMAT_VERSION,
+        uuid_to_string!(pool_uuid),
+    );
+    (
+        DmNameBuf::new(value.clone()).expect("FORMAT_VERSION display length < 63"),
+        DmUuidBuf::new(value).expect("FORMAT_VERSION display length < 64"),
+    )
+}
+
 /// Format a name & uuid for the flex layer.
 ///
 /// Prerequisite: len(format!("{}", FORMAT_VERSION)
@@ -240,6 +264,65 @@ pub fn format_backstore_ids(pool_uuid: PoolUuid, role: CacheRole) -> (DmNameBuf,
         DmNameBuf::new(value.clone()).expect("FORMAT_VERSION display_length < 60"),
         DmUuidBuf::new(value).expect("FORMAT_VERSION display_length < 61"),
     )
+}
+
+/// Format the temporary name given to the encryption layer DM device of the
+/// source pool of an in-progress migration.
+///
+/// Only V2 pools have an encryption layer that is named after the pool UUID,
+/// so for a V1 source pool no device with this name ever exists. A V2 source
+/// pool's encryption device must give up the canonical name, see
+/// `format_crypt_backstore_name()`, before the destination backstore can
+/// activate its own encryption layer under it.
+///
+/// Prerequisite: len(format!("{}", FORMAT_VERSION)
+///             + len("stratis")                         7
+///             + len("private")                         7
+///             + len("crypt")                           5
+///             + len("migrate")                         7
+///             + num_dashes                             5
+///             + len(pool uuid)                         32
+///             < 128
+///
+/// which is equivalent to len(format!("{}", FORMAT_VERSION) < 65
+pub fn format_crypt_backstore_migrate_name(pool_uuid: PoolUuid) -> DmNameBuf {
+    let value = format!(
+        "stratis-{}-private-{}-crypt-migrate",
+        FORMAT_VERSION,
+        uuid_to_string!(pool_uuid)
+    );
+    DmNameBuf::new(value).expect("FORMAT_VERSION display_length < 65")
+}
+
+/// Format the temporary name given to a backstore DM device belonging to the
+/// source pool of an in-progress migration.
+///
+/// Both backstores involved in a migration derive their DM identifiers from
+/// the same pool UUID, so the source backstore's devices must give up the
+/// canonical names before the destination backstore can be set up. Only the
+/// name is changed; a DM device's UUID can not be changed once it has been
+/// set, so the destination's devices go without a UUID until the source
+/// backstore has been torn down.
+///
+/// Prerequisite: len(format!("{}", FORMAT_VERSION)
+///             + len("stratis")                         7
+///             + len("private")                         7
+///             + len("physical")                        8
+///             + len("migrate")                         7
+///             + num_dashes                             6
+///             + len(pool uuid)                         32
+///             + max(len(CacheRole))                    9
+///             < 128
+///
+/// which is equivalent to len(format!("{}", FORMAT_VERSION) < 76
+pub fn format_backstore_migrate_name(pool_uuid: PoolUuid, role: CacheRole) -> DmNameBuf {
+    let value = format!(
+        "stratis-{}-private-{}-physical-{}-migrate",
+        FORMAT_VERSION,
+        uuid_to_string!(pool_uuid),
+        role
+    );
+    DmNameBuf::new(value).expect("FORMAT_VERSION display_length < 76")
 }
 
 #[cfg(test)]

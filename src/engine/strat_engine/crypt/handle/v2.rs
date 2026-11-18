@@ -520,7 +520,6 @@ impl CryptHandle {
     }
 
     /// Return the path of the activated devicemapper device.
-    #[cfg(test)]
     pub fn activated_device_path(&self) -> &Path {
         &self.metadata.activated_path
     }
@@ -945,6 +944,20 @@ impl CryptHandle {
             &mut self.acquire_crypt_device()?,
             self.luks2_device_path(),
             self.activation_name(),
+        )
+    }
+
+    /// Wipe all LUKS2 metadata on the device safely using libcryptsetup,
+    /// deactivating the device under the given name rather than under its
+    /// activation name.
+    ///
+    /// This is for a device that has been renamed, so that its activation name
+    /// now belongs to a different device that must not be deactivated.
+    pub fn wipe_renamed(&self, name: &DmName) -> StratisResult<()> {
+        ensure_wiped(
+            &mut self.acquire_crypt_device()?,
+            self.luks2_device_path(),
+            name,
         )
     }
 

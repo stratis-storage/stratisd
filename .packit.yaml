@@ -41,6 +41,7 @@ jobs:
       preserve_project: true
       targets:
           - fedora-all
+          - fedora-eln
 
     - job: tests
       identifier: local

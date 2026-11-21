@@ -10,9 +10,7 @@ use std::{
 use tokio::sync::RwLock;
 use zbus::{
     fdo::Error,
-    interface,
-    zvariant::{ObjectPath, OwnedObjectPath, Value},
-    Connection,
+    interface, Connection, {ObjectPath, OwnedObjectPath, Variant},
 };
 
 use crate::{
@@ -355,12 +353,12 @@ impl PoolR8 {
     }
 
     #[zbus(property(emits_changed_signal = "true"))]
-    async fn key_descriptions(&self) -> Result<Value<'_>, Error> {
+    async fn key_descriptions(&self) -> Result<Variant<'_>, Error> {
         pool_prop(&self.engine, self.uuid, key_descs_prop).await
     }
 
     #[zbus(property(emits_changed_signal = "true"))]
-    async fn clevis_infos(&self) -> Result<Value<'_>, Error> {
+    async fn clevis_infos(&self) -> Result<Variant<'_>, Error> {
         pool_prop(&self.engine, self.uuid, clevis_infos_prop).await
     }
 
@@ -433,7 +431,7 @@ impl PoolR8 {
     }
 
     #[zbus(property(emits_changed_signal = "false"))]
-    async fn volume_key_loaded(&self) -> Result<Value<'_>, Error> {
+    async fn volume_key_loaded(&self) -> Result<Variant<'_>, Error> {
         pool_prop(&self.engine, self.uuid, volume_key_loaded_prop).await
     }
 

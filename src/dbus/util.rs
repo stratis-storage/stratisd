@@ -5,10 +5,7 @@
 use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use tokio::sync::RwLock;
-use zbus::{
-    zvariant::{ObjectPath, OwnedObjectPath, Value},
-    Connection,
-};
+use zbus::{Connection, ObjectPath, OwnedObjectPath, Variant};
 
 use devicemapper::DmError;
 
@@ -63,14 +60,14 @@ pub fn option_to_tuple<T>(value: Option<T>, default: T) -> (bool, T) {
 pub fn result_option_to_tuple<'a, T, E>(
     result: Result<Option<T>, E>,
     default: T,
-) -> (bool, Value<'a>)
+) -> (bool, Variant<'a>)
 where
     E: Display,
-    Value<'a>: From<T> + From<(bool, T)>,
+    Variant<'a>: From<T> + From<(bool, T)>,
 {
     let (success, value) = match result {
-        Ok(value) => (true, Value::from(option_to_tuple(value, default))),
-        Err(e) => (false, Value::from(e.to_string())),
+        Ok(value) => (true, Variant::from(option_to_tuple(value, default))),
+        Err(e) => (false, Variant::from(e.to_string())),
     };
     (success, value)
 }

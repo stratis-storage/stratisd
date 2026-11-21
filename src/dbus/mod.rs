@@ -39,8 +39,8 @@ pub async fn create_dbus_handler(
     let counter = Arc::new(AtomicU64::new(0));
     let manager = Lockable::new_shared(Manager::default());
     let connection = Arc::new(
-        Builder::system()?
-            .name(consts::STRATIS_BASE_SERVICE)?
+        Builder::system()
+            .name(consts::STRATIS_BASE_SERVICE)
             .build()
             .await?,
     );

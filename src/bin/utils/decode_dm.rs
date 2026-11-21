@@ -12,10 +12,9 @@ use std::{
 use stratisd::engine::{FilesystemUuid, PoolUuid};
 
 use zbus::{
-    blocking::{fdo::ObjectManagerProxy, Connection},
-    fdo::{Error, ManagedObjects},
+    fdo::{Error, ManagedObjects, ObjectManagerProxy},
     names::OwnedInterfaceName,
-    zvariant::OwnedValue,
+    Connection, OwnedVariant,
 };
 
 const REVISION_NUMBER: &str = env!("CARGO_PKG_VERSION_MINOR");
@@ -28,14 +27,15 @@ static FILESYSTEM_INTERFACE: LazyLock<String> =
     LazyLock::new(|| format!("{BUS_NAME}.filesystem.r{REVISION_NUMBER}"));
 
 // Get managed objects for Stratis.
-fn get_managed_objects() -> Result<ManagedObjects, Error> {
-    let conn = Connection::system()?;
+async fn get_managed_objects() -> Result<ManagedObjects, Error> {
+    let conn = Connection::system().await?;
     let proxy = ObjectManagerProxy::builder(&conn)
-        .destination(BUS_NAME)?
-        .path(TOP_OBJECT)?
-        .build()?;
+        .destination(BUS_NAME)
+        .path(TOP_OBJECT)
+        .build()
+        .await?;
 
-    proxy.get_managed_objects()
+    proxy.get_managed_objects().await
 }
 
 // Extract the devicemapper name from the devicemapper path
@@ -86,7 +86,7 @@ fn parse_dm_name(dmname: &str) -> Result<(PoolUuid, FilesystemUuid), String> {
 
 // Get the Name property by matching on Uuid property for the given interface.
 fn get_name_by_uuid_and_intf(
-    ifaces: &HashMap<OwnedInterfaceName, HashMap<String, OwnedValue>>,
+    ifaces: &HashMap<OwnedInterfaceName, HashMap<String, OwnedVariant>>,
     interface_name: &str,
     uuid_str: &str,
 ) -> Option<String> {
@@ -156,7 +156,11 @@ fn get_symlink_by_uuids(
 pub fn pool_name(dm_path: &Path) -> Result<String, String> {
     let dm_name = extract_dm_name(dm_path)?;
     let (pool_uuid, _filesystem_uuid) = parse_dm_name(&dm_name)?;
-    let managed_objects = get_managed_objects()
+
+    let runtime = tokio::runtime::Runtime::new()
+        .map_err(|e| format!("Failed to create tokio runtime: {e}"))?;
+    let managed_objects = runtime
+        .block_on(get_managed_objects())
         .map_err(|e| format!("Unable to retrieve Stratis information from the D-Bus: {e}"))?;
 
     managed_objects
@@ -171,7 +175,11 @@ pub fn pool_name(dm_path: &Path) -> Result<String, String> {
 pub fn filesystem_name(dm_path: &Path) -> Result<String, String> {
     let dm_name = extract_dm_name(dm_path)?;
     let (_pool_uuid, filesystem_uuid) = parse_dm_name(&dm_name)?;
-    let managed_objects = get_managed_objects()
+
+    let runtime = tokio::runtime::Runtime::new()
+        .map_err(|e| format!("Failed to create tokio runtime: {e}"))?;
+    let managed_objects = runtime
+        .block_on(get_managed_objects())
         .map_err(|e| format!("Unable to retrieve Stratis information from the D-Bus: {e}"))?;
 
     managed_objects
@@ -190,7 +198,11 @@ pub fn filesystem_name(dm_path: &Path) -> Result<String, String> {
 pub fn symlink(dm_path: &Path) -> Result<PathBuf, String> {
     let dm_name = extract_dm_name(dm_path)?;
     let (pool_uuid, filesystem_uuid) = parse_dm_name(&dm_name)?;
-    let managed_objects = get_managed_objects()
+
+    let runtime = tokio::runtime::Runtime::new()
+        .map_err(|e| format!("Failed to create tokio runtime: {e}"))?;
+    let managed_objects = runtime
+        .block_on(get_managed_objects())
         .map_err(|e| format!("Unable to retrieve Stratis information from the D-Bus: {e}"))?;
 
     get_symlink_by_uuids(&managed_objects, pool_uuid, filesystem_uuid)

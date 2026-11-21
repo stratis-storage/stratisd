@@ -10,10 +10,7 @@ use std::{
 
 use serde_json::from_str;
 use tokio::sync::RwLock;
-use zbus::{
-    zvariant::{Fd, ObjectPath, OwnedObjectPath},
-    Connection,
-};
+use zbus::{Connection, Fd, ObjectPath, OwnedObjectPath};
 
 use crate::{
     dbus::{

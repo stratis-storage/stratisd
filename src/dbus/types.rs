@@ -4,7 +4,12 @@
 
 use std::collections::HashMap;
 
-use zbus::zvariant::{signature::Child, Basic, Signature, Type, Value};
+use serde::Serialize;
+use zbus::{
+    wire::signature::Child,
+    zvariant::{Basic, Type},
+    Signature, Variant,
+};
 
 use crate::{
     dbus::util::result_option_to_tuple,
@@ -14,11 +19,13 @@ use crate::{
 pub type FilesystemSpec<'a> = Vec<(&'a str, (bool, &'a str), (bool, &'a str))>;
 
 /// Wrapper type indicating that the return value is being returned from Manager.r2
+#[derive(Serialize)]
 pub struct ManagerR2<T> {
     pub inner: T,
 }
 
 /// Wrapper type indicating that the return value is being returned from Manager.r8
+#[derive(Serialize)]
 pub struct ManagerR8<T> {
     pub inner: T,
 }
@@ -48,14 +55,14 @@ impl Type for LockedPoolsInfo {
     };
 }
 
-impl<'a> From<LockedPoolsInfo> for Value<'a> {
+impl<'a> From<LockedPoolsInfo> for Variant<'a> {
     fn from(infos: LockedPoolsInfo) -> Self {
         let mut top_level_dict = HashMap::new();
         for (uuid, info) in infos.locked.iter() {
             let mut dict = HashMap::new();
             dict.insert(
                 "key_description".to_string(),
-                Value::from(result_option_to_tuple(
+                Variant::from(result_option_to_tuple(
                     info.info
                         .key_description()
                         .map(|opt| opt.map(|kd| kd.as_application_str().to_owned())),
@@ -64,7 +71,7 @@ impl<'a> From<LockedPoolsInfo> for Value<'a> {
             );
             dict.insert(
                 "clevis_info".to_string(),
-                Value::from(result_option_to_tuple(
+                Variant::from(result_option_to_tuple(
                     info.info
                         .clevis_info()
                         .map(|opt| opt.map(|(pin, value)| (pin.to_owned(), value.to_string()))),
@@ -73,7 +80,7 @@ impl<'a> From<LockedPoolsInfo> for Value<'a> {
             );
             dict.insert(
                 "devs".to_string(),
-                Value::from(
+                Variant::from(
                     info.devices
                         .iter()
                         .map(|d| {
@@ -86,18 +93,18 @@ impl<'a> From<LockedPoolsInfo> for Value<'a> {
                 ),
             );
             if let Some(name) = infos.uuid_to_name.get(uuid) {
-                dict.insert("name".to_string(), Value::from(name.clone()));
+                dict.insert("name".to_string(), Variant::from(name.clone()));
             }
             top_level_dict.insert(*uuid, dict);
         }
-        Value::from(top_level_dict)
+        Variant::from(top_level_dict)
     }
 }
 
 fn stopped_pools_to_value<'b>(
     infos: &StoppedPoolsInfo,
     metadata: bool,
-) -> HashMap<PoolUuid, HashMap<String, Value<'b>>> {
+) -> HashMap<PoolUuid, HashMap<String, Variant<'b>>> {
     let mut top_level_dict = HashMap::new();
     for (uuid, info) in infos
         .stopped
@@ -108,7 +115,7 @@ fn stopped_pools_to_value<'b>(
         if let Some(enc_info) = info.info.as_ref() {
             dict.insert(
                 "key_description".to_string(),
-                Value::from(result_option_to_tuple(
+                Variant::from(result_option_to_tuple(
                     enc_info
                         .key_description()
                         .map(|opt| opt.map(|kd| kd.as_application_str().to_owned())),
@@ -117,7 +124,7 @@ fn stopped_pools_to_value<'b>(
             );
             dict.insert(
                 "clevis_info".to_string(),
-                Value::from(result_option_to_tuple(
+                Variant::from(result_option_to_tuple(
                     enc_info
                         .clevis_info()
                         .map(|opt| opt.map(|(pin, value)| (pin.to_owned(), value.to_string()))),
@@ -127,7 +134,7 @@ fn stopped_pools_to_value<'b>(
         }
         dict.insert(
             "devs".to_string(),
-            Value::from(
+            Variant::from(
                 info.devices
                     .iter()
                     .map(|d| {
@@ -140,14 +147,14 @@ fn stopped_pools_to_value<'b>(
             ),
         );
         if let Some(name) = infos.uuid_to_name.get(uuid) {
-            dict.insert("name".to_string(), Value::from(name.clone()));
+            dict.insert("name".to_string(), Variant::from(name.clone()));
         }
         if metadata {
             dict.insert(
                 "metadata_version".to_string(),
                 match info.metadata_version {
-                    Some(m) => Value::from((true, m as u64)),
-                    None => Value::from((false, 0)),
+                    Some(m) => Variant::from((true, m as u64)),
+                    None => Variant::from((false, 0)),
                 },
             );
             dict.insert(
@@ -164,9 +171,9 @@ fn stopped_pools_to_value<'b>(
                         if f.clevis_enabled {
                             feat.insert("clevis_present".to_string(), true);
                         }
-                        Value::from((true, feat))
+                        Variant::from((true, feat))
                     }
-                    None => Value::from((false, HashMap::<String, bool>::new())),
+                    None => Variant::from((false, HashMap::<String, bool>::new())),
                 },
             );
         }
@@ -194,13 +201,13 @@ impl Type for ManagerR2<StoppedPoolsInfo> {
     };
 }
 
-impl<'a> From<ManagerR2<StoppedPoolsInfo>> for Value<'a> {
+impl<'a> From<ManagerR2<StoppedPoolsInfo>> for Variant<'a> {
     fn from(wrapper: ManagerR2<StoppedPoolsInfo>) -> Self {
         let infos = wrapper.inner;
 
         let top_level_dict = stopped_pools_to_value(&infos, false);
 
-        Value::from(top_level_dict)
+        Variant::from(top_level_dict)
     }
 }
 
@@ -222,13 +229,13 @@ impl Type for ManagerR8<StoppedPoolsInfo> {
     };
 }
 
-impl<'a> From<ManagerR8<StoppedPoolsInfo>> for Value<'a> {
+impl<'a> From<ManagerR8<StoppedPoolsInfo>> for Variant<'a> {
     fn from(wrapper: ManagerR8<StoppedPoolsInfo>) -> Self {
         let infos = wrapper.inner;
 
         let top_level_dict = stopped_pools_to_value(&infos, true);
 
-        Value::from(top_level_dict)
+        Variant::from(top_level_dict)
     }
 }
 
@@ -241,9 +248,9 @@ impl Type for PoolUuid {
     const SIGNATURE: &Signature = &Signature::Str;
 }
 
-impl<'a> From<PoolUuid> for Value<'a> {
-    fn from(u: PoolUuid) -> Value<'a> {
-        Value::from(u.simple().to_string())
+impl<'a> From<PoolUuid> for Variant<'a> {
+    fn from(u: PoolUuid) -> Variant<'a> {
+        Variant::from(u.simple().to_string())
     }
 }
 
@@ -251,8 +258,8 @@ impl Type for ActionAvailability {
     const SIGNATURE: &Signature = &Signature::Str;
 }
 
-impl<'a> From<ActionAvailability> for Value<'a> {
+impl<'a> From<ActionAvailability> for Variant<'a> {
     fn from(aa: ActionAvailability) -> Self {
-        Value::from(aa.to_string())
+        Variant::from(aa.to_string())
     }
 }

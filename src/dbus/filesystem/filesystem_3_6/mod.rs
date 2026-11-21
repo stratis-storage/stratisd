@@ -7,9 +7,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use zbus::{
     fdo::Error,
-    interface,
-    zvariant::{ObjectPath, OwnedObjectPath},
-    Connection,
+    interface, Connection, {ObjectPath, OwnedObjectPath},
 };
 mod props;
 

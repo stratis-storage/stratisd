@@ -66,7 +66,6 @@ jobs:
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
-          asciidoc
           clang
           cryptsetup
           cryptsetup-devel
@@ -89,9 +88,9 @@ jobs:
         with:
           components: ${{ matrix.components }}
       - name: Build stratisd
-        run: PROFILEDIR=debug make -f Makefile build-all
+        run: PROFILEDIR=debug make -f Makefile build-all-rust
       - name: Install stratisd
-        run: PROFILEDIR=debug make -f Makefile install
+        run: PROFILEDIR=debug make -f Makefile install-programs
       - name: Reload udev
         run: udevadm control --reload
       - name: Test ${{ matrix.task }} on CURRENT_DEVELOPMENT_RUST_TOOLCHAIN
@@ -106,7 +105,6 @@ jobs:
         run: >
           DEBIAN_FRONTEND=noninteractive
           sudo apt-get install -y
-          asciidoc
           clang
           curl
           git
@@ -137,9 +135,9 @@ jobs:
         with:
           components: cargo
       - name: Build stratisd
-        run: PROFILEDIR=debug make -f Makefile build-all
+        run: PROFILEDIR=debug make -f Makefile build-all-rust
       - name: Install stratisd
-        run: sudo make PROFILEDIR=debug -f Makefile install
+        run: sudo make PROFILEDIR=debug -f Makefile install-programs
       - name: Workaround for dbus inotify
         run: sudo cp stratisd.conf /usr/share/dbus-1/system.d
       - name: Reload udev
@@ -170,7 +168,6 @@ jobs:
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
-          asciidoc
           clang
           clevis
           clevis-luks
@@ -200,9 +197,9 @@ jobs:
         with:
           components: cargo
       - name: Build stratisd
-        run: PROFILEDIR=debug make -f Makefile build-all
+        run: PROFILEDIR=debug make -f Makefile build-all-rust
       - name: Install stratisd
-        run: PROFILEDIR=debug make -f Makefile install
+        run: PROFILEDIR=debug make -f Makefile install-programs
       - name: Workaround for dbus inotify
         run: cp stratisd.conf /usr/share/dbus-1/system.d
       - name: Reload udev

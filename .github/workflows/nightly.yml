@@ -175,7 +175,6 @@ jobs:
         run: >
           DEBIAN_FRONTEND=noninteractive
           sudo apt-get install -y
-          asciidoc
           clang
           curl
           git
@@ -206,9 +205,9 @@ jobs:
         with:
           components: cargo
       - name: Build stratisd
-        run: PROFILEDIR=debug make -f Makefile build-all
+        run: PROFILEDIR=debug make -f Makefile build-all-rust
       - name: Install stratisd
-        run: sudo make PROFILEDIR=debug -f Makefile install
+        run: sudo make PROFILEDIR=debug -f Makefile install-programs
       - name: Workaround for dbus inotify
         run: sudo cp stratisd.conf /usr/share/dbus-1/system.d
       - name: Reload udev

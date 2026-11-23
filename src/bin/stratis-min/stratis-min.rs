@@ -2,10 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, error::Error, path::PathBuf};
+use std::{collections::HashMap, error::Error, path::PathBuf, str::FromStr};
 
 use clap::{Arg, ArgAction, ArgGroup, Command};
+use devicemapper::IEC;
 use serde_json::{json, Map, Value};
+use strum_macros::EnumString;
 
 use stratisd::{
     engine::{
@@ -16,25 +18,38 @@ use stratisd::{
     stratis::{StratisError, VERSION},
 };
 
+#[derive(Debug, Clone, Copy, EnumString)]
+enum SizeUnit {
+    B,
+    KiB,
+    MiB,
+    GiB,
+    TiB,
+    PiB,
+}
+
+const fn unit_multiplier(unit: SizeUnit) -> u64 {
+    match unit {
+        SizeUnit::B => 1,
+        SizeUnit::KiB => IEC::Ki,
+        SizeUnit::MiB => IEC::Mi,
+        SizeUnit::GiB => IEC::Gi,
+        SizeUnit::TiB => IEC::Ti,
+        SizeUnit::PiB => IEC::Pi,
+    }
+}
+
 fn parse_size(s: &str) -> Result<u128, String> {
     let split = s.find(|c: char| !c.is_ascii_digit()).unwrap_or(s.len());
-    let (magnitude_str, units) = s.split_at(split);
+    let (magnitude_str, units_str) = s.split_at(split);
     let magnitude: u128 = magnitude_str
         .parse()
         .map_err(|_| "Ill-formed size: magnitude must be a decimal integer".to_string())?;
-    let multiplier = match units {
-        "B" => 1,
-        "KiB" => 1024,
-        "MiB" => 1024 * 1024,
-        "GiB" => 1024 * 1024 * 1024,
-        "TiB" => 1024u128.pow(4),
-        "PiB" => 1024u128.pow(5),
-        _ => {
-            return Err("Ill-formed size: units must be B, KiB, MiB, GiB, TiB, or PiB".to_string())
-        }
-    };
+    let multiplier = SizeUnit::from_str(units_str)
+        .map(unit_multiplier)
+        .map_err(|_| "Ill-formed size: units must be B, KiB, MiB, GiB, TiB, or PiB".to_string())?;
     magnitude
-        .checked_mul(multiplier)
+        .checked_mul(u128::from(multiplier))
         .ok_or_else(|| "Ill-formed size: byte count exceeds u128::MAX".to_string())
 }
 

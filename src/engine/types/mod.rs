@@ -379,14 +379,14 @@ impl Deref for DevicePath {
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, strum_macros::Display)]
 pub enum ActionAvailability {
     /// Full set of actions may be taken
-    #[strum(serialize = "fully_operational")]
+    #[strum(to_string = "fully_operational")]
     Full = 0,
     /// No requests via an IPC mechanism may be taken
-    #[strum(serialize = "no_ipc_requests")]
+    #[strum(to_string = "no_ipc_requests")]
     NoRequests = 1,
     /// No changes may be made to the pool including background changes
     /// like reacting to devicemapper events
-    #[strum(serialize = "no_pool_changes")]
+    #[strum(to_string = "no_pool_changes")]
     NoPoolChanges = 2,
 }
 
@@ -545,13 +545,13 @@ pub enum OffsetDirection {
     AsRefStr,
 )]
 pub enum IntegrityTagSpec {
-    #[strum(serialize = "0b")]
+    #[strum(to_string = "0b")]
     #[serde(rename = "0b")]
     B0,
-    #[strum(serialize = "32b")]
+    #[strum(to_string = "32b")]
     #[serde(rename = "32b")]
     B32,
-    #[strum(serialize = "512b")]
+    #[strum(to_string = "512b")]
     #[serde(rename = "512b")]
     B512,
 }

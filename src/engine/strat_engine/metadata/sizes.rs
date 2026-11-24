@@ -143,11 +143,11 @@ pub mod mda_size {
 
     impl MDADataSize {
         /// Create a new value, bounded from below by the minimum allowed.
-        // Note that this code is dead due to GitHub issue:
+        // Note that this code is only used in test due to GitHub issue:
         // https://github.com/stratis-storage/stratisd/issues/754.
         // To fix that bug it is necessary for client code to specify a
         // size. It will use this method to do that.
-        #[allow(dead_code)]
+        #[cfg(test)]
         pub fn new(value: Bytes) -> MDADataSize {
             if value > MIN_MDA_DATA_REGION_SIZE {
                 MDADataSize(value)

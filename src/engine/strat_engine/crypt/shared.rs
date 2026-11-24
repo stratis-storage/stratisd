@@ -345,7 +345,6 @@ fn tang_dispatch(json: &Value) -> StratisResult<Value> {
     hasher.update(thp.as_bytes());
     let array = hasher.finalize();
 
-    #[allow(deprecated)]
     let thp = BASE64URL_NOPAD.encode(array.as_slice());
 
     Ok(json!({"url": url.to_owned(), "thp": thp}))

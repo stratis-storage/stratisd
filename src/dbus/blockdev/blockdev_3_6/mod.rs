@@ -91,7 +91,6 @@ impl BlockdevR6 {
 #[interface(name = "org.storage.stratis3.blockdev.r6", introspection_docs = false)]
 impl BlockdevR6 {
     #[zbus(property(emits_changed_signal = "const"))]
-    #[allow(non_snake_case)]
     async fn devnode(&self) -> Result<String, Error> {
         blockdev_prop(&self.engine, self.parent_uuid, self.uuid, devnode_prop).await
     }

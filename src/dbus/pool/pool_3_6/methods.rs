@@ -21,7 +21,6 @@ use crate::{
     stratis::StratisError,
 };
 
-#[allow(clippy::too_many_arguments)]
 pub async fn create_filesystems_method(
     engine: &Arc<dyn Engine>,
     connection: &Arc<Connection>,

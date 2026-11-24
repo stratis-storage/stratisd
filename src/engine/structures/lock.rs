@@ -1318,7 +1318,6 @@ where
     }
 
     #[cfg(test)]
-    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.1.len()
     }

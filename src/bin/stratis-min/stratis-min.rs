@@ -810,7 +810,14 @@ fn main() -> Result<(), String> {
 
 #[cfg(test)]
 mod test {
-    use super::{parse_args, parse_size};
+    use proptest::{
+        prelude::{any, prop_assert, prop_assert_eq, proptest},
+        sample::select,
+    };
+
+    use super::{parse_args, parse_size, unit_multiplier};
+
+    const VALID_UNITS: &[&str] = &["B", "KiB", "MiB", "GiB", "TiB", "PiB"];
 
     #[test]
     fn test_stratis_min_parse_args() {
@@ -841,14 +848,18 @@ mod test {
     }
 
     #[test]
-    fn test_parse_size_multiplication_overflow() {
-        let pib = 1024u128.pow(5);
-        let max_magnitude = u128::MAX / pib;
-        assert!(parse_size(&format!("{max_magnitude}PiB")).is_ok());
-        assert_eq!(
-            parse_size(&format!("{}PiB", max_magnitude + 1)),
-            Err("Ill-formed size: byte count exceeds u128::MAX".to_string())
-        );
+    fn test_parse_size_boundaries_per_unit() {
+        for unit in VALID_UNITS {
+            let multiplier = u128::from(unit_multiplier(unit.parse().unwrap()));
+            let max = u128::MAX / multiplier;
+            assert_eq!(parse_size(&format!("{max}{unit}")), Ok(max * multiplier));
+            if let Some(overflow) = max.checked_add(1) {
+                assert_eq!(
+                    parse_size(&format!("{overflow}{unit}")),
+                    Err("Ill-formed size: byte count exceeds u128::MAX".to_string())
+                );
+            }
+        }
     }
 
     #[test]
@@ -874,5 +885,39 @@ mod test {
             parse_size("GiB"),
             Err("Ill-formed size: magnitude must be a decimal integer".to_string())
         );
+    }
+
+    proptest! {
+        #[test]
+        fn test_stratis_min_parse_size_proptest_round_trip(
+            bytes in any::<u128>(),
+            unit in select(VALID_UNITS),
+        ) {
+            let multiplier = u128::from(unit_multiplier(unit.parse().unwrap()));
+            let magnitude = bytes / multiplier;
+            prop_assert_eq!(parse_size(&format!("{magnitude}{unit}")), Ok(magnitude * multiplier));
+        }
+
+        #[test]
+        fn test_stratis_min_parse_size_proptest_invalid_unit(
+            m in any::<u128>(),
+            suffix in "[a-zA-Z]{1,5}",
+        ) {
+            if !VALID_UNITS.contains(&suffix.as_str()) {
+                let input = format!("{m}{suffix}");
+                prop_assert!(parse_size(&input).is_err());
+            }
+        }
+
+        #[test]
+        fn test_stratis_min_parse_size_proptest_no_unit(m in any::<u128>()) {
+            let input = format!("{m}");
+            prop_assert!(parse_size(&input).is_err());
+        }
+
+        #[test]
+        fn test_stratis_min_parse_size_proptest_no_panic(s in "\\PC{0,20}") {
+            let _ = parse_size(&s);
+        }
     }
 }

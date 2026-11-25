@@ -16,7 +16,7 @@ use itertools::Itertools;
 use serde_json::Map;
 use strum_macros::{self, EnumString, VariantNames};
 #[cfg(feature = "dbus_enabled")]
-use zbus::zvariant::{Type, Value};
+use zbus::{zvariant::Type, Variant};
 
 use libcryptsetup_rs::SafeMemHandle;
 
@@ -689,7 +689,7 @@ where
 /// A data type representing a key description for the kernel keyring
 #[cfg_attr(
     feature = "dbus_enabled",
-    derive(Type, Value),
+    derive(Type, Variant),
     zvariant(signature = "s")
 )]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
@@ -744,7 +744,7 @@ impl VolumeKeyKeyDescription {
 /// Use Clevis or keyring to unlock LUKS volume.
 #[cfg_attr(
     feature = "dbus_enabled",
-    derive(Type, Value),
+    derive(Type, Variant),
     zvariant(signature = "s")
 )]
 #[derive(Serialize, Deserialize, Clone, Copy, Eq, PartialEq, Debug, EnumString, VariantNames)]

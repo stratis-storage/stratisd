@@ -5,7 +5,7 @@
 use tokio::sync::OwnedRwLockReadGuard;
 
 use chrono::SecondsFormat;
-use zbus::{fdo::Error, zvariant::OwnedObjectPath};
+use zbus::{fdo::Error, OwnedObjectPath};
 
 use crate::{
     dbus::{util::option_to_tuple, Manager},

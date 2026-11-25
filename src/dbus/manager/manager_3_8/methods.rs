@@ -11,8 +11,7 @@ use std::{
 use serde_json::{from_str, Value};
 use tokio::sync::RwLock;
 use zbus::{
-    zvariant::{Fd, OwnedObjectPath},
-    Connection,
+    Connection, {Fd, OwnedObjectPath},
 };
 
 use devicemapper::Bytes;

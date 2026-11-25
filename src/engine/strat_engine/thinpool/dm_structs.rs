@@ -14,15 +14,15 @@ use devicemapper::{ThinPoolStatus, ThinPoolStatusSummary};
 /// match those strings that the kernel uses to identify the different states
 #[derive(Clone, Copy, Debug, Eq, PartialEq, strum_macros::AsRefStr)]
 pub enum ThinPoolStatusDigest {
-    #[strum(serialize = "Fail")]
+    #[strum(to_string = "Fail")]
     Fail,
-    #[strum(serialize = "Error")]
+    #[strum(to_string = "Error")]
     Error,
-    #[strum(serialize = "rw")]
+    #[strum(to_string = "rw")]
     Good,
-    #[strum(serialize = "ro")]
+    #[strum(to_string = "ro")]
     ReadOnly,
-    #[strum(serialize = "out_of_data_space")]
+    #[strum(to_string = "out_of_data_space")]
     OutOfSpace,
 }
 

@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use tokio::sync::OwnedRwLockReadGuard;
-use zbus::{fdo::Error, zvariant::OwnedObjectPath};
+use zbus::{fdo::Error, OwnedObjectPath};
 
 use crate::{
     dbus::{util::option_to_tuple, Manager},

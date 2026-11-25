@@ -100,13 +100,13 @@ pub fn format_crypt_backstore_name(pool_uuid: &PoolUuid) -> DmNameBuf {
 
 #[derive(Clone, Copy, strum_macros::Display)]
 pub enum FlexRole {
-    #[strum(serialize = "mdv")]
+    #[strum(to_string = "mdv")]
     MetadataVolume,
-    #[strum(serialize = "thindata")]
+    #[strum(to_string = "thindata")]
     ThinData,
-    #[strum(serialize = "thinmeta")]
+    #[strum(to_string = "thinmeta")]
     ThinMeta,
-    #[strum(serialize = "thinmetaspare")]
+    #[strum(to_string = "thinmetaspare")]
     ThinMetaSpare,
 }
 

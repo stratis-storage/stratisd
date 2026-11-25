@@ -8,11 +8,7 @@ use std::{
 };
 
 use tokio::sync::RwLock;
-use zbus::{
-    interface,
-    zvariant::{Fd, ObjectPath, OwnedObjectPath},
-    Connection, Result,
-};
+use zbus::{interface, Connection, Fd, ObjectPath, OwnedObjectPath, Result};
 
 use crate::{
     dbus::{consts, manager::Manager},

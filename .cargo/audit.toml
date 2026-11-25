@@ -1,9 +1,5 @@
 [advisories]
-ignore = [
-  "RUSTSEC-2026-0370",
-  "RUSTSEC-2026-0371",
-  "RUSTSEC-2026-0372",
-]
+ignore = []
 
 [output]
 deny = ["warnings"]

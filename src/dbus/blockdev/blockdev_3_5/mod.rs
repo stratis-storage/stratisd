@@ -8,9 +8,7 @@ use tokio::sync::RwLock;
 use zbus::{
     self,
     fdo::Error,
-    interface,
-    zvariant::{ObjectPath, OwnedObjectPath},
-    Connection,
+    interface, Connection, {ObjectPath, OwnedObjectPath},
 };
 
 use crate::dbus::blockdev::blockdev_3_0::{

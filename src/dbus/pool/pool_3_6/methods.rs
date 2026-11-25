@@ -5,7 +5,7 @@
 use std::sync::{atomic::AtomicU64, Arc};
 
 use tokio::sync::RwLock;
-use zbus::{zvariant::OwnedObjectPath, Connection};
+use zbus::{Connection, OwnedObjectPath};
 
 use devicemapper::Bytes;
 

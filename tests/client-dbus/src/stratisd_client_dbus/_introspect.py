@@ -246,6 +246,11 @@ SPECS = {
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
+    <method name="RemoveCache">
+      <arg name="results" type="(bas)" direction="out" />
+      <arg name="return_code" type="q" direction="out" />
+      <arg name="return_string" type="s" direction="out" />
+    </method>
     <method name="SetName">
       <arg name="name" type="s" direction="in" />
       <arg name="result" type="(bs)" direction="out" />

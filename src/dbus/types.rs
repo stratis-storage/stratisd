@@ -24,7 +24,6 @@ pub struct ManagerR8<T> {
 }
 
 #[derive(Clone, Copy, Debug)]
-#[allow(non_camel_case_types)]
 pub enum DbusErrorEnum {
     OK = 0,
     ERROR = 1,

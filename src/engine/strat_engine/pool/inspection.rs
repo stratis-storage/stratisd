@@ -298,7 +298,6 @@ impl DataDevice {
 }
 
 impl Allocator<DataDeviceUse> for DataDevice {
-    #[allow(clippy::unused_self)]
     fn offset(&self) -> Sectors {
         Sectors(0)
     }
@@ -371,7 +370,6 @@ impl CacheDevice {
 }
 
 impl Allocator<CacheDeviceUse> for CacheDevice {
-    #[allow(clippy::unused_self)]
     fn offset(&self) -> Sectors {
         Sectors(0)
     }

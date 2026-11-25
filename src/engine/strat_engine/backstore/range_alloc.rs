@@ -380,7 +380,6 @@ impl RangeAllocator {
 
     /// Attempt to allocate from the back of the device.
     /// Returns a PerDevSegments object containing the allocated ranges.
-    #[allow(dead_code)]
     pub fn alloc_back(&mut self, amount: Sectors) -> PerDevSegments {
         let mut segs = PerDevSegments::new(self.segments.limit());
         let mut needed = amount;

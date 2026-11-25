@@ -102,7 +102,6 @@ impl StratBlockDev {
     ///
     /// Precondition: segments in other_segments do not overlap with Stratis
     /// metadata region.
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         dev: Device,
         bda: BDA,

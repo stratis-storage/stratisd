@@ -102,7 +102,6 @@ impl ManagerR0 {
         unset_key_method(&self.engine, &key_desc).await
     }
 
-    #[allow(clippy::too_many_arguments)]
     #[zbus(out_args("result", "return_code", "return_string"))]
     async fn create_pool(
         &self,

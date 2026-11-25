@@ -42,8 +42,8 @@ use crate::{
         },
         structures::Table,
         types::{
-            DevUuid, LockedPoolsInfo, MaybeInconsistent, Name, PoolEncryptionInfo, PoolIdentifier,
-            PoolUuid, SizedKeyMemory, StoppedPoolsInfo, StratBlockDevDiff, StratSigblockVersion,
+            DevUuid, MaybeInconsistent, Name, PoolEncryptionInfo, PoolIdentifier, PoolUuid,
+            SizedKeyMemory, StoppedPoolsInfo, StratBlockDevDiff, StratSigblockVersion,
             TokenUnlockMethod, UdevEngineEvent, UuidOrConflict,
         },
         BlockDevTier,
@@ -632,40 +632,6 @@ impl LiminalDevices {
             }
         } else {
             Ok(())
-        }
-    }
-
-    /// Get a mapping of pool UUIDs from all of the LUKS2 devices that are currently
-    /// locked to their encryption info in the set of pools that are not yet set up.
-    pub fn locked_pools(&self) -> LockedPoolsInfo {
-        LockedPoolsInfo {
-            name_to_uuid: self
-                .name_to_uuid
-                .iter()
-                .filter_map(|(name, maybe_conflict)| {
-                    maybe_conflict
-                        .to_result()
-                        .ok()
-                        .map(|uuid| (name.clone(), uuid))
-                })
-                .collect::<HashMap<_, _>>(),
-            uuid_to_name: self
-                .name_to_uuid
-                .iter()
-                .filter_map(|(name, maybe_conflict)| {
-                    maybe_conflict
-                        .to_result()
-                        .ok()
-                        .map(|uuid| (uuid, name.clone()))
-                })
-                .collect::<HashMap<_, _>>(),
-            locked: self
-                .stopped_pools
-                .iter()
-                .filter_map(|(pool_uuid, map)| {
-                    map.locked_pool_info().map(|info| (*pool_uuid, info))
-                })
-                .collect(),
         }
     }
 

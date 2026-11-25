@@ -18,13 +18,8 @@ General constants.
 SERVICE = "org.storage.stratis3"
 TOP_OBJECT = "/org/storage/stratis3"
 
-REVISION_NUMBER = 10
-
-REVISION = f"r{REVISION_NUMBER}"
-
-BLOCKDEV_INTERFACE = f"org.storage.stratis3.blockdev.{REVISION}"
-FETCH_PROPERTIES_INTERFACE = f"org.storage.stratis3.FetchProperties.{REVISION}"
-FILESYSTEM_INTERFACE = f"org.storage.stratis3.filesystem.{REVISION}"
-MANAGER_INTERFACE = f"org.storage.stratis3.Manager.{REVISION}"
-POOL_INTERFACE = f"org.storage.stratis3.pool.{REVISION}"
-REPORT_INTERFACE = f"org.storage.stratis3.Report.{REVISION}"
+BLOCKDEV_INTERFACE = "org.storage.stratis3.blockdev"
+FILESYSTEM_INTERFACE = "org.storage.stratis3.filesystem"
+MANAGER_INTERFACE = "org.storage.stratis3.Manager"
+POOL_INTERFACE = "org.storage.stratis3.pool"
+REPORT_INTERFACE = "org.storage.stratis3.Report"

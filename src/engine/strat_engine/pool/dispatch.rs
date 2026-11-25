@@ -36,11 +36,10 @@ impl Pool for AnyPool {
         pool_uuid: PoolUuid,
         pool_name: &str,
         blockdevs: &[&Path],
-        supports_encrypted: bool,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
         match self {
-            AnyPool::V1(p) => p.init_cache(pool_uuid, pool_name, blockdevs, supports_encrypted),
-            AnyPool::V2(p) => p.init_cache(pool_uuid, pool_name, blockdevs, supports_encrypted),
+            AnyPool::V1(p) => p.init_cache(pool_uuid, pool_name, blockdevs),
+            AnyPool::V2(p) => p.init_cache(pool_uuid, pool_name, blockdevs),
         }
     }
 

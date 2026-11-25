@@ -30,8 +30,8 @@ pub use crate::{
             actions::{
                 Clevis, CreateAction, DeleteAction, EncryptedDevice, EngineAction, GrowAction, Key,
                 MappingCreateAction, MappingDeleteAction, PropChangeAction, ReencryptedDevice,
-                RegenAction, RenameAction, SetCreateAction, SetDeleteAction, SetUnlockAction,
-                StartAction, StopAction, ToDisplay,
+                RegenAction, RenameAction, SetCreateAction, SetDeleteAction, StartAction,
+                StopAction, ToDisplay,
             },
             diff::{
                 Compare, Diff, PoolDiff, StratBlockDevDiff, StratFilesystemDiff, StratPoolDiff,
@@ -213,19 +213,6 @@ pub enum ReportType {
 pub struct PoolDevice {
     pub devnode: PathBuf,
     pub uuid: DevUuid,
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub struct LockedPoolInfo {
-    pub info: PoolEncryptionInfo,
-    pub devices: Vec<PoolDevice>,
-}
-
-#[derive(Default, Debug, Eq, PartialEq)]
-pub struct LockedPoolsInfo {
-    pub locked: HashMap<PoolUuid, LockedPoolInfo>,
-    pub name_to_uuid: HashMap<Name, PoolUuid>,
-    pub uuid_to_name: HashMap<PoolUuid, Name>,
 }
 
 #[derive(Debug, Eq, PartialEq)]

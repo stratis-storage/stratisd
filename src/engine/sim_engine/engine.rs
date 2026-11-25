@@ -25,11 +25,10 @@ use crate::{
             Table,
         },
         types::{
-            CreateAction, DeleteAction, DevUuid, Features, FilesystemUuid, InputEncryptionInfo,
-            IntegritySpec, LockedPoolsInfo, Name, PoolDevice, PoolDiff, PoolIdentifier, PoolUuid,
-            RenameAction, ReportType, SetUnlockAction, StartAction, StopAction, StoppedPoolInfo,
-            StoppedPoolsInfo, StratFilesystemDiff, TokenUnlockMethod, UdevEngineEvent,
-            UnlockMethod, ValidatedIntegritySpec,
+            CreateAction, DeleteAction, Features, FilesystemUuid, InputEncryptionInfo,
+            IntegritySpec, Name, PoolDevice, PoolDiff, PoolIdentifier, PoolUuid, RenameAction,
+            ReportType, StartAction, StopAction, StoppedPoolInfo, StoppedPoolsInfo,
+            StratFilesystemDiff, TokenUnlockMethod, UdevEngineEvent, ValidatedIntegritySpec,
         },
         StratSigblockVersion,
     },
@@ -210,14 +209,6 @@ impl Engine for SimEngine {
         Ok(RenameAction::Renamed(uuid))
     }
 
-    async fn unlock_pool(
-        &self,
-        _pool_uuid: PoolUuid,
-        _unlock_method: UnlockMethod,
-    ) -> StratisResult<SetUnlockAction<DevUuid>> {
-        Ok(SetUnlockAction::empty())
-    }
-
     async fn upgrade_pool(
         &self,
         lock: SomeLockReadGuard<PoolUuid, dyn Pool>,
@@ -237,10 +228,6 @@ impl Engine for SimEngine {
         key: PoolIdentifier<PoolUuid>,
     ) -> Option<SomeLockWriteGuard<PoolUuid, dyn Pool>> {
         get_mut_pool!(self; key).map(|l| l.into_dyn())
-    }
-
-    async fn locked_pools(&self) -> LockedPoolsInfo {
-        LockedPoolsInfo::default()
     }
 
     async fn stopped_pools(&self) -> StoppedPoolsInfo {
@@ -399,7 +386,6 @@ impl Engine for SimEngine {
     async fn stop_pool(
         &self,
         pool_id: PoolIdentifier<PoolUuid>,
-        _: bool,
     ) -> StratisResult<StopAction<PoolUuid>> {
         let is_stopped = match pool_id {
             PoolIdentifier::Name(ref n) => self.stopped_pools.read().await.get_by_name(n).is_some(),

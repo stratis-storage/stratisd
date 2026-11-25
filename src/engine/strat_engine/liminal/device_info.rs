@@ -26,7 +26,7 @@ use crate::{
             metadata::{StratisIdentifiers, BDA},
         },
         types::{
-            DevUuid, EncryptionInfo, Features, LockedPoolInfo, MaybeInconsistent, Name, PoolDevice,
+            DevUuid, EncryptionInfo, Features, MaybeInconsistent, Name, PoolDevice,
             PoolEncryptionInfo, PoolUuid, StoppedPoolInfo, StratSigblockVersion,
         },
     },
@@ -594,54 +594,6 @@ impl DeviceSet {
             )
             .map(|opt| (opt.unwrap_or(MaybeInconsistent::No(None)), None)),
         }
-    }
-
-    /// The encryption information and devices registered for locked pools to be
-    /// exported over the API. If none of the infos correspond to a Stratis managed
-    /// encrypted device, None.
-    ///
-    /// This method filters out Stratis devices that have no detected associated
-    /// LUKS2 device. This could happen for encrypted devices if the LUKS2 device
-    /// is detected after the unlocked Stratis device but should eventually become
-    /// consistent.
-    ///
-    /// Error from gather_encryption_info is converted into an option because
-    /// unlocked Stratis devices and LUKS2 devices on which the Stratis devices are
-    /// stored may appear at different times in udev. This is not necessarily
-    /// an error case and may resolve itself after more devices appear in udev.
-    pub fn locked_pool_info(&self) -> Option<LockedPoolInfo> {
-        gather_encryption_info(
-            self.internal.len(),
-            self.internal.values().map(|info| info.encryption_info()),
-        )
-        .ok()
-        .and_then(|info| info)
-        .and_then(|info| {
-            self.internal
-                .iter()
-                .map(|(uuid, l)| {
-                    let devnode = match l {
-                        LInfo::Stratis(strat_info) => {
-                            strat_info.luks.as_ref().map(|l| l.dev_info.devnode.clone())
-                        }
-                        LInfo::Luks(luks_info) => Some(luks_info.dev_info.devnode.clone()),
-                    };
-                    devnode.map(|devnode| PoolDevice {
-                        devnode,
-                        uuid: *uuid,
-                    })
-                })
-                .try_fold(Vec::new(), |mut vec, dev_info| {
-                    dev_info.map(|d| {
-                        vec.push(d);
-                        vec
-                    })
-                })
-                .map(|d| LockedPoolInfo {
-                    info: info.clone(),
-                    devices: d,
-                })
-        })
     }
 
     /// The encryption information and devices registered for stopped pools to

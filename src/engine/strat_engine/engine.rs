@@ -39,10 +39,10 @@ use crate::{
             Table,
         },
         types::{
-            CreateAction, DeleteAction, DevUuid, FilesystemUuid, InputEncryptionInfo,
-            IntegritySpec, LockedPoolsInfo, PoolDiff, PoolIdentifier, RenameAction, ReportType,
-            SetUnlockAction, StartAction, StopAction, StoppedPoolsInfo, StratFilesystemDiff,
-            TokenUnlockMethod, UdevEngineEvent, UnlockMethod, ValidatedIntegritySpec,
+            CreateAction, DeleteAction, FilesystemUuid, InputEncryptionInfo, IntegritySpec,
+            PoolDiff, PoolIdentifier, RenameAction, ReportType, StartAction, StopAction,
+            StoppedPoolsInfo, StratFilesystemDiff, TokenUnlockMethod, UdevEngineEvent,
+            ValidatedIntegritySpec,
         },
         Engine, Name, Pool, PoolUuid, Report,
     },
@@ -734,39 +734,6 @@ impl Engine for StratEngine {
         }
     }
 
-    async fn unlock_pool(
-        &self,
-        pool_uuid: PoolUuid,
-        unlock_method: UnlockMethod,
-    ) -> StratisResult<SetUnlockAction<DevUuid>> {
-        let pool_id = PoolIdentifier::Uuid(pool_uuid);
-        if let Some(lock) = self.pools.read(pool_id.clone()).await {
-            let (_, pool_uuid, pool) = lock.as_tuple();
-            if !pool.is_encrypted() {
-                return Err(StratisError::Msg(format!(
-                    "Pool with UUID {pool_uuid} is not encrypted but an attempt is being made to unlock it"
-                )));
-            } else {
-                Ok(SetUnlockAction::identity())
-            }
-        } else {
-            let mut pools = self.pools.modify_all().await;
-            let mut liminal = self.liminal_devices.write().await;
-            let unlocked_uuids = spawn_blocking!({
-                let (name, pool_uuid, pool, unlocked_uuids) = liminal.start_pool(
-                    &pools,
-                    PoolIdentifier::Uuid(pool_uuid),
-                    TokenUnlockMethod::from(Some(unlock_method)),
-                    None,
-                    false,
-                )?;
-                pools.insert(name, pool_uuid, pool);
-                StratisResult::Ok(unlocked_uuids)
-            })??;
-            Ok(SetUnlockAction::new(unlocked_uuids))
-        }
-    }
-
     async fn upgrade_pool(
         &self,
         lock: SomeLockReadGuard<PoolUuid, dyn Pool>,
@@ -786,10 +753,6 @@ impl Engine for StratEngine {
         key: PoolIdentifier<PoolUuid>,
     ) -> Option<SomeLockWriteGuard<PoolUuid, dyn Pool>> {
         self.get_mut_pool(key).await.map(|l| l.into_dyn())
-    }
-
-    async fn locked_pools(&self) -> LockedPoolsInfo {
-        self.liminal_devices.read().await.locked_pools()
     }
 
     async fn stopped_pools(&self) -> StoppedPoolsInfo {
@@ -910,7 +873,6 @@ impl Engine for StratEngine {
     async fn stop_pool(
         &self,
         pool_id: PoolIdentifier<PoolUuid>,
-        has_partially_constructed: bool,
     ) -> StratisResult<StopAction<PoolUuid>> {
         let id_str = pool_id.to_string();
 
@@ -920,18 +882,12 @@ impl Engine for StratEngine {
             PoolIdentifier::Uuid(ref u) => Some(*u),
         };
         if let Some(pool_uuid) = pool_uuid {
-            if has_partially_constructed {
-                if stopped_pools.stopped.contains_key(&pool_uuid) {
-                    return Ok(StopAction::Identity);
-                } else if stopped_pools.partially_constructed.contains_key(&pool_uuid) {
-                    let mut lim_devs = self.liminal_devices.write().await;
-                    spawn_blocking!(lim_devs.stop_partially_constructed_pool(pool_uuid))??;
-                    return Ok(StopAction::CleanedUp(pool_uuid));
-                }
-            } else if stopped_pools.stopped.contains_key(&pool_uuid)
-                || stopped_pools.partially_constructed.contains_key(&pool_uuid)
-            {
+            if stopped_pools.stopped.contains_key(&pool_uuid) {
                 return Ok(StopAction::Identity);
+            } else if stopped_pools.partially_constructed.contains_key(&pool_uuid) {
+                let mut lim_devs = self.liminal_devices.write().await;
+                spawn_blocking!(lim_devs.stop_partially_constructed_pool(pool_uuid))??;
+                return Ok(StopAction::CleanedUp(pool_uuid));
             }
         }
 
@@ -991,7 +947,9 @@ mod test {
             ns::unshare_mount_namespace,
             tests::{crypt, loopbacked, real, FailDevice},
         },
-        types::{ActionAvailability, EngineAction, KeyDescription, OptionalTokenSlotInput},
+        types::{
+            ActionAvailability, EngineAction, KeyDescription, OptionalTokenSlotInput, UnlockMethod,
+        },
     };
 
     use super::*;
@@ -1196,7 +1154,7 @@ mod test {
             .expect("Pool must be present");
 
         if let Some(cds) = cache_paths {
-            pool.init_cache(uuid, name, cds, true).unwrap();
+            pool.init_cache(uuid, name, cds).unwrap();
         }
 
         fail_device
@@ -1214,7 +1172,7 @@ mod test {
 
         fail_device.stop_failing().unwrap();
 
-        test_async!(engine.stop_pool(PoolIdentifier::Uuid(uuid), true)).unwrap();
+        test_async!(engine.stop_pool(PoolIdentifier::Uuid(uuid))).unwrap();
 
         test_async!(engine.start_pool(PoolIdentifier::Uuid(uuid), unlock_method, None, false))
             .unwrap();
@@ -1631,11 +1589,9 @@ mod test {
             .unwrap()
             .changed()
             .unwrap();
-        assert!(
-            test_async!(engine.stop_pool(PoolIdentifier::Uuid(uuid), true))
-                .unwrap()
-                .is_changed()
-        );
+        assert!(test_async!(engine.stop_pool(PoolIdentifier::Uuid(uuid)))
+            .unwrap()
+            .is_changed());
         assert_eq!(test_async!(engine.stopped_pools()).stopped.len(), 1);
         assert_eq!(test_async!(engine.pools()).len(), 0);
 

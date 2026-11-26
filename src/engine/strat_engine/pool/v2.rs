@@ -550,15 +550,8 @@ impl Pool for StratPool {
         pool_uuid: PoolUuid,
         pool_name: &str,
         blockdevs: &[&Path],
-        supports_encrypted: bool,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
         validate_paths(blockdevs)?;
-
-        if self.is_encrypted() && !supports_encrypted {
-            return Err(StratisError::Msg(
-                "Use of a cache is not supported with an encrypted pool".to_string(),
-            ));
-        }
 
         let devices = ProcessedPathInfos::try_from(blockdevs)?;
         let (stratis_devices, unowned_devices) = devices.unpack();
@@ -1612,7 +1605,7 @@ mod tests {
                 .unwrap();
         }
 
-        pool.init_cache(uuid, name, paths1, true).unwrap();
+        pool.init_cache(uuid, name, paths1).unwrap();
         invariant(&pool, name);
 
         let metadata2 = pool.record(name);
@@ -1669,7 +1662,7 @@ mod tests {
         .unwrap();
         invariant(&pool, name);
 
-        pool.init_cache(uuid, name, cache_path, true).unwrap();
+        pool.init_cache(uuid, name, cache_path).unwrap();
         invariant(&pool, name);
 
         pool.add_blockdevs(uuid, name, data_paths, BlockDevTier::Data)
@@ -2256,11 +2249,11 @@ mod tests {
                 .unwrap();
         {
             let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
-            pool.init_cache(uuid, name, &[paths[1]], true).unwrap();
+            pool.init_cache(uuid, name, &[paths[1]]).unwrap();
             assert!(pool.has_cache());
         }
 
-        test_async!(engine.stop_pool(PoolIdentifier::Uuid(uuid), true)).unwrap();
+        test_async!(engine.stop_pool(PoolIdentifier::Uuid(uuid))).unwrap();
         test_async!(engine.start_pool(
             PoolIdentifier::Uuid(uuid),
             TokenUnlockMethod::None,
@@ -2304,11 +2297,10 @@ mod tests {
             {
                 let mut pool =
                     test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
-                pool.init_cache(uuid, name, &[paths[1], paths[2]], true)
-                    .unwrap();
+                pool.init_cache(uuid, name, &[paths[1], paths[2]]).unwrap();
                 assert!(pool.has_cache());
             }
-            test_async!(engine.stop_pool(PoolIdentifier::Uuid(uuid), true)).unwrap();
+            test_async!(engine.stop_pool(PoolIdentifier::Uuid(uuid))).unwrap();
             uuid
         };
 
@@ -2433,7 +2425,7 @@ mod tests {
                 .unwrap();
         }
 
-        pool.init_cache(uuid, name, cache_paths, true).unwrap();
+        pool.init_cache(uuid, name, cache_paths).unwrap();
         invariant(&pool, name);
         assert!(pool.has_cache());
 
@@ -2536,7 +2528,7 @@ mod tests {
                 assert!(handle.is_encrypted());
             }
 
-            test_async!(engine.stop_pool(PoolIdentifier::Uuid(pool_uuid), true)).unwrap();
+            test_async!(engine.stop_pool(PoolIdentifier::Uuid(pool_uuid))).unwrap();
             test_async!(engine.start_pool(
                 PoolIdentifier::Uuid(pool_uuid),
                 TokenUnlockMethod::Any,
@@ -2611,7 +2603,7 @@ mod tests {
                 assert!(pool.is_encrypted());
             }
 
-            test_async!(engine.stop_pool(PoolIdentifier::Uuid(pool_uuid), true)).unwrap();
+            test_async!(engine.stop_pool(PoolIdentifier::Uuid(pool_uuid))).unwrap();
             test_async!(engine.start_pool(
                 PoolIdentifier::Uuid(pool_uuid),
                 TokenUnlockMethod::Any,
@@ -2684,7 +2676,7 @@ mod tests {
                 assert!(!handle.is_encrypted());
             }
 
-            test_async!(engine.stop_pool(PoolIdentifier::Uuid(pool_uuid), true)).unwrap();
+            test_async!(engine.stop_pool(PoolIdentifier::Uuid(pool_uuid))).unwrap();
             test_async!(engine.start_pool(
                 PoolIdentifier::Uuid(pool_uuid),
                 TokenUnlockMethod::None,

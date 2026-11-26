@@ -26,13 +26,12 @@ use crate::{
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
             EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo,
-            IntegritySpec, Key, KeyDescription, LockedPoolsInfo, MappingCreateAction,
-            MappingDeleteAction, Name, OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo,
-            PoolIdentifier, PoolUuid, PropChangeAction, ReencryptedDevice, RegenAction,
-            RenameAction, ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction,
-            SizedKeyMemory, StartAction, StopAction, StoppedPoolsInfo, StratBlockDevDiff,
-            StratFilesystemDiff, StratSigblockVersion, TokenUnlockMethod, UdevEngineEvent,
-            UnlockMethod,
+            IntegritySpec, Key, KeyDescription, MappingCreateAction, MappingDeleteAction, Name,
+            OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolIdentifier, PoolUuid,
+            PropChangeAction, ReencryptedDevice, RegenAction, RenameAction, ReportType,
+            SetCreateAction, SetDeleteAction, SizedKeyMemory, StartAction, StopAction,
+            StoppedPoolsInfo, StratBlockDevDiff, StratFilesystemDiff, StratSigblockVersion,
+            TokenUnlockMethod, UdevEngineEvent,
         },
     },
     stratis::StratisResult,
@@ -155,7 +154,6 @@ pub trait Pool: Debug + Send + Sync {
         pool_uuid: PoolUuid,
         pool_name: &str,
         blockdevs: &[&Path],
-        supports_encrypted: bool,
     ) -> StratisResult<SetCreateAction<DevUuid>>;
 
     /// Remove the cache tier from the pool. Tears down the dm-cache
@@ -544,18 +542,6 @@ pub trait Engine: Debug + Report + Send + Sync {
         new_name: &str,
     ) -> StratisResult<RenameAction<PoolUuid>>;
 
-    /// Unlock all encrypted devices registered under a given pool UUID.
-    /// This method returns a `Vec<DevUuid>`. This `Vec` will contain UUIDs of
-    /// devices that were newly unlocked while ignoring devices that are already
-    /// in the unlocked state. If some devices are able to be unlocked
-    /// and some fail, an error is returned as all devices should be able to
-    /// be unlocked if the necessary key is in the keyring.
-    async fn unlock_pool(
-        &self,
-        uuid: PoolUuid,
-        token_slot: UnlockMethod,
-    ) -> StratisResult<SetUnlockAction<DevUuid>>;
-
     /// Upgrade the read lock on a given pool to a write lock.
     ///
     /// This method will prioritize the given lock over all other queued operations to preserve
@@ -576,10 +562,6 @@ pub trait Engine: Debug + Report + Send + Sync {
         &self,
         key: PoolIdentifier<PoolUuid>,
     ) -> Option<SomeLockWriteGuard<PoolUuid, dyn Pool>>;
-
-    /// Get a mapping of encrypted pool UUIDs for pools that have not yet
-    /// been set up and need to be unlocked to their encryption infos.
-    async fn locked_pools(&self) -> LockedPoolsInfo;
 
     /// Get a mapping of pool UUIDs for pools that have not yet
     /// been set up and need to be started to their device infos.
@@ -631,7 +613,6 @@ pub trait Engine: Debug + Report + Send + Sync {
     async fn stop_pool(
         &self,
         pool_id: PoolIdentifier<PoolUuid>,
-        has_partially_constructed: bool,
     ) -> StratisResult<StopAction<PoolUuid>>;
 
     /// Refresh the state of all pools and liminal devices.

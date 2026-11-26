@@ -36,7 +36,7 @@ pub async fn pool_stop(
     engine: Arc<dyn Engine>,
     id: PoolIdentifier<PoolUuid>,
 ) -> StratisResult<bool> {
-    Ok(engine.stop_pool(id, true).await?.is_changed())
+    Ok(engine.stop_pool(id).await?.is_changed())
 }
 
 // stratis-min pool create
@@ -78,7 +78,7 @@ pub async fn pool_init_cache<'a>(
         .await
         .ok_or_else(|| StratisError::Msg(format!("No pool named {name} found")))?;
     let (_, uuid, pool) = guard.as_mut_tuple();
-    block_in_place(|| Ok(pool.init_cache(uuid, name, paths, true)?.is_changed()))
+    block_in_place(|| Ok(pool.init_cache(uuid, name, paths)?.is_changed()))
 }
 
 // stratis-min pool rename

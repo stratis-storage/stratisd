@@ -1,0 +1,190 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+use std::sync::Arc;
+
+use tokio::sync::RwLock;
+use zbus::{
+    fdo::Error,
+    interface,
+    zvariant::{ObjectPath, OwnedObjectPath},
+    Connection,
+};
+
+use crate::dbus::filesystem::{
+    methods::set_name_method,
+    props::{
+        created_prop, devnode_prop, merge_scheduled_prop, name_prop, origin_prop, pool_prop,
+        send_merge_scheduled_signal_on_change, send_size_limit_signal_on_change,
+        set_merge_scheduled_prop, set_size_limit_prop, size_limit_prop, size_prop, used_prop,
+    },
+};
+
+use crate::{
+    dbus::{
+        filesystem::shared::{filesystem_prop, set_filesystem_prop},
+        manager::Manager,
+    },
+    engine::{Engine, FilesystemUuid, Lockable, Name, PoolUuid},
+    stratis::StratisResult,
+};
+
+pub struct FilesystemInterface {
+    engine: Arc<dyn Engine>,
+    connection: Arc<Connection>,
+    manager: Lockable<Arc<RwLock<Manager>>>,
+    parent_uuid: PoolUuid,
+    uuid: FilesystemUuid,
+}
+
+impl FilesystemInterface {
+    fn new(
+        engine: Arc<dyn Engine>,
+        connection: Arc<Connection>,
+        manager: Lockable<Arc<RwLock<Manager>>>,
+        parent_uuid: PoolUuid,
+        uuid: FilesystemUuid,
+    ) -> Self {
+        FilesystemInterface {
+            engine,
+            connection,
+            manager,
+            parent_uuid,
+            uuid,
+        }
+    }
+
+    pub async fn register(
+        engine: Arc<dyn Engine>,
+        connection: &Arc<Connection>,
+        manager: &Lockable<Arc<RwLock<Manager>>>,
+        path: ObjectPath<'_>,
+        parent_uuid: PoolUuid,
+        uuid: FilesystemUuid,
+    ) -> StratisResult<()> {
+        let filesystem = Self::new(
+            engine,
+            Arc::clone(connection),
+            manager.clone(),
+            parent_uuid,
+            uuid,
+        );
+
+        connection.object_server().at(path, filesystem).await?;
+        Ok(())
+    }
+
+    pub async fn unregister(
+        connection: &Arc<Connection>,
+        path: ObjectPath<'_>,
+    ) -> StratisResult<()> {
+        connection
+            .object_server()
+            .remove::<FilesystemInterface, _>(path)
+            .await?;
+        Ok(())
+    }
+}
+
+#[interface(name = "org.storage.stratis3.filesystem", introspection_docs = false)]
+impl FilesystemInterface {
+    #[zbus(out_args("result", "return_code", "return_string"))]
+    async fn set_name(&self, name: &str) -> ((bool, String), u16, String) {
+        set_name_method(
+            &self.engine,
+            &self.connection,
+            &self.manager,
+            self.parent_uuid,
+            self.uuid,
+            name,
+        )
+        .await
+    }
+
+    #[zbus(property(emits_changed_signal = "const"))]
+    async fn created(&self) -> Result<String, Error> {
+        filesystem_prop(&self.engine, self.parent_uuid, self.uuid, created_prop).await
+    }
+
+    #[zbus(property(emits_changed_signal = "invalidates"))]
+    async fn devnode(&self) -> Result<String, Error> {
+        filesystem_prop(&self.engine, self.parent_uuid, self.uuid, devnode_prop).await
+    }
+
+    #[zbus(property)]
+    async fn merge_scheduled(&self) -> Result<bool, Error> {
+        filesystem_prop(
+            &self.engine,
+            self.parent_uuid,
+            self.uuid,
+            merge_scheduled_prop,
+        )
+        .await
+    }
+
+    #[zbus(property)]
+    async fn set_merge_scheduled(&self, value: bool) -> Result<(), Error> {
+        set_filesystem_prop(
+            &self.engine,
+            &self.connection,
+            &self.manager,
+            self.parent_uuid,
+            self.uuid,
+            value,
+            set_merge_scheduled_prop,
+            send_merge_scheduled_signal_on_change,
+        )
+        .await
+    }
+
+    #[zbus(property)]
+    async fn name(&self) -> Result<Name, Error> {
+        filesystem_prop(&self.engine, self.parent_uuid, self.uuid, name_prop).await
+    }
+
+    #[zbus(property)]
+    async fn origin(&self) -> Result<(bool, String), Error> {
+        filesystem_prop(&self.engine, self.parent_uuid, self.uuid, origin_prop).await
+    }
+
+    #[zbus(property(emits_changed_signal = "const"))]
+    async fn pool(&self) -> Result<OwnedObjectPath, Error> {
+        pool_prop(self.manager.read().await, self.parent_uuid)
+    }
+
+    #[zbus(property)]
+    async fn size(&self) -> Result<String, Error> {
+        filesystem_prop(&self.engine, self.parent_uuid, self.uuid, size_prop).await
+    }
+
+    #[zbus(property)]
+    async fn size_limit(&self) -> Result<(bool, String), Error> {
+        filesystem_prop(&self.engine, self.parent_uuid, self.uuid, size_limit_prop).await
+    }
+
+    #[zbus(property)]
+    async fn set_size_limit(&self, value: (bool, String)) -> Result<(), Error> {
+        set_filesystem_prop(
+            &self.engine,
+            &self.connection,
+            &self.manager,
+            self.parent_uuid,
+            self.uuid,
+            value,
+            set_size_limit_prop,
+            send_size_limit_signal_on_change,
+        )
+        .await
+    }
+
+    #[zbus(property)]
+    async fn used(&self) -> Result<(bool, String), Error> {
+        filesystem_prop(&self.engine, self.parent_uuid, self.uuid, used_prop).await
+    }
+
+    #[zbus(property(emits_changed_signal = "const"))]
+    fn uuid(&self) -> String {
+        self.uuid.simple().to_string()
+    }
+}

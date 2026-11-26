@@ -18,14 +18,11 @@ use zbus::{
     zvariant::OwnedValue,
 };
 
-const REVISION_NUMBER: &str = env!("CARGO_PKG_VERSION_MINOR");
 const BUS_NAME: &str = "org.storage.stratis3";
 const TOP_OBJECT: &str = "/org/storage/stratis3";
 
-static POOL_INTERFACE: LazyLock<String> =
-    LazyLock::new(|| format!("{BUS_NAME}.pool.r{REVISION_NUMBER}"));
-static FILESYSTEM_INTERFACE: LazyLock<String> =
-    LazyLock::new(|| format!("{BUS_NAME}.filesystem.r{REVISION_NUMBER}"));
+static POOL_INTERFACE: LazyLock<String> = LazyLock::new(|| format!("{BUS_NAME}.pool"));
+static FILESYSTEM_INTERFACE: LazyLock<String> = LazyLock::new(|| format!("{BUS_NAME}.filesystem"));
 
 // Get managed objects for Stratis.
 fn get_managed_objects() -> Result<ManagedObjects, Error> {
